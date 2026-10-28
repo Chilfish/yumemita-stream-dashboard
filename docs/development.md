@@ -37,6 +37,7 @@ src/
 │  ├─ data.ts       fetch / 并发加载
 │  ├─ aggregate.ts  合并、聚合、找极值
 │  ├─ routes.ts     URL 构造与对比 id 解析
+│  ├─ table-params.ts 数据表 URL 参数解析/序列化
 │  └─ format.ts     数字 / 时间 / 币种格式化
 ├─ hooks/           异步状态、主题、尺寸
 ├─ pages/           路由页面（数据 ↔ 视图 ↔ navigate）
@@ -84,14 +85,16 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 - `Select` 用 **items-first**：`<Select items={items}>` + `<SelectItem value={item}>`；不要沿用 Radix 的纯 children 写法。
 - `Button` 默认 `type="button"`；表单里要显式写 `type`。
-- `Table` 自身不带排序/分页；排序在 `table-view.tsx` 里用 React state 实现。
+- `Table` 自身不带排序/分页；数据表的筛选/排序状态存在 URL 里，由 `table-page.tsx` + `lib/table-params.ts` 管理，`table-view.tsx` 是受控组件。
 - 导航用 `SidebarMenuButton render={<NavLink to={...} />}`；active 状态自己算好传给 `isActive`，不要给 `NavLink` 传函数式 `className`。
 - 侧边栏折叠样式靠祖先的 `group-data-[collapsible=icon]`；只在折叠时隐藏的内容加这个 class。
 
 ## 路由
 
 - 使用 React Router v8 的 **hash 路由**（`createHashRouter`），静态托管/子路径不需要服务端回退。
-- URL 形态：`#/:datasetId/<view>`；单场是 `#/:datasetId/stream/:videoId`，对比是 `#/:datasetId/compare?ids=a,b,c`。
+- URL 形态：`#/:datasetId/<view>`；单场是 `#/:datasetId/stream/:videoId`，对比是 `#/:datasetId/compare?ids=a,b,c`，数据表是 `#/:datasetId/table?q=&sort=&dir=&vstats=`。
+- 表格参数用 `parseTableParams` / `writeTableParams`（`lib/table-params.ts`），默认值不写入 URL，更新用 `replace: true`。
+- 根路由与 `:datasetId` 有 `errorElement`（`route-error.tsx`）；新页面不需要单独加错误兜底。
 - `src/pages/` 只做三件事：取 `useDatasetView()` 数据、调用 `navigate`、渲染 `dashboard/` 里的视图。
 - 页面按路由 `lazy()`（`src/pages/lazy-pages.tsx`），`DatasetLayout` 用 `Suspense` 包住 `Outlet`。
 - 数据只在 `DatasetLayout` 加载一次，路由切换不会重复请求 datapack。
@@ -159,6 +162,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 - `src/lib/format.test.ts`：格式化边界（null、时长、币种、JST）。
 - `src/lib/aggregate.test.ts`：合并、合计、币种排序、Top 词/作者、最佳场次、峰值分钟。
+- `src/lib/table-params.test.ts`：表格 URL 参数的默认值、非法值回退、序列化与往返。
 - 组件不强制单测；交互复杂时再加 `@testing-library/react`。
 
 ```bash

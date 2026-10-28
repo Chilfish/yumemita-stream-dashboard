@@ -4,13 +4,10 @@
 
 按优先级排列，都可以在现有分层上增量完成；下面各节是更长期的数据/分析/体验/工程 backlog。
 
-1. **表格筛选写 URL**：`q` / `sort` / `dir` / `vstats` 进 `useSearchParams`，筛选后的视图可分享、可刷新；同步更新 `docs/architecture.md` 的 URL 表。
-2. **复制深链按钮**：单场和对比页提供「复制链接」，复用当前 hash URL，不需要后端。
-3. **路由错误边界**：给 `:datasetId` 和 lazy 页面加 `errorElement` / 错误兜底，渲染异常不要整页白屏。
-4. **移动端回归**：375px 下检查侧栏 Sheet、数据表横向滚动、图表触控 tooltip。
-5. **单场按需加载**：先渲染 manifest 摘要，打开某场再 fetch 该 datapack；当前一次加载 30 份约 1 MB。
-6. **路由冒烟测试**：agent-browser 覆盖首页重定向、单场深链刷新、无效 id、对比 `?ids=`、前进后退。
-7. **键盘快捷键**：`j` / `k` 切场、`1`–`5` 切页面、`/` 聚焦搜索；侧栏 `Ctrl/Cmd+B` 已内置。
+1. **移动端回归**：375px 下检查侧栏 Sheet、数据表横向滚动、图表触控 tooltip。
+2. **单场按需加载**：先渲染 manifest 摘要，打开某场再 fetch 该 datapack；当前一次加载 30 份约 1 MB。
+3. **路由冒烟测试**：agent-browser 覆盖首页重定向、单场深链刷新、无效 id、对比 `?ids=`、前进后退。
+4. **键盘快捷键**：`j` / `k` 切场、`1`–`5` 切页面、`/` 聚焦搜索；侧栏 `Ctrl/Cmd+B` 已内置。
 
 ## 数据
 
@@ -34,6 +31,8 @@
 
 - [x] URL 状态：`#/:datasetId/stream/:videoId`，单场与对比选择可分享、可前进后退。
 - [x] 侧边栏导航（可折叠，移动端 Sheet），数据加载一次不随路由重复请求。
+- [x] 数据表筛选写 URL：`q` / `sort` / `dir` / `vstats` 随 hash 路由保存，刷新与分享可还原。
+- [x] 复制深链：单场与对比页的「复制链接」按钮，复制当前 hash URL（含查询参数）。
 - [ ] 图表导出 PNG/SVG。
 - [ ] 日历热力图：按日期看更新频率与热度。
 - [ ] 键盘快捷键：切换场次、页面、对比选择。
@@ -45,6 +44,7 @@
 - [ ] 用 zod / valibot 做运行时 schema 校验，替代手写 `validate-data.mjs` 的一部分。
 - [ ] 数据 schema 版本迁移：`v1 → v2` 的兼容层。
 - [x] 按路由 `React.lazy()` 拆包，降低首屏 JS。
+- [x] 路由错误边界：根路由与 `:datasetId` 的 `errorElement`，渲染或懒加载异常有兜底与重试。
 - [ ] Playwright / agent-browser 冒烟测试：加载首页、切换页面、打开单场。
 - [ ] Lighthouse / 可访问性审计。
 - [ ] 部署 workflow（GitHub Pages / Netlify），并处理 `data/*.json` 的缓存头。

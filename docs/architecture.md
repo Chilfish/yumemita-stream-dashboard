@@ -30,6 +30,7 @@
                         │ fetch（浏览器）
 ┌───────────────────────▼─────────────────────────────────┐
 │ src/lib/data.ts          只负责请求与并发控制            │
+│ src/lib/table-params.ts  数据表 URL 参数解析/序列化       │
 │ src/hooks/               useDatasetIndex / useDataset    │
 └───────────────────────┬─────────────────────────────────┘
                         │ StreamDatapack Map
@@ -79,10 +80,12 @@
 | `#/:datasetId/stream` | 跳转到最新一场 |
 | `#/:datasetId/stream/:videoId` | 单场 |
 | `#/:datasetId/compare?ids=a,b,c` | 对比，最多 4 场 |
-| `#/:datasetId/table` | 数据表 |
+| `#/:datasetId/table?q=&sort=&dir=&vstats=` | 数据表；筛选/排序状态可分享 |
 | `#/:datasetId/about` | 说明 |
 
-路由表在 `src/router.tsx`；`src/pages/` 是薄包装层：从 `useDatasetView()` 取数据、把导航动作接到 `navigate`，视图组件本身不依赖 router。
+路由表在 `src/router.tsx`，根路由与 `:datasetId` 都配置了 `errorElement`（`route-error.tsx`），渲染或懒加载异常会显示兜底页而不是白屏。`src/pages/` 是薄包装层：从 `useDatasetView()` 取数据、把导航动作接到 `navigate`，视图组件本身不依赖 router。
+
+数据表的查询参数由 `src/lib/table-params.ts` 解析/序列化：`q` 搜索词、`sort` 排序字段、`dir` 方向（`asc`/`desc`）、`vstats=1` 只看有 VSTATS 的场次。默认值不写进 URL，参数变化用 `replace`，避免输入搜索词时污染历史记录。
 
 ## 状态管理
 
@@ -90,9 +93,9 @@
 
 | 状态 | 位置 | 说明 |
 | --- | --- | --- |
-| dataset、当前页面、选中场次、对比选择 | URL（React Router） | 可分享、可刷新、可前进后退 |
+| dataset、当前页面、选中场次、对比选择、表格筛选/排序 | URL（React Router） | 可分享、可刷新、可前进后退 |
 | 数据加载状态 | `useDatasetIndex` / `useDataset` | 在 `DatasetLayout` 加载一次，路由切换不重复请求 |
-| 表格搜索/排序、图表 hover | 各组件内部 | 仅本页使用，不跨组件共享 |
+| 图表 hover、复制成功提示 | 各组件内部 | 仅本页使用，不跨组件共享 |
 
 选这个方案的原因：数据量小（30 场约 1 MB），页面结构简单，引入全局 store 只会增加理解成本。
 
@@ -132,6 +135,8 @@ src/components/dashboard/
   stream-picker.tsx   单场选择器
   stream-table.tsx    场次表格
   sc-table.tsx        SC 明细表
+  copy-link-button.tsx 复制当前深链
+  route-error.tsx     路由错误兜底页
 ```
 
 ```text
