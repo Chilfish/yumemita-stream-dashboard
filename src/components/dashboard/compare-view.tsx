@@ -113,7 +113,7 @@ export function CompareView({
           </CardAction>
         </CardHeader>
         <CardPanel className="pt-0">
-          <ScrollArea className="h-[560px] rounded-lg border">
+          <ScrollArea className="h-72 rounded-lg border sm:h-[560px]">
             <div className="flex flex-col gap-0.5 p-1.5">
               {rows.map(row => {
                 const checked = selectedIds.includes(row.videoId);

@@ -40,7 +40,7 @@ export function StreamPicker({ rows, selectedId, onSelect }: StreamPickerProps) 
         />
       </div>
 
-      <ScrollArea className="h-[560px] rounded-lg border">
+      <ScrollArea className="h-64 rounded-lg border sm:h-[560px]">
         <div className="flex flex-col gap-1 p-1.5">
           {filtered.map(row => {
             const selected = row.videoId === selectedId;

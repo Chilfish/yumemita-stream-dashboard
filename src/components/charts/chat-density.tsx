@@ -1,5 +1,6 @@
 import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
 import { useState } from "react";
+import type { PointerEvent } from "react";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { AxisLabel, YAxis } from "@/components/charts/axis";
@@ -8,6 +9,16 @@ import { formatCompact, formatMinuteOffset } from "@/lib/format";
 
 interface ChatDensityProps {
   row: StreamRow;
+}
+
+function pointerHoverIndex(
+  event: PointerEvent<SVGRectElement>,
+  scale: { invert: (value: number) => number },
+  length: number,
+): number {
+  const bounds = event.currentTarget.getBoundingClientRect();
+  const index = Math.round(scale.invert(event.clientX - bounds.left));
+  return Math.min(Math.max(index, 0), Math.max(0, length - 1));
 }
 
 export function ChatDensity({ row }: ChatDensityProps) {
@@ -140,13 +151,11 @@ export function ChatDensity({ row }: ChatDensityProps) {
             <rect
               fill="transparent"
               height={scTop + scStripHeight}
-              onMouseLeave={() => setHover(null)}
-              onMouseMove={event => {
-                const bounds = event.currentTarget.getBoundingClientRect();
-                const relative = event.clientX - bounds.left;
-                const index = Math.round(x.invert(relative));
-                setHover(Math.min(Math.max(index, 0), perMinute.length - 1));
-              }}
+              onPointerCancel={() => setHover(null)}
+              onPointerDown={event => setHover(pointerHoverIndex(event, x, perMinute.length))}
+              onPointerLeave={() => setHover(null)}
+              onPointerMove={event => setHover(pointerHoverIndex(event, x, perMinute.length))}
+              style={{ touchAction: "pan-y" }}
               width={innerWidth}
               x={0}
               y={0}
