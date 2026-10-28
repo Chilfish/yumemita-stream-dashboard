@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useDataset } from "@/hooks/use-dataset";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useTheme } from "@/hooks/use-theme";
 import { buildSummaryRows, findStreamSummary } from "@/lib/aggregate";
 import { sectionFromPathname, viewPath } from "@/lib/routes";
@@ -25,6 +26,8 @@ export function DatasetLayout() {
   const { manifest, totals, status, error } = useDataset(dataset?.id ?? null);
 
   const rows = useMemo(() => (manifest ? buildSummaryRows(manifest) : []), [manifest]);
+
+  useKeyboardShortcuts({ datasetId: dataset?.id ?? null, rows });
 
   if (!dataset) {
     return <Navigate replace to={viewPath(index.datasets[0].id, "overview")} />;

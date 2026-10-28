@@ -2,7 +2,9 @@ import { Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card";
+import { Kbd } from "@/components/ui/kbd";
 import { formatDateTime } from "@/lib/format";
+import { SHORTCUTS } from "@/lib/keyboard";
 import type { BatchManifest, DatasetIndexEntry } from "@/types/dataset";
 
 interface AboutViewProps {
@@ -101,6 +103,28 @@ bun run dev            # http://localhost:5173`}
           </ol>
           <p className="text-muted-foreground text-xs">
             更细的步骤见 <code>docs/adding-data.md</code>。
+          </p>
+        </CardPanel>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>键盘快捷键</CardTitle>
+          <CardDescription>不用离开键盘就能翻场和切换页面。</CardDescription>
+        </CardHeader>
+        <CardPanel className="flex flex-col gap-3 pt-0">
+          <dl className="flex flex-col gap-2 text-xs">
+            {SHORTCUTS.map(shortcut => (
+              <div className="flex items-center justify-between gap-3" key={shortcut.keys}>
+                <dt>
+                  <Kbd>{shortcut.keys}</Kbd>
+                </dt>
+                <dd className="text-muted-foreground">{shortcut.label}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-muted-foreground text-xs">
+            在输入框、文本域或下拉框里输入时，快捷键会被忽略。
           </p>
         </CardPanel>
       </Card>
