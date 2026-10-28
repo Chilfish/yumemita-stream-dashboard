@@ -81,24 +81,24 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 ### 本页用到的组件
 
-`Card` / `CardHeader` / `CardTitle` / `CardDescription` / `CardPanel` / `CardAction`、`Sidebar` 系列、`Breadcrumb`、`Table`、`Select`、`Badge`、`Button`、`Checkbox`、`Label`、`Input`、`ScrollArea`、`Alert`、`Skeleton`。
+`Sidebar` 系列、`Breadcrumb`、`Table`、`Badge`、`Button`、`Checkbox`、`Label`、`Input`、`ScrollArea`、`Alert`、`Skeleton`、`SegmentedControl`、`ToggleGroup`、`Meter`、`Kbd`、`Sheet`、`Tooltip`。
 
 ### 常见坑
 
 - `Select` 用 **items-first**：`<Select items={items}>` + `<SelectItem value={item}>`；不要沿用 Radix 的纯 children 写法。
 - `Button` 默认 `type="button"`；表单里要显式写 `type`。
-- `Table` 自身不带排序/分页；数据表的筛选/排序状态存在 URL 里，由 `table-page.tsx` + `lib/table-params.ts` 管理，`table-view.tsx` 是受控组件。
+- `Table` 自身不带排序/分页；场次表的筛选/排序状态存在 URL 里，由 `streams-page.tsx` + `lib/table-params.ts` 管理，`streams-view.tsx` + `dashboard/data-table.tsx` 是受控视图。
 - 导航用 `SidebarMenuButton render={<NavLink to={...} />}`；active 状态自己算好传给 `isActive`，不要给 `NavLink` 传函数式 `className`。
 - 侧边栏折叠样式靠祖先的 `group-data-[collapsible=icon]`；只在折叠时隐藏的内容加这个 class。
 
 ## 路由
 
 - 使用 React Router v8 的 **hash 路由**（`createHashRouter`），静态托管/子路径不需要服务端回退。
-- URL 形态：`#/:datasetId/<view>`；单场是 `#/:datasetId/stream/:videoId`，对比是 `#/:datasetId/compare?ids=a,b,c`，数据表是 `#/:datasetId/table?q=&sort=&dir=&vstats=`。
+- URL 形态：`#/:id` 成员首页、`#/:id/streams?q=&type=&sort=&dir=&vstats=` 场次页、`#/:id/stream/:videoId?view=` 单场、`#/:id/compare?ids=a,b,c` 对比、`#/:id/about` 说明；旧地址 `#/:id/overview`、`#/:id/table` 自动重定向。
 - 表格参数用 `parseTableParams` / `writeTableParams`（`lib/table-params.ts`），默认值不写入 URL，更新用 `replace: true`。
 - 根路由与 `:datasetId` 有 `errorElement`（`route-error.tsx`）；新页面不需要单独加错误兜底。
 - `DatasetLayout` 只加载 manifest + `insights.json`；列表页不下载 datapack。单场和对比用 `useStreamPacks` 按需拉取，缓存由 `lib/data.ts` 负责。
-- 全局快捷键在 `hooks/use-keyboard-shortcuts.ts`：`j` / `k` 翻场、`1`–`5` 切页面、`/` 聚焦搜索；输入框内自动忽略。
+- 全局快捷键在 `hooks/use-keyboard-shortcuts.ts`：`j` / `k` 翻场、`1`–`5` 切页面、`/` 聚焦搜索、`⌘K` 搜索场次与成员、`⌘B` 收起/展开侧栏；除 `⌘K` 外，输入框内自动忽略。
 - `src/pages/` 只做三件事：取 `useDatasetView()` 数据、调用 `navigate`、渲染 `dashboard/` 里的视图。
 - 页面按路由 `lazy()`（`src/pages/lazy-pages.tsx`），`DatasetLayout` 用 `Suspense` 包住 `Outlet`。
 
@@ -146,6 +146,9 @@ bunx --bun shadcn@latest add @coss/ui -y
 | `top-bars.tsx` | 横向 Top 排行（词/发言者/徽章） |
 | `multi-line-chart.tsx` | 多场逐分钟弹幕叠加 |
 | `stream-shape.tsx` | 全部场次按直播进度对齐的典型节奏曲线（含 25–75 分位带） |
+| `sparkline.tsx` | 迷你曲线 / 面积，供首页与行内复用 |
+| `stream-timeline.tsx` | 单场双轨时间轴：弹幕面积 + SC 刻度 + 悬停读数 |
+| `chart-frame.tsx` | 无卡片图表容器：标题 + 口径 + 动作 |
 
 ## 加一个路由页面
 
@@ -168,7 +171,9 @@ bunx --bun shadcn@latest add @coss/ui -y
 - `src/lib/format.test.ts`：格式化边界（null、时长、币种、JST）。
 - `src/lib/aggregate.test.ts`：合并、合计、币种排序、Top 词/作者、最佳场次、峰值分钟。
 - `src/lib/table-params.test.ts`：表格 URL 参数的默认值、非法值回退、序列化与往返。
-- `src/lib/keyboard.test.ts`：快捷键的邻居索引与输入框判定。
+- `src/lib/keyboard.test.ts`：快捷键的邻居索引、输入框判定与 ⌘K 判定。
+- `src/lib/classify.test.ts`：标题类型规则与未匹配回退。
+- `src/lib/routes.test.ts`：路由构造、子视图解析、对比 id 解析。
 - 路由冒烟：`bun run test:smoke`（先启动 dev/preview，可通过 `--url` / `BASE_URL` 指定地址）。
 - 组件不强制单测；交互复杂时再加 `@testing-library/react`。
 
@@ -182,7 +187,7 @@ bun run test:watch
 - `tsc -b` 使用 project references：`tsconfig.app.json`（src）+ `tsconfig.node.json`（vite.config）。
 - TypeScript 7 已移除 `baseUrl`；路径别名只写在 `paths`，相对于 tsconfig 解析。
 - 构建产物：`dist/`；数据在 `dist/data/`。
-- 当前主包约 447 KB（gzip ~144 KB），主要来自 D3 + Base UI；视图已按路由 `lazy()` 拆包。
+- 当前主包约 349 KB（gzip ~112 KB），主要来自 D3 + Base UI；视图已按路由 `lazy()` 拆包。
 
 ## 提交前
 

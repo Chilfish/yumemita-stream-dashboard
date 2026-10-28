@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { SHORTCUTS, isEditableElement, streamNeighborIndex } from "./keyboard";
+import {
+  SHORTCUTS,
+  isCommandPaletteShortcut,
+  isEditableElement,
+  streamNeighborIndex,
+} from "./keyboard";
 
 describe("streamNeighborIndex", () => {
   it("moves to the older neighbour with delta 1", () => {
@@ -55,13 +60,35 @@ describe("isEditableElement", () => {
   });
 });
 
+describe("isCommandPaletteShortcut", () => {
+  it("accepts Command+K and Ctrl+K", () => {
+    expect(isCommandPaletteShortcut({ key: "k", metaKey: true })).toBe(true);
+    expect(isCommandPaletteShortcut({ key: "K", ctrlKey: true })).toBe(true);
+  });
+
+  it("rejects plain k, other keys and Alt combinations", () => {
+    expect(isCommandPaletteShortcut({ key: "k" })).toBe(false);
+    expect(isCommandPaletteShortcut({ key: "j", metaKey: true })).toBe(false);
+    expect(isCommandPaletteShortcut({ key: "k", metaKey: true, altKey: true })).toBe(false);
+    expect(isCommandPaletteShortcut({ key: "k", ctrlKey: false, metaKey: false })).toBe(false);
+  });
+});
+
 describe("SHORTCUTS", () => {
-  it("lists the three bindings in display order", () => {
-    expect(SHORTCUTS.map(shortcut => shortcut.keys)).toEqual(["j / k", "1–5", "/"]);
+  it("lists the five bindings in display order", () => {
+    expect(SHORTCUTS.map(shortcut => shortcut.keys)).toEqual([
+      "j / k",
+      "1–5",
+      "/",
+      "⌘K",
+      "⌘B",
+    ]);
     expect(SHORTCUTS.map(shortcut => shortcut.label)).toEqual([
       "下一场（更旧）/ 上一场（更新）",
       "切换页面",
       "聚焦搜索",
+      "搜索场次与成员",
+      "收起 / 展开侧栏",
     ]);
   });
 });

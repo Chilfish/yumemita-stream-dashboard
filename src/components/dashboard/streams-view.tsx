@@ -330,6 +330,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
           >
             <DataTable
               ariaLabel="场次列表"
+              className="min-w-[1080px]"
               columns={columns}
               onSort={handleSort}
               rowHref={row => streamPath(datasetId, row.videoId)}
@@ -337,6 +338,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
               rowLabel={row => `打开 ${row.title}`}
               rows={visible}
               sort={{ key: sort, dir }}
+              stickyFirstColumn
               stickyHeader
             />
           </div>

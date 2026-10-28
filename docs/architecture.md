@@ -126,19 +126,28 @@
 src/components/dashboard/
   dataset-layout.tsx   Sidebar + Header + 数据加载 + Outlet
   dataset-index-gate.tsx  索引加载/错误门禁 + context
-  app-sidebar.tsx     侧边导航：品牌、dataset 选择、页面、主题
-  app-header.tsx      顶栏：折叠按钮、面包屑、场次统计
+  app-sidebar.tsx     侧边导航：品牌、成员列表、页面、主题
+  app-header.tsx      顶栏：折叠按钮、面包屑、⌘K 搜索、场次统计
   dataset-view-context.ts  页面共享 rows / totals
   loading-screen.tsx  加载骨架屏
-  kpi-grid.tsx        6 个 KPI 卡
-  overview-view.tsx   总览
-  stream-view.tsx     单场（左侧选择器 + 右侧详情）
+  panel.tsx           Panel / PanelHead / PanelBody / PanelNote / SplitPanel
+  page-header.tsx     页面头（标题 + facts + actions）
+  metric-strip.tsx    6 / 4 项指标条
+  delta.tsx           环比变化
+  data-table.tsx      列定义驱动的表格（排序、吸附首列、行链接）
+  member-home-view.tsx  L1 成员首页
+  home-latest-stream.tsx / home-month-panel.tsx / home-recent-streams.tsx
+  home-content-mix.tsx / home-meter-row.tsx / home-top-words.tsx / home-top-authors.tsx
+  streams-view.tsx    L2 场次页（表格 + 工具条）
+  streams-toolbar.tsx 搜索、类型筛选、仅有 VSTATS、导出 CSV、移动端筛选 Sheet
+  stream-detail-view.tsx  L3 单场详情 + 分段控件
+  stream-overview-panel.tsx / stream-timeline-panel.tsx
+  stream-words-panel.tsx / stream-paid-panel.tsx / stream-comments-panel.tsx
   compare-view.tsx    对比（最多 4 场，受控选择）
-  table-view.tsx      数据表（搜索/排序/筛选/CSV）
-  about-view.tsx      口径与更新说明
-  stream-picker.tsx   单场选择器
-  stream-table.tsx    场次表格
-  sc-table.tsx        SC 明细表
+  about-view.tsx      口径、限制与更新说明
+  mobile-tab-bar.tsx  移动端底部标签栏
+  member-sheet.tsx    移动端成员 Sheet
+  command-palette.tsx ⌘K 搜索场次与成员
   copy-link-button.tsx 复制当前深链
   route-error.tsx     路由错误兜底页
 ```
@@ -146,16 +155,19 @@ src/components/dashboard/
 ```text
 src/pages/
   lazy-pages.tsx      路由级 lazy() 包装
-  home-redirect.tsx   重定向到首个 dataset
-  overview-page.tsx / stream-index-page.tsx / stream-page.tsx
-  compare-page.tsx / table-page.tsx / about-page.tsx
+  home-redirect.tsx   重定向到上次访问 / 首个 dataset
+  home-page.tsx / streams-page.tsx / stream-index-page.tsx
+  stream-page.tsx / compare-page.tsx / about-page.tsx
+  legacy-redirects.tsx 旧 overview / table 地址重定向
 ```
 
 ```text
 src/components/charts/
   chart-canvas.tsx    响应式 SVG 容器
   chart-card.tsx      Card 包装 + 空状态
+  chart-frame.tsx     无卡片图表容器（标题 + 口径 + 动作）
   axis.tsx            网格线 / 刻度 / 轴标题
+  sparkline.tsx       迷你曲线 / 面积，供首页与行内复用
   stream-bars.tsx     每场平均/最大同接
   chat-density.tsx    逐分钟弹幕 + SC 条 + hover
   ten-minute-bars.tsx 每 10 分钟分布
@@ -164,6 +176,7 @@ src/components/charts/
   top-bars.tsx        横向 Top 排行
   multi-line-chart.tsx 多场逐分钟叠加
   stream-shape.tsx    典型节奏曲线（按进度对齐 + 分位带）
+  stream-timeline.tsx 单场双轨时间轴（弹幕面积 + SC 刻度 + 悬停读数）
 ```
 
 ## 扩展点

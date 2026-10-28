@@ -32,6 +32,7 @@ export interface DataTableProps<T> {
   rowLabel?: (row: T) => string;
   empty?: ReactNode;
   stickyHeader?: boolean;
+  stickyFirstColumn?: boolean;
   className?: string;
   ariaLabel?: string;
 }
@@ -53,6 +54,7 @@ export function DataTable<T>({
   rowLabel,
   empty,
   stickyHeader,
+  stickyFirstColumn,
   className,
   ariaLabel,
 }: DataTableProps<T>) {
@@ -60,7 +62,7 @@ export function DataTable<T>({
     <Table aria-label={ariaLabel} className={className}>
       <TableHeader>
         <TableRow>
-          {columns.map(column => {
+          {columns.map((column, columnIndex) => {
             const active = sort?.key === column.key;
             const sortable = onSort !== undefined && column.sortable === true;
 
@@ -70,6 +72,9 @@ export function DataTable<T>({
                 className={cn(
                   "group text-footnote",
                   stickyHeader && "sticky top-14 z-10 bg-card",
+                  stickyFirstColumn &&
+                    columnIndex === 0 &&
+                    "sticky left-0 z-20 border-e border-hairline bg-card",
                   column.align === "right" && "text-right",
                   column.headerClassName,
                 )}
@@ -113,10 +118,13 @@ export function DataTable<T>({
 
             return (
               <TableRow className="h-[33px] border-b-0" key={rowKey(row)}>
-                {columns.map(column => (
+                {columns.map((column, columnIndex) => (
                   <TableCell
                     className={cn(
                       "py-2 text-footnote",
+                      stickyFirstColumn &&
+                        columnIndex === 0 &&
+                        "sticky left-0 z-10 border-e border-hairline bg-card",
                       column.align === "right" && "text-right tabular-nums",
                       column.cellClassName,
                     )}
@@ -129,7 +137,7 @@ export function DataTable<T>({
                   <TableCell className="w-0 p-0">
                     <Link
                       aria-label={rowLabel?.(row) ?? "打开详情"}
-                      className="absolute inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-member"
+                      className="absolute inset-0 z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-member"
                       to={href}
                     />
                   </TableCell>

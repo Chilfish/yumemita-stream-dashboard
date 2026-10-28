@@ -1,12 +1,17 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { isEditableElement, streamNeighborIndex } from "@/lib/keyboard";
+import {
+  isCommandPaletteShortcut,
+  isEditableElement,
+  streamNeighborIndex,
+} from "@/lib/keyboard";
 import { VIEWS, sectionFromPathname, streamPath, viewPath } from "@/lib/routes";
 import type { StreamSummary } from "@/types/dataset";
 
 interface UseKeyboardShortcutsOptions {
   datasetId: string | null;
   rows: StreamSummary[];
+  onCommandPalette?: () => void;
 }
 
 const VIEW_KEYS = ["1", "2", "3", "4", "5"] as const;
@@ -31,13 +36,25 @@ function firstVisibleSearchInput(): HTMLInputElement | null {
   return null;
 }
 
-export function useKeyboardShortcuts({ datasetId, rows }: UseKeyboardShortcutsOptions): void {
+export function useKeyboardShortcuts({
+  datasetId,
+  rows,
+  onCommandPalette,
+}: UseKeyboardShortcutsOptions): void {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.defaultPrevented) return;
+
+      if (isCommandPaletteShortcut(event)) {
+        if (!datasetId) return;
+        event.preventDefault();
+        onCommandPalette?.();
+        return;
+      }
+
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (isEditableElement(event.target)) return;
       if (!datasetId) return;
@@ -86,5 +103,5 @@ export function useKeyboardShortcuts({ datasetId, rows }: UseKeyboardShortcutsOp
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [datasetId, navigate, pathname, rows]);
+  }, [datasetId, navigate, onCommandPalette, pathname, rows]);
 }

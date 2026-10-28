@@ -7,7 +7,22 @@ export const SHORTCUTS: readonly ShortcutHint[] = [
   { keys: "j / k", label: "下一场（更旧）/ 上一场（更新）" },
   { keys: "1–5", label: "切换页面" },
   { keys: "/", label: "聚焦搜索" },
+  { keys: "⌘K", label: "搜索场次与成员" },
+  { keys: "⌘B", label: "收起 / 展开侧栏" },
 ];
+
+export function isCommandPaletteShortcut(event: {
+  key: string;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+}): boolean {
+  return (
+    (event.metaKey === true || event.ctrlKey === true) &&
+    event.altKey !== true &&
+    event.key.toLowerCase() === "k"
+  );
+}
 
 const EDITABLE_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 
