@@ -52,6 +52,7 @@ export interface BatchManifest {
 export interface DatasetIndexEntry {
   id: string;
   label: string;
+  color?: string | null;
   channelId: string | null;
   count: number;
   generatedAt: string | null;

@@ -46,7 +46,7 @@ export function RouteError() {
   const error = useRouteError();
   const { datasetId } = useParams();
   const { detail, stack } = describeError(error);
-  const overviewPath = datasetId ? viewPath(datasetId, "overview") : "/";
+  const overviewPath = datasetId ? viewPath(datasetId, "home") : "/";
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-4 py-16">

@@ -11,7 +11,7 @@ import type { DatasetTotals } from "@/lib/aggregate";
 import { formatFullDate, formatInteger } from "@/lib/format";
 import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/dataset";
 
-interface OverviewViewProps {
+interface MemberHomeViewProps {
   dataset: DatasetIndexEntry;
   manifest: BatchManifest;
   rows: StreamSummary[];
@@ -19,13 +19,13 @@ interface OverviewViewProps {
   onSelectStream: (videoId: string) => void;
 }
 
-export function OverviewView({
+export function MemberHomeView({
   dataset,
   manifest,
   rows,
   totals,
   onSelectStream,
-}: OverviewViewProps) {
+}: MemberHomeViewProps) {
   const sortedByDate = [...rows].sort((a, b) =>
     (a.startedAt ?? "").localeCompare(b.startedAt ?? ""),
   );

@@ -1,8 +1,12 @@
 import { Navigate } from "react-router";
 import { useDatasetIndexContext } from "@/components/dashboard/dataset-index-context";
-import { viewPath } from "@/lib/routes";
+import { readLastMember } from "@/lib/preferences";
+import { homePath } from "@/lib/routes";
 
 export function HomeRedirect() {
   const index = useDatasetIndexContext();
-  return <Navigate replace to={viewPath(index.datasets[0].id, "overview")} />;
+  const last = readLastMember();
+  const target =
+    index.datasets.find(dataset => dataset.id === last)?.id ?? index.datasets[0].id;
+  return <Navigate replace to={homePath(target)} />;
 }

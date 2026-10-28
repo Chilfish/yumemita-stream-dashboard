@@ -415,3 +415,90 @@ export function findStreamRow(rows: StreamRow[], videoId: string | null): Stream
   if (!videoId) return null;
   return rows.find(row => row.summary.videoId === videoId) ?? null;
 }
+
+export interface MonthlyPoint {
+  /** `YYYY-MM` */
+  month: string;
+  /** 展示用，例如 `10 月` */
+  label: string;
+  streams: number;
+  durationSec: number;
+  chatTotal: number;
+  superchats: number;
+  chatPerMinute: number | null;
+  avgAuthors: number | null;
+  avgConcurrent: number | null;
+}
+
+/** 按自然月聚合；返回按时间正序排列的最近 `limit` 个月。 */
+export function buildMonthlySeries(rows: StreamSummary[], limit = 6): MonthlyPoint[] {
+  const buckets = new Map<
+    string,
+    {
+      streams: number;
+      durationSec: number;
+      chatTotal: number;
+      superchats: number;
+      authors: number;
+      authorsCount: number;
+      concurrentSum: number;
+      concurrentCount: number;
+    }
+  >();
+
+  for (const row of rows) {
+    if (!row.startedAt) continue;
+    const month = row.startedAt.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) continue;
+    const bucket = buckets.get(month) ?? {
+      streams: 0,
+      durationSec: 0,
+      chatTotal: 0,
+      superchats: 0,
+      authors: 0,
+      authorsCount: 0,
+      concurrentSum: 0,
+      concurrentCount: 0,
+    };
+    bucket.streams += 1;
+    bucket.durationSec += row.durationSec ?? 0;
+    bucket.chatTotal += row.chatTotal ?? 0;
+    bucket.superchats += row.superchats ?? 0;
+    if (row.uniqueAuthors > 0) {
+      bucket.authors += row.uniqueAuthors;
+      bucket.authorsCount += 1;
+    }
+    if (row.avgConcurrent != null) {
+      bucket.concurrentSum += row.avgConcurrent;
+      bucket.concurrentCount += 1;
+    }
+    buckets.set(month, bucket);
+  }
+
+  return [...buckets.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-Math.max(1, limit))
+    .map(([month, bucket]) => ({
+      month,
+      label: `${Number(month.slice(5, 7))} 月`,
+      streams: bucket.streams,
+      durationSec: bucket.durationSec,
+      chatTotal: bucket.chatTotal,
+      superchats: bucket.superchats,
+      chatPerMinute:
+        bucket.durationSec > 0 ? bucket.chatTotal / (bucket.durationSec / 60) : null,
+      avgAuthors: bucket.authorsCount > 0 ? bucket.authors / bucket.authorsCount : null,
+      avgConcurrent:
+        bucket.concurrentCount > 0 ? bucket.concurrentSum / bucket.concurrentCount : null,
+    }));
+}
+
+/** 环比变化（%）；任一值为空或分母为 0 时返回 null。 */
+export function percentChange(
+  current: number | null | undefined,
+  previous: number | null | undefined,
+): number | null {
+  if (current == null || previous == null || previous === 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+

@@ -1,15 +1,19 @@
-import { createHashRouter, Navigate } from "react-router";
+import { createHashRouter } from "react-router";
 import { DatasetIndexGate } from "@/components/dashboard/dataset-index-gate";
 import { DatasetLayout } from "@/components/dashboard/dataset-layout";
 import { RouteError } from "@/components/dashboard/route-error";
 import { HomeRedirect } from "@/pages/home-redirect";
 import {
+  LegacyOverviewRedirect,
+  LegacyTableRedirect,
+} from "@/pages/legacy-redirects";
+import {
   AboutPage,
   ComparePage,
-  OverviewPage,
+  HomePage,
   StreamIndexPage,
   StreamPage,
-  TablePage,
+  StreamsPage,
 } from "@/pages/lazy-pages";
 
 export const router = createHashRouter([
@@ -24,14 +28,15 @@ export const router = createHashRouter([
         element: <DatasetLayout />,
         errorElement: <RouteError />,
         children: [
-          { index: true, element: <Navigate replace to="overview" /> },
-          { path: "overview", element: <OverviewPage /> },
+          { index: true, element: <HomePage /> },
+          { path: "streams", element: <StreamsPage /> },
           { path: "stream", element: <StreamIndexPage /> },
           { path: "stream/:videoId", element: <StreamPage /> },
           { path: "compare", element: <ComparePage /> },
-          { path: "table", element: <TablePage /> },
           { path: "about", element: <AboutPage /> },
-          { path: "*", element: <Navigate replace to="overview" /> },
+          { path: "overview", element: <LegacyOverviewRedirect /> },
+          { path: "table", element: <LegacyTableRedirect /> },
+          { path: "*", element: <HomeRedirect /> },
         ],
       },
       { path: "*", element: <HomeRedirect /> },

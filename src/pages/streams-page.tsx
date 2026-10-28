@@ -1,10 +1,10 @@
 import { useNavigate, useSearchParams } from "react-router";
 import { useDatasetView } from "@/components/dashboard/dataset-view-context";
-import { TableView } from "@/components/dashboard/table-view";
+import { StreamsView } from "@/components/dashboard/streams-view";
 import { streamPath } from "@/lib/routes";
 import { type TableParams, parseTableParams, writeTableParams } from "@/lib/table-params";
 
-export function TablePage() {
+export function StreamsPage() {
   const { dataset, rows } = useDatasetView();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,7 +15,7 @@ export function TablePage() {
   }
 
   return (
-    <TableView
+    <StreamsView
       onParamsChange={handleParamsChange}
       onSelect={videoId => navigate(streamPath(dataset.id, videoId))}
       params={params}

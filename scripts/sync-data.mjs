@@ -47,7 +47,7 @@ const index = {
 };
 
 for (const source of config.datasets) {
-  const { id, label, channelId, manifest: manifestRel, datapackDir } = source;
+  const { id, label, color, channelId, manifest: manifestRel, datapackDir } = source;
   assert(id && /^[a-z0-9-]+$/.test(id), `dataset id 非法：${id}`);
   assert(label, `dataset ${id} 缺少 label`);
   assert(manifestRel && datapackDir, `dataset ${id} 缺少 manifest 或 datapackDir`);
@@ -112,6 +112,7 @@ for (const source of config.datasets) {
   index.datasets.push({
     id,
     label,
+    color: color ?? null,
     channelId: channelId ?? manifest.channelId ?? null,
     count: copied.length,
     generatedAt: manifest.generatedAt ?? null,

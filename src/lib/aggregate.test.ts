@@ -1,18 +1,28 @@
 import { describe, expect, it } from "vitest";
 import type { StreamDatapack } from "@/types/datapack";
 import type { StreamSummary } from "@/types/dataset";
-import { aggregateDataset, buildStreamRows, buildStreamShape, buildSummaryRows, currencyRows, findStreamRow, findStreamSummary } from "./aggregate";
+import {
+  aggregateDataset,
+  buildMonthlySeries,
+  buildStreamRows,
+  buildStreamShape,
+  buildSummaryRows,
+  currencyRows,
+  findStreamRow,
+  findStreamSummary,
+  percentChange,
+} from "./aggregate";
 
 function makeSummary(
   overrides: Partial<StreamSummary> & {
     videoId: string;
-    startedAt: string;
+    startedAt: string | null;
     durationSec: number;
   },
 ): StreamSummary {
   return {
     rank: 1,
-    date: overrides.startedAt.slice(0, 10),
+    date: overrides.startedAt?.slice(0, 10) ?? "",
     title: `stream ${overrides.videoId}`,
     url: `https://www.youtube.com/watch?v=${overrides.videoId}`,
     durationHms: "1:00:00",
@@ -329,5 +339,64 @@ describe("aggregate", () => {
     pack.chat.density.perMinute = [];
 
     expect(buildStreamShape([{ pack }])).toBeNull();
+  });
+});
+
+describe("buildMonthlySeries", () => {
+  it("groups rows by calendar month in ascending order", () => {
+    const rows = [
+      makeSummary({ startedAt: "2026-09-12T20:00:00+09:00", videoId: "a", durationSec: 600, chatTotal: 60, superchats: 1, uniqueAuthors: 10 }),
+      makeSummary({ startedAt: "2026-09-20T20:00:00+09:00", videoId: "b", durationSec: 600, chatTotal: 120, superchats: 2, uniqueAuthors: 20 }),
+      makeSummary({ startedAt: "2026-10-02T20:00:00+09:00", videoId: "c", durationSec: 1200, chatTotal: 240 }),
+    ];
+
+    const series = buildMonthlySeries(rows);
+    expect(series.map(point => point.month)).toEqual(["2026-09", "2026-10"]);
+    expect(series[0]).toMatchObject({
+      label: "9 月",
+      streams: 2,
+      chatTotal: 180,
+      superchats: 3,
+      chatPerMinute: 9,
+      avgAuthors: 15,
+    });
+    expect(series[1]).toMatchObject({
+      label: "10 月",
+      streams: 1,
+      chatPerMinute: 12,
+      avgAuthors: null,
+    });
+  });
+
+  it("keeps only the most recent months", () => {
+    const rows = ["2026-05", "2026-06", "2026-07"].map((month, index) =>
+      makeSummary({
+        startedAt: `${month}-01T20:00:00+09:00`,
+        videoId: `v${index}`,
+        durationSec: 60,
+      }),
+    );
+    expect(buildMonthlySeries(rows, 2).map(point => point.month)).toEqual([
+      "2026-06",
+      "2026-07",
+    ]);
+  });
+
+  it("skips rows without a usable start date", () => {
+    const rows = [makeSummary({ startedAt: null, videoId: "a", durationSec: 60 })];
+    expect(buildMonthlySeries(rows)).toEqual([]);
+  });
+});
+
+describe("percentChange", () => {
+  it("computes relative change", () => {
+    expect(percentChange(130, 100)).toBeCloseTo(30);
+    expect(percentChange(50, 100)).toBeCloseTo(-50);
+  });
+
+  it("returns null when a value is missing or the base is zero", () => {
+    expect(percentChange(null, 100)).toBeNull();
+    expect(percentChange(100, 0)).toBeNull();
+    expect(percentChange(100, null)).toBeNull();
   });
 });

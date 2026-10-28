@@ -1,5 +1,6 @@
 import { TriangleAlert } from "lucide-react";
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
+import type { CSSProperties } from "react";
 import { Navigate, Outlet, ScrollRestoration, useLocation, useParams } from "react-router";
 import { AppHeader } from "@/components/dashboard/app-header";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
@@ -8,13 +9,15 @@ import { DatasetViewContext } from "@/components/dashboard/dataset-view-context"
 import { LoadingScreen, ViewSkeleton } from "@/components/dashboard/loading-screen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardPanel } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useDataset } from "@/hooks/use-dataset";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useTheme } from "@/hooks/use-theme";
 import { buildSummaryRows, findStreamSummary } from "@/lib/aggregate";
-import { sectionFromPathname, viewPath } from "@/lib/routes";
+import { rememberMember } from "@/lib/preferences";
+import { homePath, sectionFromPathname } from "@/lib/routes";
+
+const DEFAULT_MEMBER_COLOR = "#b8461f";
 
 export function DatasetLayout() {
   const { datasetId } = useParams();
@@ -29,8 +32,12 @@ export function DatasetLayout() {
 
   useKeyboardShortcuts({ datasetId: dataset?.id ?? null, rows });
 
+  useEffect(() => {
+    if (dataset) rememberMember(dataset.id);
+  }, [dataset]);
+
   if (!dataset) {
-    return <Navigate replace to={viewPath(index.datasets[0].id, "overview")} />;
+    return <Navigate replace to={homePath(index.datasets[0].id)} />;
   }
 
   const section = sectionFromPathname(pathname);
@@ -39,7 +46,9 @@ export function DatasetLayout() {
   const chatTotal = totals?.chatTotal ?? 0;
 
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      style={{ "--member-color": dataset.color ?? DEFAULT_MEMBER_COLOR } as CSSProperties}
+    >
       <AppSidebar
         chatTotal={chatTotal}
         dataset={dataset}
@@ -75,16 +84,11 @@ export function DatasetLayout() {
         ) : null}
 
         {status === "ready" && manifest && totals ? (
-          <div className="mx-auto w-full max-w-[1500px] px-4 py-5 md:px-6">
+          <div className="mx-auto w-full max-w-[1320px] px-4 py-6 md:px-6">
             {rows.length === 0 ? (
-              <Card className="mb-4">
-                <CardPanel>
-                  <p className="text-muted-foreground text-sm">
-                    没有加载到 manifest。确认 <code>public/data/&lt;dataset&gt;/manifest.json</code>{" "}
-                    存在。
-                  </p>
-                </CardPanel>
-              </Card>
+              <p className="mb-4 text-footnote text-muted-foreground">
+                没有加载到 manifest。确认 <code>public/data/&lt;dataset&gt;/manifest.json</code> 存在。
+              </p>
             ) : null}
             <DatasetViewContext.Provider value={{ dataset, manifest, rows, totals }}>
               <Suspense fallback={<ViewSkeleton />}>

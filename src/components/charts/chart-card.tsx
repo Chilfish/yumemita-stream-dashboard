@@ -1,10 +1,9 @@
 import { Download } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import { ChartFrame } from "@/components/charts/chart-frame";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu";
 import { exportPng, exportSvg, safeFilename } from "@/lib/chart-export";
-import { cn } from "@/lib/utils";
 
 interface ChartCardProps {
   title: string;
@@ -64,26 +63,18 @@ export function ChartCard({ title, description, action, children, className }: C
     return () => observer.disconnect();
   }, []);
 
-  const showAction = Boolean(action) || hasChart;
+  const actions =
+    action || hasChart ? (
+      <>
+        {action}
+        {hasChart ? <ChartExportMenu panelRef={panelRef} title={title} /> : null}
+      </>
+    ) : undefined;
 
   return (
-    <Card className={cn("overflow-hidden", className)}>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description ? <CardDescription>{description}</CardDescription> : null}
-        {showAction ? (
-          <CardAction>
-            <div className="flex items-center gap-1">
-              {action}
-              {hasChart ? <ChartExportMenu panelRef={panelRef} title={title} /> : null}
-            </div>
-          </CardAction>
-        ) : null}
-      </CardHeader>
-      <CardPanel className="pt-0">
-        <div ref={panelRef}>{children}</div>
-      </CardPanel>
-    </Card>
+    <ChartFrame action={actions} className={className} meta={description} title={title}>
+      <div ref={panelRef}>{children}</div>
+    </ChartFrame>
   );
 }
 
@@ -96,11 +87,11 @@ interface EmptyChartProps {
 export function EmptyChart({ message, hint, height = 220 }: EmptyChartProps) {
   return (
     <div
-      className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center text-muted-foreground"
+      className="flex flex-col items-center justify-center gap-1 px-4 text-center"
       style={{ height }}
     >
-      <p className="text-sm font-medium text-foreground">{message}</p>
-      {hint ? <p className="max-w-sm text-xs">{hint}</p> : null}
+      <p className="text-footnote text-muted-foreground">{message}</p>
+      {hint ? <p className="max-w-sm text-caption text-ink-3">{hint}</p> : null}
     </div>
   );
 }

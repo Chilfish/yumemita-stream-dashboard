@@ -1,13 +1,6 @@
-import { Guitar, Info, LayoutDashboard, Mic2, GitCompare, Moon, Sun, Table2 } from "lucide-react";
+import { GitCompare, Guitar, Info, LayoutDashboard, Moon, Sun, Table2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +18,9 @@ import type { Theme } from "@/hooks/use-theme";
 import { formatInteger } from "@/lib/format";
 import { sectionFromPathname, viewPath, type ViewKey } from "@/lib/routes";
 import type { DatasetIndexEntry } from "@/types/dataset";
+import { cn } from "@/lib/utils";
+
+const DEFAULT_MEMBER_COLOR = "#b8461f";
 
 interface NavItem {
   key: ViewKey;
@@ -33,12 +29,14 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: "overview", label: "总览", icon: LayoutDashboard },
-  { key: "stream", label: "单场", icon: Mic2 },
+  { key: "home", label: "首页", icon: LayoutDashboard },
+  { key: "streams", label: "场次", icon: Table2 },
   { key: "compare", label: "对比", icon: GitCompare },
-  { key: "table", label: "数据表", icon: Table2 },
   { key: "about", label: "说明", icon: Info },
 ];
+
+const ACTIVE_ITEM_CLASS =
+  "relative before:absolute before:inset-y-2 before:-left-2 before:w-[2.5px] before:rounded-full before:bg-transparent data-[active=true]:before:bg-member data-[active=true]:bg-card! data-[active=true]:font-medium data-[active=true]:shadow-sm/5";
 
 interface AppSidebarProps {
   dataset: DatasetIndexEntry;
@@ -59,17 +57,19 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const selectItems = datasets.map(item => ({ value: item.id, label: item.label }));
-  const selected = selectItems.find(item => item.value === dataset.id) ?? null;
+  const section = sectionFromPathname(pathname);
+  const activeSection: ViewKey = section === "stream" ? "streams" : section;
 
   function isActive(key: ViewKey): boolean {
+    if (key === "home") return pathname === viewPath(dataset.id, "home");
     const target = viewPath(dataset.id, key);
     return pathname === target || pathname.startsWith(`${target}/`);
   }
 
-  function handleDatasetChange(nextId: string | undefined): void {
-    if (!nextId || nextId === dataset.id) return;
-    navigate(viewPath(nextId, sectionFromPathname(pathname)));
+  function handleMemberSelect(next: DatasetIndexEntry): void {
+    if (next.id === dataset.id) return;
+    const nextSection = section === "home" ? "home" : section;
+    navigate(viewPath(next.id, nextSection));
   }
 
   return (
@@ -80,46 +80,58 @@ export function AppSidebar({
             <SidebarMenuButton
               size="lg"
               tooltip="ゆめみた 配信数据台"
-              render={<Link to={viewPath(dataset.id, "overview")} />}
+              render={<Link to={viewPath(dataset.id, "home")} />}
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted text-foreground">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-card text-foreground shadow-surface">
                 <Guitar aria-hidden="true" className="size-4" />
               </span>
               <span className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate font-heading font-semibold text-sm">
-                  ゆめみた 配信数据台
-                </span>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  {dataset.label} · {dataset.count} 场
+                <span className="truncate font-semibold text-sm">ゆめみた 配信数据台</span>
+                <span className="truncate text-caption text-muted-foreground">
+                  {formatInteger(chatTotal)} 条弹幕
                 </span>
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-
-        {datasets.length > 1 ? (
-          <div className="group-data-[collapsible=icon]:hidden">
-            <Select
-              items={selectItems}
-              onValueChange={item => handleDatasetChange(item?.value)}
-              value={selected}
-            >
-              <SelectTrigger aria-label="选择数据集" className="h-8 w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectPopup>
-                {selectItems.map(item => (
-                  <SelectItem key={item.value} value={item}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-          </div>
-        ) : null}
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>成员</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {datasets.map(member => {
+                const color = member.color ?? DEFAULT_MEMBER_COLOR;
+                return (
+                  <SidebarMenuItem key={member.id}>
+                    <SidebarMenuButton
+                      className={ACTIVE_ITEM_CLASS}
+                      isActive={member.id === dataset.id}
+                      onClick={() => handleMemberSelect(member)}
+                      tooltip={member.label}
+                      type="button"
+                    >
+                      <span
+                        className="flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] text-white"
+                        style={{ backgroundColor: color }}
+                      >
+                        {member.label.slice(0, 1)}
+                      </span>
+                      <span className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
+                        <span className="truncate">{member.label}</span>
+                        <span className="shrink-0 text-caption text-ink-3">
+                          {formatInteger(member.count)}
+                        </span>
+                      </span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupLabel>浏览</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -129,7 +141,8 @@ export function AppSidebar({
                 return (
                   <SidebarMenuItem key={item.key}>
                     <SidebarMenuButton
-                      isActive={isActive(item.key)}
+                      className={cn(ACTIVE_ITEM_CLASS, isActive(item.key) && "font-medium")}
+                      isActive={item.key === activeSection}
                       tooltip={item.label}
                       render={<NavLink to={viewPath(dataset.id, item.key)} />}
                     >
@@ -156,7 +169,7 @@ export function AppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <p className="px-2 text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
+        <p className="px-2 text-caption text-ink-3 group-data-[collapsible=icon]:hidden">
           {formatInteger(streamCount)} 场 · {formatInteger(chatTotal)} 条弹幕
         </p>
       </SidebarFooter>

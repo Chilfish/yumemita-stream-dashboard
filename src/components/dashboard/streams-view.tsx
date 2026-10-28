@@ -29,7 +29,7 @@ import {
 } from "@/lib/table-params";
 import { cn } from "@/lib/utils";
 
-interface TableViewProps {
+interface StreamsViewProps {
   rows: StreamSummary[];
   onSelect: (videoId: string) => void;
   params: TableParams;
@@ -112,7 +112,7 @@ function escapeCsv(value: string | number | null | undefined): string {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-export function TableView({ rows, onSelect, params, onParamsChange }: TableViewProps) {
+export function StreamsView({ rows, onSelect, params, onParamsChange }: StreamsViewProps) {
   const { q: query, sort: sortKey, dir: direction, vstats: onlyVstats } = params;
 
   const visible = useMemo(() => {

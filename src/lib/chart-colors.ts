@@ -1,6 +1,6 @@
-/** 图表配色。映射到 coss 主题 token，自动适配深浅色。 */
+/** 图表配色。映射到主题 token：chart-1 跟随成员色，其余为中性灰与语义色，深浅色自动适配。 */
 export const CHART_COLORS = [
-  "var(--chart-1)",
+  "var(--member-color, var(--chart-1))",
   "var(--chart-2)",
   "var(--chart-3)",
   "var(--chart-4)",

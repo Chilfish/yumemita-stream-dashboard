@@ -1,6 +1,4 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -11,9 +9,33 @@
     --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
     --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
     --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-    --font-heading: 'Inter Variable', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, monospace;
-    --font-sans: 'Inter Variable', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", "Microsoft YaHei", sans-serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --text-display: 1.75rem;
+    --text-display--line-height: 2.125rem;
+    --text-display--letter-spacing: -0.02em;
+    --text-display--font-weight: 600;
+    --text-title: 1.3125rem;
+    --text-title--line-height: 1.75rem;
+    --text-title--letter-spacing: -0.015em;
+    --text-title--font-weight: 600;
+    --text-headline: 1rem;
+    --text-headline--line-height: 1.375rem;
+    --text-headline--letter-spacing: -0.01em;
+    --text-headline--font-weight: 600;
+    --text-body: 0.875rem;
+    --text-body--line-height: 1.3125rem;
+    --text-body--letter-spacing: 0em;
+    --text-body--font-weight: 400;
+    --text-footnote: 0.75rem;
+    --text-footnote--line-height: 1.0625rem;
+    --text-footnote--letter-spacing: 0em;
+    --text-footnote--font-weight: 400;
+    --text-caption: 0.6875rem;
+    --text-caption--line-height: 0.9375rem;
+    --text-caption--letter-spacing: 0.02em;
+    --text-caption--font-weight: 500;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
     --color-sidebar-primary: var(--sidebar-primary);
@@ -30,6 +52,11 @@
     --color-chart-3: var(--chart-3);
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
+    --color-member: var(--member-color, #b8461f);
+    --color-positive: var(--positive);
+    --color-paid: var(--paid);
+    --color-ink-3: var(--ink-3);
+    --color-hairline: var(--hairline);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
     --color-ring: var(--ring);
@@ -62,6 +89,9 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    --radius-panel: 14px;
+    --radius-control: 9px;
+    --shadow-surface: var(--surface-shadow);
   @keyframes skeleton {
   to {
     background-position: -200% 0;
@@ -139,6 +169,8 @@
     }
 }
 
+/* 阴影经 --surface-shadow 间接引用：直接内联字面量会让深色模式的 none 覆盖失效。 */
+
 :root {
     --destructive-foreground: var(--color-red-700);
     --info: var(--color-blue-500);
@@ -149,15 +181,20 @@
     --warning-foreground: var(--color-amber-700);
     --accent: --alpha(var(--color-black) / 4%);
     --accent-foreground: var(--color-neutral-800);
-    --background: var(--color-white);
-    --border: --alpha(var(--color-black) / 8%);
-    --card: var(--color-white);
+    --background: #f4f4f6;
+    --border: var(--hairline);
+    --card: #ffffff;
     --card-foreground: var(--color-neutral-800);
     --destructive: var(--color-red-500);
-    --foreground: var(--color-neutral-800);
+    --foreground: #1b1b1d;
     --input: --alpha(var(--color-black) / 10%);
     --muted: --alpha(var(--color-black) / 4%);
-    --muted-foreground: color-mix(in srgb, var(--color-neutral-500) 90%, var(--color-black));
+    --muted-foreground: #62626a;
+    --ink-3: #8a8a92;
+    --hairline: rgb(0 0 0 / 0.08);
+    --positive: #2c7365;
+    --paid: #98721f;
+    --member-color: #b8461f;
     --popover: var(--color-white);
     --popover-foreground: var(--color-neutral-800);
     --primary: var(--color-neutral-800);
@@ -165,19 +202,20 @@
     --ring: var(--color-neutral-400);
     --secondary: --alpha(var(--color-black) / 4%);
     --secondary-foreground: var(--color-neutral-800);
-    --chart-1: var(--color-orange-600);
-    --chart-2: var(--color-teal-600);
-    --chart-3: var(--color-cyan-900);
-    --chart-4: var(--color-amber-400);
-    --chart-5: var(--color-amber-500);
+    --chart-1: var(--member-color, #b8461f);
+    --chart-2: #8a8a92;
+    --chart-3: var(--positive);
+    --chart-4: var(--paid);
+    --chart-5: #62626a;
     --code: var(--color-white);
     --code-foreground: var(--foreground);
     --code-highlight: --alpha(var(--color-black) / 4%);
     --radius: 0.625rem;
-    --sidebar: var(--color-neutral-50);
+    --surface-shadow: 0 1px 1px rgb(0 0 0 / 0.02), 0 6px 18px rgb(0 0 0 / 0.045);
+    --sidebar: #ececef;
     --sidebar-accent: --alpha(var(--color-black) / 4%);
     --sidebar-accent-foreground: var(--color-neutral-800);
-    --sidebar-border: --alpha(var(--color-black) / 6%);
+    --sidebar-border: var(--hairline);
     --sidebar-foreground: color-mix(in srgb, var(--color-neutral-800) 64%, var(--sidebar));
     --sidebar-primary: var(--color-neutral-800);
     --sidebar-primary-foreground: var(--color-neutral-50);
@@ -194,15 +232,20 @@
     --warning-foreground: var(--color-amber-400);
     --accent: --alpha(var(--color-white) / 4%);
     --accent-foreground: var(--color-neutral-100);
-    --background: color-mix(in srgb, var(--color-neutral-950) 95%, var(--color-white));
-    --border: --alpha(var(--color-white) / 6%);
-    --card: color-mix(in srgb, var(--background) 98%, var(--color-white));
+    --background: #000000;
+    --border: var(--hairline);
+    --card: #161617;
     --card-foreground: var(--color-neutral-100);
     --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-    --foreground: var(--color-neutral-100);
+    --foreground: #f5f5f7;
     --input: --alpha(var(--color-white) / 8%);
     --muted: --alpha(var(--color-white) / 4%);
-    --muted-foreground: color-mix(in srgb, var(--color-neutral-500) 90%, var(--color-white));
+    --muted-foreground: #a1a1a6;
+    --ink-3: #8e8e93;
+    --hairline: rgb(255 255 255 / 0.09);
+    --positive: #5fc2ad;
+    --paid: #e0b25c;
+    --member-color: #ff8a5c;
     --popover: color-mix(in srgb, var(--background) 98%, var(--color-white));
     --popover-foreground: var(--color-neutral-100);
     --primary: var(--color-neutral-100);
@@ -210,18 +253,21 @@
     --ring: var(--color-neutral-500);
     --secondary: --alpha(var(--color-white) / 4%);
     --secondary-foreground: var(--color-neutral-100);
-    --chart-1: var(--color-blue-700);
-    --chart-2: var(--color-emerald-500);
-    --chart-3: var(--color-amber-500);
-    --chart-4: var(--color-purple-500);
-    --chart-5: var(--color-rose-500);
+    --chart-1: var(--member-color);
+    --chart-2: #8e8e93;
+    --chart-3: var(--positive);
+    --chart-4: var(--paid);
+    --chart-5: #a1a1a6;
     --code: color-mix(in srgb, var(--background) 98%, var(--color-white));
     --code-foreground: var(--foreground);
     --code-highlight: --alpha(var(--color-white) / 4%);
-    --sidebar: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
+    /* 深色无阴影，靠表面色差分层；用透明零阴影而不是 none，保证 box-shadow 列表始终合法。 */
+    --shadow-surface: none;
+    --surface-shadow: 0 0 #0000;
+    --sidebar: #111113;
     --sidebar-accent: --alpha(var(--color-white) / 4%);
     --sidebar-accent-foreground: var(--color-neutral-100);
-    --sidebar-border: --alpha(var(--color-white) / 5%);
+    --sidebar-border: var(--hairline);
     --sidebar-foreground: color-mix(in srgb, var(--color-neutral-100) 64%, var(--sidebar));
     --sidebar-primary: var(--color-neutral-100);
     --sidebar-primary-foreground: var(--color-neutral-800);
@@ -239,6 +285,22 @@
     font-family: var(--font-mono);
     }
   html {
-    @apply font-sans font-mono;
+    @apply font-sans;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+    }
+
+  *, *::before, *::after {
+    animation-delay: 0ms !important;
+    animation-duration: 100ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-delay: 0ms !important;
+    transition-duration: 100ms !important;
+    transition-property: opacity !important;
     }
 }

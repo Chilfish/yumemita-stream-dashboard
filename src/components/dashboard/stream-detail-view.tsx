@@ -31,7 +31,7 @@ import {
   formatTime,
 } from "@/lib/format";
 
-interface StreamViewProps {
+interface StreamDetailViewProps {
   rows: StreamSummary[];
   row: StreamRow;
   onSelect: (videoId: string) => void;
@@ -57,7 +57,7 @@ function Stat({ label, value, hint, icon: Icon }: StatProps) {
   );
 }
 
-export function StreamView({ rows, row, onSelect }: StreamViewProps) {
+export function StreamDetailView({ rows, row, onSelect }: StreamDetailViewProps) {
   const { pack, summary } = row;
   const memberOnly = pack.video.availability === "subscriber_only";
   const superchatCount = pack.chat.paid.superchats.length;

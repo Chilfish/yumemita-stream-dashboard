@@ -3,6 +3,7 @@
     {
       "id": "nonoka",
       "label": "宮永ののか",
+      "color": "#b8461f",
       "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
       "manifest": "data/nonoka/manifest.json",
       "datapackDir": "data/nonoka"

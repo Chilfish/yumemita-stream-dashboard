@@ -2,13 +2,13 @@ import { TriangleAlert } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useDatasetView } from "@/components/dashboard/dataset-view-context";
 import { ViewSkeleton } from "@/components/dashboard/loading-screen";
-import { StreamView } from "@/components/dashboard/stream-view";
+import { StreamDetailView } from "@/components/dashboard/stream-detail-view";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
 import { useStreamPacks } from "@/hooks/use-stream-packs";
 import { findStreamSummary } from "@/lib/aggregate";
-import { streamPath, viewPath } from "@/lib/routes";
+import { streamPath, streamsPath } from "@/lib/routes";
 
 export function StreamPage() {
   const { dataset, rows } = useDatasetView();
@@ -28,10 +28,10 @@ export function StreamPage() {
           <p className="text-muted-foreground text-xs">{videoId}</p>
           <Button
             className="mt-2"
-            render={<Link to={viewPath(dataset.id, "stream")} />}
+            render={<Link to={streamsPath(dataset.id)} />}
             variant="outline"
           >
-            返回单场列表
+            返回场次列表
           </Button>
         </CardPanel>
       </Card>
@@ -61,7 +61,7 @@ export function StreamPage() {
   }
 
   return (
-    <StreamView
+    <StreamDetailView
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
       row={{ summary, pack }}
       rows={rows}
