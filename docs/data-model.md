@@ -1,6 +1,6 @@
 # 数据模型
 
-页面消费三层 JSON：**dataset 索引 → manifest → datapack**。三层都是纯 JSON，没有数据库。
+页面消费四层 JSON：**dataset 索引 → manifest → insights → datapack**。四层都是纯 JSON，没有数据库；列表页只读前两层加 insights，单场/对比再按需读 datapack。
 
 ## 1. dataset 索引
 
@@ -15,9 +15,10 @@
       "id": "nonoka",
       "label": "宮永ののか",
       "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
-      "count": 30,
+      "count": 48,
       "generatedAt": "2026-10-28T03:24:04+09:00",
-      "manifest": "data/nonoka/manifest.json"
+      "manifest": "data/nonoka/manifest.json",
+      "insights": "data/nonoka/insights.json"
     }
   ]
 }
@@ -31,10 +32,12 @@
 | `count` | 成功同步的 datapack 数 |
 | `generatedAt` | 源 manifest 的生成时间 |
 | `manifest` | manifest 的相对路径 |
+| `insights` | 预聚合摘要的相对路径 |
 
 ## 2. manifest
 
-`data/<dataset>/manifest.json` 是一场批次的索引。当前数据集来自 `batch30_manifest.json`。
+`data/<dataset>/manifest.json` 是一场批次的索引。最初 30 场来自 `batch30_manifest.json`，
+后续由 `scripts/stream-datapack.ts` 增量 upsert。
 
 ```json
 {
@@ -42,8 +45,8 @@
   "generatedAt": "2026-10-28T03:24:04+09:00",
   "subject": "宮永ののか",
   "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
-  "scope": "最近 30 场不重复直播（按标题去重，保留正片）",
-  "count": 30,
+  "scope": "按频道顺序补齐的历史场次（48/262；同名去重，保留正片）",
+  "count": 48,
   "note": "vstats 为 null 表示该场没有 VSTATS 条目。",
   "streams": []
 }
@@ -82,7 +85,31 @@
 
 > manifest 是**摘要**，页面图表需要的逐分钟序列、SC 明细、Top 列表在 datapack 里。
 
-## 3. datapack
+## 3. insights
+
+`public/data/<dataset>/insights.json` 由 `sync-data.mjs` 在同步时用 `aggregateDataset` 预聚合，schema `yumemita.dashboard.insights/v1`。
+
+```json
+{
+  "schema": "yumemita.dashboard.insights/v1",
+  "generatedAt": "2026-10-28T07:07:33.929Z",
+  "totals": {
+    "streamCount": 48,
+    "chatTotal": 99117,
+    "scByCurrency": [],
+    "topWords": [],
+    "topAuthors": [],
+    "bestByAvg": null,
+    "peakChatMinute": null
+  }
+}
+```
+
+- `totals` 的结构与 `src/lib/aggregate.ts` 的 `DatasetTotals` 一致：KPI、币种、Top 词/发言者、最佳场次、峰值分钟、典型节奏等。
+- **生成物，不要手改**；数据更新后重新 `bun run sync:data`。
+- 列表页依赖它渲染总览；缺失时页面会提示重新同步。
+
+## 4. datapack
 
 `data/<dataset>/<videoId>.datapack.json`，schema `yumemita.stream-datapack/v1`。
 
@@ -201,6 +228,7 @@ bun run validate:data
 
 - `index.json` 存在且有 dataset；
 - 每个 manifest 有 `streams`；
+- 每个 dataset 的 `insights.json` 存在且有 `totals`；
 - 每个 `streams[].videoId` 对应的 datapack 存在且能解析；
 - `pack.schema` 正确；
 - `pack.video.id === videoId`；

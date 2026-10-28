@@ -2,17 +2,12 @@
 
 ## 近期（下一步）
 
-按优先级排列，都可以在现有分层上增量完成；下面各节是更长期的数据/分析/体验/工程 backlog。
-
-1. **移动端回归**：375px 下检查侧栏 Sheet、数据表横向滚动、图表触控 tooltip。
-2. **单场按需加载**：先渲染 manifest 摘要，打开某场再 fetch 该 datapack；当前一次加载 30 份约 1 MB。
-3. **路由冒烟测试**：agent-browser 覆盖首页重定向、单场深链刷新、无效 id、对比 `?ids=`、前进后退。
-4. **键盘快捷键**：`j` / `k` 切场、`1`–`5` 切页面、`/` 聚焦搜索；侧栏 `Ctrl/Cmd+B` 已内置。
+当前没有排期中的事项。下一批建议从「体验」的图表导出 / 日历热力图，或「工程」的运行时校验 / 部署 workflow 里挑。
 
 ## 数据
 
 - [ ] 补齐其他成员（`data/<id>/` + `data-sources.json` 即可，不需要改组件）。
-- [ ] 全频道历史场次，而不只是最近 30 场。
+- [ ] 全频道历史场次，而不只是最近的批次（进度 **48/262**，见 [data-progress.md](data-progress.md)）。
 - [ ] 精确词频 / 发言者：现在只有各场 Top 40 / Top 20；要精确值需在 datapack 里加全量聚合或原始弹幕索引。
 - [ ] 同接时间序列：VSTATS 只给平均/最大；若以后有采样源，可加曲线。
 - [ ] 评论增长快照：同一场多次抓取，观察评论随时间的变化。
@@ -33,22 +28,22 @@
 - [x] 侧边栏导航（可折叠，移动端 Sheet），数据加载一次不随路由重复请求。
 - [x] 数据表筛选写 URL：`q` / `sort` / `dir` / `vstats` 随 hash 路由保存，刷新与分享可还原。
 - [x] 复制深链：单场与对比页的「复制链接」按钮，复制当前 hash URL（含查询参数）。
-- [ ] 图表导出 PNG/SVG。
+- [x] 图表导出 PNG/SVG：ChartCard 右上角可导出当前 SVG，样式内联，PNG 为 2× 画布。
 - [ ] 日历热力图：按日期看更新频率与热度。
-- [ ] 键盘快捷键：切换场次、页面、对比选择。
-- [ ] 移动端优化：表格横向滚动、图表触控 tooltip。
+- [x] 键盘快捷键：`j` / `k` 切场、`1`–`5` 切页面、`/` 聚焦搜索。
+- [x] 移动端优化：375px 下侧栏 Sheet、数据表横向滚动、图表触控 tooltip 均已回归。
 - [ ] 空数据/部分数据的更明确提示（已有基础版）。
 
 ## 工程
 
-- [ ] 用 zod / valibot 做运行时 schema 校验，替代手写 `validate-data.mjs` 的一部分。
+- [x] 用 valibot 做运行时 schema 校验：`scripts/validate-schema.ts` 校验 index / manifest / insights / datapack，替代手写字段检查。
 - [ ] 数据 schema 版本迁移：`v1 → v2` 的兼容层。
 - [x] 按路由 `React.lazy()` 拆包，降低首屏 JS。
 - [x] 路由错误边界：根路由与 `:datasetId` 的 `errorElement`，渲染或懒加载异常有兜底与重试。
-- [ ] Playwright / agent-browser 冒烟测试：加载首页、切换页面、打开单场。
-- [ ] Lighthouse / 可访问性审计。
-- [ ] 部署 workflow（GitHub Pages / Netlify），并处理 `data/*.json` 的缓存头。
-- [ ] 如果数据继续增长，考虑把 datapack 拆成「摘要 + 明细」两层，按需加载。
+- [x] Playwright / agent-browser 冒烟测试：首页、单场深链刷新、无效 id、对比深链、前进后退（`bun run test:smoke`）。
+- [x] 可访问性审计：axe 覆盖总览/单场/对比/数据表，0 violations；CWV LCP ~1.1s、CLS 0。
+- [x] 部署 workflow：`.github/workflows/deploy.yml` 发布 GitHub Pages，`VITE_BASE` 支持子路径；Pages 不支持自定义缓存头，缓存策略见部署文档。
+- [x] datapack 拆成「摘要 + 明细」：`manifest.json` + `insights.json` 先渲染，单场/对比按需加载 datapack。
 
 ## 非目标
 

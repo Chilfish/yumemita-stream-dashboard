@@ -13,7 +13,7 @@ bun run build
 dist/
 ├─ index.html
 ├─ assets/        # JS/CSS/字体（带 hash）
-└─ data/          # index.json + <dataset>/manifest.json + datapack
+└─ data/          # index.json + <dataset>/manifest.json + insights.json + datapack
 ```
 
 `dist/` 是纯静态文件，不需要 Node 运行时。
@@ -92,9 +92,10 @@ bun run ci
 
 ## 体积
 
-- 当前 30 场数据约 1 MB；构建后 `dist/data/` 同量级。
+- 首屏数据是 `index.json` + `manifest.json` + `insights.json`，当前不到 150 KB；datapack 只在该场 / 对比时按需请求。
+- 当前 48 场 datapack 合计约 1.5 MB，`dist/data/` 同量级，但不会一次性加载。
 - JS 主包约 447 KB（gzip ~144 KB），CSS 约 240 KB（gzip ~32 KB）。
-- 视图已按路由 `React.lazy()` 拆包，总览/单场/对比/数据表/说明各自是独立 chunk；数据仍按 manifest 懒加载。
+- 视图已按路由 `React.lazy()` 拆包，总览/单场/对比/数据表/说明各自是独立 chunk。
 
 ## 回滚
 

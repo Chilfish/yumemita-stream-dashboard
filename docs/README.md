@@ -7,9 +7,11 @@
 | [architecture.md](architecture.md) | 分层、数据流、路由、状态管理、图表策略、扩展点 | 想改页面结构或加新视图 |
 | [data-model.md](data-model.md) | manifest / datapack 的字段、口径、版本演进 | 读写 JSON、排查数据问题 |
 | [adding-data.md](adding-data.md) | 加场次、加成员、加数据集、数据校验 | 数据有更新 |
+| [data-progress.md](data-progress.md) | 频道历史抓取进度、跳过判定、下一批候选 | 继续补历史场次 |
 | [development.md](development.md) | 本地开发、代码规范、coss ui、D3 图表写法、测试 | 日常开发 |
 | [deployment.md](deployment.md) | 构建、静态托管、子路径、缓存、CI | 上线 |
 | [troubleshooting.md](troubleshooting.md) | 常见报错与数据异常 | 页面空白 / 图表为空 |
+| [ui-refactor.md](ui-refactor.md) | 信息架构、设计系统、coss ui 落地映射、迁移计划 | 规划界面重构 |
 | [roadmap.md](roadmap.md) | 后续数据与功能计划 | 规划迭代 |
 
 ## 约定

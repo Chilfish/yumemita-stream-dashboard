@@ -1,5 +1,18 @@
 # Changelog
 
+## 未发布
+
+### 数据
+
+- `nonoka` 分两批从最近 30 场向前续抓 18 场（2026-06-22 – 2026-08-09，以及 2024-12-13 的存档），共 **48 场**。
+- 新增 [docs/data-progress.md](docs/data-progress.md)：频道历史抓取进度、跳过判定、下一批候选。
+
+### 工程
+
+- `scripts/stream-datapack.ts` 接入 `data-sources.json`：按 `channel_id` 匹配 dataset，直接写
+  `data/<id>/<videoId>.datapack.json` 并 upsert manifest；支持一次传入多个会话目录。
+- manifest 摘要抽到 `scripts/lib/dataset-manifest.ts`，与 `add-datapack.mjs` 共用。
+
 ## 0.1.0 — 2026-10-28
 
 首个可用版本。

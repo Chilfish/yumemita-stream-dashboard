@@ -91,7 +91,7 @@ bun run dev
 
 ## manifest 从哪来
 
-如果上游有 `collect-batch.mjs` 之类的脚本，直接用它生成 `batch30_manifest.json`，再改名为 `manifest.json` 放进 `data/<id>/`。手工维护也可以，但请保持以下字段与 datapack 一致：
+如果上游有 `collect-batch.mjs` 之类的脚本，直接用它生成 `batch30_manifest.json`，再改名为 `manifest.json` 放进 `data/<id>/`。本仓库的 `scripts/stream-datapack.ts` 也能直接从会话目录增量写 datapack 并 upsert manifest。手工维护也可以，但请保持以下字段与 datapack 一致：
 
 - `videoId` / `title` / `url` / `startedAt` / `durationSec`
 - `chatTotal` / `uniqueAuthors` / `superchats`
@@ -125,7 +125,7 @@ bun run dev
 
 ## 数据体积与 Git
 
-- 当前 30 场约 **1 MB**，直接提交 JSON 即可，不需要 Git LFS。
+- 当前 48 场约 **1.5 MB**，直接提交 JSON 即可，不需要 Git LFS。
 - 如果未来超过 ~100 MB，再考虑 LFS 或把数据放到对象存储；页面读取路径不变（仍按 manifest + 文件名）。
 - `public/data/` 是生成物，已 gitignore；不要提交。
 - `data/` 是源数据，**要提交**。

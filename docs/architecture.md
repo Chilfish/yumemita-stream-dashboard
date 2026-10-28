@@ -29,16 +29,18 @@
 └───────────────────────┬─────────────────────────────────┘
                         │ fetch（浏览器）
 ┌───────────────────────▼─────────────────────────────────┐
-│ src/lib/data.ts          只负责请求与并发控制            │
+│ src/lib/data.ts          请求、datapack 缓存、并发控制   │
 │ src/lib/table-params.ts  数据表 URL 参数解析/序列化       │
-│ src/hooks/               useDatasetIndex / useDataset    │
+│ src/hooks/               useDatasetIndex / useDataset /  │
+│                          useStreamPacks（按需）           │
 └───────────────────────┬─────────────────────────────────┘
-                        │ StreamDatapack Map
+                        │ StreamSummary[] / 按需 datapack
 ┌───────────────────────▼─────────────────────────────────┐
 │ src/lib/aggregate.ts     纯函数：合并、聚合、找峰值      │
 │ src/lib/format.ts        纯函数：数字/时间/币种格式化    │
 └───────────────────────┬─────────────────────────────────┘
-                        │ StreamRow[] + DatasetTotals
+                        │ StreamSummary[] + DatasetTotals
+                        │ （datapack 打开单场时按需拉取）
 ┌───────────────────────▼─────────────────────────────────┐
 │ src/components/dashboard/  页面级视图、Sidebar、Header       │
 │ src/pages/                 路由包装层（页面 ↔ URL）          │
@@ -59,11 +61,11 @@
 
 1. `scripts/sync-data.mjs` 读 `data-sources.json`。
 2. 对每个 dataset：读 manifest，按 manifest 的 `streams[].videoId` 复制 datapack 到 `public/data/<id>/`。
-3. 写 `public/data/index.json`（dataset 列表 + 数量 + 生成时间）。
-4. `useDatasetIndex()` 拉 index；默认选中第一个 dataset。
-5. `useDataset(datasetId)` 拉 manifest，再以 6 路并发拉全部 datapack，汇报进度。
-6. `buildStreamRows(manifest, packs)` 合并成 `StreamRow[]`，按开播时间倒序。
-7. `aggregateDataset(rows)` 算出全量 KPI、币种、Top 词/发言者、最佳场次、峰值分钟。
+3. 同步时用 `aggregateDataset` 预聚合全量 KPI、币种、Top 词/发言者、最佳场次、峰值分钟与典型节奏，写 `insights.json`。
+4. 写 `public/data/index.json`（dataset 列表 + 数量 + 生成时间）。
+5. `useDatasetIndex()` 拉 index；默认选中第一个 dataset。
+6. `useDataset(datasetId)` 并行拉 manifest 与 insights，然后用 `buildSummaryRows` 得到按开播时间倒序的 `StreamSummary[]`。列表页不再等待所有 datapack。
+7. 列表视图（总览 / 数据表 / 对比指标）只消费 summary 与预聚合 totals；单场和对比的逐分钟曲线通过 `useStreamPacks` 按需请求 datapack，`lib/data.ts` 里有缓存与并发去重。
 8. 各视图消费 `rows` / `totals`；图表组件只接收已整理好的数据。
 
 ## 路由与 URL 状态
@@ -94,10 +96,11 @@
 | 状态 | 位置 | 说明 |
 | --- | --- | --- |
 | dataset、当前页面、选中场次、对比选择、表格筛选/排序 | URL（React Router） | 可分享、可刷新、可前进后退 |
-| 数据加载状态 | `useDatasetIndex` / `useDataset` | 在 `DatasetLayout` 加载一次，路由切换不重复请求 |
+| manifest、insights | `useDataset` | 进入 dataset 时加载一次，路由切换不重复请求 |
+| 单场 / 对比的 datapack | `useStreamPacks` | 按 videoId 按需加载，模块级缓存去重 |
 | 图表 hover、复制成功提示 | 各组件内部 | 仅本页使用，不跨组件共享 |
 
-选这个方案的原因：数据量小（30 场约 1 MB），页面结构简单，引入全局 store 只会增加理解成本。
+选这个方案的原因：首屏只需要 manifest 与预聚合摘要，页面结构简单，引入全局 store 只会增加理解成本。
 
 ## 图表策略：React + D3
 
@@ -159,6 +162,7 @@ src/components/charts/
   currency-donut.tsx  SC 币种构成
   top-bars.tsx        横向 Top 排行
   multi-line-chart.tsx 多场逐分钟叠加
+  stream-shape.tsx    典型节奏曲线（按进度对齐 + 分位带）
 ```
 
 ## 扩展点
@@ -199,15 +203,16 @@ src/components/charts/
 | 图表库 | D3 + 手写 SVG | 可控、体积小、方便加自定义指标 |
 | UI 库 | coss ui | Base UI 的可访问性 + Tailwind token，风格统一 |
 | 数据加载 | 静态 JSON + fetch | 无后端、可静态托管、数据随仓库走 |
-| 聚合位置 | 浏览器端纯函数 | 30 场 1 MB，浏览器足够；方便离线 |
+| 聚合位置 | 同步时预聚合 + 浏览器局部计算 | 列表页不再下载全部 datapack；单场明细按需加载 |
 | 状态管理 | React 局部状态 | 页面简单，避免全局 store |
 | 数据源 | `data/` → `public/data/` | 源数据可读可 diff，生成物不进 git |
 
 ## 性能与限制
 
-- 30 份 datapack 约 1 MB；6 路并发加载，通常 < 1 秒（本地）。
-- `aggregateDataset` 用 `useMemo`，只在 `packs` 变化时重算。
+- 首屏只加载 `index.json` + `manifest.json` + `insights.json`（当前约 150 KB 以内），不再一次性拉全部 datapack。
+- 单场页只请求该场的 datapack；对比页最多请求所选 4 场。`fetchDatapack` 用模块级缓存与 in-flight 去重，来回切换不会重复下载。
+- `insights.json` 由 `sync:data` 预聚合，页面内不再对全部场次重算 totals；`buildSummaryRows` 只做排序。
 - 图表用 ResizeObserver，窗口缩放不会重建数据。
 - 词频/发言者是“各场 Top 列表相加”，不是全量重扫；精确聚合需要扩展 datapack schema。
 - 使用 hash 路由，刷新/分享任一页面都能还原；视图按路由 `React.lazy()` 拆包，首屏只加载当前页。
-- `DatasetLayout` 一次加载整份 dataset，页面切换不会重新请求 datapack。
+- 数据增长时只需重新 `sync:data`：manifest/insights 保持小体积，datapack 始终按需加载。

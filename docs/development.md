@@ -24,6 +24,7 @@ bun run dev
 | `bun run typecheck` | `tsc -b` |
 | `bun run test` | Vitest 单次 |
 | `bun run test:watch` | Vitest watch |
+| `bun run test:smoke` | agent-browser 路由冒烟（需先起 dev/preview） |
 | `bun run lint` | oxlint |
 | `bun run check` | typecheck + test + lint |
 | `bun run ci` | 全链路（CI 同款） |
@@ -38,6 +39,7 @@ src/
 │  ├─ aggregate.ts  合并、聚合、找极值
 │  ├─ routes.ts     URL 构造与对比 id 解析
 │  ├─ table-params.ts 数据表 URL 参数解析/序列化
+│  ├─ keyboard.ts   快捷键纯函数
 │  └─ format.ts     数字 / 时间 / 币种格式化
 ├─ hooks/           异步状态、主题、尺寸
 ├─ pages/           路由页面（数据 ↔ 视图 ↔ navigate）
@@ -95,9 +97,10 @@ bunx --bun shadcn@latest add @coss/ui -y
 - URL 形态：`#/:datasetId/<view>`；单场是 `#/:datasetId/stream/:videoId`，对比是 `#/:datasetId/compare?ids=a,b,c`，数据表是 `#/:datasetId/table?q=&sort=&dir=&vstats=`。
 - 表格参数用 `parseTableParams` / `writeTableParams`（`lib/table-params.ts`），默认值不写入 URL，更新用 `replace: true`。
 - 根路由与 `:datasetId` 有 `errorElement`（`route-error.tsx`）；新页面不需要单独加错误兜底。
+- `DatasetLayout` 只加载 manifest + `insights.json`；列表页不下载 datapack。单场和对比用 `useStreamPacks` 按需拉取，缓存由 `lib/data.ts` 负责。
+- 全局快捷键在 `hooks/use-keyboard-shortcuts.ts`：`j` / `k` 翻场、`1`–`5` 切页面、`/` 聚焦搜索；输入框内自动忽略。
 - `src/pages/` 只做三件事：取 `useDatasetView()` 数据、调用 `navigate`、渲染 `dashboard/` 里的视图。
 - 页面按路由 `lazy()`（`src/pages/lazy-pages.tsx`），`DatasetLayout` 用 `Suspense` 包住 `Outlet`。
-- 数据只在 `DatasetLayout` 加载一次，路由切换不会重复请求 datapack。
 
 ## D3 图表写法
 
@@ -129,6 +132,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 5. 空数据用 `EmptyChart`；`null` 值跳过，不要画 0。
 6. 每个 mark 加 `<title>`；SVG 加 `aria-label`。
 7. 文本用 `className="fill-muted-foreground text-[10px]"` 等 token class。
+8. 需要 hover / 触控提示时用 pointer 事件（`onPointerDown` / `onPointerMove`），不要只写 `onMouseMove`；给覆盖层加 `touchAction: "pan-y"` 保留纵向滚动。
 
 ### 现有图表
 
@@ -141,6 +145,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 | `currency-donut.tsx` | SC 笔数按币种构成 |
 | `top-bars.tsx` | 横向 Top 排行（词/发言者/徽章） |
 | `multi-line-chart.tsx` | 多场逐分钟弹幕叠加 |
+| `stream-shape.tsx` | 全部场次按直播进度对齐的典型节奏曲线（含 25–75 分位带） |
 
 ## 加一个路由页面
 
@@ -163,6 +168,8 @@ bunx --bun shadcn@latest add @coss/ui -y
 - `src/lib/format.test.ts`：格式化边界（null、时长、币种、JST）。
 - `src/lib/aggregate.test.ts`：合并、合计、币种排序、Top 词/作者、最佳场次、峰值分钟。
 - `src/lib/table-params.test.ts`：表格 URL 参数的默认值、非法值回退、序列化与往返。
+- `src/lib/keyboard.test.ts`：快捷键的邻居索引与输入框判定。
+- 路由冒烟：`bun run test:smoke`（先启动 dev/preview，可通过 `--url` / `BASE_URL` 指定地址）。
 - 组件不强制单测；交互复杂时再加 `@testing-library/react`。
 
 ```bash

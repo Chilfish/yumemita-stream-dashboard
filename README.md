@@ -2,7 +2,7 @@
 
 把 **夢限大みゅーたいぷ** 成员直播的归一化 JSON 做成可交互的数据可视化页面：同接、弹幕密度、SC、评论、词频与跨场对比。
 
-当前内置数据集：**宮永ののか**，最近 **30 场**不重复直播（2026-08-10 – 2026-10-22）。
+当前内置数据集：**宮永ののか**，**48 场**不重复直播（2024-12-13 – 2026-10-22，持续补历史场次）。
 
 > 这个目录设计为**独立仓库**：数据在 `data/` 内随仓库一起提交，不依赖上层归档目录。
 > 页面只读数据，所有统计都在浏览器端完成。
@@ -13,11 +13,11 @@
 
 ![单场](docs/assets/stream.png)
 
-> 截图来自本地 30 场数据；右上角可切换深浅色主题。
+> 截图来自本地 48 场数据；右上角可切换深浅色主题。
 
 ## 功能
 
-- **总览**：月度 KPI、每场平均/最大同接、SC 币种构成、弹幕浓度 × 同接散点、全月高频词/发言者、最近场次。
+- **总览**：月度 KPI、典型节奏曲线（全部场次按进度对齐）、每场平均/最大同接、SC 币种构成、弹幕浓度 × 同接散点、全月高频词/发言者、最近场次。
 - **单场**：逐分钟弹幕曲线（含 SC 标记）、每 10 分钟分布、SC 全表、Top 词/发言者、徽章、评论区。
 - **对比**：最多选 4 场，逐分钟弹幕叠加对比 + 指标横表（最高值高亮）。
 - **数据表**：可搜索、排序、筛选（仅有 VSTATS）、导出 CSV。
@@ -149,6 +149,7 @@ bun run build
 - [docs/architecture.md](docs/architecture.md) — 架构与数据流
 - [docs/data-model.md](docs/data-model.md) — manifest / datapack 字段与口径
 - [docs/adding-data.md](docs/adding-data.md) — 新增场次、成员、数据集
+- [docs/data-progress.md](docs/data-progress.md) — 频道历史抓取进度与下一批候选
 - [docs/development.md](docs/development.md) — 本地开发、代码规范、图表写法
 - [docs/deployment.md](docs/deployment.md) — 构建与静态托管
 - [docs/troubleshooting.md](docs/troubleshooting.md) — 常见问题
