@@ -12,7 +12,7 @@ import { Card, CardPanel } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useDataset } from "@/hooks/use-dataset";
 import { useTheme } from "@/hooks/use-theme";
-import { aggregateDataset, buildStreamRows, findStreamRow } from "@/lib/aggregate";
+import { buildSummaryRows, findStreamSummary } from "@/lib/aggregate";
 import { sectionFromPathname, viewPath } from "@/lib/routes";
 
 export function DatasetLayout() {
@@ -22,13 +22,9 @@ export function DatasetLayout() {
   const { theme, toggle } = useTheme();
 
   const dataset = index.datasets.find(item => item.id === datasetId) ?? null;
-  const { manifest, packs, status, error, progress } = useDataset(dataset?.id ?? null);
+  const { manifest, totals, status, error } = useDataset(dataset?.id ?? null);
 
-  const rows = useMemo(
-    () => (manifest ? buildStreamRows(manifest, packs) : []),
-    [manifest, packs],
-  );
-  const totals = useMemo(() => aggregateDataset(rows), [rows]);
+  const rows = useMemo(() => (manifest ? buildSummaryRows(manifest) : []), [manifest]);
 
   if (!dataset) {
     return <Navigate replace to={viewPath(index.datasets[0].id, "overview")} />;
@@ -36,12 +32,13 @@ export function DatasetLayout() {
 
   const section = sectionFromPathname(pathname);
   const segments = pathname.split("/");
-  const stream = section === "stream" ? findStreamRow(rows, segments[3] ?? null) : null;
+  const stream = section === "stream" ? findStreamSummary(rows, segments[3] ?? null) : null;
+  const chatTotal = totals?.chatTotal ?? 0;
 
   return (
     <SidebarProvider>
       <AppSidebar
-        chatTotal={totals.chatTotal}
+        chatTotal={chatTotal}
         dataset={dataset}
         datasets={index.datasets}
         onToggleTheme={toggle}
@@ -52,28 +49,20 @@ export function DatasetLayout() {
       <SidebarInset>
         <ScrollRestoration />
         <AppHeader
-          chatTotal={totals.chatTotal}
+          chatTotal={chatTotal}
           dataset={dataset}
           section={section}
           stream={stream}
           streamCount={rows.length || dataset.count}
         />
 
-        {status === "loading" ? (
-          <LoadingScreen
-            label={
-              progress.total > 0
-                ? `正在加载 datapack ${progress.loaded}/${progress.total}…`
-                : "正在加载 manifest…"
-            }
-          />
-        ) : null}
+        {status === "loading" ? <LoadingScreen label="正在加载 manifest 与聚合摘要…" /> : null}
 
         {status === "error" ? (
           <div className="mx-auto max-w-2xl px-4 py-16">
             <Alert variant="error">
               <TriangleAlert aria-hidden="true" />
-              <AlertTitle>datapack 加载失败</AlertTitle>
+              <AlertTitle>数据加载失败</AlertTitle>
               <AlertDescription>{error ?? "未知错误"}</AlertDescription>
             </Alert>
             <Button className="mt-4" onClick={() => window.location.reload()} type="button">
@@ -82,14 +71,14 @@ export function DatasetLayout() {
           </div>
         ) : null}
 
-        {status === "ready" && manifest ? (
+        {status === "ready" && manifest && totals ? (
           <div className="mx-auto w-full max-w-[1500px] px-4 py-5 md:px-6">
             {rows.length === 0 ? (
               <Card className="mb-4">
                 <CardPanel>
                   <p className="text-muted-foreground text-sm">
-                    没有加载到 datapack。确认 manifest 里的 videoId 与
-                    <code>public/data/&lt;dataset&gt;/</code> 下的文件一致。
+                    没有加载到 manifest。确认 <code>public/data/&lt;dataset&gt;/manifest.json</code>{" "}
+                    存在。
                   </p>
                 </CardPanel>
               </Card>

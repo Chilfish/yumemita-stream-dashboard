@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { StreamRow } from "@/lib/aggregate";
+import type { StreamSummary } from "@/types/dataset";
 import {
   formatDate,
   formatDuration,
@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface TableViewProps {
-  rows: StreamRow[];
+  rows: StreamSummary[];
   onSelect: (videoId: string) => void;
   params: TableParams;
   onParamsChange: (next: TableParams) => void;
@@ -77,30 +77,30 @@ function SortableHead({
   );
 }
 
-function sortValue(row: StreamRow, key: TableSortKey): number | null {
+function sortValue(row: StreamSummary, key: TableSortKey): number | null {
   switch (key) {
     case "date":
-      return row.summary.startedAt ? Date.parse(row.summary.startedAt) : null;
+      return row.startedAt ? Date.parse(row.startedAt) : null;
     case "duration":
-      return row.summary.durationSec;
+      return row.durationSec;
     case "avg":
-      return row.pack.vstats?.avgConcurrent ?? null;
+      return row.avgConcurrent;
     case "max":
-      return row.pack.vstats?.maxConcurrent ?? null;
+      return row.maxConcurrent;
     case "watch":
-      return row.pack.vstats?.watchTimeHours ?? null;
+      return row.watchTimeHours;
     case "views":
-      return row.pack.vstats?.views ?? row.pack.video.snapshot.views;
+      return row.vstatsViews ?? row.snapshotViews;
     case "likes":
-      return row.pack.vstats?.likes ?? row.pack.video.snapshot.likes;
+      return row.vstatsLikes ?? row.snapshotLikes;
     case "chat":
-      return row.pack.chat.total;
+      return row.chatTotal;
     case "authors":
-      return row.pack.chat.uniqueAuthors;
+      return row.uniqueAuthors;
     case "sc":
-      return row.pack.chat.paid.superchats.length;
+      return row.superchats;
     case "comments":
-      return row.pack.comments?.total ?? null;
+      return row.commentsCaptured;
     default:
       return null;
   }
@@ -118,11 +118,9 @@ export function TableView({ rows, onSelect, params, onParamsChange }: TableViewP
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = rows.filter(row => {
-      if (onlyVstats && !row.pack.vstats) return false;
+      if (onlyVstats && row.avgConcurrent == null) return false;
       if (!needle) return true;
-      return `${row.summary.title} ${row.summary.date} ${row.summary.videoId}`
-        .toLowerCase()
-        .includes(needle);
+      return `${row.title} ${row.date} ${row.videoId}`.toLowerCase().includes(needle);
     });
 
     return [...filtered].sort((a, b) => {
@@ -160,19 +158,19 @@ export function TableView({ rows, onSelect, params, onParamsChange }: TableViewP
       "评论",
     ];
     const body = visible.map(row => [
-      row.summary.date,
-      row.summary.title,
-      row.summary.videoId,
-      row.summary.durationHms,
-      row.pack.vstats?.avgConcurrent,
-      row.pack.vstats?.maxConcurrent,
-      row.pack.vstats?.watchTimeHours,
-      row.pack.vstats?.views ?? row.pack.video.snapshot.views,
-      row.pack.vstats?.likes ?? row.pack.video.snapshot.likes,
-      row.pack.chat.total,
-      row.pack.chat.uniqueAuthors,
-      row.pack.chat.paid.superchats.length,
-      row.pack.comments?.total,
+      row.date,
+      row.title,
+      row.videoId,
+      row.durationHms,
+      row.avgConcurrent,
+      row.maxConcurrent,
+      row.watchTimeHours,
+      row.vstatsViews ?? row.snapshotViews,
+      row.vstatsLikes ?? row.snapshotLikes,
+      row.chatTotal,
+      row.uniqueAuthors,
+      row.superchats,
+      row.commentsCaptured,
     ]);
     const csv = [headers, ...body]
       .map(line => line.map(escapeCsv).join(","))
@@ -328,24 +326,24 @@ export function TableView({ rows, onSelect, params, onParamsChange }: TableViewP
         </TableHeader>
         <TableBody>
           {visible.map(row => {
-            const memberOnly = row.pack.video.availability === "subscriber_only";
+            const memberOnly = row.availability === "subscriber_only";
             return (
               <TableRow
                 className="cursor-pointer"
-                key={row.summary.videoId}
-                onClick={() => onSelect(row.summary.videoId)}
+                key={row.videoId}
+                onClick={() => onSelect(row.videoId)}
               >
                 <TableCell className="font-mono text-xs">
                   <div className="flex flex-col gap-0.5">
-                    <span>{formatDate(row.summary.startedAt)}</span>
+                    <span>{formatDate(row.startedAt)}</span>
                     <span className="text-[10px] text-muted-foreground">
-                      {formatTime(row.summary.startedAt)}
+                      {formatTime(row.startedAt)}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
-                    <span className="max-w-[340px] truncate">{row.summary.title}</span>
+                    <span className="max-w-[340px] truncate">{row.title}</span>
                     {memberOnly ? (
                       <Badge className="shrink-0 text-[10px]" variant="outline">
                         会员
@@ -354,40 +352,38 @@ export function TableView({ rows, onSelect, params, onParamsChange }: TableViewP
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatDuration(row.summary.durationSec)}
+                  {formatDuration(row.durationSec)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.pack.vstats?.avgConcurrent ?? null)}
+                  {formatInteger(row.avgConcurrent)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.pack.vstats?.maxConcurrent ?? null)}
+                  {formatInteger(row.maxConcurrent)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.pack.vstats?.watchTimeHours ?? null)}
+                  {formatInteger(row.watchTimeHours)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.pack.vstats?.views ?? row.pack.video.snapshot.views)}
+                  {formatInteger(row.vstatsViews ?? row.snapshotViews)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.pack.vstats?.likes ?? row.pack.video.snapshot.likes)}
+                  {formatInteger(row.vstatsLikes ?? row.snapshotLikes)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.pack.chat.total)}
+                  {formatInteger(row.chatTotal)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.pack.chat.uniqueAuthors)}
+                  {formatInteger(row.uniqueAuthors)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {row.pack.chat.paid.superchats.length}
+                  {row.superchats}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.pack.comments?.total ?? null)}
+                  {formatInteger(row.commentsCaptured)}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
                   {formatPercent(
-                    row.pack.derived.likesPer1000Views != null
-                      ? row.pack.derived.likesPer1000Views / 10
-                      : null,
+                    row.likesPer1000Views != null ? row.likesPer1000Views / 10 : null,
                     2,
                   )}
                 </TableCell>

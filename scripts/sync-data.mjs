@@ -16,6 +16,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { aggregateDataset, buildStreamRows } from "../src/lib/aggregate.ts";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = join(appRoot, "data-sources.json");
@@ -64,6 +65,7 @@ for (const source of config.datasets) {
 
   const copied = [];
   const warnings = [];
+  const packs = new Map();
   for (const stream of manifest.streams) {
     const videoId = stream.videoId;
     if (!videoId) {
@@ -81,6 +83,7 @@ for (const source of config.datasets) {
       continue;
     }
     copyFileSync(sourcePath, join(destDir, `${videoId}.datapack.json`));
+    packs.set(videoId, pack);
     copied.push(videoId);
   }
 
@@ -91,6 +94,21 @@ for (const source of config.datasets) {
     "utf8",
   );
 
+  const totals = aggregateDataset(buildStreamRows(manifest, packs));
+  writeFileSync(
+    join(destDir, "insights.json"),
+    `${JSON.stringify(
+      {
+        schema: "yumemita.dashboard.insights/v1",
+        generatedAt: new Date().toISOString(),
+        totals,
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+
   index.datasets.push({
     id,
     label,
@@ -98,6 +116,7 @@ for (const source of config.datasets) {
     count: copied.length,
     generatedAt: manifest.generatedAt ?? null,
     manifest: `data/${id}/manifest.json`,
+    insights: `data/${id}/insights.json`,
   });
 
   console.log(`[sync-data] ${label} (${id}) -> ${copied.length}/${manifest.streams.length} 场`);

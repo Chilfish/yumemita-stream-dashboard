@@ -17,5 +17,5 @@ export function StreamIndexPage() {
     );
   }
 
-  return <Navigate replace to={streamPath(dataset.id, latest.summary.videoId)} />;
+  return <Navigate replace to={streamPath(dataset.id, latest.videoId)} />;
 }

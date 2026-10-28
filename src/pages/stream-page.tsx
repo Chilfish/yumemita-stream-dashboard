@@ -1,18 +1,26 @@
+import { TriangleAlert } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useDatasetView } from "@/components/dashboard/dataset-view-context";
+import { ViewSkeleton } from "@/components/dashboard/loading-screen";
 import { StreamView } from "@/components/dashboard/stream-view";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
-import { findStreamRow } from "@/lib/aggregate";
+import { useStreamPacks } from "@/hooks/use-stream-packs";
+import { findStreamSummary } from "@/lib/aggregate";
 import { streamPath, viewPath } from "@/lib/routes";
 
 export function StreamPage() {
   const { dataset, rows } = useDatasetView();
   const { videoId } = useParams();
   const navigate = useNavigate();
-  const row = findStreamRow(rows, videoId ?? null);
+  const summary = findStreamSummary(rows, videoId ?? null);
+  const { packs, status, error } = useStreamPacks(
+    dataset.id,
+    summary ? [summary.videoId] : [],
+  );
 
-  if (!row) {
+  if (!summary) {
     return (
       <Card>
         <CardPanel className="flex flex-col items-center gap-2 py-12 text-center">
@@ -30,11 +38,33 @@ export function StreamPage() {
     );
   }
 
+  if (status === "error") {
+    return (
+      <Card>
+        <CardPanel className="flex flex-col items-start gap-3 py-8">
+          <Alert variant="error">
+            <TriangleAlert aria-hidden="true" />
+            <AlertTitle>单场数据加载失败</AlertTitle>
+            <AlertDescription>{error ?? "未知错误"}</AlertDescription>
+          </Alert>
+          <Button onClick={() => window.location.reload()} type="button" variant="outline">
+            重新加载
+          </Button>
+        </CardPanel>
+      </Card>
+    );
+  }
+
+  const pack = packs.get(summary.videoId);
+  if (!pack) {
+    return <ViewSkeleton />;
+  }
+
   return (
     <StreamView
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
+      row={{ summary, pack }}
       rows={rows}
-      selectedId={row.summary.videoId}
     />
   );
 }

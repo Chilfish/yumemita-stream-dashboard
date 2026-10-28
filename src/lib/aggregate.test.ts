@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StreamDatapack } from "@/types/datapack";
 import type { StreamSummary } from "@/types/dataset";
-import { aggregateDataset, buildStreamRows, currencyRows, findStreamRow } from "./aggregate";
+import { aggregateDataset, buildStreamRows, buildSummaryRows, currencyRows, findStreamRow, findStreamSummary } from "./aggregate";
 
 function makeSummary(
   overrides: Partial<StreamSummary> & {
@@ -243,6 +243,14 @@ describe("aggregate", () => {
     expect(built.map(row => row.summary.videoId)).toEqual(["b", "a"]);
     expect(findStreamRow(built, "a")?.pack.video.id).toBe("a");
     expect(findStreamRow(built, "missing")).toBeNull();
+  });
+
+  it("builds summary rows without packs", () => {
+    const built = buildSummaryRows({ streams: rows.map(row => row.summary) });
+    expect(built.map(row => row.videoId)).toEqual(["b", "a"]);
+    expect(findStreamSummary(built, "a")?.title).toBe("stream a");
+    expect(findStreamSummary(built, "missing")).toBeNull();
+    expect(findStreamSummary(built, null)).toBeNull();
   });
 
   it("aggregates totals, currencies, words and best streams", () => {

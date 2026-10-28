@@ -2,25 +2,23 @@ import { max, scaleLinear, scaleSqrt } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { AxisLabel, YAxis } from "@/components/charts/axis";
-import type { StreamRow } from "@/lib/aggregate";
+import type { StreamSummary } from "@/types/dataset";
 import { formatCompact, formatDate } from "@/lib/format";
 
 interface ScatterPlotProps {
-  rows: StreamRow[];
+  rows: StreamSummary[];
   selectedId?: string | null;
   onSelect?: (videoId: string) => void;
 }
 
 export function ScatterPlot({ rows, selectedId, onSelect }: ScatterPlotProps) {
   const points = rows.filter(
-    row =>
-      row.pack.vstats?.avgConcurrent != null &&
-      row.pack.derived.chatPer1000AvgViewers != null,
+    row => row.avgConcurrent != null && row.chatPer1000AvgViewers != null,
   );
-  const maxX = max(points, row => row.pack.vstats?.avgConcurrent ?? 0) ?? 1;
-  const maxY = max(points, row => row.pack.derived.chatPer1000AvgViewers ?? 0) ?? 1;
-  const maxChat = max(points, row => row.pack.chat.total) ?? 1;
-  const minChat = Math.min(...points.map(row => row.pack.chat.total), maxChat);
+  const maxX = max(points, row => row.avgConcurrent ?? 0) ?? 1;
+  const maxY = max(points, row => row.chatPer1000AvgViewers ?? 0) ?? 1;
+  const maxChat = max(points, row => row.chatTotal) ?? 1;
+  const minChat = Math.min(...points.map(row => row.chatTotal), maxChat);
 
   return (
     <ChartCanvas ariaLabel="平均同接与每千同接弹幕数的散点图" height={320}>
@@ -68,14 +66,14 @@ export function ScatterPlot({ rows, selectedId, onSelect }: ScatterPlotProps) {
             </text>
 
             {points.map(row => {
-              const avg = row.pack.vstats?.avgConcurrent ?? 0;
-              const density = row.pack.derived.chatPer1000AvgViewers ?? 0;
-              const memberOnly = row.pack.video.availability === "subscriber_only";
-              const selected = selectedId === row.summary.videoId;
+              const avg = row.avgConcurrent ?? 0;
+              const density = row.chatPer1000AvgViewers ?? 0;
+              const memberOnly = row.availability === "subscriber_only";
+              const selected = selectedId === row.videoId;
               return (
                 <g
-                  key={row.summary.videoId}
-                  onClick={() => onSelect?.(row.summary.videoId)}
+                  key={row.videoId}
+                  onClick={() => onSelect?.(row.videoId)}
                   style={{ cursor: onSelect ? "pointer" : "default" }}
                 >
                   <circle
@@ -83,11 +81,11 @@ export function ScatterPlot({ rows, selectedId, onSelect }: ScatterPlotProps) {
                     cy={y(density)}
                     fill={memberOnly ? CHART_COLORS[3] : CHART_COLORS[0]}
                     fillOpacity={selected ? 0.95 : 0.66}
-                    r={radius(row.pack.chat.total)}
+                    r={radius(row.chatTotal)}
                     stroke={selected ? "var(--foreground)" : "transparent"}
                     strokeWidth={selected ? 2 : 0}
                   >
-                    <title>{`${formatDate(row.summary.startedAt)} ${row.summary.title}\n平均同接 ${formatCompact(avg)} · 每千同接 ${formatCompact(density)} 条 · 弹幕 ${formatCompact(row.pack.chat.total)}`}</title>
+                    <title>{`${formatDate(row.startedAt)} ${row.title}\n平均同接 ${formatCompact(avg)} · 每千同接 ${formatCompact(density)} 条 · 弹幕 ${formatCompact(row.chatTotal)}`}</title>
                   </circle>
                 </g>
               );

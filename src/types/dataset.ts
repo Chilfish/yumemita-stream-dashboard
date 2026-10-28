@@ -56,6 +56,7 @@ export interface DatasetIndexEntry {
   count: number;
   generatedAt: string | null;
   manifest: string;
+  insights?: string;
 }
 
 export interface DatasetIndex {

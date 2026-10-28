@@ -41,6 +41,17 @@ for (const dataset of index.datasets) {
     errors.push(`${dataset.id}: manifest.streams 不是数组`);
     continue;
   }
+
+  const insightsPath = join(
+    appRoot,
+    "public",
+    dataset.insights ?? `data/${dataset.id}/insights.json`,
+  );
+  const insights = readJson(insightsPath);
+  if (insights && !insights.totals) {
+    errors.push(`${dataset.id}: insights.json 缺少 totals`);
+  }
+
   for (const stream of manifest.streams) {
     const packPath = join(dataRoot, dataset.id, `${stream.videoId}.datapack.json`);
     const pack = readJson(packPath);

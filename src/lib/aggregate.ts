@@ -67,6 +67,12 @@ export interface DatasetTotals {
   peakChatMinute: PeakChatMinute | null;
 }
 
+export function buildSummaryRows(manifest: { streams: StreamSummary[] }): StreamSummary[] {
+  return [...manifest.streams].sort((a, b) =>
+    (b.startedAt ?? "").localeCompare(a.startedAt ?? ""),
+  );
+}
+
 export function buildStreamRows(
   manifest: { streams: StreamSummary[] },
   packs: Map<string, StreamDatapack>,
@@ -279,6 +285,14 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
       : null,
     peakChatMinute: bestPeak,
   };
+}
+
+export function findStreamSummary(
+  rows: StreamSummary[],
+  videoId: string | null,
+): StreamSummary | null {
+  if (!videoId) return null;
+  return rows.find(row => row.videoId === videoId) ?? null;
 }
 
 export function findStreamRow(rows: StreamRow[], videoId: string | null): StreamRow | null {

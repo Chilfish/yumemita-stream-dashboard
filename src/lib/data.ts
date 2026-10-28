@@ -1,3 +1,4 @@
+import type { DatasetTotals } from "@/lib/aggregate";
 import type { StreamDatapack } from "@/types/datapack";
 import type { BatchManifest, DatasetIndex } from "@/types/dataset";
 
@@ -30,41 +31,41 @@ export async function fetchManifest(datasetId: string, signal?: AbortSignal): Pr
   return manifest;
 }
 
-export async function fetchDatapack(
+export async function fetchInsights(
+  datasetId: string,
+  signal?: AbortSignal,
+): Promise<DatasetTotals> {
+  const file = await fetchJson<{ totals?: DatasetTotals }>(`${datasetId}/insights.json`, signal);
+  if (!file.totals) {
+    throw new Error(`${datasetId} 的 insights.json 缺少 totals，请重新运行 bun run sync:data`);
+  }
+  return file.totals;
+}
+
+const packCache = new Map<string, StreamDatapack>();
+const inflightPacks = new Map<string, Promise<StreamDatapack>>();
+
+export function fetchDatapack(
   datasetId: string,
   videoId: string,
   signal?: AbortSignal,
 ): Promise<StreamDatapack> {
-  return fetchJson<StreamDatapack>(`${datasetId}/${videoId}.datapack.json`, signal);
-}
+  const key = `${datasetId}/${videoId}`;
+  const cached = packCache.get(key);
+  if (cached) return Promise.resolve(cached);
 
-const LOAD_CONCURRENCY = 6;
+  const inflight = inflightPacks.get(key);
+  if (inflight) return inflight;
 
-export async function loadDatapacks(
-  datasetId: string,
-  manifest: BatchManifest,
-  onProgress?: (loaded: number, total: number) => void,
-  signal?: AbortSignal,
-): Promise<Map<string, StreamDatapack>> {
-  const total = manifest.streams.length;
-  const queue = [...manifest.streams];
-  const result = new Map<string, StreamDatapack>();
-  let loaded = 0;
+  const request = fetchJson<StreamDatapack>(`${datasetId}/${videoId}.datapack.json`, signal)
+    .then(pack => {
+      packCache.set(key, pack);
+      return pack;
+    })
+    .finally(() => {
+      inflightPacks.delete(key);
+    });
 
-  async function worker(): Promise<void> {
-    while (queue.length > 0) {
-      if (signal?.aborted) return;
-      const stream = queue.shift();
-      if (!stream) return;
-      const pack = await fetchDatapack(datasetId, stream.videoId, signal);
-      result.set(stream.videoId, pack);
-      loaded += 1;
-      onProgress?.(loaded, total);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(LOAD_CONCURRENCY, total) }, () => worker()),
-  );
-  return result;
+  inflightPacks.set(key, request);
+  return request;
 }

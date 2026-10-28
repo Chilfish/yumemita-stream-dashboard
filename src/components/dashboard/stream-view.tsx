@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
 import type { StreamRow } from "@/lib/aggregate";
-import { findStreamRow } from "@/lib/aggregate";
+import type { StreamSummary } from "@/types/dataset";
 import {
   formatDateTime,
   formatDuration,
@@ -32,8 +32,8 @@ import {
 } from "@/lib/format";
 
 interface StreamViewProps {
-  rows: StreamRow[];
-  selectedId: string | null;
+  rows: StreamSummary[];
+  row: StreamRow;
   onSelect: (videoId: string) => void;
 }
 
@@ -57,13 +57,7 @@ function Stat({ label, value, hint, icon: Icon }: StatProps) {
   );
 }
 
-export function StreamView({ rows, selectedId, onSelect }: StreamViewProps) {
-  const row = findStreamRow(rows, selectedId);
-
-  if (!row) {
-    return <EmptyChart message="找不到该场次" />;
-  }
-
+export function StreamView({ rows, row, onSelect }: StreamViewProps) {
   const { pack, summary } = row;
   const memberOnly = pack.video.availability === "subscriber_only";
   const superchatCount = pack.chat.paid.superchats.length;

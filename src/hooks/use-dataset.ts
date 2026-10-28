@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchManifest, loadDatapacks } from "@/lib/data";
-import type { StreamDatapack } from "@/types/datapack";
+import { fetchInsights, fetchManifest } from "@/lib/data";
+import type { DatasetTotals } from "@/lib/aggregate";
 import type { BatchManifest } from "@/types/dataset";
 
 export type DatasetStatus = "idle" | "loading" | "ready" | "error";
@@ -8,23 +8,21 @@ export type DatasetStatus = "idle" | "loading" | "ready" | "error";
 interface DatasetState {
   datasetId: string | null;
   manifest: BatchManifest | null;
-  packs: Map<string, StreamDatapack>;
+  totals: DatasetTotals | null;
   status: DatasetStatus;
   error: string | null;
-  progress: { loaded: number; total: number };
 }
 
-const EMPTY_PACKS = new Map<string, StreamDatapack>();
+const EMPTY_STATE: DatasetState = {
+  datasetId: null,
+  manifest: null,
+  totals: null,
+  status: "idle",
+  error: null,
+};
 
 export function useDataset(datasetId: string | null): DatasetState {
-  const [state, setState] = useState<DatasetState>({
-    datasetId: null,
-    manifest: null,
-    packs: EMPTY_PACKS,
-    status: "idle",
-    error: null,
-    progress: { loaded: 0, total: 0 },
-  });
+  const [state, setState] = useState<DatasetState>(EMPTY_STATE);
 
   useEffect(() => {
     if (!datasetId) return;
@@ -35,40 +33,34 @@ export function useDataset(datasetId: string | null): DatasetState {
     setState({
       datasetId: id,
       manifest: null,
-      packs: EMPTY_PACKS,
+      totals: null,
       status: "loading",
       error: null,
-      progress: { loaded: 0, total: 0 },
     });
 
     async function run(): Promise<void> {
       try {
-        const manifest = await fetchManifest(id, controller.signal);
+        const [manifest, totals] = await Promise.all([
+          fetchManifest(id, controller.signal),
+          fetchInsights(id, controller.signal),
+        ]);
         if (controller.signal.aborted) return;
-        setState(current => ({
-          ...current,
+        setState({
+          datasetId: id,
           manifest,
-          progress: { loaded: 0, total: manifest.streams.length },
-        }));
-        const packs = await loadDatapacks(
-          id,
-          manifest,
-          (loaded, total) => {
-            if (!controller.signal.aborted) {
-              setState(current => ({ ...current, progress: { loaded, total } }));
-            }
-          },
-          controller.signal,
-        );
-        if (controller.signal.aborted) return;
-        setState(current => ({ ...current, packs, status: "ready" }));
+          totals,
+          status: "ready",
+          error: null,
+        });
       } catch (error: unknown) {
         if (controller.signal.aborted) return;
-        setState(current => ({
-          ...current,
+        setState({
+          datasetId: id,
+          manifest: null,
+          totals: null,
           status: "error",
           error: error instanceof Error ? error.message : String(error),
-        }));
+        });
       }
     }
 
@@ -76,27 +68,11 @@ export function useDataset(datasetId: string | null): DatasetState {
     return () => controller.abort();
   }, [datasetId]);
 
-  if (!datasetId) {
-    return {
-      datasetId: null,
-      manifest: null,
-      packs: EMPTY_PACKS,
-      status: "idle",
-      error: null,
-      progress: { loaded: 0, total: 0 },
-    };
-  }
+  if (!datasetId) return EMPTY_STATE;
 
   // dataset 刚切换、effect 还没跑时，不要返回上一份 dataset 的数据。
   if (state.datasetId !== datasetId) {
-    return {
-      datasetId,
-      manifest: null,
-      packs: EMPTY_PACKS,
-      status: "loading",
-      error: null,
-      progress: { loaded: 0, total: 0 },
-    };
+    return { ...EMPTY_STATE, datasetId, status: "loading" };
   }
 
   return state;

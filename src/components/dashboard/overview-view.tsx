@@ -6,14 +6,14 @@ import { TopBars } from "@/components/charts/top-bars";
 import { KpiGrid } from "@/components/dashboard/kpi-grid";
 import { StreamTable } from "@/components/dashboard/stream-table";
 import { Badge } from "@/components/ui/badge";
-import type { DatasetTotals, StreamRow } from "@/lib/aggregate";
+import type { DatasetTotals } from "@/lib/aggregate";
 import { formatFullDate, formatInteger } from "@/lib/format";
-import type { BatchManifest, DatasetIndexEntry } from "@/types/dataset";
+import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/dataset";
 
 interface OverviewViewProps {
   dataset: DatasetIndexEntry;
   manifest: BatchManifest;
-  rows: StreamRow[];
+  rows: StreamSummary[];
   totals: DatasetTotals;
   onSelectStream: (videoId: string) => void;
 }
@@ -26,7 +26,7 @@ export function OverviewView({
   onSelectStream,
 }: OverviewViewProps) {
   const sortedByDate = [...rows].sort((a, b) =>
-    (a.summary.startedAt ?? "").localeCompare(b.summary.startedAt ?? ""),
+    (a.startedAt ?? "").localeCompare(b.startedAt ?? ""),
   );
   const first = sortedByDate[0];
   const last = sortedByDate.at(-1);
@@ -49,7 +49,7 @@ export function OverviewView({
           <h2 className="font-heading font-semibold text-xl">{dataset.label} · 总览</h2>
           <p className="mt-1 text-muted-foreground text-xs">
             {first && last
-              ? `${formatFullDate(first.summary.startedAt)} – ${formatFullDate(last.summary.startedAt)} · ${manifest.scope}`
+              ? `${formatFullDate(first.startedAt)} – ${formatFullDate(last.startedAt)} · ${manifest.scope}`
               : manifest.scope}
           </p>
         </div>

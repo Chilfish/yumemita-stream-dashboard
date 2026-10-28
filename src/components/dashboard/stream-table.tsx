@@ -7,12 +7,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { StreamRow } from "@/lib/aggregate";
+import type { StreamSummary } from "@/types/dataset";
 import { formatDate, formatDuration, formatInteger, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface StreamTableProps {
-  rows: StreamRow[];
+  rows: StreamSummary[];
   onSelect?: (videoId: string) => void;
   selectedId?: string | null;
   limit?: number;
@@ -36,26 +36,26 @@ export function StreamTable({ rows, onSelect, selectedId, limit }: StreamTablePr
       </TableHeader>
       <TableBody>
         {visible.map(row => {
-          const selected = row.summary.videoId === selectedId;
-          const memberOnly = row.pack.video.availability === "subscriber_only";
+          const selected = row.videoId === selectedId;
+          const memberOnly = row.availability === "subscriber_only";
           return (
             <TableRow
               className={cn(onSelect && "cursor-pointer", selected && "bg-accent/60")}
               data-state={selected ? "selected" : undefined}
-              key={row.summary.videoId}
-              onClick={() => onSelect?.(row.summary.videoId)}
+              key={row.videoId}
+              onClick={() => onSelect?.(row.videoId)}
             >
               <TableCell className="font-mono text-xs">
                 <div className="flex flex-col gap-0.5">
-                  <span>{formatDate(row.summary.startedAt)}</span>
+                  <span>{formatDate(row.startedAt)}</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {formatTime(row.summary.startedAt)}
+                    {formatTime(row.startedAt)}
                   </span>
                 </div>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1.5">
-                  <span className="max-w-[320px] truncate">{row.summary.title}</span>
+                  <span className="max-w-[320px] truncate">{row.title}</span>
                   {memberOnly ? (
                     <Badge className="shrink-0 text-[10px]" variant="outline">
                       会员
@@ -64,20 +64,19 @@ export function StreamTable({ rows, onSelect, selectedId, limit }: StreamTablePr
                 </div>
               </TableCell>
               <TableCell className="text-right font-mono text-xs">
-                {formatDuration(row.summary.durationSec)}
+                {formatDuration(row.durationSec)}
               </TableCell>
               <TableCell className="text-right font-mono text-xs">
-                {formatInteger(row.pack.vstats?.avgConcurrent ?? null)} /{" "}
-                {formatInteger(row.pack.vstats?.maxConcurrent ?? null)}
+                {formatInteger(row.avgConcurrent)} / {formatInteger(row.maxConcurrent)}
               </TableCell>
               <TableCell className="text-right font-mono text-xs">
-                {formatInteger(row.pack.chat.total)}
+                {formatInteger(row.chatTotal)}
               </TableCell>
               <TableCell className="text-right font-mono text-xs">
-                {row.pack.chat.paid.superchats.length}
+                {row.superchats}
               </TableCell>
               <TableCell className="text-right font-mono text-xs">
-                {formatInteger(row.pack.comments?.total ?? null)}
+                {formatInteger(row.commentsCaptured)}
               </TableCell>
             </TableRow>
           );

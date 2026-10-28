@@ -3,12 +3,12 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { StreamRow } from "@/lib/aggregate";
 import { formatDate, formatInteger, formatTime } from "@/lib/format";
+import type { StreamSummary } from "@/types/dataset";
 import { cn } from "@/lib/utils";
 
 interface StreamPickerProps {
-  rows: StreamRow[];
+  rows: StreamSummary[];
   selectedId: string | null;
   onSelect: (videoId: string) => void;
 }
@@ -19,9 +19,7 @@ export function StreamPicker({ rows, selectedId, onSelect }: StreamPickerProps) 
     const needle = query.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter(row =>
-      `${row.summary.title} ${row.summary.date} ${row.summary.videoId}`
-        .toLowerCase()
-        .includes(needle),
+      `${row.title} ${row.date} ${row.videoId}`.toLowerCase().includes(needle),
     );
   }, [rows, query]);
 
@@ -45,21 +43,21 @@ export function StreamPicker({ rows, selectedId, onSelect }: StreamPickerProps) 
       <ScrollArea className="h-[560px] rounded-lg border">
         <div className="flex flex-col gap-1 p-1.5">
           {filtered.map(row => {
-            const selected = row.summary.videoId === selectedId;
-            const memberOnly = row.pack.video.availability === "subscriber_only";
+            const selected = row.videoId === selectedId;
+            const memberOnly = row.availability === "subscriber_only";
             return (
               <button
                 className={cn(
                   "rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent",
                   selected && "bg-accent",
                 )}
-                key={row.summary.videoId}
-                onClick={() => onSelect(row.summary.videoId)}
+                key={row.videoId}
+                onClick={() => onSelect(row.videoId)}
                 type="button"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-[11px] text-muted-foreground">
-                    {formatDate(row.summary.startedAt)} {formatTime(row.summary.startedAt)}
+                    {formatDate(row.startedAt)} {formatTime(row.startedAt)}
                   </span>
                   {memberOnly ? (
                     <Badge className="text-[10px]" variant="outline">
@@ -67,11 +65,10 @@ export function StreamPicker({ rows, selectedId, onSelect }: StreamPickerProps) 
                     </Badge>
                   ) : null}
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-xs leading-snug">{row.summary.title}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-snug">{row.title}</p>
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {formatInteger(row.pack.chat.total)} 条弹幕 ·{" "}
-                  {row.pack.chat.paid.superchats.length} SC ·{" "}
-                  {formatInteger(row.pack.vstats?.avgConcurrent ?? null)} 平均同接
+                  {formatInteger(row.chatTotal)} 条弹幕 · {row.superchats} SC ·{" "}
+                  {formatInteger(row.avgConcurrent)} 平均同接
                 </p>
               </button>
             );

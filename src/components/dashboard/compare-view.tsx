@@ -16,7 +16,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { StreamRow } from "@/lib/aggregate";
+import type { StreamDatapack } from "@/types/datapack";
+import type { StreamSummary } from "@/types/dataset";
+import type { PackStatus } from "@/hooks/use-stream-packs";
 import {
   formatDate,
   formatDuration,
@@ -27,51 +29,74 @@ import {
 const MAX_SELECTED = 4;
 
 interface CompareViewProps {
-  rows: StreamRow[];
+  rows: StreamSummary[];
   selectedIds: string[];
   onToggle: (videoId: string) => void;
+  packs: Map<string, StreamDatapack>;
+  packStatus: PackStatus;
+  packError: string | null;
 }
 
 interface Metric {
   key: string;
   label: string;
-  value: (row: StreamRow) => number | null;
+  value: (row: StreamSummary) => number | null;
   format: (value: number | null) => string;
   higherIsBetter?: boolean;
 }
 
 const METRICS: Metric[] = [
-  { key: "duration", label: "时长", value: row => row.summary.durationSec, format: value => formatDuration(value) },
-  { key: "avg", label: "平均同接", value: row => row.pack.vstats?.avgConcurrent ?? null, format: formatInteger },
-  { key: "max", label: "最大同接", value: row => row.pack.vstats?.maxConcurrent ?? null, format: formatInteger },
-  { key: "watch", label: "视聴时间（人·时）", value: row => row.pack.vstats?.watchTimeHours ?? null, format: formatInteger },
-  { key: "views", label: "播放", value: row => row.pack.vstats?.views ?? row.pack.video.snapshot.views, format: formatInteger },
+  { key: "duration", label: "时长", value: row => row.durationSec, format: value => formatDuration(value) },
+  { key: "avg", label: "平均同接", value: row => row.avgConcurrent, format: formatInteger },
+  { key: "max", label: "最大同接", value: row => row.maxConcurrent, format: formatInteger },
+  { key: "watch", label: "视聴时间（人·时）", value: row => row.watchTimeHours, format: formatInteger },
+  { key: "views", label: "播放", value: row => row.vstatsViews ?? row.snapshotViews, format: formatInteger },
   {
     key: "likeRate",
     label: "点赞率",
-    value: row => (row.pack.derived.likesPer1000Views != null ? row.pack.derived.likesPer1000Views / 10 : null),
+    value: row => (row.likesPer1000Views != null ? row.likesPer1000Views / 10 : null),
     format: value => formatPercent(value, 2),
   },
-  { key: "chat", label: "弹幕", value: row => row.pack.chat.total, format: formatInteger },
-  { key: "authors", label: "发言人数", value: row => row.pack.chat.uniqueAuthors, format: formatInteger },
+  { key: "chat", label: "弹幕", value: row => row.chatTotal, format: formatInteger },
+  { key: "authors", label: "发言人数", value: row => row.uniqueAuthors, format: formatInteger },
   {
     key: "chatPer1000",
     label: "每千同接弹幕",
-    value: row => row.pack.derived.chatPer1000AvgViewers,
+    value: row => row.chatPer1000AvgViewers,
     format: value => (value == null ? "—" : formatInteger(Math.round(value))),
   },
-  { key: "sc", label: "SC 笔数", value: row => row.pack.chat.paid.superchats.length, format: formatInteger },
-  { key: "comments", label: "评论", value: row => row.pack.comments?.total ?? null, format: formatInteger },
+  { key: "sc", label: "SC 笔数", value: row => row.superchats, format: formatInteger },
+  { key: "comments", label: "评论", value: row => row.commentsCaptured, format: formatInteger },
 ];
 
-export function CompareView({ rows, selectedIds, onToggle }: CompareViewProps) {
+export function CompareView({
+  rows,
+  selectedIds,
+  onToggle,
+  packs,
+  packStatus,
+  packError,
+}: CompareViewProps) {
   const selected = useMemo(
     () =>
       selectedIds
-        .map(id => rows.find(row => row.summary.videoId === id))
-        .filter((row): row is StreamRow => row != null),
+        .map(id => rows.find(row => row.videoId === id))
+        .filter((row): row is StreamSummary => row != null),
     [rows, selectedIds],
   );
+
+  const series = selected
+    .map((row, index) => {
+      const pack = packs.get(row.videoId);
+      if (!pack) return null;
+      return {
+        id: row.videoId,
+        label: `${formatDate(row.startedAt)} ${row.title}`,
+        values: pack.chat.density.perMinute,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item != null);
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -91,26 +116,26 @@ export function CompareView({ rows, selectedIds, onToggle }: CompareViewProps) {
           <ScrollArea className="h-[560px] rounded-lg border">
             <div className="flex flex-col gap-0.5 p-1.5">
               {rows.map(row => {
-                const checked = selectedIds.includes(row.summary.videoId);
+                const checked = selectedIds.includes(row.videoId);
                 const disabled = !checked && selectedIds.length >= MAX_SELECTED;
                 return (
                   <Label
                     className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-accent data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50"
                     data-disabled={disabled}
-                    key={row.summary.videoId}
+                    key={row.videoId}
                   >
                     <Checkbox
                       checked={checked}
                       className="mt-0.5"
                       disabled={disabled}
-                      onCheckedChange={() => onToggle(row.summary.videoId)}
+                      onCheckedChange={() => onToggle(row.videoId)}
                     />
                     <span className="min-w-0">
                       <span className="block font-mono text-[11px] text-muted-foreground">
-                        {formatDate(row.summary.startedAt)}
+                        {formatDate(row.startedAt)}
                       </span>
                       <span className="mt-0.5 line-clamp-2 block text-xs leading-snug">
-                        {row.summary.title}
+                        {row.title}
                       </span>
                     </span>
                   </Label>
@@ -126,19 +151,15 @@ export function CompareView({ rows, selectedIds, onToggle }: CompareViewProps) {
           description="按开播后分钟对齐；不同时长的场次在同一时间轴上比较每分钟弹幕量。"
           title="逐分钟弹幕对比"
         >
-          {selected.length >= 2 ? (
-            <MultiLineChart
-              ariaLabel="所选直播的逐分钟弹幕对比"
-              series={selected.map((row, index) => ({
-                id: row.summary.videoId,
-                label: `${formatDate(row.summary.startedAt)} ${row.summary.title}`,
-                values: row.pack.chat.density.perMinute,
-                color: CHART_COLORS[index % CHART_COLORS.length],
-              }))}
-            />
+          {series.length >= 2 ? (
+            <MultiLineChart ariaLabel="所选直播的逐分钟弹幕对比" series={series} />
           ) : (
-            <div className="flex h-64 items-center justify-center text-muted-foreground text-sm">
-              至少选择 2 场
+            <div className="flex h-64 items-center justify-center text-center text-muted-foreground text-sm">
+              {packStatus === "loading"
+                ? "正在加载所选场次的逐分钟明细…"
+                : packStatus === "error"
+                  ? `逐分钟明细加载失败：${packError ?? "未知错误"}`
+                  : "至少选择 2 场"}
             </div>
           )}
         </ChartCard>
@@ -153,12 +174,12 @@ export function CompareView({ rows, selectedIds, onToggle }: CompareViewProps) {
                 <TableRow>
                   <TableHead className="w-36">指标</TableHead>
                   {selected.map(row => (
-                    <TableHead className="min-w-32" key={row.summary.videoId}>
+                    <TableHead className="min-w-32" key={row.videoId}>
                       <div className="flex flex-col gap-0.5">
                         <span className="font-mono text-[10px] text-muted-foreground">
-                          {formatDate(row.summary.startedAt)}
+                          {formatDate(row.startedAt)}
                         </span>
-                        <span className="max-w-48 truncate">{row.summary.title}</span>
+                        <span className="max-w-48 truncate">{row.title}</span>
                       </div>
                     </TableHead>
                   ))}
@@ -179,7 +200,7 @@ export function CompareView({ rows, selectedIds, onToggle }: CompareViewProps) {
                         return (
                           <TableCell
                             className={isBest ? "font-heading font-semibold" : "font-mono text-xs"}
-                            key={row.summary.videoId}
+                            key={row.videoId}
                           >
                             {isBest ? (
                               <span className="inline-flex items-center gap-1">

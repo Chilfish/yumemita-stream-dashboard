@@ -10,8 +10,7 @@ import {
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { formatDate, formatInteger } from "@/lib/format";
 import { viewPath, type ViewKey } from "@/lib/routes";
-import type { StreamRow } from "@/lib/aggregate";
-import type { DatasetIndexEntry } from "@/types/dataset";
+import type { DatasetIndexEntry, StreamSummary } from "@/types/dataset";
 
 const SECTION_LABELS: Record<ViewKey, string> = {
   overview: "总览",
@@ -24,7 +23,7 @@ const SECTION_LABELS: Record<ViewKey, string> = {
 interface AppHeaderProps {
   dataset: DatasetIndexEntry;
   section: ViewKey;
-  stream: StreamRow | null;
+  stream: StreamSummary | null;
   streamCount: number;
   chatTotal: number;
 }
@@ -45,13 +44,13 @@ export function AppHeader({ dataset, section, stream, streamCount, chatTotal }: 
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem className="min-w-0">
-            {stream ? <BreadcrumbPage className="truncate">{formatDate(stream.summary.startedAt)} 单场</BreadcrumbPage> : <BreadcrumbPage>{SECTION_LABELS[section]}</BreadcrumbPage>}
+            {stream ? <BreadcrumbPage className="truncate">{formatDate(stream.startedAt)} 单场</BreadcrumbPage> : <BreadcrumbPage>{SECTION_LABELS[section]}</BreadcrumbPage>}
           </BreadcrumbItem>
           {stream ? (
             <>
               <BreadcrumbSeparator />
               <BreadcrumbItem className="min-w-0">
-                <BreadcrumbPage className="truncate">{stream.summary.title}</BreadcrumbPage>
+                <BreadcrumbPage className="truncate">{stream.title}</BreadcrumbPage>
               </BreadcrumbItem>
             </>
           ) : null}

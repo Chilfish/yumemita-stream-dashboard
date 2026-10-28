@@ -2,22 +2,20 @@ import { max, scaleBand, scaleLinear } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { AxisLabel, YAxis } from "@/components/charts/axis";
-import type { StreamRow } from "@/lib/aggregate";
+import type { StreamSummary } from "@/types/dataset";
 import { formatCompact, formatDate } from "@/lib/format";
 
 interface StreamBarsProps {
-  rows: StreamRow[];
+  rows: StreamSummary[];
   selectedId?: string | null;
   onSelect?: (videoId: string) => void;
 }
 
 export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
   const sorted = [...rows]
-    .filter(row => row.pack.vstats?.avgConcurrent != null)
-    .sort((a, b) =>
-      (a.summary.startedAt ?? "").localeCompare(b.summary.startedAt ?? ""),
-    );
-  const maxValue = max(sorted, row => row.pack.vstats?.maxConcurrent ?? 0) ?? 1;
+    .filter(row => row.avgConcurrent != null)
+    .sort((a, b) => (a.startedAt ?? "").localeCompare(b.startedAt ?? ""));
+  const maxValue = max(sorted, row => row.maxConcurrent ?? 0) ?? 1;
 
   return (
     <ChartCanvas ariaLabel="每场直播的平均与最大同接" height={300}>
@@ -26,7 +24,7 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const x = scaleBand()
-          .domain(sorted.map(row => row.summary.videoId))
+          .domain(sorted.map(row => row.videoId))
           .range([0, innerWidth])
           .paddingInner(0.3);
         const y = scaleLinear().domain([0, maxValue]).nice().range([innerHeight, 0]);
@@ -37,17 +35,17 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
           <g transform={`translate(${margin.left},${margin.top})`}>
             <YAxis scale={y} x={innerWidth} />
             {sorted.map((row, index) => {
-              const avg = row.pack.vstats?.avgConcurrent;
-              const peak = row.pack.vstats?.maxConcurrent;
+              const avg = row.avgConcurrent;
+              const peak = row.maxConcurrent;
               if (avg == null) return null;
-              const bandX = x(row.summary.videoId) ?? 0;
+              const bandX = x(row.videoId) ?? 0;
               const center = bandX + x.bandwidth() / 2;
-              const dimmed = selectedId != null && selectedId !== row.summary.videoId;
+              const dimmed = selectedId != null && selectedId !== row.videoId;
               return (
                 <g
-                  aria-label={`${formatDate(row.summary.startedAt)} ${row.summary.title}`}
-                  key={row.summary.videoId}
-                  onClick={() => onSelect?.(row.summary.videoId)}
+                  aria-label={`${formatDate(row.startedAt)} ${row.title}`}
+                  key={row.videoId}
+                  onClick={() => onSelect?.(row.videoId)}
                   opacity={dimmed ? 0.35 : 1}
                   role={onSelect ? "button" : undefined}
                   style={{ cursor: onSelect ? "pointer" : "default" }}
@@ -60,7 +58,7 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
                     x={center - barWidth - 1}
                     y={y(avg)}
                   >
-                    <title>{`${formatDate(row.summary.startedAt)} 平均 ${formatCompact(avg)}`}</title>
+                    <title>{`${formatDate(row.startedAt)} 平均 ${formatCompact(avg)}`}</title>
                   </rect>
                   {peak != null ? (
                     <rect
@@ -71,7 +69,7 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
                       x={center + 1}
                       y={y(peak)}
                     >
-                      <title>{`${formatDate(row.summary.startedAt)} 最大 ${formatCompact(peak)}`}</title>
+                      <title>{`${formatDate(row.startedAt)} 最大 ${formatCompact(peak)}`}</title>
                     </rect>
                   ) : null}
                   {index % labelEvery === 0 ? (
@@ -81,7 +79,7 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
                       x={center}
                       y={innerHeight + 16}
                     >
-                      {formatDate(row.summary.startedAt)}
+                      {formatDate(row.startedAt)}
                     </text>
                   ) : null}
                 </g>

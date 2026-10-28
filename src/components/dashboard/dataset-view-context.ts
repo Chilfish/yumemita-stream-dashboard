@@ -1,11 +1,11 @@
 import { createContext, useContext } from "react";
-import type { DatasetTotals, StreamRow } from "@/lib/aggregate";
-import type { BatchManifest, DatasetIndexEntry } from "@/types/dataset";
+import type { DatasetTotals } from "@/lib/aggregate";
+import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/dataset";
 
 export interface DatasetViewValue {
   dataset: DatasetIndexEntry;
   manifest: BatchManifest;
-  rows: StreamRow[];
+  rows: StreamSummary[];
   totals: DatasetTotals;
 }
 
