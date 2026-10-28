@@ -1,0 +1,283 @@
+import { describe, expect, it } from "vitest";
+import type { StreamDatapack } from "@/types/datapack";
+import type { StreamSummary } from "@/types/dataset";
+import { aggregateDataset, buildStreamRows, currencyRows, findStreamRow } from "./aggregate";
+
+function makeSummary(
+  overrides: Partial<StreamSummary> & {
+    videoId: string;
+    startedAt: string;
+    durationSec: number;
+  },
+): StreamSummary {
+  return {
+    rank: 1,
+    date: overrides.startedAt.slice(0, 10),
+    title: `stream ${overrides.videoId}`,
+    url: `https://www.youtube.com/watch?v=${overrides.videoId}`,
+    durationHms: "1:00:00",
+    endedAt: null,
+    availability: "public",
+    avgConcurrent: null,
+    maxConcurrent: null,
+    maxConcurrentAt: null,
+    watchTimeHours: null,
+    vstatsViews: null,
+    vstatsLikes: null,
+    snapshotViews: null,
+    snapshotLikes: null,
+    snapshotComments: null,
+    chatTotal: 0,
+    chatByKind: { text: 0, superchat: 0, sticker: 0, membership: 0 },
+    pureEmojiOnly: 0,
+    uniqueAuthors: 0,
+    superchats: 0,
+    scTotalsByCurrency: {},
+    stickers: 0,
+    memberships: 0,
+    commentsCaptured: null,
+    chatPer1000AvgViewers: null,
+    likesPer1000Views: null,
+    scPerHour: null,
+    sessionDir: "",
+    datapack: "",
+    generatedAt: "",
+    ...overrides,
+  };
+}
+
+interface PackOptions {
+  id: string;
+  startedAt: string;
+  durationSec: number;
+  avg: number | null;
+  chat: number;
+  sc?: { currency: string; amount: number; count: number };
+  words?: { word: string; count: number }[];
+  authors?: StreamDatapack["chat"]["topAuthors"];
+  peakOffset?: number;
+  availability?: string;
+  views?: number;
+  likes?: number;
+  comments?: number;
+}
+
+function makePack(options: PackOptions): StreamDatapack {
+  const { id, startedAt, durationSec, avg, chat } = options;
+  const minutes = Math.max(1, Math.ceil(durationSec / 60));
+  const peakOffset = options.peakOffset ?? 0;
+  const perMinute = Array.from({ length: minutes }, (_, index) =>
+    index === peakOffset ? 100 : 0,
+  );
+  const scCount = options.sc?.count ?? 0;
+
+  return {
+    schema: "yumemita.stream-datapack/v1",
+    generatedAt: startedAt,
+    video: {
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `stream ${id}`,
+      channelId: "channel",
+      channelName: "channel",
+      channelUrl: null,
+      channelFollowersAtCapture: null,
+      liveStatus: "was_live",
+      availability: options.availability ?? "public",
+      startedAt,
+      publishedAt: startedAt,
+      durationSec,
+      durationHms: "1:00:00",
+      endedAt: null,
+      thumbnail: null,
+      description: null,
+      links: [],
+      chapters: [],
+      hasLiveChatReplay: true,
+      captionsJa: true,
+      snapshot: {
+        views: options.views ?? 1000,
+        likes: options.likes ?? 100,
+        comments: options.comments ?? 0,
+      },
+    },
+    vstats:
+      avg == null
+        ? null
+        : {
+            updatedAt: startedAt,
+            startedAt,
+            endedAt: null,
+            durationText: null,
+            maxConcurrent: avg * 2,
+            maxConcurrentAt: null,
+            avgConcurrent: avg,
+            watchTimeHours: 1,
+            views: options.views ?? 1000,
+            likes: options.likes ?? 100,
+          },
+    chat: {
+      total: chat,
+      byKind: {
+        text: chat - scCount,
+        superchat: scCount,
+        sticker: 0,
+        membership: 0,
+      },
+      pureEmojiOnly: 0,
+      uniqueAuthors: 10,
+      ownerMessages: 0,
+      badges: { Member: chat },
+      timeRange: { firstAt: startedAt, lastAt: startedAt, preRollSec: 0 },
+      coveragePct: 100,
+      density: {
+        perMinuteMean: 1,
+        peakMinute: { offsetMin: peakOffset, at: startedAt, count: 100 },
+        perMinute,
+        perMinuteSc: Array.from({ length: minutes }, () => 0),
+        perFiveMinute: [],
+        perTenMinute: [],
+      },
+      paid: {
+        superchats: options.sc
+          ? [
+              {
+                at: startedAt,
+                author: "tester",
+                amountText: `${options.sc.currency} ${options.sc.amount}`,
+                currency: options.sc.currency,
+                amount: options.sc.amount,
+                message: "",
+              },
+            ]
+          : [],
+        scTotalsByCurrency: options.sc
+          ? { [options.sc.currency]: { count: options.sc.count, amount: options.sc.amount } }
+          : {},
+        stickers: [],
+        stickerTotalsByCurrency: {},
+        memberships: [],
+        paidSharePct: 0,
+      },
+      topAuthors: options.authors ?? [],
+      topWords: options.words ?? [],
+      hashtags: {},
+      emojiKinds: { distinct: 0, top: [] },
+    },
+    comments:
+      options.comments == null
+        ? null
+        : {
+            total: options.comments,
+            topLevel: options.comments,
+            replies: 0,
+            pinned: 0,
+            totalLikes: 0,
+            items: [],
+          },
+    derived: {
+      chatPer1000AvgViewers: avg ? (chat / avg) * 1000 : null,
+      likesPer1000Views: null,
+      scPerHour: null,
+      vstatsVsYtdlpViews: null,
+    },
+  };
+}
+
+describe("aggregate", () => {
+  const rows = [
+    {
+      summary: makeSummary({
+        videoId: "a",
+        startedAt: "2026-10-01T20:00:00+09:00",
+        durationSec: 3600,
+        chatTotal: 100,
+      }),
+      pack: makePack({
+        id: "a",
+        startedAt: "2026-10-01T20:00:00+09:00",
+        durationSec: 3600,
+        avg: 100,
+        chat: 100,
+        sc: { currency: "¥", amount: 500, count: 2 },
+        words: [{ word: "ライブ", count: 5 }],
+        authors: [
+          {
+            author: "@a",
+            messages: 10,
+            superchats: 1,
+            stickers: 0,
+            memberships: 0,
+            badges: ["Member"],
+          },
+        ],
+        peakOffset: 5,
+      }),
+    },
+    {
+      summary: makeSummary({
+        videoId: "b",
+        startedAt: "2026-10-02T20:00:00+09:00",
+        durationSec: 3600,
+        chatTotal: 50,
+      }),
+      pack: makePack({
+        id: "b",
+        startedAt: "2026-10-02T20:00:00+09:00",
+        durationSec: 3600,
+        avg: 200,
+        chat: 50,
+        sc: { currency: "₩", amount: 1000, count: 1 },
+        words: [{ word: "ライブ", count: 3 }],
+        peakOffset: 7,
+        comments: 4,
+      }),
+    },
+  ];
+
+  it("builds rows sorted by start time descending", () => {
+    const built = buildStreamRows(
+      { streams: rows.map(row => row.summary) },
+      new Map(rows.map(row => [row.summary.videoId, row.pack])),
+    );
+    expect(built.map(row => row.summary.videoId)).toEqual(["b", "a"]);
+    expect(findStreamRow(built, "a")?.pack.video.id).toBe("a");
+    expect(findStreamRow(built, "missing")).toBeNull();
+  });
+
+  it("aggregates totals, currencies, words and best streams", () => {
+    const totals = aggregateDataset(rows);
+    expect(totals.streamCount).toBe(2);
+    expect(totals.chatTotal).toBe(150);
+    expect(totals.chatByKind.superchat).toBe(3);
+    expect(totals.views).toBe(2000);
+    expect(totals.withVstatsCount).toBe(2);
+    expect(totals.commentTotal).toBe(4);
+    expect(totals.scByCurrency).toEqual([
+      { currency: "₩", count: 1, amount: 1000 },
+      { currency: "¥", count: 2, amount: 500 },
+    ]);
+    expect(totals.topWords[0]).toMatchObject({ word: "ライブ", count: 8, streams: 2 });
+    expect(totals.topAuthors[0]).toMatchObject({ author: "@a", messages: 10, streams: 1 });
+    expect(totals.bestByAvg?.videoId).toBe("b");
+    expect(totals.bestByChat?.videoId).toBe("a");
+    expect(totals.bestBySc?.videoId).toBe("a");
+    expect(totals.peakChatMinute).toMatchObject({
+      videoId: "a",
+      value: 100,
+      offsetMin: 5,
+    });
+  });
+
+  it("sorts currency rows by amount", () => {
+    expect(
+      currencyRows({
+        "¥": { count: 1, amount: 10 },
+        "₩": { count: 1, amount: 20 },
+      }),
+    ).toEqual([
+      { currency: "₩", count: 1, amount: 20 },
+      { currency: "¥", count: 1, amount: 10 },
+    ]);
+  });
+});

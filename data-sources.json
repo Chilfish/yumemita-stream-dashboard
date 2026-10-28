@@ -1,0 +1,11 @@
+{
+  "datasets": [
+    {
+      "id": "nonoka",
+      "label": "宮永ののか",
+      "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
+      "manifest": "data/nonoka/manifest.json",
+      "datapackDir": "data/nonoka"
+    }
+  ]
+}

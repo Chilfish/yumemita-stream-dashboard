@@ -1,0 +1,1598 @@
+{
+  "schema": "yumemita.stream-datapack.batch/v1",
+  "generatedAt": "2026-10-28T13:15:25.130+09:00",
+  "subject": "宮永ののか",
+  "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
+  "scope": "最近 30 场不重复直播（按标题去重，保留正片）",
+  "count": 30,
+  "note": "每场的完整数据在 datapack 字段指向的文件；本清单只做索引。vstats 为 null 表示该场没有 VSTATS 条目（会员限定，或早于 2026-08-31）。",
+  "streams": [
+    {
+      "rank": 1,
+      "date": "2026-10-22",
+      "videoId": "c5nKH98CfRM",
+      "title": "【ギター重ね録り】うちゅうのふしぎをアコギかばー！れつらご【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=c5nKH98CfRM",
+      "durationHms": "1:17:57",
+      "durationSec": 4677,
+      "startedAt": "2026-10-22T20:42:02+09:00",
+      "endedAt": "2026-10-22T21:59:59+09:00",
+      "availability": "public",
+      "avgConcurrent": 580,
+      "maxConcurrent": 627,
+      "maxConcurrentAt": "10/22 21:51",
+      "watchTimeHours": 690,
+      "vstatsViews": 14740,
+      "vstatsLikes": 462,
+      "snapshotViews": 14146,
+      "snapshotLikes": 456,
+      "snapshotComments": 7,
+      "chatTotal": 1569,
+      "chatByKind": {
+        "text": 1558,
+        "superchat": 9,
+        "sticker": 2,
+        "membership": 0
+      },
+      "pureEmojiOnly": 693,
+      "uniqueAuthors": 194,
+      "superchats": 9,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 4,
+          "amount": 9000
+        },
+        "¥": {
+          "count": 4,
+          "amount": 1040
+        },
+        "NT$": {
+          "count": 1,
+          "amount": 170
+        }
+      },
+      "stickers": 2,
+      "memberships": 0,
+      "commentsCaptured": 7,
+      "chatPer1000AvgViewers": 2705.2,
+      "likesPer1000Views": 31.3,
+      "scPerHour": 6.93,
+      "sessionDir": "2026-10-22_宮永ののか_c5nKH98CfRM",
+      "datapack": "archives/docs/配信数据画像/data/c5nKH98CfRM.datapack.json",
+      "generatedAt": "2026-10-28T12:09:10+09:00"
+    },
+    {
+      "rank": 2,
+      "date": "2026-10-20",
+      "videoId": "dqMd3swZP-k",
+      "title": "【弾き語り】ひさしぶりかも♪みんなやっほー【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=dqMd3swZP-k",
+      "durationHms": "3:08:42",
+      "durationSec": 11322,
+      "startedAt": "2026-10-20T20:26:43+09:00",
+      "endedAt": "2026-10-20T23:35:25+09:00",
+      "availability": "public",
+      "avgConcurrent": 808,
+      "maxConcurrent": 1007,
+      "maxConcurrentAt": "10/20 22:04",
+      "watchTimeHours": 2451,
+      "vstatsViews": 32570,
+      "vstatsLikes": 947,
+      "snapshotViews": 30066,
+      "snapshotLikes": 924,
+      "snapshotComments": 9,
+      "chatTotal": 5491,
+      "chatByKind": {
+        "text": 5455,
+        "superchat": 25,
+        "sticker": 5,
+        "membership": 6
+      },
+      "pureEmojiOnly": 1313,
+      "uniqueAuthors": 407,
+      "superchats": 25,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 10,
+          "amount": 101000
+        },
+        "¥": {
+          "count": 13,
+          "amount": 4100
+        },
+        "NT$": {
+          "count": 2,
+          "amount": 200
+        }
+      },
+      "stickers": 5,
+      "memberships": 6,
+      "commentsCaptured": 9,
+      "chatPer1000AvgViewers": 6795.8,
+      "likesPer1000Views": 29.1,
+      "scPerHour": 7.95,
+      "sessionDir": "2026-10-20_宮永ののか_dqMd3swZP-k",
+      "datapack": "archives/docs/配信数据画像/data/dqMd3swZP-k.datapack.json",
+      "generatedAt": "2026-10-28T12:09:10+09:00"
+    },
+    {
+      "rank": 3,
+      "date": "2026-10-13",
+      "videoId": "0Oom7elwKMo",
+      "title": "【ライブ振り返り】バンドリ！13thライブをふりかえる！【ゆめみた/夢限大みゅーたいぷ】",
+      "url": "https://www.youtube.com/watch?v=0Oom7elwKMo",
+      "durationHms": "2:29:50",
+      "durationSec": 8990,
+      "startedAt": "2026-10-13T20:16:46+09:00",
+      "endedAt": "2026-10-13T22:46:36+09:00",
+      "availability": "public",
+      "avgConcurrent": 645,
+      "maxConcurrent": 823,
+      "maxConcurrentAt": "10/13 21:00",
+      "watchTimeHours": 1547,
+      "vstatsViews": 22488,
+      "vstatsLikes": 596,
+      "snapshotViews": 22520,
+      "snapshotLikes": 596,
+      "snapshotComments": 9,
+      "chatTotal": 3897,
+      "chatByKind": {
+        "text": 3844,
+        "superchat": 47,
+        "sticker": 2,
+        "membership": 4
+      },
+      "pureEmojiOnly": 618,
+      "uniqueAuthors": 282,
+      "superchats": 47,
+      "scTotalsByCurrency": {
+        "HK$": {
+          "count": 3,
+          "amount": 70
+        },
+        "₩": {
+          "count": 5,
+          "amount": 27000
+        },
+        "¥": {
+          "count": 34,
+          "amount": 50958
+        },
+        "NT$": {
+          "count": 5,
+          "amount": 360
+        }
+      },
+      "stickers": 2,
+      "memberships": 4,
+      "commentsCaptured": 9,
+      "chatPer1000AvgViewers": 6041.9,
+      "likesPer1000Views": 26.5,
+      "scPerHour": 18.82,
+      "sessionDir": "",
+      "datapack": "data/nonoka/0Oom7elwKMo.datapack.json",
+      "generatedAt": "2026-10-28T12:09:10+09:00"
+    },
+    {
+      "rank": 4,
+      "date": "2026-10-06",
+      "videoId": "yF_UhMTJu7g",
+      "title": "【#アワーノーツ】ののユノSSR両方引くまで日本語禁止！【ゆめみた/夢限大みゅーたいぷ】",
+      "url": "https://www.youtube.com/watch?v=yF_UhMTJu7g",
+      "durationHms": "1:20:11",
+      "durationSec": 4811,
+      "startedAt": "2026-10-06T20:39:08+09:00",
+      "endedAt": "2026-10-06T21:59:19+09:00",
+      "availability": "public",
+      "avgConcurrent": 1158,
+      "maxConcurrent": 1392,
+      "maxConcurrentAt": "10/06 21:08",
+      "watchTimeHours": 1456,
+      "vstatsViews": 33364,
+      "vstatsLikes": 906,
+      "snapshotViews": 33407,
+      "snapshotLikes": 907,
+      "snapshotComments": 17,
+      "chatTotal": 4772,
+      "chatByKind": {
+        "text": 4735,
+        "superchat": 26,
+        "sticker": 8,
+        "membership": 3
+      },
+      "pureEmojiOnly": 616,
+      "uniqueAuthors": 418,
+      "superchats": 25,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 15,
+          "amount": 6830
+        },
+        "₩": {
+          "count": 3,
+          "amount": 6000
+        },
+        "$": {
+          "count": 2,
+          "amount": 4
+        },
+        "NT$": {
+          "count": 5,
+          "amount": 195
+        }
+      },
+      "stickers": 8,
+      "memberships": 3,
+      "commentsCaptured": 17,
+      "chatPer1000AvgViewers": 4120.9,
+      "likesPer1000Views": 27.2,
+      "scPerHour": 18.74,
+      "sessionDir": "2026-10-06_宮永ののか_yF_UhMTJu7g",
+      "datapack": "archives/docs/配信数据画像/data/yF_UhMTJu7g.datapack.json",
+      "generatedAt": "2026-10-28T12:09:10+09:00"
+    },
+    {
+      "rank": 5,
+      "date": "2026-09-30",
+      "videoId": "KmfeeLN_BkI",
+      "title": "【でかいぬしゅうかい】さむくなってきたよね# 24【宮永ののか/夢限大みゅーたいぷ】",
+      "url": "https://www.youtube.com/watch?v=KmfeeLN_BkI",
+      "durationHms": "2:28:05",
+      "durationSec": 8885,
+      "startedAt": "2026-09-30T20:01:08+09:00",
+      "endedAt": "2026-09-30T22:29:13+09:00",
+      "availability": "subscriber_only",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": null,
+      "vstatsLikes": null,
+      "snapshotViews": null,
+      "snapshotLikes": 72,
+      "snapshotComments": 6,
+      "chatTotal": 2722,
+      "chatByKind": {
+        "text": 2712,
+        "superchat": 4,
+        "sticker": 6,
+        "membership": 0
+      },
+      "pureEmojiOnly": 610,
+      "uniqueAuthors": 96,
+      "superchats": 4,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 1,
+          "amount": 2000
+        },
+        "¥": {
+          "count": 3,
+          "amount": 1700
+        }
+      },
+      "stickers": 6,
+      "memberships": 0,
+      "commentsCaptured": 6,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": null,
+      "scPerHour": 1.62,
+      "sessionDir": "2026-09-30_宮永ののか_KmfeeLN_BkI",
+      "datapack": "archives/docs/配信数据画像/data/KmfeeLN_BkI.datapack.json",
+      "generatedAt": "2026-10-28T12:09:11+09:00"
+    },
+    {
+      "rank": 6,
+      "date": "2026-09-27",
+      "videoId": "-xMz0CgnHGM",
+      "title": "# 8【魔法少女ノ魔女裁判】第四回魔女裁判！かわいい魔法少女ゲームをあそぶ【宮永ののか】【ゆめみた/夢限大みゅーたいぷ】#まのさば実況 #まのさばネタバレ",
+      "url": "https://www.youtube.com/watch?v=-xMz0CgnHGM",
+      "durationHms": "2:38:45",
+      "durationSec": 9525,
+      "startedAt": "2026-09-27T11:13:09+09:00",
+      "endedAt": "2026-09-27T13:51:54+09:00",
+      "availability": "public",
+      "avgConcurrent": 515,
+      "maxConcurrent": 715,
+      "maxConcurrentAt": "09/27 13:18",
+      "watchTimeHours": 1375,
+      "vstatsViews": 24361,
+      "vstatsLikes": 478,
+      "snapshotViews": 24404,
+      "snapshotLikes": 479,
+      "snapshotComments": 11,
+      "chatTotal": 2918,
+      "chatByKind": {
+        "text": 2915,
+        "superchat": 3,
+        "sticker": 0,
+        "membership": 0
+      },
+      "pureEmojiOnly": 412,
+      "uniqueAuthors": 171,
+      "superchats": 3,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 2,
+          "amount": 866
+        },
+        "₩": {
+          "count": 1,
+          "amount": 2000
+        }
+      },
+      "stickers": 0,
+      "memberships": 0,
+      "commentsCaptured": 11,
+      "chatPer1000AvgViewers": 5666,
+      "likesPer1000Views": 19.6,
+      "scPerHour": 1.13,
+      "sessionDir": "2026-09-27_宮永ののか_-xMz0CgnHGM",
+      "datapack": "archives/docs/配信数据画像/data/-xMz0CgnHGM.datapack.json",
+      "generatedAt": "2026-10-28T12:09:10+09:00"
+    },
+    {
+      "rank": 7,
+      "date": "2026-09-26",
+      "videoId": "IkeMIZRzeuQ",
+      "title": "【弾き騙り】新宿着陸計画ありがとう！振り返り＆おしゃべり(ギター付き)【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=IkeMIZRzeuQ",
+      "durationHms": "3:31:56",
+      "durationSec": 12716,
+      "startedAt": "2026-09-26T22:32:57+09:00",
+      "endedAt": "2026-09-27T02:04:53+09:00",
+      "availability": "public",
+      "avgConcurrent": 550,
+      "maxConcurrent": 811,
+      "maxConcurrentAt": "09/26 23:51",
+      "watchTimeHours": 1956,
+      "vstatsViews": 26049,
+      "vstatsLikes": 609,
+      "snapshotViews": 26059,
+      "snapshotLikes": 609,
+      "snapshotComments": 10,
+      "chatTotal": 4186,
+      "chatByKind": {
+        "text": 4150,
+        "superchat": 35,
+        "sticker": 1,
+        "membership": 0
+      },
+      "pureEmojiOnly": 904,
+      "uniqueAuthors": 255,
+      "superchats": 31,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 8,
+          "amount": 34500
+        },
+        "¥": {
+          "count": 19,
+          "amount": 23289
+        },
+        "HK$": {
+          "count": 3,
+          "amount": 63
+        },
+        "NT$": {
+          "count": 1,
+          "amount": 30
+        }
+      },
+      "stickers": 1,
+      "memberships": 0,
+      "commentsCaptured": 10,
+      "chatPer1000AvgViewers": 7610.9,
+      "likesPer1000Views": 23.4,
+      "scPerHour": 8.77,
+      "sessionDir": "2026-09-26_宮永ののか_IkeMIZRzeuQ",
+      "datapack": "archives/docs/配信数据画像/data/IkeMIZRzeuQ.datapack.json",
+      "generatedAt": "2026-10-28T12:09:10+09:00"
+    },
+    {
+      "rank": 8,
+      "date": "2026-09-23",
+      "videoId": "Y28oPgYZuZo",
+      "title": "【弾き語り】シルバーウィークさいしゅうび！とか言わないほうがいいか(-_-;)【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=Y28oPgYZuZo",
+      "durationHms": "2:43:48",
+      "durationSec": 9828,
+      "startedAt": "2026-09-23T23:05:24+09:00",
+      "endedAt": "2026-09-24T01:49:12+09:00",
+      "availability": "public",
+      "avgConcurrent": 717,
+      "maxConcurrent": 867,
+      "maxConcurrentAt": "09/24 00:26",
+      "watchTimeHours": 1973,
+      "vstatsViews": 26548,
+      "vstatsLikes": 599,
+      "snapshotViews": 26551,
+      "snapshotLikes": 599,
+      "snapshotComments": 13,
+      "chatTotal": 4168,
+      "chatByKind": {
+        "text": 4141,
+        "superchat": 25,
+        "sticker": 2,
+        "membership": 0
+      },
+      "pureEmojiOnly": 1164,
+      "uniqueAuthors": 283,
+      "superchats": 23,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 17,
+          "amount": 6020
+        },
+        "HK$": {
+          "count": 1,
+          "amount": 10
+        },
+        "₩": {
+          "count": 3,
+          "amount": 6000
+        },
+        "NT$": {
+          "count": 2,
+          "amount": 60
+        }
+      },
+      "stickers": 2,
+      "memberships": 0,
+      "commentsCaptured": 13,
+      "chatPer1000AvgViewers": 5813.1,
+      "likesPer1000Views": 22.6,
+      "scPerHour": 8.43,
+      "sessionDir": "2026-09-23_宮永ののか_Y28oPgYZuZo",
+      "datapack": "archives/docs/配信数据画像/data/Y28oPgYZuZo.datapack.json",
+      "generatedAt": "2026-10-28T12:10:48+09:00"
+    },
+    {
+      "rank": 9,
+      "date": "2026-09-21",
+      "videoId": "duxW1ah76vs",
+      "title": "【Our Notes先行プレイ!】フルコンするまでギター練習!上手に演奏できるもん!【ゆめみた/夢限大みゅーたいぷ】 #半分人間",
+      "url": "https://www.youtube.com/watch?v=duxW1ah76vs",
+      "durationHms": "1:37:25",
+      "durationSec": 5845,
+      "startedAt": "2026-09-21T22:32:01+09:00",
+      "endedAt": "2026-09-22T00:09:26+09:00",
+      "availability": "public",
+      "avgConcurrent": 1255,
+      "maxConcurrent": 1634,
+      "maxConcurrentAt": "09/21 23:18",
+      "watchTimeHours": 2030,
+      "vstatsViews": 41954,
+      "vstatsLikes": 1120,
+      "snapshotViews": 41964,
+      "snapshotLikes": 1120,
+      "snapshotComments": 17,
+      "chatTotal": 6899,
+      "chatByKind": {
+        "text": 6874,
+        "superchat": 19,
+        "sticker": 6,
+        "membership": 0
+      },
+      "pureEmojiOnly": 1022,
+      "uniqueAuthors": 418,
+      "superchats": 19,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 14,
+          "amount": 8140
+        },
+        "₩": {
+          "count": 5,
+          "amount": 12000
+        }
+      },
+      "stickers": 6,
+      "memberships": 0,
+      "commentsCaptured": 17,
+      "chatPer1000AvgViewers": 5497.2,
+      "likesPer1000Views": 26.7,
+      "scPerHour": 11.71,
+      "sessionDir": "2026-09-21_宮永ののか_duxW1ah76vs",
+      "datapack": "archives/docs/配信数据画像/data/duxW1ah76vs.datapack.json",
+      "generatedAt": "2026-10-28T12:11:11+09:00"
+    },
+    {
+      "rank": 10,
+      "date": "2026-09-20",
+      "videoId": "R8u6-bD13RY",
+      "title": "【弾き語り】リリイベありがとう🎶ちょっとだけ！【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=R8u6-bD13RY",
+      "durationHms": "1:21:48",
+      "durationSec": 4908,
+      "startedAt": "2026-09-20T23:30:49+09:00",
+      "endedAt": "2026-09-21T00:52:37+09:00",
+      "availability": "public",
+      "avgConcurrent": 455,
+      "maxConcurrent": 693,
+      "maxConcurrentAt": "09/21 00:46",
+      "watchTimeHours": 622,
+      "vstatsViews": 15660,
+      "vstatsLikes": 478,
+      "snapshotViews": 15660,
+      "snapshotLikes": 478,
+      "snapshotComments": 9,
+      "chatTotal": 2110,
+      "chatByKind": {
+        "text": 2092,
+        "superchat": 12,
+        "sticker": 5,
+        "membership": 1
+      },
+      "pureEmojiOnly": 591,
+      "uniqueAuthors": 205,
+      "superchats": 10,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 4,
+          "amount": 8000
+        },
+        "¥": {
+          "count": 5,
+          "amount": 2840
+        },
+        "NT$": {
+          "count": 1,
+          "amount": 30
+        }
+      },
+      "stickers": 5,
+      "memberships": 1,
+      "commentsCaptured": 9,
+      "chatPer1000AvgViewers": 4637.4,
+      "likesPer1000Views": 30.5,
+      "scPerHour": 7.34,
+      "sessionDir": "2026-09-20_宮永ののか_R8u6-bD13RY",
+      "datapack": "archives/docs/配信数据画像/data/R8u6-bD13RY.datapack.json",
+      "generatedAt": "2026-10-28T12:10:06+09:00"
+    },
+    {
+      "rank": 11,
+      "date": "2026-09-18",
+      "videoId": "UQBqWEKNZWk",
+      "title": "【弾き語り】ぎたー！！！！！！！！！【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=UQBqWEKNZWk",
+      "durationHms": "2:15:45",
+      "durationSec": 8145,
+      "startedAt": "2026-09-18T23:01:09+09:00",
+      "endedAt": "2026-09-19T01:16:54+09:00",
+      "availability": "public",
+      "avgConcurrent": 579,
+      "maxConcurrent": 742,
+      "maxConcurrentAt": "09/19 01:02",
+      "watchTimeHours": 1324,
+      "vstatsViews": 26224,
+      "vstatsLikes": 636,
+      "snapshotViews": 26089,
+      "snapshotLikes": 636,
+      "snapshotComments": 12,
+      "chatTotal": 3030,
+      "chatByKind": {
+        "text": 3005,
+        "superchat": 17,
+        "sticker": 8,
+        "membership": 0
+      },
+      "pureEmojiOnly": 824,
+      "uniqueAuthors": 345,
+      "superchats": 17,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 4,
+          "amount": 67000
+        },
+        "NT$": {
+          "count": 6,
+          "amount": 345
+        },
+        "¥": {
+          "count": 6,
+          "amount": 1620
+        },
+        "HK$": {
+          "count": 1,
+          "amount": 10
+        }
+      },
+      "stickers": 8,
+      "memberships": 0,
+      "commentsCaptured": 12,
+      "chatPer1000AvgViewers": 5233.2,
+      "likesPer1000Views": 24.3,
+      "scPerHour": 7.53,
+      "sessionDir": "2026-09-18_宮永ののか_UQBqWEKNZWk",
+      "datapack": "archives/docs/配信数据画像/data/UQBqWEKNZWk.datapack.json",
+      "generatedAt": "2026-10-28T12:09:12+09:00"
+    },
+    {
+      "rank": 12,
+      "date": "2026-09-17",
+      "videoId": "G7uEkKAC8Bc",
+      "title": "【弾き語り】またーり【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=G7uEkKAC8Bc",
+      "durationHms": "1:53:39",
+      "durationSec": 6819,
+      "startedAt": "2026-09-17T20:06:24+09:00",
+      "endedAt": "2026-09-17T22:00:03+09:00",
+      "availability": "public",
+      "avgConcurrent": 574,
+      "maxConcurrent": 760,
+      "maxConcurrentAt": "09/17 21:50",
+      "watchTimeHours": 1091,
+      "vstatsViews": 22962,
+      "vstatsLikes": 669,
+      "snapshotViews": 22963,
+      "snapshotLikes": 669,
+      "snapshotComments": 13,
+      "chatTotal": 3002,
+      "chatByKind": {
+        "text": 2989,
+        "superchat": 6,
+        "sticker": 5,
+        "membership": 2
+      },
+      "pureEmojiOnly": 720,
+      "uniqueAuthors": 266,
+      "superchats": 6,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 4,
+          "amount": 1475
+        },
+        "HK$": {
+          "count": 1,
+          "amount": 10
+        },
+        "₩": {
+          "count": 1,
+          "amount": 2000
+        }
+      },
+      "stickers": 4,
+      "memberships": 2,
+      "commentsCaptured": 13,
+      "chatPer1000AvgViewers": 5230,
+      "likesPer1000Views": 29.1,
+      "scPerHour": 3.17,
+      "sessionDir": "2026-09-17_宮永ののか_G7uEkKAC8Bc",
+      "datapack": "archives/docs/配信数据画像/data/G7uEkKAC8Bc.datapack.json",
+      "generatedAt": "2026-10-28T12:10:49+09:00"
+    },
+    {
+      "rank": 13,
+      "date": "2026-09-16",
+      "videoId": "9Di14qEQJH8",
+      "title": "【弾き語り】㊗アニメ最終回！アニメゆめみた、どうだった？【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=9Di14qEQJH8",
+      "durationHms": "2:30:13",
+      "durationSec": 9013,
+      "startedAt": "2026-09-16T20:07:20+09:00",
+      "endedAt": "2026-09-16T22:37:33+09:00",
+      "availability": "public",
+      "avgConcurrent": 536,
+      "maxConcurrent": 627,
+      "maxConcurrentAt": "09/16 20:55",
+      "watchTimeHours": 1342,
+      "vstatsViews": 24012,
+      "vstatsLikes": 614,
+      "snapshotViews": 24016,
+      "snapshotLikes": 614,
+      "snapshotComments": 11,
+      "chatTotal": 2846,
+      "chatByKind": {
+        "text": 2827,
+        "superchat": 14,
+        "sticker": 1,
+        "membership": 4
+      },
+      "pureEmojiOnly": 630,
+      "uniqueAuthors": 251,
+      "superchats": 14,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 8,
+          "amount": 2480
+        },
+        "₩": {
+          "count": 3,
+          "amount": 42000
+        },
+        "HK$": {
+          "count": 2,
+          "amount": 20
+        },
+        "NT$": {
+          "count": 1,
+          "amount": 30
+        }
+      },
+      "stickers": 1,
+      "memberships": 4,
+      "commentsCaptured": 11,
+      "chatPer1000AvgViewers": 5309.7,
+      "likesPer1000Views": 25.6,
+      "scPerHour": 5.61,
+      "sessionDir": "2026-09-16_宮永ののか_9Di14qEQJH8",
+      "datapack": "archives/docs/配信数据画像/data/9Di14qEQJH8.datapack.json",
+      "generatedAt": "2026-10-28T12:11:25+09:00"
+    },
+    {
+      "rank": 14,
+      "date": "2026-09-12",
+      "videoId": "4YHGjqizdeY",
+      "title": "# 7【魔法少女ノ魔女裁判】四話とつにゅー！かわいい魔法少女ゲームをあそぶ【宮永ののか】【ゆめみた/夢限大みゅーたいぷ】#まのさば実況 #まのさばネタバレ",
+      "url": "https://www.youtube.com/watch?v=4YHGjqizdeY",
+      "durationHms": "3:00:46",
+      "durationSec": 10846,
+      "startedAt": "2026-09-12T12:02:52+09:00",
+      "endedAt": "2026-09-12T15:03:38+09:00",
+      "availability": "public",
+      "avgConcurrent": 414,
+      "maxConcurrent": 505,
+      "maxConcurrentAt": "09/12 14:01",
+      "watchTimeHours": 1249,
+      "vstatsViews": 19119,
+      "vstatsLikes": 439,
+      "snapshotViews": 19119,
+      "snapshotLikes": 439,
+      "snapshotComments": 14,
+      "chatTotal": 3503,
+      "chatByKind": {
+        "text": 3496,
+        "superchat": 4,
+        "sticker": 1,
+        "membership": 2
+      },
+      "pureEmojiOnly": 387,
+      "uniqueAuthors": 180,
+      "superchats": 4,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 4,
+          "amount": 1500
+        }
+      },
+      "stickers": 1,
+      "memberships": 2,
+      "commentsCaptured": 14,
+      "chatPer1000AvgViewers": 8461.4,
+      "likesPer1000Views": 23,
+      "scPerHour": 1.33,
+      "sessionDir": "2026-09-12_宮永ののか_4YHGjqizdeY",
+      "datapack": "archives/docs/配信数据画像/data/4YHGjqizdeY.datapack.json",
+      "generatedAt": "2026-10-28T12:12:23+09:00"
+    },
+    {
+      "rank": 15,
+      "date": "2026-09-09",
+      "videoId": "ITHkg-79XRw",
+      "title": "【弾き語り】アニメ最終回直前！ざつだんギター【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=ITHkg-79XRw",
+      "durationHms": "2:11:38",
+      "durationSec": 7898,
+      "startedAt": "2026-09-09T23:34:34+09:00",
+      "endedAt": "2026-09-10T01:46:12+09:00",
+      "availability": "public",
+      "avgConcurrent": 542,
+      "maxConcurrent": 659,
+      "maxConcurrentAt": "09/10 00:39",
+      "watchTimeHours": 1193,
+      "vstatsViews": 15759,
+      "vstatsLikes": 496,
+      "snapshotViews": 15759,
+      "snapshotLikes": 496,
+      "snapshotComments": 12,
+      "chatTotal": 2900,
+      "chatByKind": {
+        "text": 2864,
+        "superchat": 27,
+        "sticker": 4,
+        "membership": 5
+      },
+      "pureEmojiOnly": 887,
+      "uniqueAuthors": 252,
+      "superchats": 27,
+      "scTotalsByCurrency": {
+        "HK$": {
+          "count": 2,
+          "amount": 20
+        },
+        "₩": {
+          "count": 6,
+          "amount": 109333
+        },
+        "¥": {
+          "count": 19,
+          "amount": 20930
+        }
+      },
+      "stickers": 4,
+      "memberships": 5,
+      "commentsCaptured": 12,
+      "chatPer1000AvgViewers": 5350.6,
+      "likesPer1000Views": 31.5,
+      "scPerHour": 12.34,
+      "sessionDir": "2026-09-09_宮永ののか_ITHkg-79XRw",
+      "datapack": "archives/docs/配信数据画像/data/ITHkg-79XRw.datapack.json",
+      "generatedAt": "2026-10-28T12:12:21+09:00"
+    },
+    {
+      "rank": 16,
+      "date": "2026-08-31",
+      "videoId": "SS04QWN1rrQ",
+      "title": "【弾き語り】8月さいご！ClariSギターれんしゅ～【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=SS04QWN1rrQ",
+      "durationHms": "3:00:07",
+      "durationSec": 10807,
+      "startedAt": "2026-08-31T21:06:57+09:00",
+      "endedAt": "2026-09-01T00:07:04+09:00",
+      "availability": "public",
+      "avgConcurrent": 375,
+      "maxConcurrent": 681,
+      "maxConcurrentAt": "08/31 23:47",
+      "watchTimeHours": 1133,
+      "vstatsViews": 33816,
+      "vstatsLikes": 731,
+      "snapshotViews": 33816,
+      "snapshotLikes": 731,
+      "snapshotComments": 10,
+      "chatTotal": 2999,
+      "chatByKind": {
+        "text": 2980,
+        "superchat": 12,
+        "sticker": 5,
+        "membership": 2
+      },
+      "pureEmojiOnly": 810,
+      "uniqueAuthors": 306,
+      "superchats": 12,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 5,
+          "amount": 21500
+        },
+        "NT$": {
+          "count": 3,
+          "amount": 255
+        },
+        "¥": {
+          "count": 4,
+          "amount": 2000
+        }
+      },
+      "stickers": 5,
+      "memberships": 2,
+      "commentsCaptured": 10,
+      "chatPer1000AvgViewers": 7997.3,
+      "likesPer1000Views": 21.6,
+      "scPerHour": 4,
+      "sessionDir": "2026-08-31_宮永ののか_SS04QWN1rrQ",
+      "datapack": "archives/docs/配信数据画像/data/SS04QWN1rrQ.datapack.json",
+      "generatedAt": "2026-10-28T12:12:33+09:00"
+    },
+    {
+      "rank": 17,
+      "date": "2026-08-30",
+      "videoId": "blxgN0vjLBI",
+      "title": "# 6【魔法少女ノ魔女裁判】第三回魔女裁判！かわいい魔法少女ゲームをあそぶ【宮永ののか】【ゆめみた/夢限大みゅーたいぷ】#まのさば実況 #まのさばネタバレ",
+      "url": "https://www.youtube.com/watch?v=blxgN0vjLBI",
+      "durationHms": "3:39:17",
+      "durationSec": 13157,
+      "startedAt": "2026-08-30T11:55:02+09:00",
+      "endedAt": "2026-08-30T15:34:19+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": 28606,
+      "vstatsLikes": 556,
+      "snapshotViews": 28608,
+      "snapshotLikes": 556,
+      "snapshotComments": 11,
+      "chatTotal": 4063,
+      "chatByKind": {
+        "text": 4051,
+        "superchat": 9,
+        "sticker": 2,
+        "membership": 1
+      },
+      "pureEmojiOnly": 432,
+      "uniqueAuthors": 211,
+      "superchats": 8,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 2,
+          "amount": 7000
+        },
+        "¥": {
+          "count": 3,
+          "amount": 2690
+        },
+        "NT$": {
+          "count": 3,
+          "amount": 90
+        }
+      },
+      "stickers": 2,
+      "memberships": 1,
+      "commentsCaptured": 11,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": 19.4,
+      "scPerHour": 2.19,
+      "sessionDir": "2026-08-30_宮永ののか_blxgN0vjLBI",
+      "datapack": "archives/docs/配信数据画像/data/blxgN0vjLBI.datapack.json",
+      "generatedAt": "2026-10-28T12:13:11+09:00"
+    },
+    {
+      "rank": 18,
+      "date": "2026-08-29",
+      "videoId": "LmI79HkAsNc",
+      "title": "# 5【魔法少女ノ魔女裁判】３話かいし！かわいい魔法少女ゲームをあそぶ【宮永ののか】【ゆめみた/夢限大みゅーたいぷ】#まのさば実況 #まのさばネタバレ",
+      "url": "https://www.youtube.com/watch?v=LmI79HkAsNc",
+      "durationHms": "3:25:56",
+      "durationSec": 12356,
+      "startedAt": "2026-08-29T11:49:22+09:00",
+      "endedAt": "2026-08-29T15:15:18+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": 21789,
+      "vstatsLikes": 460,
+      "snapshotViews": 21792,
+      "snapshotLikes": 460,
+      "snapshotComments": 7,
+      "chatTotal": 1694,
+      "chatByKind": {
+        "text": 1690,
+        "superchat": 0,
+        "sticker": 4,
+        "membership": 0
+      },
+      "pureEmojiOnly": 194,
+      "uniqueAuthors": 147,
+      "superchats": 0,
+      "scTotalsByCurrency": {},
+      "stickers": 4,
+      "memberships": 0,
+      "commentsCaptured": 7,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": 21.1,
+      "scPerHour": null,
+      "sessionDir": "2026-08-29_宮永ののか_LmI79HkAsNc",
+      "datapack": "archives/docs/配信数据画像/data/LmI79HkAsNc.datapack.json",
+      "generatedAt": "2026-10-28T12:13:30+09:00"
+    },
+    {
+      "rank": 19,
+      "date": "2026-08-28",
+      "videoId": "8pLPN7zBYnc",
+      "title": "【でかいぬしゅうかい】はうー# 23【宮永ののか/夢限大みゅーたいぷ】",
+      "url": "https://www.youtube.com/watch?v=8pLPN7zBYnc",
+      "durationHms": "2:04:15",
+      "durationSec": 7455,
+      "startedAt": "2026-08-28T23:42:14+09:00",
+      "endedAt": "2026-08-29T01:46:29+09:00",
+      "availability": "subscriber_only",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": null,
+      "vstatsLikes": null,
+      "snapshotViews": null,
+      "snapshotLikes": 65,
+      "snapshotComments": 3,
+      "chatTotal": 1637,
+      "chatByKind": {
+        "text": 1624,
+        "superchat": 10,
+        "sticker": 3,
+        "membership": 0
+      },
+      "pureEmojiOnly": 263,
+      "uniqueAuthors": 87,
+      "superchats": 10,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 5,
+          "amount": 1420
+        },
+        "₩": {
+          "count": 5,
+          "amount": 16000
+        }
+      },
+      "stickers": 3,
+      "memberships": 0,
+      "commentsCaptured": 3,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": null,
+      "scPerHour": 4.82,
+      "sessionDir": "2026-08-28_宮永ののか_8pLPN7zBYnc",
+      "datapack": "archives/docs/配信数据画像/data/8pLPN7zBYnc.datapack.json",
+      "generatedAt": "2026-10-28T12:14:10+09:00"
+    },
+    {
+      "rank": 20,
+      "date": "2026-08-26",
+      "videoId": "c9zFMwjV7k0",
+      "title": "【弾き語り】EGOISTおおめ、またーりれんしゅう←いつもでは【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=c9zFMwjV7k0",
+      "durationHms": "2:05:38",
+      "durationSec": 7538,
+      "startedAt": "2026-08-26T23:07:49+09:00",
+      "endedAt": "2026-08-27T01:13:27+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": 12065,
+      "vstatsLikes": 609,
+      "snapshotViews": 12068,
+      "snapshotLikes": 609,
+      "snapshotComments": 13,
+      "chatTotal": 2535,
+      "chatByKind": {
+        "text": 2505,
+        "superchat": 22,
+        "sticker": 5,
+        "membership": 3
+      },
+      "pureEmojiOnly": 666,
+      "uniqueAuthors": 284,
+      "superchats": 22,
+      "scTotalsByCurrency": {
+        "NT$": {
+          "count": 2,
+          "amount": 100
+        },
+        "₩": {
+          "count": 12,
+          "amount": 194000
+        },
+        "¥": {
+          "count": 7,
+          "amount": 3618
+        },
+        "HK$": {
+          "count": 1,
+          "amount": 38
+        }
+      },
+      "stickers": 5,
+      "memberships": 3,
+      "commentsCaptured": 13,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": 50.5,
+      "scPerHour": 10.51,
+      "sessionDir": "2026-08-26_宮永ののか_c9zFMwjV7k0",
+      "datapack": "archives/docs/配信数据画像/data/c9zFMwjV7k0.datapack.json",
+      "generatedAt": "2026-10-28T12:14:47+09:00"
+    },
+    {
+      "rank": 21,
+      "date": "2026-08-25",
+      "videoId": "UFx2RyP1-bw",
+      "title": "【弾き語り】化物語ひきがたりわく【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=UFx2RyP1-bw",
+      "durationHms": "2:08:37",
+      "durationSec": 7717,
+      "startedAt": "2026-08-25T22:33:41+09:00",
+      "endedAt": "2026-08-26T00:42:18+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": 10355,
+      "vstatsLikes": 622,
+      "snapshotViews": 10358,
+      "snapshotLikes": 622,
+      "snapshotComments": 8,
+      "chatTotal": 1874,
+      "chatByKind": {
+        "text": 1849,
+        "superchat": 15,
+        "sticker": 10,
+        "membership": 0
+      },
+      "pureEmojiOnly": 455,
+      "uniqueAuthors": 244,
+      "superchats": 12,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 6,
+          "amount": 1750
+        },
+        "NT$": {
+          "count": 2,
+          "amount": 105
+        },
+        "₩": {
+          "count": 4,
+          "amount": 22300
+        }
+      },
+      "stickers": 8,
+      "memberships": 0,
+      "commentsCaptured": 8,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": 60.1,
+      "scPerHour": 5.61,
+      "sessionDir": "2026-08-25_宮永ののか_UFx2RyP1-bw",
+      "datapack": "archives/docs/配信数据画像/data/UFx2RyP1-bw.datapack.json",
+      "generatedAt": "2026-10-28T12:14:57+09:00"
+    },
+    {
+      "rank": 22,
+      "date": "2026-08-24",
+      "videoId": "-NkdhlHMIcc",
+      "title": "【弾き語り】むかしの単語帳出てきた【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=-NkdhlHMIcc",
+      "durationHms": "2:24:53",
+      "durationSec": 8693,
+      "startedAt": "2026-08-24T23:03:11+09:00",
+      "endedAt": "2026-08-25T01:28:04+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": 12443,
+      "vstatsLikes": 698,
+      "snapshotViews": 12443,
+      "snapshotLikes": 698,
+      "snapshotComments": 10,
+      "chatTotal": 2483,
+      "chatByKind": {
+        "text": 2443,
+        "superchat": 22,
+        "sticker": 10,
+        "membership": 8
+      },
+      "pureEmojiOnly": 588,
+      "uniqueAuthors": 330,
+      "superchats": 21,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 13,
+          "amount": 67000
+        },
+        "¥": {
+          "count": 7,
+          "amount": 4610
+        },
+        "NT$": {
+          "count": 1,
+          "amount": 150
+        }
+      },
+      "stickers": 9,
+      "memberships": 8,
+      "commentsCaptured": 10,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": 56.1,
+      "scPerHour": 8.7,
+      "sessionDir": "2026-08-24_宮永ののか_-NkdhlHMIcc",
+      "datapack": "archives/docs/配信数据画像/data/-NkdhlHMIcc.datapack.json",
+      "generatedAt": "2026-10-28T12:16:17+09:00"
+    },
+    {
+      "rank": 23,
+      "date": "2026-08-23",
+      "videoId": "EM0dUwFmyXc",
+      "title": "【弾き語り】フリーライブのはなししながらギターもひこう【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=EM0dUwFmyXc",
+      "durationHms": "2:37:55",
+      "durationSec": 9475,
+      "startedAt": "2026-08-23T22:34:43+09:00",
+      "endedAt": "2026-08-24T01:12:38+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": 13551,
+      "vstatsLikes": 782,
+      "snapshotViews": 13552,
+      "snapshotLikes": 782,
+      "snapshotComments": 8,
+      "chatTotal": 2711,
+      "chatByKind": {
+        "text": 2686,
+        "superchat": 21,
+        "sticker": 0,
+        "membership": 4
+      },
+      "pureEmojiOnly": 583,
+      "uniqueAuthors": 340,
+      "superchats": 20,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 17,
+          "amount": 18833
+        },
+        "₩": {
+          "count": 2,
+          "amount": 52000
+        },
+        "NT$": {
+          "count": 1,
+          "amount": 75
+        }
+      },
+      "stickers": 0,
+      "memberships": 4,
+      "commentsCaptured": 8,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": 57.7,
+      "scPerHour": 7.6,
+      "sessionDir": "2026-08-23_宮永ののか_EM0dUwFmyXc",
+      "datapack": "archives/docs/配信数据画像/data/EM0dUwFmyXc.datapack.json",
+      "generatedAt": "2026-10-28T12:15:55+09:00"
+    },
+    {
+      "rank": 24,
+      "date": "2026-08-20",
+      "videoId": "p-R2Mluzdtc",
+      "title": "【弾き語り】アニメゆめみた待機ゆる枠【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=p-R2Mluzdtc",
+      "durationHms": "1:53:04",
+      "durationSec": 6784,
+      "startedAt": "2026-08-20T20:06:35+09:00",
+      "endedAt": "2026-08-20T21:59:39+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": 10245,
+      "vstatsLikes": 487,
+      "snapshotViews": 10247,
+      "snapshotLikes": 487,
+      "snapshotComments": 7,
+      "chatTotal": 2768,
+      "chatByKind": {
+        "text": 2762,
+        "superchat": 1,
+        "sticker": 3,
+        "membership": 2
+      },
+      "pureEmojiOnly": 513,
+      "uniqueAuthors": 254,
+      "superchats": 1,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 1,
+          "amount": 200
+        }
+      },
+      "stickers": 3,
+      "memberships": 2,
+      "commentsCaptured": 7,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": 47.5,
+      "scPerHour": 0.53,
+      "sessionDir": "2026-08-20_宮永ののか_p-R2Mluzdtc",
+      "datapack": "archives/docs/配信数据画像/data/p-R2Mluzdtc.datapack.json",
+      "generatedAt": "2026-10-28T12:16:13+09:00"
+    },
+    {
+      "rank": 25,
+      "date": "2026-08-16",
+      "videoId": "OzZAd4X2Vmo",
+      "title": "# 4【魔法少女ノ魔女裁判】第二回魔女裁判！かわいい魔法少女ゲームをあそぶ【宮永ののか】【ゆめみた/夢限大みゅーたいぷ】#まのさば実況 #まのさばネタバレ",
+      "url": "https://www.youtube.com/watch?v=OzZAd4X2Vmo",
+      "durationHms": "4:13:56",
+      "durationSec": 15236,
+      "startedAt": "2026-08-16T11:18:35+09:00",
+      "endedAt": "2026-08-16T15:32:31+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": null,
+      "vstatsLikes": null,
+      "snapshotViews": 13702,
+      "snapshotLikes": 524,
+      "snapshotComments": 7,
+      "chatTotal": 3814,
+      "chatByKind": {
+        "text": 3809,
+        "superchat": 1,
+        "sticker": 3,
+        "membership": 1
+      },
+      "pureEmojiOnly": 214,
+      "uniqueAuthors": 175,
+      "superchats": 1,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 1,
+          "amount": 499
+        }
+      },
+      "stickers": 3,
+      "memberships": 1,
+      "commentsCaptured": 7,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": null,
+      "scPerHour": 0.24,
+      "sessionDir": "2026-08-16_宮永ののか_OzZAd4X2Vmo",
+      "datapack": "archives/docs/配信数据画像/data/OzZAd4X2Vmo.datapack.json",
+      "generatedAt": "2026-10-28T12:17:20+09:00"
+    },
+    {
+      "rank": 26,
+      "date": "2026-08-15",
+      "videoId": "cgJJlsQm_v0",
+      "title": "# 3【魔法少女ノ魔女裁判】２話突入！かわいい魔法少女ゲームをあそぶ【宮永ののか】【ゆめみた/夢限大みゅーたいぷ】#まのさば実況 #まのさばネタバレ",
+      "url": "https://www.youtube.com/watch?v=cgJJlsQm_v0",
+      "durationHms": "3:28:10",
+      "durationSec": 12490,
+      "startedAt": "2026-08-15T13:11:07+09:00",
+      "endedAt": "2026-08-15T16:39:17+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": null,
+      "vstatsLikes": null,
+      "snapshotViews": 11888,
+      "snapshotLikes": 521,
+      "snapshotComments": 9,
+      "chatTotal": 2680,
+      "chatByKind": {
+        "text": 2673,
+        "superchat": 3,
+        "sticker": 2,
+        "membership": 2
+      },
+      "pureEmojiOnly": 200,
+      "uniqueAuthors": 159,
+      "superchats": 3,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 1,
+          "amount": 5000
+        },
+        "¥": {
+          "count": 2,
+          "amount": 2320
+        }
+      },
+      "stickers": 2,
+      "memberships": 2,
+      "commentsCaptured": 9,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": null,
+      "scPerHour": 0.87,
+      "sessionDir": "2026-08-15_宮永ののか_cgJJlsQm_v0",
+      "datapack": "archives/docs/配信数据画像/data/cgJJlsQm_v0.datapack.json",
+      "generatedAt": "2026-10-28T12:18:07+09:00"
+    },
+    {
+      "rank": 27,
+      "date": "2026-08-14",
+      "videoId": "qdNLBOiO2PU",
+      "title": "【完全版後編】ののちゃんに100の質問💓完全解説３！【宮永ののか】【ゆめみた/夢限大みゅーたいぷ】",
+      "url": "https://www.youtube.com/watch?v=qdNLBOiO2PU",
+      "durationHms": "3:14:18",
+      "durationSec": 11658,
+      "startedAt": "2026-08-14T20:36:11+09:00",
+      "endedAt": "2026-08-14T23:50:29+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": null,
+      "vstatsLikes": null,
+      "snapshotViews": 13328,
+      "snapshotLikes": 591,
+      "snapshotComments": 6,
+      "chatTotal": 3508,
+      "chatByKind": {
+        "text": 3497,
+        "superchat": 4,
+        "sticker": 5,
+        "membership": 2
+      },
+      "pureEmojiOnly": 402,
+      "uniqueAuthors": 211,
+      "superchats": 4,
+      "scTotalsByCurrency": {
+        "₩": {
+          "count": 2,
+          "amount": 52000
+        },
+        "$": {
+          "count": 1,
+          "amount": 2
+        },
+        "¥": {
+          "count": 1,
+          "amount": 200
+        }
+      },
+      "stickers": 5,
+      "memberships": 2,
+      "commentsCaptured": 6,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": null,
+      "scPerHour": 1.24,
+      "sessionDir": "2026-08-14_宮永ののか_qdNLBOiO2PU",
+      "datapack": "archives/docs/配信数据画像/data/qdNLBOiO2PU.datapack.json",
+      "generatedAt": "2026-10-28T12:17:39+09:00"
+    },
+    {
+      "rank": 28,
+      "date": "2026-08-12",
+      "videoId": "uxmT5-WGyCU",
+      "title": "【弾き語り】㊗３万人を見届けよう！(圧)【ゆめみた/夢限大みゅーたいぷ】 #半分人間 #shorts",
+      "url": "https://www.youtube.com/watch?v=uxmT5-WGyCU",
+      "durationHms": "2:56:28",
+      "durationSec": 10588,
+      "startedAt": "2026-08-12T22:40:03+09:00",
+      "endedAt": "2026-08-13T01:36:31+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": null,
+      "vstatsLikes": null,
+      "snapshotViews": 16309,
+      "snapshotLikes": 941,
+      "snapshotComments": 18,
+      "chatTotal": 4934,
+      "chatByKind": {
+        "text": 4880,
+        "superchat": 45,
+        "sticker": 7,
+        "membership": 2
+      },
+      "pureEmojiOnly": 1164,
+      "uniqueAuthors": 411,
+      "superchats": 43,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 35,
+          "amount": 35458
+        },
+        "NT$": {
+          "count": 6,
+          "amount": 365
+        },
+        "HK$": {
+          "count": 2,
+          "amount": 55
+        }
+      },
+      "stickers": 7,
+      "memberships": 2,
+      "commentsCaptured": 18,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": null,
+      "scPerHour": 14.63,
+      "sessionDir": "2026-08-12_宮永ののか_uxmT5-WGyCU",
+      "datapack": "archives/docs/配信数据画像/data/uxmT5-WGyCU.datapack.json",
+      "generatedAt": "2026-10-28T12:18:47+09:00"
+    },
+    {
+      "rank": 29,
+      "date": "2026-08-11",
+      "videoId": "7b_yD_PbnDM",
+      "title": "【歌枠】ののうた♪アニソンおおめうたわく【ゆめみた/夢限大みゅーたいぷ】 #VTuber #shorts",
+      "url": "https://www.youtube.com/watch?v=7b_yD_PbnDM",
+      "durationHms": "2:03:40",
+      "durationSec": 7420,
+      "startedAt": "2026-08-11T22:39:44+09:00",
+      "endedAt": "2026-08-12T00:43:24+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": null,
+      "vstatsLikes": null,
+      "snapshotViews": 16607,
+      "snapshotLikes": 927,
+      "snapshotComments": 11,
+      "chatTotal": 3961,
+      "chatByKind": {
+        "text": 3933,
+        "superchat": 16,
+        "sticker": 10,
+        "membership": 2
+      },
+      "pureEmojiOnly": 1389,
+      "uniqueAuthors": 301,
+      "superchats": 14,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 10,
+          "amount": 25896
+        },
+        "NT$": {
+          "count": 4,
+          "amount": 325
+        }
+      },
+      "stickers": 10,
+      "memberships": 2,
+      "commentsCaptured": 11,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": null,
+      "scPerHour": 6.8,
+      "sessionDir": "2026-08-11_宮永ののか_7b_yD_PbnDM",
+      "datapack": "archives/docs/配信数据画像/data/7b_yD_PbnDM.datapack.json",
+      "generatedAt": "2026-10-28T12:23:05+09:00"
+    },
+    {
+      "rank": 30,
+      "date": "2026-08-10",
+      "videoId": "JO_SYT9N3gc",
+      "title": "【完全版中編】ののちゃんに100の質問💓完全解説２！【宮永ののか】【ゆめみた/夢限大みゅーたいぷ】",
+      "url": "https://www.youtube.com/watch?v=JO_SYT9N3gc",
+      "durationHms": "2:09:53",
+      "durationSec": 7793,
+      "startedAt": "2026-08-10T22:37:59+09:00",
+      "endedAt": "2026-08-11T00:47:52+09:00",
+      "availability": "public",
+      "avgConcurrent": null,
+      "maxConcurrent": null,
+      "maxConcurrentAt": null,
+      "watchTimeHours": null,
+      "vstatsViews": null,
+      "vstatsLikes": null,
+      "snapshotViews": 10889,
+      "snapshotLikes": 509,
+      "snapshotComments": 15,
+      "chatTotal": 3443,
+      "chatByKind": {
+        "text": 3432,
+        "superchat": 5,
+        "sticker": 3,
+        "membership": 3
+      },
+      "pureEmojiOnly": 461,
+      "uniqueAuthors": 208,
+      "superchats": 5,
+      "scTotalsByCurrency": {
+        "¥": {
+          "count": 3,
+          "amount": 1020
+        },
+        "A$": {
+          "count": 1,
+          "amount": 2
+        },
+        "NT$": {
+          "count": 1,
+          "amount": 30
+        }
+      },
+      "stickers": 3,
+      "memberships": 3,
+      "commentsCaptured": 15,
+      "chatPer1000AvgViewers": null,
+      "likesPer1000Views": null,
+      "scPerHour": 2.31,
+      "sessionDir": "2026-08-10_宮永ののか_JO_SYT9N3gc",
+      "datapack": "archives/docs/配信数据画像/data/JO_SYT9N3gc.datapack.json",
+      "generatedAt": "2026-10-28T12:19:40+09:00"
+    }
+  ]
+}
