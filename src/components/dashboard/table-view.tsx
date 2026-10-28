@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Download, RotateCcw, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,34 +21,27 @@ import {
   formatPercent,
   formatTime,
 } from "@/lib/format";
+import {
+  DEFAULT_TABLE_PARAMS,
+  type SortDirection,
+  type TableParams,
+  type TableSortKey,
+} from "@/lib/table-params";
 import { cn } from "@/lib/utils";
-
-type SortKey =
-  | "date"
-  | "duration"
-  | "avg"
-  | "max"
-  | "watch"
-  | "views"
-  | "likes"
-  | "chat"
-  | "authors"
-  | "sc"
-  | "comments";
-
-type SortDirection = "asc" | "desc";
 
 interface TableViewProps {
   rows: StreamRow[];
   onSelect: (videoId: string) => void;
+  params: TableParams;
+  onParamsChange: (next: TableParams) => void;
 }
 
 interface SortableHeadProps {
   label: string;
-  sortKey: SortKey;
-  active: SortKey;
+  sortKey: TableSortKey;
+  active: TableSortKey;
   direction: SortDirection;
-  onSort: (key: SortKey) => void;
+  onSort: (key: TableSortKey) => void;
   className?: string;
 }
 
@@ -84,7 +77,7 @@ function SortableHead({
   );
 }
 
-function sortValue(row: StreamRow, key: SortKey): number | null {
+function sortValue(row: StreamRow, key: TableSortKey): number | null {
   switch (key) {
     case "date":
       return row.summary.startedAt ? Date.parse(row.summary.startedAt) : null;
@@ -119,11 +112,8 @@ function escapeCsv(value: string | number | null | undefined): string {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-export function TableView({ rows, onSelect }: TableViewProps) {
-  const [query, setQuery] = useState("");
-  const [onlyVstats, setOnlyVstats] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>("date");
-  const [direction, setDirection] = useState<SortDirection>("desc");
+export function TableView({ rows, onSelect, params, onParamsChange }: TableViewProps) {
+  const { q: query, sort: sortKey, dir: direction, vstats: onlyVstats } = params;
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -145,13 +135,12 @@ export function TableView({ rows, onSelect }: TableViewProps) {
     });
   }, [rows, query, onlyVstats, sortKey, direction]);
 
-  function handleSort(key: SortKey): void {
+  function handleSort(key: TableSortKey): void {
     if (key === sortKey) {
-      setDirection(current => (current === "asc" ? "desc" : "asc"));
+      onParamsChange({ ...params, dir: direction === "asc" ? "desc" : "asc" });
       return;
     }
-    setSortKey(key);
-    setDirection("desc");
+    onParamsChange({ ...params, sort: key, dir: "desc" });
   }
 
   function exportCsv(): void {
@@ -198,10 +187,7 @@ export function TableView({ rows, onSelect }: TableViewProps) {
   }
 
   function resetFilters(): void {
-    setQuery("");
-    setOnlyVstats(false);
-    setSortKey("date");
-    setDirection("desc");
+    onParamsChange({ ...DEFAULT_TABLE_PARAMS });
   }
 
   return (
@@ -215,7 +201,7 @@ export function TableView({ rows, onSelect }: TableViewProps) {
           <Input
             aria-label="搜索直播"
             className="pl-8"
-            onChange={event => setQuery(event.target.value)}
+            onChange={event => onParamsChange({ ...params, q: event.target.value })}
             placeholder="搜索标题 / 日期 / videoId"
             type="search"
             value={query}
@@ -224,7 +210,7 @@ export function TableView({ rows, onSelect }: TableViewProps) {
         <Label className="flex items-center gap-2 whitespace-nowrap text-xs">
           <Checkbox
             checked={onlyVstats}
-            onCheckedChange={checked => setOnlyVstats(checked === true)}
+            onCheckedChange={checked => onParamsChange({ ...params, vstats: checked === true })}
           />
           仅有 VSTATS
         </Label>
