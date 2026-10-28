@@ -13,6 +13,7 @@ import { ChatDensity } from "@/components/charts/chat-density";
 import { ChartCard, EmptyChart } from "@/components/charts/chart-card";
 import { TenMinuteBars } from "@/components/charts/ten-minute-bars";
 import { TopBars } from "@/components/charts/top-bars";
+import { CopyLinkButton } from "@/components/dashboard/copy-link-button";
 import { ScTable } from "@/components/dashboard/sc-table";
 import { StreamPicker } from "@/components/dashboard/stream-picker";
 import { Badge } from "@/components/ui/badge";
@@ -111,15 +112,18 @@ export function StreamView({ rows, selectedId, onSelect }: StreamViewProps) {
                   {summary.videoId}
                 </p>
               </div>
-              <Button
-                render={<a href={summary.url} rel="noreferrer" target="_blank" />}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <ExternalLink aria-hidden="true" />
-                YouTube
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  render={<a href={summary.url} rel="noreferrer" target="_blank" />}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <ExternalLink aria-hidden="true" />
+                  YouTube
+                </Button>
+                <CopyLinkButton />
+              </div>
             </div>
           </CardPanel>
         </Card>

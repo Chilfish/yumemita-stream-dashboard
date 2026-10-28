@@ -3,8 +3,9 @@ import { ChartCard } from "@/components/charts/chart-card";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { MultiLineChart } from "@/components/charts/multi-line-chart";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardPanel, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardHeader, CardPanel, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CopyLinkButton } from "@/components/dashboard/copy-link-button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -82,6 +83,9 @@ export function CompareView({ rows, selectedIds, onToggle }: CompareViewProps) {
               {selected.length}/{MAX_SELECTED}
             </span>
           </CardTitle>
+          <CardAction>
+            <CopyLinkButton />
+          </CardAction>
         </CardHeader>
         <CardPanel className="pt-0">
           <ScrollArea className="h-[560px] rounded-lg border">
