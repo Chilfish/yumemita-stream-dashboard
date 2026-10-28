@@ -1,0 +1,125 @@
+# stream-datapack — 一场直播的归一化数据包
+
+把**同一场直播**的四类数据合并成一份 JSON：
+
+| 来源                     | 提供什么                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| yt-dlp 元信息            | 开播时刻・时长・标题・简介与简介外链・字幕/弹幕回放有无                       |
+| 弹幕（`live_chat` 全量） | 条数・构成・时间分布・词频・SC / 贴纸 / 会员里程碑・参与人数                  |
+| 评论区                   | 顶层评论・赞数・置顶・上传者发言                                              |
+| VSTATS 快照              | 平均/最大同接・最大值时刻・视聴时间・播放・点赞（YouTube 自身不提供同接历史） |
+
+产物直接进本仓库的 `data/<datasetId>/<videoId>.datapack.json`，并同步更新该 dataset 的
+`manifest.json` 摘要。原始素材（视频/音频/弹幕回放/评论原文）不进本仓库。
+
+## 用法
+
+```powershell
+# 先按常规把素材抓进会话目录（meta / danmaku / comments / web）
+bun scripts/stream-datapack.ts "D:/projects/claude-messages/temp/youtube-live/<日期>_<成员>_<videoId>"
+
+# 并行抓完多场后一次生成（会自动按开播时间重排 manifest）
+bun scripts/stream-datapack.ts <会话目录1> <会话目录2> ...
+
+# 只预览、不碰 data/：写到别处且不更新 manifest
+bun scripts/stream-datapack.ts <会话目录> --out <路径>
+
+# 还没在 data-sources.json 登记频道时，强制指定 dataset
+bun scripts/stream-datapack.ts <会话目录> --dataset nonoka --skip-index
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dataset <id>` | 强制指定 dataset；默认按 `info.channel_id` 匹配 `data-sources.json` |
+| `--out <路径>` | 只写指定文件，不更新 manifest（单个会话） |
+| `--vstats <路径>` | 手动指定 VSTATS HTML，默认自动找 `web/vstats_video_<id>.html`（单个会话） |
+| `--skip-index` | 只写 datapack，不更新 manifest |
+| `-h, --help` | 帮助 |
+
+匹配不到 dataset 时退回旧行为：写到 `<会话目录>/work/stream-datapack.json`，并打印提示。
+
+## 抓取侧（不在本仓库）
+
+本仓库只放结果。原始会话由归档工程的 `yt-dlp` + `scripts/danmaku` 产出：
+
+```powershell
+$url = "https://www.youtube.com/watch?v=<videoId>"
+
+# 元信息（评论另跑一次 --write-comments，原样存 comments_<id>.json）
+yt-dlp -J --cookies-from-browser firefox $url > meta/info.json
+
+# 弹幕回放 → 归一化 jsonl
+yt-dlp --cookies-from-browser firefox --skip-download --write-subs --sub-langs live_chat `
+  -o "danmaku/%(id)s.%(ext)s" $url
+bun <归档工程>/scripts/danmaku/from-live-chat.ts danmaku/<videoId>.live_chat.json
+
+# VSTATS 单场页
+Invoke-WebRequest "https://www.vstats.jp/video/<videoId>" -OutFile web/vstats_video_<videoId>.html
+```
+
+YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登录的 Firefox cookie 即可
+（频道列表 `--flat-playlist` 不需要）。
+
+## 会话目录结构
+
+```
+<会话目录>/
+├── meta/info.json                    # yt-dlp -J 原样输出
+├── danmaku/danmaku_<videoId>.jsonl   # 归一化弹幕
+├── danmaku/<videoId>.live_chat.json  # 原始回放（补会员里程碑文案；可选）
+├── comments/comments_<videoId>.json  # 评论区
+└── web/vstats_video_<videoId>.html   # VSTATS 单场页快照（可选）
+```
+
+输入全部可选，缺哪块就跳过哪块；至少要 `meta/info.json`（里面要能读到 `id`）。
+
+## 输出结构（`yumemita.stream-datapack/v1`）
+
+| 段         | 内容                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `video`    | id・标题・频道・开播/公开时刻（JST）・时长・结束时刻・简介・简介外链数组・章节・字幕与弹幕回放有无・抓取时点的播放/点赞/评论                |
+| `vstats`   | 页面更新时刻・开始/结束・配信时长・`maxConcurrent` ＋ `maxConcurrentAt`・`avgConcurrent`・`watchTimeHours`・播放・点赞；没有快照时为 `null` |
+| `chat`     | 见下表                                                                                                                                      |
+| `comments` | 总数・顶层/回复数・置顶数・赞数合计・逐条（作者・赞・时刻・置顶・是否上传者・全文）                                                         |
+| `derived`  | 派生比值（见下）                                                                                                                            |
+
+`chat` 字段：
+
+| 字段                                        | 含义                                                                      |
+| ------------------------------------------- | ------------------------------------------------------------------------- |
+| `total` / `byKind`                          | 全部条目数；`text` / `superchat` / `sticker` / `membership` 分项          |
+| `pureEmojiOnly`                             | 只有频道表情的条目（与 `danmaku_*.txt` 头部的「已过滤」数一致）           |
+| `uniqueAuthors` / `ownerMessages`           | 发言人数；主播本人发言数（徽章 `Owner`）                                  |
+| `badges`                                    | 徽章分布（`Member` / `New member` / `Owner`…）                            |
+| `timeRange`                                 | 首条/末条时刻 ＋ `preRollSec`（开播前待机所秒数）                         |
+| `coveragePct`                               | 弹幕覆盖到的时长占比（用开播时刻对齐）                                    |
+| `density.perMinute`                         | **逐分钟条数**（下标＝开播后第几分钟），画图直接用                        |
+| `density.perMinuteSc`                       | 逐分钟 SC 笔数                                                            |
+| `density.perFiveMinute` / `perTenMinute`    | 5 分/10 分汇总；10 分档带 `at` 时刻                                       |
+| `density.peakMinute`                        | 条数最多的一分钟                                                          |
+| `paid.superchats`                           | 全量 SC：时刻・金额原文・币种・数值・留言                                 |
+| `paid.scTotalsByCurrency`                   | 分币种合计（**不换算汇率**）                                              |
+| `paid.stickers` / `stickerTotalsByCurrency` | 贴纸同上                                                                  |
+| `paid.memberships`                          | 会员里程碑（`header` 取自原始回放的 `headerSubtext`，如「Welcome to …」） |
+| `paid.paidSharePct`                         | 付费条目占全部条目的比例                                                  |
+| `topAuthors`                                | 发言数 Top 20（含各自 SC / 贴纸 / 会员次数）                              |
+| `topWords`                                  | 分词后词频（`Intl.Segmenter` 日语分词；≥3 次、最多 40 个）                |
+| `hashtags`                                  | `#` / `＃` 标签计数                                                       |
+| `emojiKinds`                                | 表情种类数 ＋ Top 15（频道表情的 id 形如 `<channelId>/<hash>`）           |
+
+`derived`：
+
+- `chatPer1000AvgViewers` — 弹幕条数 ÷ 平均同接 × 1000，跨场次比较「弹幕热不热」。
+- `likesPer1000Views` — 点赞率（千分比）。
+- `scPerHour` — SC 笔/小时。
+- `vstatsVsYtdlpViews` — 两边播放数之差（快照时点不同，正常会有小幅差）。
+
+## 口径与已知限制
+
+- **时间一律 JST（UTC+9）**；`video.startedAt` 取 `release_timestamp`（开播），不是 `timestamp`（公开）。
+- **纯表情**沿用归档工程 `scripts/danmaku` 的判定：`emoji.id` 含 `/` 的频道表情全部折成 `[表情]`，去掉后为空才算。
+- **SC 金额不换算**：`¥ / HK$ / NT$ / ₩` 各记各的，合计只按币种分组（汇率随时变，不做隐含假设）。
+- **词频不做语义过滤**：只剩助词/语尾的短平假名会被丢掉，但同义词、表记揺れ不会合并。
+- **没有同接曲线**：VSTATS 只给平均/最大＋最大值时刻，YouTube 也不保存历史同接。
+- **会员里程碑 ≠ 入会人数**：`liveChatMembershipItemRenderer` 只记录直播中出现的那几条。
+- **评论区口径**取决于抓取时的 `--write-comments` 上限，`comments.total` 是**抓到的**条数，不是视频的总评论数（后者看 `video.snapshot.comments`）。
