@@ -1,24 +1,26 @@
 # data/
 
-源数据目录。每个 dataset 一个子目录：
+**本地暂存区，不进 git。** 真源是每个 dataset 下的 `*.datapack.json`，发布时由它们派生出
+`manifest.json` 与 `insights.json`，三者一起上传到对象存储（R2 等）。
 
 ```text
 data/
 └─ nonoka/
-   ├─ manifest.json
-   └─ <videoId>.datapack.json
+   ├─ <videoId>.datapack.json   # 每场完整数据（真源）
+   ├─ manifest.json             # 由 pack 派生
+   ├─ insights.json             # 由 pack 派生
+   └─ .fetch-state/             # 抓取进度（fetch:streams 用）
 ```
 
 ## 当前数据集
 
 | id | 成员 | 场次 | 时间范围 | channelId |
 | --- | --- | --- | --- | --- |
-| `nonoka` | 宮永ののか | 48 | 2024-12-13 – 2026-10-22 | `UCGeCnpimiSN5rgiKbJzHd3A` |
+| `nonoka` | 宮永ののか | 262 | 2023-11-19 – 2026-10-22 | `UCGeCnpimiSN5rgiKbJzHd3A` |
 
 - 抓取进度、跳过判定与下一批候选见 [../docs/data-progress.md](../docs/data-progress.md)。
-
-- `nonoka/manifest.json`：场次摘要索引（由 `scripts/stream-datapack.ts` 维护）。
-- `nonoka/<videoId>.datapack.json`：每场完整数据，schema `yumemita.stream-datapack/v1`。
+- `<videoId>.datapack.json`：每场完整数据，schema `yumemita.stream-datapack/v1`。
+- `manifest.json` / `insights.json`：`bun run publish:data` 生成，不要手改。
 
 ## 文件命名
 
@@ -39,20 +41,22 @@ data/
 ## 更新
 
 ```bash
-# 单场
+# 单场：放进暂存区并更新本地 manifest
 bun run add:datapack nonoka /path/to/<videoId>.datapack.json
 
-# 批量/手工后
+# 从全部 pack 重建 manifest + insights，并上传到 R2
+bun run publish:data
+
+# 构建/开发前同步到 public/data
 bun run sync:data
 bun run validate:data
 ```
 
-`sync:data` 会生成 `public/data/`（gitignore），浏览器只读生成物。
+`sync:data` 在配了 `VITE_DATAPACK_BASE` 时从对象存储拉 manifest/insights（带本地缓存），
+没配时直接用这里的本地文件，离线也能开发。
 
 ## 不要放什么
 
 - 原始视频/音频、弹幕原始 JSONL、评论原始 JSON。
 - cookie、token、邮箱、付款信息等隐私数据。
 - `public/data/`（生成物）。
-
-字段与口径见 [../docs/data-model.md](../docs/data-model.md)。

@@ -9,8 +9,9 @@
 | 评论区                   | 顶层评论・赞数・置顶・上传者发言                                              |
 | VSTATS 快照              | 平均/最大同接・最大值时刻・视聴时间・播放・点赞（YouTube 自身不提供同接历史） |
 
-产物直接进本仓库的 `data/<datasetId>/<videoId>.datapack.json`，并同步更新该 dataset 的
-`manifest.json` 摘要。原始素材（视频/音频/弹幕回放/评论原文）不进本仓库。
+产物写到本地暂存区 `data/<datasetId>/<videoId>.datapack.json`（已 gitignore），并更新该 dataset 的
+本地 `manifest.json` 摘要。正式发布用 `bun run publish:data` 重建 manifest + insights 并上传对象存储。
+原始素材（视频/音频/弹幕回放/评论原文）不进本仓库。
 
 ## 用法
 

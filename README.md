@@ -2,10 +2,11 @@
 
 把 **夢限大みゅーたいぷ** 成员直播的归一化 JSON 做成可交互的数据可视化页面：同接、弹幕密度、SC、评论、词频与跨场对比。
 
-当前内置数据集：**宮永ののか**，**48 场**不重复直播（2024-12-13 – 2026-10-22，持续补历史场次）。
+当前内置数据集：**宮永ののか**，**262 场**不重复直播（2023-11-19 – 2026-10-22，持续补历史场次）。
 
-> 这个目录设计为**独立仓库**：数据在 `data/` 内随仓库一起提交，不依赖上层归档目录。
-> 页面只读数据，所有统计都在浏览器端完成。
+> **数据全部放在对象存储**（Cloudflare R2 等）：`manifest.json`、`insights.json` 与逐场 datapack。
+> git 里只有代码和 `data-sources.json` 配置，`bun run publish:data` 是唯一的写入入口。
+> 构建时拉取索引与预聚合，页面内只做局部计算。
 
 ## 界面
 
@@ -36,7 +37,9 @@ bun run dev
 # http://localhost:5173
 ```
 
-`dev` 会先运行 `sync:data`，把 `data/` 同步到 `public/data/`（生成物，已 gitignore）。
+`dev` 会先运行 `sync:data`：配了 `VITE_DATAPACK_BASE` 就从对象存储拉索引与预聚合（带本地缓存），没配就用本地 `data/` 暂存区。单场 datapack 由浏览器按需向对象存储请求。
+
+需要连对象存储时，复制 `.env.example` 为 `.env` 并填写 `VITE_DATAPACK_BASE`（构建时注入）；留空则完全走本地 `data/`，离线开发不受影响。
 
 ### 常用命令
 
@@ -45,8 +48,9 @@ bun run dev
 | `bun run dev` | 同步数据 + 启动开发服务器 |
 | `bun run build` | 同步数据 + 类型检查 + 生产构建（`dist/`） |
 | `bun run preview` | 预览生产构建 |
-| `bun run sync:data` | `data/` → `public/data/`，生成 dataset 索引 |
-| `bun run validate:data` | 校验 index → manifest → datapack 的完整性 |
+| `bun run sync:data` | 拉取 manifest + insights 到 `public/data/`，生成 dataset 索引 |
+| `bun run publish:data` | 由 pack 重建 manifest + insights 并上传对象存储 |
+| `bun run validate:data` | 校验 index → manifest → insights；加 `--remote` 检查对象存储 |
 | `bun run add:datapack` | 加一份 datapack，自动更新 manifest |
 | `bun run typecheck` | TypeScript 类型检查 |
 | `bun run test` | Vitest 单元测试 |
@@ -57,36 +61,45 @@ bun run dev
 ## 数据流
 
 ```text
-data/<dataset>/manifest.json + <videoId>.datapack.json
+data/<dataset>/*.datapack.json          # 本地暂存（gitignore，唯一真源）
         │
-        │  scripts/sync-data.mjs
+        │  scripts/publish-data.ts
         ▼
-public/data/index.json + <dataset>/manifest.json + <videoId>.datapack.json
+manifest.json + insights.json           # 由 pack 派生
+        │
+        │  上传
+        ▼
+对象存储（R2）: <base>/<dataset>/manifest.json · insights.json · <videoId>.datapack.json
+        │
+        │  scripts/sync-data.mjs（构建时拉索引，带本地缓存）
+        ▼
+public/data/index.json + <dataset>/manifest.json + insights.json
         │
         │  fetch（浏览器）
         ▼
-useDatasetIndex → useDataset → StreamDatapack Map
+useDatasetIndex → useDataset → StreamSummary[] + DatasetTotals
         │
         ▼
 buildStreamRows / aggregateDataset（纯函数）
         │
         ▼
 总览 / 单场 / 对比 / 数据表
+
+单场 / 对比：useStreamPacks 直接向对象存储请求 datapack
 ```
 
-- `data/` 是**源数据**，随仓库提交。
-- `public/data/` 是**构建中间产物**，由 `sync:data` 生成，不提交。
-- `dist/data/` 会随生产构建一起打包，静态托管即可直接访问。
+- `data/<id>/*.datapack.json` 是**唯一真源**（本地暂存，不提交）。
+- `manifest.json` / `insights.json` 由 `publish:data` 从 pack 派生，与 pack 一起上传，保证索引不会指向不存在的 pack。
+- 构建时 `sync:data` 只拉 manifest/insights（带本地缓存），datapack 不进构建产物。
+- `public/data/` 是**构建中间产物**，不提交；`data-sources.json` 是唯一入库的数据配置。
 
 ## 目录结构
 
 ```text
 stream-dashboard/
-├─ data/                     # 源数据（提交）
+├─ data/                     # 本地暂存区（gitignore，仅 README 入库）
 │  ├─ README.md
-│  └─ nonoka/
-│     ├─ manifest.json
-│     └─ <videoId>.datapack.json
+│  └─ nonoka/*.datapack.json
 ├─ docs/                     # 架构 / 数据模型 / 开发 / 部署文档
 ├─ public/data/              # 生成物（gitignore）
 ├─ scripts/
@@ -141,7 +154,7 @@ bun run build
 # 产物在 dist/，包含 dist/data/
 ```
 
-任意静态托管（GitHub Pages / Netlify / Vercel / Cloudflare Pages）都可以。若部署在子路径，请在 `vite.config.ts` 设置 `base`；数据加载使用 `import.meta.env.BASE_URL`，会自动跟随。详见 [docs/deployment.md](docs/deployment.md)。
+部署在 Vercel（构建 `bun run build`，输出 `dist/`）；`vercel.json` 已配好缓存头。构建前设置 `VITE_DATAPACK_BASE` 指向对象存储；子路径部署用 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
 
 ## 文档
 

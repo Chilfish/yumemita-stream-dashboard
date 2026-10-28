@@ -6,7 +6,10 @@
       "color": "#b8461f",
       "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
       "manifest": "data/nonoka/manifest.json",
-      "datapackDir": "data/nonoka"
+      "datapackDir": "data/nonoka",
+      "subject": "宮永ののか",
+      "scope": "按频道顺序补齐的历史场次；按标题去重，保留正片",
+      "note": "vstats 为 null 表示该场没有 VSTATS 条目（会员限定，或站点未收录）。"
     }
   ]
 }

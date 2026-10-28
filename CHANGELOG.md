@@ -9,6 +9,16 @@
 
 ### 工程
 
+- **数据源迁到对象存储**：manifest / insights / datapack 全部放 R2，git 里只保留 `data-sources.json`。
+- 新增 `bun run publish:data`：以本地 pack 为唯一真源，派生 manifest + insights 后先传 pack、再传索引，
+  避免索引指向不存在的文件；`--no-upload` 可只生成本地文件。
+- `sync:data` 改为构建时从 `VITE_DATAPACK_BASE` 拉 manifest/insights，带 `node_modules/.cache` 缓存兜底；
+  没配地址时回退本地 `data/` 暂存区。
+- `validate:data --remote` 逐条 HEAD 校验对象存储上的 manifest / insights / datapack。
+- 新增 `vercel.json`（缓存头）与 `.env.example`。
+- 移除 GitHub Pages 部署 workflow（`.github/workflows/deploy.yml`），部署迁到 Vercel。
+- 修复：`data/.gitignore` 的全忽略规则导致 232 份 datapack 从未被提交，远端构建缺数据。
+
 - `scripts/stream-datapack.ts` 接入 `data-sources.json`：按 `channel_id` 匹配 dataset，直接写
   `data/<id>/<videoId>.datapack.json` 并 upsert manifest；支持一次传入多个会话目录。
 - manifest 摘要抽到 `scripts/lib/dataset-manifest.ts`，与 `add-datapack.mjs` 共用。

@@ -4,7 +4,8 @@
  * 摘要字段与 `src/types/dataset.ts` 的 `StreamSummary`、`docs/data-model.md` 对齐；
  * 新增字段时只改这里，避免两个入口各写一份后漂移。
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import type { ChatByKind, CurrencyTotals } from '../../src/types/datapack.ts'
 
 export const MANIFEST_SCHEMA = 'yumemita.stream-datapack.batch/v1'
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000
@@ -30,11 +31,11 @@ export interface StreamSummary {
   snapshotLikes: number | null
   snapshotComments: number | null
   chatTotal: number
-  chatByKind: Record<string, number>
+  chatByKind: ChatByKind
   pureEmojiOnly: number
   uniqueAuthors: number
   superchats: number
-  scTotalsByCurrency: Record<string, unknown>
+  scTotalsByCurrency: CurrencyTotals
   stickers: number
   memberships: number
   commentsCaptured: number | null
@@ -43,7 +44,7 @@ export interface StreamSummary {
   scPerHour: number | null
   sessionDir: string
   datapack: string
-  generatedAt: string | null
+  generatedAt: string
 }
 
 export interface ManifestFile {
@@ -85,12 +86,12 @@ export interface DatapackSummarySource {
   } | null
   chat: {
     total: number
-    byKind: Record<string, number>
+    byKind: ChatByKind
     pureEmojiOnly: number
     uniqueAuthors: number
     paid: {
       superchats: unknown[]
-      scTotalsByCurrency: Record<string, unknown>
+      scTotalsByCurrency: CurrencyTotals
       stickers: unknown[]
       memberships: unknown[]
     }
@@ -146,7 +147,7 @@ export function buildStreamSummary(pack: DatapackSummarySource, datapackRel: str
     scPerHour: pack.derived?.scPerHour ?? null,
     sessionDir: '',
     datapack: datapackRel,
-    generatedAt: pack.generatedAt ?? null,
+    generatedAt: pack.generatedAt ?? isoJst(new Date()),
   }
 }
 
@@ -156,7 +157,9 @@ export function upsertManifestStream(
   pack: DatapackSummarySource,
   datapackRel: string,
 ): { count: number, videoId: string } {
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as ManifestFile
+  const manifest: ManifestFile = existsSync(manifestPath)
+    ? (JSON.parse(readFileSync(manifestPath, 'utf8')) as ManifestFile)
+    : { schema: MANIFEST_SCHEMA, streams: [] }
   const videoId = pack.video.id
   if (!videoId)
     throw new Error('datapack 缺少 video.id')

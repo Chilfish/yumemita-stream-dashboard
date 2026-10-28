@@ -4,7 +4,7 @@
  *   bun scripts/add-datapack.mjs <datasetId> <path/to/datapack.json>
  *
  * - 校验 schema 与 video.id
- * - 复制到 data/<datasetId>/<videoId>.datapack.json
+ * - 复制到 data/<datasetId>/<videoId>.datapack.json（上传前的本地暂存区，不进 git）
  * - 从 datapack 抽出 manifest 摘要，按 videoId upsert，按开播时间重排 rank
  * - 更新 count / generatedAt
  */
@@ -45,7 +45,6 @@ const videoId = pack.video?.id;
 if (!videoId) fail("datapack 缺少 video.id");
 
 const manifestPath = resolve(appRoot, source.manifest ?? join("data", datasetId, "manifest.json"));
-if (!existsSync(manifestPath)) fail(`找不到 manifest：${manifestPath}`);
 const datasetDir = dirname(manifestPath);
 const datapackPath = join(datasetDir, `${videoId}.datapack.json`);
 
@@ -55,6 +54,6 @@ copyFileSync(packPath, datapackPath);
 const datapackRel = relative(appRoot, datapackPath).replaceAll("\\", "/");
 const { count } = upsertManifestStream(manifestPath, pack, datapackRel);
 
-console.log(`[add-datapack] ${videoId} -> data/${datasetId}/`);
+console.log(`[add-datapack] ${videoId} -> data/${datasetId}/（暂存区，需上传到对象存储）`);
 console.log(`[add-datapack] manifest: ${count} 场`);
 console.log("[add-datapack] 下一步：bun run sync:data && bun run validate:data");

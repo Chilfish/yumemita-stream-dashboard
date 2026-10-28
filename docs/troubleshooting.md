@@ -15,20 +15,20 @@
 
 ## “index.json 里没有可用的 dataset”
 
-- `data-sources.json` 为空，或 dataset 的 `manifest` 路径写错。
-- `sync:data` 的输出里看每个 dataset 复制了多少场；0 场会直接失败。
-- 检查 `data/<id>/manifest.json` 是否存在、`streams` 是否非空。
+- `data-sources.json` 为空或 `id` 不合法。
+- 配了 `VITE_DATAPACK_BASE` 时检查 `<base>/<id>/manifest.json` 是否存在；没配时先跑 `bun run publish:data --no-upload` 生成本地文件。
+- `sync:data` 的输出会写每个 dataset 的场次数。
 
 ## “datapack 加载失败（HTTP 404）”
 
-- 文件名不一致：manifest 里的 `videoId` 必须等于 `data/<id>/<videoId>.datapack.json` 的文件名。
-- 只放了 datapack、没更新 manifest，或反过来。
-- 重新跑：
+- 对象存储上缺这个 videoId：发布没跑完，或漏传。
+- `VITE_DATAPACK_BASE` 配错（桶不对、路径多了层级），或桶的 CORS 没放行站点源。
+- manifest 与 pack 不一致：manifest 由 `publish:data` 派生，不要手改。
 
-  ```bash
-  bun run sync:data
-  bun run validate:data
-  ```
+```bash
+bun run publish:data               # 重新派生并上传
+bun run validate:data -- --remote  # 逐条 HEAD 确认可达
+```
 
 ## 图表是空的
 
@@ -96,5 +96,6 @@ bun run dev -- --port 5174
 
 ## 数据更新后页面还是旧的
 
-- 生产环境检查 `data/*.json` 的缓存头，建议 `no-cache`。
+- 发布后缓存：`data/*.json` 在 `vercel.json` 里是 300s 短缓存，对象存储侧的 manifest/insights 也是短缓存，等一会儿或强制刷新。
+- 改了本地 pack 后忘了 `bun run publish:data`，远端仍是旧索引。
 - 本地开发 Vite 会热更新；如果是 `preview`，重新 `bun run build && bun run preview`。

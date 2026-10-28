@@ -1,6 +1,8 @@
 # 数据模型
 
-页面消费四层 JSON：**dataset 索引 → manifest → insights → datapack**。四层都是纯 JSON，没有数据库；列表页只读前两层加 insights，单场/对比再按需读 datapack。
+页面消费四层 JSON：**dataset 索引 → manifest → insights → datapack**。四层都是纯 JSON，没有数据库。索引与预聚合随构建产物同源提供，datapack 放在对象存储（R2 等）按需拉取。
+
+所有数据由 `bun run publish:data` 从本地 pack 派生并上传；git 里只有 `data-sources.json`。
 
 ## 1. dataset 索引
 
@@ -29,15 +31,14 @@
 | `id` | dataset 唯一标识，对应 `data/<id>/` |
 | `label` | 页面显示名（成员名） |
 | `channelId` | YouTube channel ID |
-| `count` | 成功同步的 datapack 数 |
+| `count` | manifest 里的场次数 |
 | `generatedAt` | 源 manifest 的生成时间 |
 | `manifest` | manifest 的相对路径 |
 | `insights` | 预聚合摘要的相对路径 |
 
 ## 2. manifest
 
-`data/<dataset>/manifest.json` 是一场批次的索引。最初 30 场来自 `batch30_manifest.json`，
-后续由 `scripts/stream-datapack.ts` 增量 upsert。
+`<base>/<dataset>/manifest.json`（对象存储），由 `publish:data` 从 `data/<dataset>/*.datapack.json` 派生，`sync:data` 在构建时拉到 `public/data/`。最早 30 场来自 `batch30_manifest.json`，后续随 pack 增量重算。
 
 ```json
 {
@@ -87,7 +88,7 @@
 
 ## 3. insights
 
-`public/data/<dataset>/insights.json` 由 `sync-data.mjs` 在同步时用 `aggregateDataset` 预聚合，schema `yumemita.dashboard.insights/v1`。
+`<base>/<dataset>/insights.json` 由 `publish:data` 用 `aggregateDataset` 预聚合，schema `yumemita.dashboard.insights/v1`，`sync:data` 在构建时同步到 `public/data/`。
 
 ```json
 {
@@ -111,7 +112,7 @@
 
 ## 4. datapack
 
-`data/<dataset>/<videoId>.datapack.json`，schema `yumemita.stream-datapack/v1`。
+`<base>/<dataset>/<videoId>.datapack.json`（对象存储），schema `yumemita.stream-datapack/v1`。本地暂存在 `data/<dataset>/<videoId>.datapack.json`，是唯一真源。
 
 ### 顶层
 
@@ -228,11 +229,11 @@ bun run validate:data
 
 - `index.json` 存在且有 dataset；
 - 每个 manifest 有 `streams`；
-- 每个 dataset 的 `insights.json` 存在且有 `totals`；
-- 每个 `streams[].videoId` 对应的 datapack 存在且能解析；
-- `pack.schema` 正确；
-- `pack.video.id === videoId`；
-- `chat.total` 是数字；
-- `chat.density.perMinute` 是数组。
+- 每个 dataset 的 `insights.json` 存在，且 `totals.streamCount` 与 manifest 场次数一致；
+- 每个 `streams[].videoId` 非空；
+- 加 `--remote` 时逐条 HEAD `<base>` 上的 manifest / insights / datapack。
+
+datapack 的字段级校验（`schema`、`video.id === videoId`、`chat.total`、`density.perMinute` 等）
+在 `publish:data` 读取 pack 时完成——`video.id` 与文件名不一致会直接中止发布。
 
 更严格的数据质量检查（时长、币种、JST 等）建议在生成 datapack 的 pipeline 侧完成。

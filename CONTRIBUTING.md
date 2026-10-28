@@ -26,10 +26,11 @@ bun run build
 
 ## 数据改动
 
-- 新增场次优先用 `bun run add:datapack <dataset> <file>`，不要手写 manifest 摘要。
-- 数据文件必须能通过 `bun run validate:data`。
-- 不要提交 `public/data/`、`dist/`、原始媒体/弹幕/评论抓取。
-- 会员限定内容：确认可公开范围；不确定就不要放进公开仓库。
+- 新增场次：把 pack 放进 `data/<dataset>/`，然后跑 `bun run publish:data`（会重建 manifest + insights 并上传对象存储）。
+- 不要手写或手改 manifest / insights：它们由 pack 派生。
+- 数据文件必须能通过 `bun run validate:data`；发布后加 `--remote` 确认对象存储可达。
+- 不要提交 `data/`（除 `README.md`）、`public/data/`、`dist/`、原始媒体/弹幕/评论抓取。
+- 会员限定内容：确认可公开范围；不确定就不要放到公开桶里。
 
 ## 代码改动
 

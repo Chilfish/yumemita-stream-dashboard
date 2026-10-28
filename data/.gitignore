@@ -1,3 +1,5 @@
+# data/ 是本地暂存区：真源在对象存储（R2 等），见 docs/adding-data.md。
+# manifest.json / insights.json 由 publish:data 生成，同样不提交。
 *
 !.gitignore
 !README.md

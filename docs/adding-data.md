@@ -2,16 +2,11 @@
 
 ## 数据从哪来
 
-页面消费的是 `stream-datapack` 生成的归一化 JSON。生产这些 JSON 的 pipeline（yt-dlp 元信息 / 弹幕 / 评论区 / VSTATS 快照）不在本仓库内；本仓库只负责**存放、同步、展示**。
+页面消费的是 `stream-datapack` 生成的归一化 JSON。生产这些 JSON 的 pipeline（yt-dlp 元信息 / 弹幕 / 评论区 / VSTATS 快照）不在本仓库内。
 
-如果你在上层归档工程里生成了新的 datapack：
-
-```text
-<archive>/docs/配信数据画像/data/<videoId>.datapack.json
-<archive>/docs/配信数据画像/data/batch30_manifest.json
-```
-
-把需要的文件搬进本仓库即可，不需要保留对归档目录的引用。
+- **场次索引与预聚合**（`manifest.json` / `insights.json`）提交进本仓库。
+- **逐场 datapack** 上传到对象存储（Cloudflare R2 等），不进 git；浏览器按 `VITE_DATAPACK_BASE/<datasetId>/<videoId>.datapack.json` 拉取。
+- `data/<datasetId>/` 下的 datapack 只是上传前的本地暂存区。
 
 ## 目录约定
 
@@ -19,85 +14,72 @@
 data/
 ├─ README.md
 └─ <datasetId>/
-   ├─ manifest.json
-   └─ <videoId>.datapack.json
+   ├─ manifest.json            # 场次索引（提交）
+   ├─ insights.json            # 预聚合摘要（提交）
+   └─ <videoId>.datapack.json  # 上传前的本地暂存区（不提交）
 ```
 
 - `datasetId`：小写字母/数字/连字符，例如 `nonoka`。
 - `videoId`：YouTube 11 位 id，也是 datapack 文件名。
-- `manifest.json`：该 dataset 的场次摘要索引。
+- `manifest.json` / `insights.json`：由 `publish:data` 从 pack 派生，不要手改。
 
-## 加一场直播（推荐用脚本）
+## 加一场直播
 
 ```bash
+# 1. 放进暂存区，顺带更新本地 manifest
 bun run add:datapack nonoka /path/to/abc123XYZ.datapack.json
-```
 
-脚本会：
+# 2. 由全部 pack 重建 manifest + insights，并上传到 R2
+bun run publish:data
 
-1. 校验 `schema` 与 `video.id`；
-2. 复制到 `data/nonoka/abc123XYZ.datapack.json`；
-3. 从 datapack 抽出 manifest 摘要（同名字段与 `collect-batch` 一致）；
-4. 按 `videoId` upsert，按开播时间重排 `rank`；
-5. 更新 `count` / `generatedAt`。
-
-然后：
-
-```bash
+# 3. 本地看效果
 bun run sync:data
 bun run validate:data
 bun run dev
 ```
 
+`add:datapack` 会校验 `schema` / `video.id`，复制到 `data/nonoka/`，并按开播时间重排本地 manifest 的 `rank`。
+真正的 manifest 与 insights 以 `publish:data` 的重算结果为准。
+
 ### 手工加（不用脚本）
 
 1. 复制 `<videoId>.datapack.json` 到 `data/<datasetId>/`。
-2. 在 `manifest.json` 的 `streams` 里加一行摘要。字段见 [data-model.md](data-model.md#2-manifest)。
-3. `count` +1，`generatedAt` 改成当前时间。
-4. `bun run sync:data && bun run validate:data`。
+2. `bun run publish:data` 重建 manifest + insights 并上传。
 
-摘要里的数字必须和 datapack 对得上；不确定就优先用脚本，避免手算出错。
+不需要手写摘要：manifest 完全由 pack 派生。
 
 ## 加一位成员 / 新 dataset
 
-1. 新建目录 `data/<id>/`。
-2. 放入 `manifest.json` 与所有 `<videoId>.datapack.json`。
-3. 在 `data-sources.json` 增加一条：
+1. 新建目录 `data/<id>/`，放入所有 `<videoId>.datapack.json`。
+2. 在 `data-sources.json` 增加一条：
 
 ```json
 {
   "datasets": [
     {
-      "id": "nonoka",
-      "label": "宮永ののか",
-      "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
-      "manifest": "data/nonoka/manifest.json",
-      "datapackDir": "data/nonoka"
-    },
-    {
       "id": "arare",
       "label": "仲町あられ",
       "channelId": "UC...",
       "manifest": "data/arare/manifest.json",
-      "datapackDir": "data/arare"
+      "datapackDir": "data/arare",
+      "subject": "仲町あられ",
+      "scope": "按频道顺序补齐的历史场次",
+      "note": ""
     }
   ]
 }
 ```
 
-4. `bun run sync:data`。`public/data/index.json` 会多一条 dataset，页面顶部自动出现选择器。
+3. `bun run publish:data --dataset arare` 生成并上传该 dataset 的 manifest / insights。
+4. `bun run sync:data`，`public/data/index.json` 会多一条 dataset，页面顶部自动出现选择器。
 
 不需要改 React 组件。
 
 ## manifest 从哪来
 
-如果上游有 `collect-batch.mjs` 之类的脚本，直接用它生成 `batch30_manifest.json`，再改名为 `manifest.json` 放进 `data/<id>/`。本仓库的 `scripts/stream-datapack.ts` 也能直接从会话目录增量写 datapack 并 upsert manifest。手工维护也可以，但请保持以下字段与 datapack 一致：
-
-- `videoId` / `title` / `url` / `startedAt` / `durationSec`
-- `chatTotal` / `uniqueAuthors` / `superchats`
-- `avgConcurrent` / `maxConcurrent` / `watchTimeHours` / `views` / `likes`
-- `commentsCaptured`
-- `chatPer1000AvgViewers` / `likesPer1000Views` / `scPerHour`
+不需要手工维护。`publish:data` 用 `scripts/lib/dataset-manifest.ts` 的 `buildStreamSummary`
+从每个 pack 抽出摘要，按开播时间倒序重排 `rank`，并写回 `count` / `generatedAt`。
+`subject` / `scope` / `note` 来自 `data-sources.json`。
 
 `rank` / `count` / `generatedAt` 只影响列表顺序和页脚显示。
 
@@ -125,10 +107,11 @@ bun run dev
 
 ## 数据体积与 Git
 
-- 当前 48 场约 **1.5 MB**，直接提交 JSON 即可，不需要 Git LFS。
-- 如果未来超过 ~100 MB，再考虑 LFS 或把数据放到对象存储；页面读取路径不变（仍按 manifest + 文件名）。
-- `public/data/` 是生成物，已 gitignore；不要提交。
-- `data/` 是源数据，**要提交**。
+- **git 里不存数据**：只有 `data-sources.json` 和 `data/README.md`。
+- datapack 合计约 7 MB（262 场，均 26 KB），放在对象存储；几千场也不会撑大仓库。
+- `data/<id>/` 下的 pack、manifest、insights 都是本地暂存/派生物，已 gitignore。
+- `public/data/` 是构建生成物，同样不提交。
+- 回滚数据靠对象存储的版本控制，不是 `git revert`。
 
 ## 隐私与版权
 

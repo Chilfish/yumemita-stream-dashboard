@@ -4,8 +4,19 @@ import type { BatchManifest, DatasetIndex } from "@/types/dataset";
 
 const DATA_BASE = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/data`;
 
+/**
+ * datapack 的对象存储根地址（R2 等）。构建时注入，按
+ * `<base>/<datasetId>/<videoId>.datapack.json` 布局取文件。
+ * 留空时回退到本地 `public/data`，离线开发与未配置环境仍可用。
+ */
+const DATAPACK_BASE = (import.meta.env.VITE_DATAPACK_BASE ?? "").replace(/\/+$/, "");
+
+function resolveUrl(path: string): string {
+  return path.startsWith("http") || path.startsWith("/") ? path : `${DATA_BASE}/${path}`;
+}
+
 async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${DATA_BASE}/${path}`, {
+  const response = await fetch(resolveUrl(path), {
     signal,
     headers: { Accept: "application/json" },
   });
@@ -55,7 +66,9 @@ export function fetchDatapack(datasetId: string, videoId: string): Promise<Strea
 
   // Shared requests are not tied to one component's AbortSignal: aborting a
   // consumer must not reject the promise a later mount reuses.
-  const request = fetchJson<StreamDatapack>(`${datasetId}/${videoId}.datapack.json`)
+  const request = fetchJson<StreamDatapack>(
+    `${DATAPACK_BASE || DATA_BASE}/${datasetId}/${videoId}.datapack.json`,
+  )
     .then(pack => {
       packCache.set(key, pack);
       return pack;

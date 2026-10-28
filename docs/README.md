@@ -18,6 +18,6 @@
 
 - 文档用简体中文；字段名、命令、代码保持原文。
 - 时间一律 **JST（UTC+9）**。
-- `data/` 是源数据，`public/data/` 是生成物；不要把生成物提交进仓库。
+- 数据（manifest / insights / datapack）在对象存储；git 里只有 `data-sources.json`。`data/` 与 `public/data/` 分别是本地暂存与构建生成物。
 - 改数据结构时，同时更新 `src/types/`、`docs/data-model.md`、`docs/adding-data.md`。
 - `src/components/ui/` 是 coss ui 的生成文件，升级用 CLI，不手写业务逻辑。

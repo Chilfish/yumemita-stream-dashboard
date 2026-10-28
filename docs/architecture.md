@@ -5,31 +5,39 @@
 **目标**
 
 - 把一份或多份 `stream-datapack` JSON 变成可浏览、可比较的数据台。
-- 数据随仓库走，静态托管即可运行，不需要后端。
+- 索引与预聚合随仓库走，逐场 datapack 放对象存储：纯静态托管即可运行，不需要后端。
 - 新增成员 / 新增场次时，尽量只动数据，不动组件。
 - 图表可控：比例尺、路径、交互都由我们自己决定，方便后续加指标。
 
 **非目标**
 
 - 不做直播内容的正文字幕/翻译（那是归档流程的事）。
-- 不做实时抓取；数据由外部 pipeline 生成后放进 `data/`。
+- 不做实时抓取；数据由外部 pipeline 生成后上传对象存储。
 - 不做账号体系、数据库、服务端聚合。
 
 ## 分层
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│ data/                    源数据（提交）                  │
-│  <dataset>/manifest.json + <videoId>.datapack.json      │
+│ data/<dataset>/*.datapack.json   本地暂存（gitignore）    │
 └───────────────────────┬─────────────────────────────────┘
-                        │ scripts/sync-data.mjs
+                        │ scripts/publish-data.ts
+                        │ 派生 manifest + insights，三者一起上传
+┌───────────────────────▼─────────────────────────────────┐
+│ 对象存储（R2 等）                                        │
+│  <base>/<dataset>/manifest.json                         │
+│                  insights.json                          │
+│                  <videoId>.datapack.json                │
+└───────────────────────┬─────────────────────────────────┘
+                        │ 构建时 scripts/sync-data.mjs（带缓存）
+                        │ 只拉 manifest + insights
 ┌───────────────────────▼─────────────────────────────────┐
 │ public/data/             生成物（gitignore）             │
-│  index.json + <dataset>/manifest.json + datapack        │
+│  index.json + <dataset>/manifest.json + insights.json   │
 └───────────────────────┬─────────────────────────────────┘
                         │ fetch（浏览器）
 ┌───────────────────────▼─────────────────────────────────┐
-│ src/lib/data.ts          请求、datapack 缓存、并发控制   │
+│ src/lib/data.ts          索引同源加载；datapack 走远端    │
 │ src/lib/table-params.ts  数据表 URL 参数解析/序列化       │
 │ src/hooks/               useDatasetIndex / useDataset /  │
 │                          useStreamPacks（按需）           │
@@ -60,12 +68,12 @@
 ## 数据流
 
 1. `scripts/sync-data.mjs` 读 `data-sources.json`。
-2. 对每个 dataset：读 manifest，按 manifest 的 `streams[].videoId` 复制 datapack 到 `public/data/<id>/`。
-3. 同步时用 `aggregateDataset` 预聚合全量 KPI、币种、Top 词/发言者、最佳场次、峰值分钟与典型节奏，写 `insights.json`。
-4. 写 `public/data/index.json`（dataset 列表 + 数量 + 生成时间）。
+2. 配了 `DATAPACK_BASE` / `VITE_DATAPACK_BASE` 时，从对象存储拉 `<id>/manifest.json` 与 `insights.json`（写本地缓存；拉取失败且无缓存才报错）；没配时直接用本地 `data/<id>/`。
+3. manifest 与 insights 由 `publish:data` 从 pack 派生，构建阶段不重算。
+4. 写 `public/data/<id>/manifest.json`、`insights.json` 与 `public/data/index.json`（dataset 列表 + 数量 + 生成时间）。
 5. `useDatasetIndex()` 拉 index；默认选中第一个 dataset。
 6. `useDataset(datasetId)` 并行拉 manifest 与 insights，然后用 `buildSummaryRows` 得到按开播时间倒序的 `StreamSummary[]`。列表页不再等待所有 datapack。
-7. 列表视图（总览 / 数据表 / 对比指标）只消费 summary 与预聚合 totals；单场和对比的逐分钟曲线通过 `useStreamPacks` 按需请求 datapack，`lib/data.ts` 里有缓存与并发去重。
+7. 列表视图（总览 / 数据表 / 对比指标）只消费 summary 与预聚合 totals；单场和对比的逐分钟曲线通过 `useStreamPacks` 按 videoId 向对象存储请求 datapack（`VITE_DATAPACK_BASE`），`lib/data.ts` 里有缓存与并发去重。
 8. 各视图消费 `rows` / `totals`；图表组件只接收已整理好的数据。
 
 ## 路由与 URL 状态
@@ -216,17 +224,18 @@ src/components/charts/
 | --- | --- | --- |
 | 图表库 | D3 + 手写 SVG | 可控、体积小、方便加自定义指标 |
 | UI 库 | coss ui | Base UI 的可访问性 + Tailwind token，风格统一 |
-| 数据加载 | 静态 JSON + fetch | 无后端、可静态托管、数据随仓库走 |
-| 聚合位置 | 同步时预聚合 + 浏览器局部计算 | 列表页不再下载全部 datapack；单场明细按需加载 |
+| 数据加载 | 索引静态托管 + datapack 对象存储 | 无后端；大文件不进 git，按需拉取 |
+| 聚合位置 | 发布时预聚合 + 浏览器局部计算 | 列表页不需要任何 datapack；预聚合由 publish 生成 |
 | 状态管理 | React 局部状态 | 页面简单，避免全局 store |
-| 数据源 | `data/` → `public/data/` | 源数据可读可 diff，生成物不进 git |
+| 数据源 | pack 派生 manifest/insights，整体上传对象存储 | 单一真源，索引不会与 pack 漂移 |
 
 ## 性能与限制
 
-- 首屏只加载 `index.json` + `manifest.json` + `insights.json`（当前约 150 KB 以内），不再一次性拉全部 datapack。
+- 首屏只加载 `index.json` + `manifest.json` + `insights.json`（262 场时约 400 KB，gzip 后约 47 KB），不拉任何 datapack。
 - 单场页只请求该场的 datapack；对比页最多请求所选 4 场。`fetchDatapack` 用模块级缓存与 in-flight 去重，来回切换不会重复下载。
-- `insights.json` 由 `sync:data` 预聚合，页面内不再对全部场次重算 totals；`buildSummaryRows` 只做排序。
+- `insights.json` 由 `publish:data` 预聚合，页面内不再对全部场次重算 totals；`buildSummaryRows` 只做排序。
 - 图表用 ResizeObserver，窗口缩放不会重建数据。
 - 词频/发言者是“各场 Top 列表相加”，不是全量重扫；精确聚合需要扩展 datapack schema。
 - 使用 hash 路由，刷新/分享任一页面都能还原；视图按路由 `React.lazy()` 拆包，首屏只加载当前页。
-- 数据增长时只需重新 `sync:data`：manifest/insights 保持小体积，datapack 始终按需加载。
+- `/data/*.json` 走短缓存（`vercel.json` 里 300s），datapack 由对象存储按 videoId 长缓存；仓库体积与场次数无关。
+- manifest 会随场次线性增长（3000 场约 4 MB raw / 460 KB gzip）。再往上需要按年份切片或引入服务端分页。
