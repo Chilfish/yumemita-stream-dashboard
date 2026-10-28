@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  // Defaults to '/' for local dev / root hosting. The Pages deploy workflow
-  // overrides VITE_BASE with '/<repo>/' for project sites.
+  // Defaults to '/' for local dev / root hosting. Set VITE_BASE to '/<path>/'
+  // when the site is served from a subpath.
   base: process.env.VITE_BASE ?? '/',
   plugins: [react(), tailwindcss()],
   resolve: {

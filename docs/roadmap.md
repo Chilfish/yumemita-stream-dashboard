@@ -42,7 +42,7 @@
 - [x] 路由错误边界：根路由与 `:datasetId` 的 `errorElement`，渲染或懒加载异常有兜底与重试。
 - [x] Playwright / agent-browser 冒烟测试：首页、单场深链刷新、无效 id、对比深链、前进后退（`bun run test:smoke`）。
 - [x] 可访问性审计：axe 覆盖总览/单场/对比/数据表，0 violations；CWV LCP ~1.1s、CLS 0。
-- [x] 部署 workflow：`.github/workflows/deploy.yml` 发布 GitHub Pages，`VITE_BASE` 支持子路径；Pages 不支持自定义缓存头，缓存策略见部署文档。
+- [x] 部署：Vercel（`bun run build` + `dist/`），`VITE_BASE` 支持子路径；GitHub Pages workflow 已移除。
 - [x] datapack 拆成「摘要 + 明细」：`manifest.json` + `insights.json` 先渲染，单场/对比按需加载 datapack。
 
 ## 非目标
