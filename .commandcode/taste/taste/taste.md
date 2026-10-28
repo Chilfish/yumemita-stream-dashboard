@@ -1,7 +1,7 @@
 # Taste
 - Expects current/latest major versions of dependencies (e.g. React Router 8, not 7) and will link the official docs to correct a stale version assumption — check the official docs for the current major before picking a version. Confidence: 0.6
 - Wants commits made as work progresses ("记得随手commit") — commit at logical checkpoints during the task instead of leaving everything uncommitted at the end. Confidence: 0.6
-- After finishing a change, expects related docs and the roadmap/next-steps list to be updated, not just the code. Confidence: 0.55
+- After finishing a change, expects related docs and the roadmap/next-steps list to be updated, not just the code — and the status/progress docs must be brought in line with reality *before* the commit ("记得先更新文档的状态"). Confidence: 0.6
 - For incremental/batch work (e.g. backfilling data), wants a dedicated index/progress doc that marks where things stand — what is done, what was skipped and why, and what comes next. Confidence: 0.5
 - Design taste leans toward Apple-style visual language: clear focal hierarchy and typography, and explicitly dislikes pages that read as a homogeneous "pile of cards" — is fine with (even wants) a large-scale rethink rather than incremental polish when the overall layout feels off. Confidence: 0.6
 - A redesign must not trade away information density: retain existing data/tables/metrics and treat the old design as a base to optimize, not replace; achieve calm by layering (quiet shell, dense data) and progressive disclosure across separate pages (member home / stream list / detail) rather than by cutting data. Confidence: 0.65
@@ -13,4 +13,7 @@
 - In batch/pipeline scripts, expects per-item failures to be skipped and logged, never fatal: known-unrecoverable cases (e.g. future/unstarted streams) should be classified as skips that don't count as failures and don't block the remaining items ("异常处理记得跳过而不阻塞"). Confidence: 0.65
 - Prefers real SPA routing over local-state tab switching: view/page state (and similar navigable context) should live in the URL so pages are deep-linkable and back/forward works, with a sidebar for navigation. Confidence: 0.65
 - Keeps raw/source data out of git: derive the committed artifacts locally before commit/push (pre-push compute step) rather than checking in originals, and expects advice to respect that boundary. Confidence: 0.55
+- Large/bulk data artifacts should live on object storage (Cloudflare R2 / S3-compatible) rather than in the repo, with the storage base URL kept in an environment variable that is inlined at build time.
+- Strongly prefers a single source of truth in data pipelines: derived artifacts (manifest, pre-aggregated insights) should be generated from the source data and written to the same destination in the same publish step, rather than kept as a second copy that is manually updated — "单一数据来源是最好的", explicitly to eliminate the "someone forgot to sync / silent drift" failure mode. Confidence: 0.6
+- Prioritizes a clean git/repo state over preserving history: when tracked files are a mess, is comfortable with rewriting history or deleting and re-committing to make it clean ("让它干净"). Confidence: 0.5
 - Architecture default is client-local-first with lazy loading (load/slice data on demand in the browser) rather than server-side compute or a database. Confidence: 0.5
