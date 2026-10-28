@@ -1,7 +1,7 @@
 import { max, scaleBand, scaleLinear } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { DirectLabel, TickText, YAxis } from "@/components/charts/axis";
 import { CHART_COLORS } from "@/lib/chart-colors";
-import { AxisLabel, YAxis } from "@/components/charts/axis";
 import type { StreamRow } from "@/lib/aggregate";
 import { formatCompact } from "@/lib/format";
 
@@ -9,14 +9,35 @@ interface TenMinuteBarsProps {
   row: StreamRow;
 }
 
+function clamp(value: number, min: number, maxValue: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, maxValue));
+}
+
 export function TenMinuteBars({ row }: TenMinuteBarsProps) {
   const buckets = row.pack.chat.density.perTenMinute;
+  const hasData = buckets.some(bucket => bucket.messages > 0);
+
+  if (!hasData) {
+    return (
+      <p className="py-10 text-center text-footnote text-muted-foreground">
+        本场没有抓取到弹幕，无法按时段分段。
+      </p>
+    );
+  }
+
   const maxMessages = max(buckets, bucket => bucket.messages) ?? 1;
+  const peakBucket = buckets.reduce((best, bucket) =>
+    bucket.messages > best.messages ? bucket : best,
+  );
+  const scBucket = buckets.reduce<typeof buckets[number] | null>(
+    (best, bucket) => (bucket.superchats > 0 && (!best || bucket.superchats > best.superchats) ? bucket : best),
+    null,
+  );
 
   return (
     <ChartCanvas ariaLabel={`${row.summary.title} 的每十分钟弹幕量`} height={230}>
       {({ width, height }) => {
-        const margin = { top: 12, right: 16, bottom: 34, left: 44 };
+        const margin = { top: 22, right: 16, bottom: 30, left: 44 };
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const x = scaleBand()
@@ -29,15 +50,16 @@ export function TenMinuteBars({ row }: TenMinuteBarsProps) {
         return (
           <g transform={`translate(${margin.left},${margin.top})`}>
             <YAxis scale={y} x={innerWidth} />
+
             {buckets.map((bucket, index) => {
               const bandX = x(String(bucket.offsetMin)) ?? 0;
               const barWidth = x.bandwidth();
-              const barHeight = innerHeight - y(bucket.messages);
+
               return (
                 <g key={bucket.offsetMin}>
                   <rect
                     fill={CHART_COLORS[0]}
-                    height={barHeight}
+                    height={innerHeight - y(bucket.messages)}
                     rx={2}
                     width={barWidth}
                     x={bandX}
@@ -52,25 +74,34 @@ export function TenMinuteBars({ row }: TenMinuteBarsProps) {
                       fill={CHART_COLORS[3]}
                       r={2.5}
                     >
-                      <title>{`SC ${bucket.superchats} 笔`}</title>
+                      <title>{`${bucket.offsetMin}–${bucket.offsetMin + 9} 分：SC ${bucket.superchats} 笔`}</title>
                     </circle>
                   ) : null}
                   {index % labelEvery === 0 ? (
-                    <text
-                      className="fill-muted-foreground text-[10px]"
-                      textAnchor="middle"
-                      x={bandX + barWidth / 2}
-                      y={innerHeight + 14}
-                    >
+                    <TickText x={bandX + barWidth / 2} y={innerHeight + 14}>
                       {bucket.offsetMin}m
-                    </text>
+                    </TickText>
                   ) : null}
                 </g>
               );
             })}
-            <AxisLabel anchor="start" x={0} y={innerHeight + 28}>
-              红点为 SC 笔数 {">"} 0
-            </AxisLabel>
+
+            <DirectLabel
+              anchor="middle"
+              label="峰值"
+              value={`${formatCompact(peakBucket.messages)} 条`}
+              x={clamp((x(String(peakBucket.offsetMin)) ?? 0) + x.bandwidth() / 2, 32, innerWidth - 32)}
+              y={clamp(y(peakBucket.messages) - 14, 10, innerHeight)}
+            />
+
+            {scBucket ? (
+              <DirectLabel
+                label="SC"
+                value={`${scBucket.superchats} 笔`}
+                x={clamp((x(String(scBucket.offsetMin)) ?? 0) + x.bandwidth() + 6, 0, innerWidth - 56)}
+                y={clamp(y(scBucket.messages) - 5, 10, innerHeight)}
+              />
+            ) : null}
           </g>
         );
       }}

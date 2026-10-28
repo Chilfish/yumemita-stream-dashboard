@@ -15,6 +15,7 @@
     "sync:data": "bun scripts/sync-data.mjs",
     "validate:data": "bun scripts/validate-data.mjs",
     "add:datapack": "bun scripts/add-datapack.mjs",
+    "fetch:streams": "bun scripts/fetch-streams.ts",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",

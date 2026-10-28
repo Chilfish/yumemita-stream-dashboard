@@ -41,7 +41,6 @@ const ACTIVE_ITEM_CLASS =
 interface AppSidebarProps {
   dataset: DatasetIndexEntry;
   datasets: DatasetIndexEntry[];
-  streamCount: number;
   chatTotal: number;
   theme: Theme;
   onToggleTheme: () => void;
@@ -50,7 +49,6 @@ interface AppSidebarProps {
 export function AppSidebar({
   dataset,
   datasets,
-  streamCount,
   chatTotal,
   theme,
   onToggleTheme,
@@ -169,9 +167,6 @@ export function AppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <p className="px-2 text-caption text-ink-3 group-data-[collapsible=icon]:hidden">
-          {formatInteger(streamCount)} 场 · {formatInteger(chatTotal)} 条弹幕
-        </p>
       </SidebarFooter>
 
       <SidebarRail />

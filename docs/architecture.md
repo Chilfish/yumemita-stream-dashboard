@@ -77,17 +77,18 @@
 
 | URL | 页面 |
 | --- | --- |
-| `#/` | 重定向到 `#/<firstDataset>/overview` |
-| `#/:datasetId/overview` | 总览 |
+| `#/` | 重定向到上次访问的成员，否则第一个数据集 |
+| `#/:datasetId` | 成员首页（L1，glance） |
+| `#/:datasetId/streams?q=&type=&sort=&dir=&vstats=` | 场次页（L2，browse）；筛选/排序状态可分享 |
 | `#/:datasetId/stream` | 跳转到最新一场 |
-| `#/:datasetId/stream/:videoId` | 单场 |
+| `#/:datasetId/stream/:videoId?view=` | 单场详情（L3，inspect）；`view` 为 `overview`/`timeline`/`words`/`paid`/`comments` |
 | `#/:datasetId/compare?ids=a,b,c` | 对比，最多 4 场 |
-| `#/:datasetId/table?q=&sort=&dir=&vstats=` | 数据表；筛选/排序状态可分享 |
 | `#/:datasetId/about` | 说明 |
+| `#/:datasetId/overview`、`#/:datasetId/table` | 旧地址，分别重定向到成员首页与场次页 |
 
 路由表在 `src/router.tsx`，根路由与 `:datasetId` 都配置了 `errorElement`（`route-error.tsx`），渲染或懒加载异常会显示兜底页而不是白屏。`src/pages/` 是薄包装层：从 `useDatasetView()` 取数据、把导航动作接到 `navigate`，视图组件本身不依赖 router。
 
-数据表的查询参数由 `src/lib/table-params.ts` 解析/序列化：`q` 搜索词、`sort` 排序字段、`dir` 方向（`asc`/`desc`）、`vstats=1` 只看有 VSTATS 的场次。默认值不写进 URL，参数变化用 `replace`，避免输入搜索词时污染历史记录。
+数据表的查询参数由 `src/lib/table-params.ts` 解析/序列化：`q` 搜索词、`type` 内容类型、`sort` 排序字段、`dir` 方向（`asc`/`desc`）、`vstats=1` 只看有 VSTATS 的场次。默认值不写进 URL，参数变化用 `replace`，避免输入搜索词时污染历史记录。
 
 ## 状态管理
 

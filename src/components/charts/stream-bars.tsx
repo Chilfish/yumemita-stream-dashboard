@@ -1,7 +1,7 @@
 import { max, scaleBand, scaleLinear } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { DirectLabel, TickText, YAxis } from "@/components/charts/axis";
 import { CHART_COLORS } from "@/lib/chart-colors";
-import { AxisLabel, YAxis } from "@/components/charts/axis";
 import type { StreamSummary } from "@/types/dataset";
 import { formatCompact, formatDate } from "@/lib/format";
 
@@ -11,16 +11,34 @@ interface StreamBarsProps {
   onSelect?: (videoId: string) => void;
 }
 
+function clamp(value: number, min: number, maxValue: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, maxValue));
+}
+
 export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
   const sorted = [...rows]
     .filter(row => row.avgConcurrent != null)
     .sort((a, b) => (a.startedAt ?? "").localeCompare(b.startedAt ?? ""));
+
+  if (sorted.length === 0) {
+    return (
+      <p className="py-10 text-center text-footnote text-muted-foreground">
+        没有带同接数据的场次，这张图暂时为空。
+      </p>
+    );
+  }
+
   const maxValue = max(sorted, row => row.maxConcurrent ?? 0) ?? 1;
+  const peakRow = sorted.reduce((best, row) =>
+    (row.maxConcurrent ?? row.avgConcurrent ?? 0) > (best.maxConcurrent ?? best.avgConcurrent ?? 0)
+      ? row
+      : best,
+  );
 
   return (
     <ChartCanvas ariaLabel="每场直播的平均与最大同接" height={300}>
       {({ width, height }) => {
-        const margin = { top: 16, right: 16, bottom: 58, left: 48 };
+        const margin = { top: 30, right: 16, bottom: 32, left: 48 };
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const x = scaleBand()
@@ -28,12 +46,26 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
           .range([0, innerWidth])
           .paddingInner(0.3);
         const y = scaleLinear().domain([0, maxValue]).nice().range([innerHeight, 0]);
-        const barWidth = Math.max(3, x.bandwidth() / 2 - 1);
+        const barWidth = Math.max(2, x.bandwidth() / 2 - 1);
         const labelEvery = Math.max(1, Math.ceil(sorted.length / 6));
+
+        // 直接标注：把两条系列的名字与数值挂在最高的一组柱子上，不再另设图例。
+        const peakCenter = (x(peakRow.videoId) ?? 0) + x.bandwidth() / 2;
+        const peakTop = Math.min(
+          y(peakRow.avgConcurrent ?? 0),
+          y(peakRow.maxConcurrent ?? peakRow.avgConcurrent ?? 0),
+        );
+        const peakAnchor = peakCenter > innerWidth * 0.62 ? "end" : "start";
+        const peakLabelX = clamp(
+          peakCenter + (peakAnchor === "end" ? -8 : 8),
+          56,
+          innerWidth - 4,
+        );
 
         return (
           <g transform={`translate(${margin.left},${margin.top})`}>
             <YAxis scale={y} x={innerWidth} />
+
             {sorted.map((row, index) => {
               const avg = row.avgConcurrent;
               const peak = row.maxConcurrent;
@@ -41,6 +73,7 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
               const bandX = x(row.videoId) ?? 0;
               const center = bandX + x.bandwidth() / 2;
               const dimmed = selectedId != null && selectedId !== row.videoId;
+
               return (
                 <g
                   aria-label={`${formatDate(row.startedAt)} ${row.title}`}
@@ -73,28 +106,28 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
                     </rect>
                   ) : null}
                   {index % labelEvery === 0 ? (
-                    <text
-                      className="fill-muted-foreground text-[10px]"
-                      textAnchor="middle"
-                      x={center}
-                      y={innerHeight + 16}
-                    >
+                    <TickText x={center} y={innerHeight + 14}>
                       {formatDate(row.startedAt)}
-                    </text>
+                    </TickText>
                   ) : null}
                 </g>
               );
             })}
-            <g transform={`translate(0,${innerHeight + 44})`}>
-              <rect fill={CHART_COLORS[0]} height={8} rx={2} width={8} x={0} y={0} />
-              <AxisLabel anchor="start" x={14} y={8}>
-                平均同接
-              </AxisLabel>
-              <rect fill={CHART_COLORS[1]} height={8} rx={2} width={8} x={78} y={0} />
-              <AxisLabel anchor="start" x={92} y={8}>
-                最大同接
-              </AxisLabel>
-            </g>
+
+            <DirectLabel
+              anchor={peakAnchor}
+              label="平均"
+              value={formatCompact(peakRow.avgConcurrent)}
+              x={peakLabelX}
+              y={clamp(peakTop - 16, 10, innerHeight)}
+            />
+            <DirectLabel
+              anchor={peakAnchor}
+              label="最大"
+              value={formatCompact(peakRow.maxConcurrent)}
+              x={peakLabelX}
+              y={clamp(peakTop - 1, 10, innerHeight)}
+            />
           </g>
         );
       }}

@@ -23,7 +23,7 @@ interface Rule {
  * 未命中的标题归入「杂谈」，并单独计数，避免静默丢弃。
  */
 const RULES: Rule[] = [
-  { key: "sing", pattern: /弾き語り|弾き騙り|歌枠|アコギ|歌って|カバー|演奏|リサイタル/ },
+  { key: "sing", pattern: /弾き語り|弾き騙り|歌枠|アコギ|歌って|カバー|リサイタル/ },
   { key: "game", pattern: /ゲーム|実況|プレイ|あそぶ|魔女裁判|SSR|ガチャ|引くまで|ノベル|RPG/ },
   {
     key: "event",

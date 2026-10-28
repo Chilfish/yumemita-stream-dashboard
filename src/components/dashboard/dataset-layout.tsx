@@ -54,7 +54,6 @@ export function DatasetLayout() {
         dataset={dataset}
         datasets={index.datasets}
         onToggleTheme={toggle}
-        streamCount={rows.length || dataset.count}
         theme={theme}
       />
 

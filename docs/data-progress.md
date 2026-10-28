@@ -81,14 +81,22 @@ yt-dlp --flat-playlist --print "%(id)s" `
 ## 更新流程
 
 ```powershell
-# 1. 抓取（meta / live_chat → jsonl / 评论 / VSTATS），见 scripts/README.md
-# 2. 一次生成多场，自动写 data/nonoka/ 并 upsert manifest
-bun scripts/stream-datapack.ts <会话目录1> <会话目录2> ...
+# 一次跑完：频道列表 → meta/弹幕/评论/VSTATS → 每 5 场自动生成 datapack
+bun scripts/fetch-streams.ts --dataset nonoka `
+  --root "D:/projects/claude-messages/temp/youtube-live" `
+  --concurrency 3
 
-# 3. 同步到 public/data/ 并校验
+# 进度与日志
+Get-Content -Wait "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch.log"
+Get-Content "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch-progress.json"
+
+# 最后同步/校验
 bun run sync:data
 bun run validate:data
 ```
+
+`--root` 是**原始会话目录**，不是 `data/`；datapack 仍按 `data-sources.json` 写到 `data/nonoka/`。
+已入库和已有素材的场次会自动跳过，中断后直接重跑同一条命令即可。
 
 ## 口径提醒
 

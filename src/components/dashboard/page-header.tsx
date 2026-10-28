@@ -12,10 +12,20 @@ interface PageHeaderProps {
   facts?: Fact[];
   actions?: ReactNode;
   className?: string;
+  /** 覆盖标题字阶：默认 `text-display`；单场详情用 `text-title`。 */
+  titleClassName?: string;
   children?: ReactNode;
 }
 
-export function PageHeader({ eyebrow, title, facts, actions, className, children }: PageHeaderProps) {
+export function PageHeader({
+  eyebrow,
+  title,
+  facts,
+  actions,
+  className,
+  titleClassName,
+  children,
+}: PageHeaderProps) {
   return (
     <header
       className={cn(
@@ -25,7 +35,9 @@ export function PageHeader({ eyebrow, title, facts, actions, className, children
     >
       <div className="min-w-0">
         {eyebrow ? <p className="text-caption text-member">{eyebrow}</p> : null}
-        <h1 className="text-display tabular-nums text-foreground">{title}</h1>
+        <h1 className={cn("tabular-nums text-foreground", titleClassName ?? "text-display")}>
+          {title}
+        </h1>
         {facts && facts.length > 0 ? (
           <ul className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-footnote">
             {facts.map((fact, index) => (

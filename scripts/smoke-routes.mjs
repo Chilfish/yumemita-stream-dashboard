@@ -68,18 +68,19 @@ function loadFixture() {
     videoId: streams[0].videoId,
     streamTitle: streams[0].title ?? "",
     compareIds: streams.slice(0, 2).map(stream => stream.videoId),
+    compareTitle: streams[0].title ?? "",
   };
 }
 
-const { datasetId, videoId, streamTitle, compareIds } = loadFixture();
+const { datasetId, videoId, streamTitle, compareIds, compareTitle } = loadFixture();
 
 const streamUrl = `${baseUrl}/#/${datasetId}/stream/${videoId}`;
 const invalidUrl = `${baseUrl}/#/${datasetId}/stream/not-a-real-id`;
 const compareUrl = `${baseUrl}/#/${datasetId}/compare?ids=${compareIds.join(",")}`;
-const overviewHash = `#/${datasetId}/overview`;
-const STREAM_STAT_LABEL = "平均 / 最大同接";
+const homeHash = `#/${datasetId}`;
+const streamMarker = streamTitle || videoId;
 const NOT_FOUND_TEXT = "找不到这场直播";
-const COMPARE_TITLE = "指标对比";
+const STREAMS_LINK = "场次";
 
 /**
  * Windows 上 npm 的全局包装是 .cmd，Bun 无法把含双引号的参数安全传进去，
@@ -201,18 +202,18 @@ function probe(url, timeout = 5000) {
 
 const scenarios = [
   {
-    name: "首页重定向 / → overview",
+    name: "首页重定向 / → 成员首页",
     async run() {
       await page.open(`${baseUrl}/`);
       await page.waitLoad();
-      await waitFor("等待重定向到 overview", async () => {
+      await waitFor("等待重定向到成员首页", async () => {
         const value = await hash();
-        return value === overviewHash ? value : null;
+        return value === homeHash ? value : null;
       });
       const current = await hash();
-      assert(current === overviewHash, `期望 ${overviewHash}，实际 ${current || "(空)"}`);
+      assert(current === homeHash, `期望 ${homeHash}，实际 ${current || "(空)"}`);
       const fullUrl = await page.url();
-      assert(fullUrl.includes(overviewHash), `地址栏没有落地到 ${overviewHash}：${fullUrl}`);
+      assert(fullUrl.includes(homeHash), `地址栏没有落地到 ${homeHash}：${fullUrl}`);
     },
   },
   {
@@ -220,25 +221,22 @@ const scenarios = [
     async run() {
       await page.open(streamUrl);
       await page.waitLoad();
-      await page.waitText(STREAM_STAT_LABEL);
+      await page.waitText(streamMarker);
 
       const before = await hash();
       assert(before.includes(videoId), `hash 里没有 ${videoId}：${before}`);
 
       const text = await bodyText();
-      const rendered = text.includes(STREAM_STAT_LABEL) || (streamTitle !== "" && text.includes(streamTitle));
-      assert(rendered, "单场页面既没有「平均 / 最大同接」也没有标题文本");
+      assert(text.includes(streamMarker), "单场页面没有渲染标题文本");
 
       await page.reload();
       await page.waitLoad();
-      await page.waitText(STREAM_STAT_LABEL);
+      await page.waitText(streamMarker);
 
       const after = await hash();
       assert(after === before, `刷新后 hash 变了：${before} → ${after}`);
       const reloadedText = await bodyText();
-      const stillRendered =
-        reloadedText.includes(STREAM_STAT_LABEL) || (streamTitle !== "" && reloadedText.includes(streamTitle));
-      assert(stillRendered, "刷新后单场内容消失");
+      assert(reloadedText.includes(streamMarker), "刷新后单场内容消失");
     },
   },
   {
@@ -257,7 +255,7 @@ const scenarios = [
     async run() {
       await page.open(compareUrl);
       await page.waitLoad();
-      await page.waitText(COMPARE_TITLE);
+      await page.waitText(compareTitle);
 
       const route = String((await page.eval("new URL(location.href).hash")) ?? "");
       const decoded = decodeURIComponent(route);
@@ -267,21 +265,21 @@ const scenarios = [
       }
 
       const text = await bodyText();
-      assert(text.includes(COMPARE_TITLE), `对比页面缺少「${COMPARE_TITLE}」`);
+      assert(text.includes(compareTitle), "对比页面没有渲染所选场次");
     },
   },
   {
-    name: "前进后退 单场 → 数据表 → back → forward",
+    name: "前进后退 单场 → 场次 → back → forward",
     async run() {
       await page.open(streamUrl);
       await page.waitLoad();
-      await page.waitText(STREAM_STAT_LABEL);
+      await page.waitText(streamMarker);
       const streamHash = await hash();
 
-      await page.clickLink("数据表");
-      await waitFor("等待进入数据表", async () => {
+      await page.clickLink(STREAMS_LINK);
+      await waitFor("等待进入场次页", async () => {
         const value = await hash();
-        return value.endsWith("/table") ? value : null;
+        return value.endsWith("/streams") ? value : null;
       });
 
       await page.back();
@@ -291,9 +289,9 @@ const scenarios = [
       });
 
       await page.forward();
-      await waitFor("等待 forward 回到数据表", async () => {
+      await waitFor("等待 forward 回到场次页", async () => {
         const value = await hash();
-        return value.endsWith("/table") ? value : null;
+        return value.endsWith("/streams") ? value : null;
       });
     },
   },

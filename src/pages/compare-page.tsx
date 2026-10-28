@@ -11,20 +11,23 @@ export function ComparePage() {
   const hasParam = searchParams.has("ids");
   const urlIds = parseCompareIds(searchParams.get("ids"));
   const validIds = urlIds.filter(id => rows.some(row => row.videoId === id));
-  const selectedIds = hasParam
-    ? validIds
-    : rows.slice(0, 3).map(row => row.videoId);
+  const selectedIds = hasParam ? validIds : rows.slice(0, 3).map(row => row.videoId);
   const { packs, status, error } = useStreamPacks(dataset.id, selectedIds);
 
-  function handleToggle(videoId: string): void {
-    const next = toggleCompareId(selectedIds, videoId);
+  function writeIds(ids: string[]): void {
     const params = new URLSearchParams(searchParams);
-    params.set("ids", next.join(","));
+    params.set("ids", ids.join(","));
     setSearchParams(params, { replace: true });
+  }
+
+  function handleToggle(videoId: string): void {
+    writeIds(toggleCompareId(selectedIds, videoId));
   }
 
   return (
     <CompareView
+      datasetLabel={dataset.label}
+      onReset={() => writeIds([])}
       onToggle={handleToggle}
       packError={error}
       packStatus={status}

@@ -1,5 +1,5 @@
 import { TriangleAlert } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useDatasetView } from "@/components/dashboard/dataset-view-context";
 import { ViewSkeleton } from "@/components/dashboard/loading-screen";
 import { StreamDetailView } from "@/components/dashboard/stream-detail-view";
@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
 import { useStreamPacks } from "@/hooks/use-stream-packs";
 import { findStreamSummary } from "@/lib/aggregate";
-import { streamPath, streamsPath } from "@/lib/routes";
+import { parseStreamSubView, streamPath, streamsPath, type StreamSubView } from "@/lib/routes";
 
 export function StreamPage() {
   const { dataset, rows } = useDatasetView();
   const { videoId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const view = parseStreamSubView(searchParams.get("view"));
   const summary = findStreamSummary(rows, videoId ?? null);
   const { packs, status, error } = useStreamPacks(
     dataset.id,
@@ -60,11 +62,20 @@ export function StreamPage() {
     return <ViewSkeleton />;
   }
 
+  const currentVideoId = summary.videoId;
+
+  // 子视图只改 `?view=`，默认值不出现在 URL 里；用 replace 避免污染历史记录。
+  function handleViewChange(next: StreamSubView): void {
+    navigate(streamPath(dataset.id, currentVideoId, next), { replace: true });
+  }
+
   return (
     <StreamDetailView
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
+      onViewChange={handleViewChange}
       row={{ summary, pack }}
       rows={rows}
+      view={view}
     />
   );
 }

@@ -38,6 +38,46 @@ bun scripts/stream-datapack.ts <会话目录> --dataset nonoka --skip-index
 
 匹配不到 dataset 时退回旧行为：写到 `<会话目录>/work/stream-datapack.json`，并打印提示。
 
+## 批量补齐历史场次
+
+`fetch-streams.ts` 把「拉频道列表 → 抓 meta/弹幕/评论/VSTATS → 每 N 场生成 datapack」串起来，
+可重入、并发、自动跳过已入库场次。
+
+```powershell
+# 原始素材放归档工程，datapack 仍自动写 data/nonoka/
+bun scripts/fetch-streams.ts --dataset nonoka `
+  --root "D:/projects/claude-messages/temp/youtube-live" `
+  --concurrency 3
+
+# 也可以把原始素材放本仓库（脚本会自动写 .gitignore，不会提交）
+bun scripts/fetch-streams.ts --dataset nonoka --root .\temp\youtube-live
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dataset <id>` | dataset；只有一个时可以省略 |
+| `--root <目录>` | **原始会话目录**（meta/danmaku/comments），不是 `data/`；默认 `$STREAM_SESSION_ROOT` 或 `./temp/youtube-live` |
+| `--state-dir <目录>` | 进度/日志/频道缓存，默认 `<root>/.fetch-state` |
+| `--concurrency <n>` | 媒体并发，默认 3 |
+| `--meta-concurrency <n>` | 元信息并发，默认 6 |
+| `--build-every <n>` | 每 n 场构建一次，默认 5 |
+| `--limit <n>` | 本次最多处理 n 场（含元信息），用于试跑 |
+| `--ids <文件>` | 直接读视频 ID 列表（每行一个），跳过频道列表抓取 |
+| `--dry-run` | 只列出候选 |
+| `--no-build` | 只抓素材 |
+
+监控：
+
+```powershell
+Get-Content -Wait "<root>/.fetch-state/fetch.log"
+Get-Content "<root>/.fetch-state/fetch-progress.json"
+```
+
+- 已入库（manifest 里有的 videoId）直接跳过；已有 meta/jsonl/comments 也不会重抓。
+- 未来场（`will begin in …`）记作「跳过」，不计失败、不阻塞后续场次。
+- 同名短摘要/预告会让位正片；会员限定场次需要已登录的 Firefox cookie，或 `--cookies <jar>`。
+- 频道 `/streams` 偶发 SSL 错误时会回退到 `<state-dir>/channel-ids.txt`；也可以用 `--ids`。
+
 ## 抓取侧（不在本仓库）
 
 本仓库只放结果。原始会话由归档工程的 `yt-dlp` + `scripts/danmaku` 产出：

@@ -1,80 +1,35 @@
-import { ArrowDown, ArrowUp, Download, RotateCcw, Search } from "lucide-react";
-import { useMemo } from "react";
+import { RotateCcw } from "lucide-react";
+import { type ReactNode, useMemo } from "react";
+import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
+import { PageHeader, type Fact } from "@/components/dashboard/page-header";
+import { StreamsToolbar } from "@/components/dashboard/streams-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import type { StreamSummary } from "@/types/dataset";
+import { CONTENT_TYPE_LABELS, classifyTitle } from "@/lib/classify";
 import {
   formatDate,
   formatDuration,
+  formatDurationLong,
   formatInteger,
   formatPercent,
   formatTime,
 } from "@/lib/format";
+import { streamPath } from "@/lib/routes";
 import {
   DEFAULT_TABLE_PARAMS,
-  type SortDirection,
   type TableParams,
   type TableSortKey,
+  isTableSortKey,
 } from "@/lib/table-params";
+import type { StreamSummary } from "@/types/dataset";
 import { cn } from "@/lib/utils";
 
-interface StreamsViewProps {
+export interface StreamsViewProps {
   rows: StreamSummary[];
-  onSelect: (videoId: string) => void;
+  /** 用于把行渲染成真实链接（`streamPath`），保留中键 / 新标签打开。 */
+  datasetId: string;
   params: TableParams;
   onParamsChange: (next: TableParams) => void;
-}
-
-interface SortableHeadProps {
-  label: string;
-  sortKey: TableSortKey;
-  active: TableSortKey;
-  direction: SortDirection;
-  onSort: (key: TableSortKey) => void;
-  className?: string;
-}
-
-function SortableHead({
-  label,
-  sortKey,
-  active,
-  direction,
-  onSort,
-  className,
-}: SortableHeadProps) {
-  const isActive = active === sortKey;
-  return (
-    <TableHead className={className}>
-      <button
-        className={cn(
-          "inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:text-foreground",
-          isActive && "text-foreground",
-        )}
-        onClick={() => onSort(sortKey)}
-        type="button"
-      >
-        {label}
-        {isActive ? (
-          direction === "asc" ? (
-            <ArrowUp aria-hidden="true" className="size-3" />
-          ) : (
-            <ArrowDown aria-hidden="true" className="size-3" />
-          )
-        ) : null}
-      </button>
-    </TableHead>
-  );
 }
 
 function sortValue(row: StreamSummary, key: TableSortKey): number | null {
@@ -112,39 +67,200 @@ function escapeCsv(value: string | number | null | undefined): string {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-export function StreamsView({ rows, onSelect, params, onParamsChange }: StreamsViewProps) {
-  const { q: query, sort: sortKey, dir: direction, vstats: onlyVstats } = params;
+function Missing() {
+  return <span className="text-ink-3">—</span>;
+}
+
+function numberCell(value: number | null | undefined): ReactNode {
+  return value == null ? <Missing /> : formatInteger(value);
+}
+
+/** `likesPer1000Views` 是千次播放点赞数，换算成百分比。 */
+function likeRateCell(value: number | null | undefined): ReactNode {
+  return value == null ? <Missing /> : formatPercent(value / 10, 2);
+}
+
+function averageDuration(rows: StreamSummary[]): number | null {
+  let total = 0;
+  let count = 0;
+  for (const row of rows) {
+    if (row.durationSec == null) continue;
+    total += row.durationSec;
+    count += 1;
+  }
+  return count === 0 ? null : Math.round(total / count);
+}
+
+export function StreamsView({ rows, datasetId, params, onParamsChange }: StreamsViewProps) {
+  const { q, type: typeFilter, sort, dir, vstats: onlyVstats } = params;
+
+  const facts = useMemo<Fact[]>(() => {
+    const chatTotal = rows.reduce((sum, row) => sum + row.chatTotal, 0);
+    const withConcurrent = rows.filter(row => row.avgConcurrent != null).length;
+    return [
+      { value: formatInteger(rows.length), label: "总场次" },
+      { value: formatInteger(withConcurrent), label: "有同接场次" },
+      { value: formatDurationLong(averageDuration(rows)), label: "平均时长" },
+      { value: formatInteger(chatTotal), label: "总弹幕" },
+    ];
+  }, [rows]);
 
   const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = q.trim().toLowerCase();
     const filtered = rows.filter(row => {
       if (onlyVstats && row.avgConcurrent == null) return false;
+      if (typeFilter !== DEFAULT_TABLE_PARAMS.type && classifyTitle(row.title).key !== typeFilter) {
+        return false;
+      }
       if (!needle) return true;
       return `${row.title} ${row.date} ${row.videoId}`.toLowerCase().includes(needle);
     });
 
     return [...filtered].sort((a, b) => {
-      const left = sortValue(a, sortKey);
-      const right = sortValue(b, sortKey);
+      const left = sortValue(a, sort);
+      const right = sortValue(b, sort);
       if (left == null && right == null) return 0;
       if (left == null) return 1;
       if (right == null) return -1;
-      return direction === "asc" ? left - right : right - left;
+      return dir === "asc" ? left - right : right - left;
     });
-  }, [rows, query, onlyVstats, sortKey, direction]);
+  }, [rows, q, typeFilter, onlyVstats, sort, dir]);
 
-  function handleSort(key: TableSortKey): void {
-    if (key === sortKey) {
-      onParamsChange({ ...params, dir: direction === "asc" ? "desc" : "asc" });
+  const columns: DataColumn<StreamSummary>[] = useMemo(
+    () => [
+      {
+        key: "date",
+        header: "日期",
+        sortable: true,
+        width: "7.25rem",
+        render: row => (
+          <span className="flex items-baseline gap-1.5">
+            <span className="tabular-nums">{formatDate(row.startedAt)}</span>
+            <span className="text-caption text-ink-3 tabular-nums">
+              {formatTime(row.startedAt)}
+            </span>
+          </span>
+        ),
+      },
+      {
+        key: "stream",
+        header: "场次",
+        headerClassName: "w-full",
+        render: row => (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="max-w-[38ch] truncate font-medium text-foreground">{row.title}</span>
+            {row.availability === "subscriber_only" ? (
+              <Badge className="shrink-0" size="sm" variant="outline">
+                会员
+              </Badge>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        key: "type",
+        header: "类型",
+        width: "4.25rem",
+        render: row => (
+          <span className="text-muted-foreground">
+            {CONTENT_TYPE_LABELS[classifyTitle(row.title).key]}
+          </span>
+        ),
+      },
+      {
+        key: "duration",
+        header: "时长",
+        align: "right",
+        sortable: true,
+        width: "5.5rem",
+        render: row =>
+          row.durationSec == null ? <Missing /> : <span>{formatDuration(row.durationSec)}</span>,
+      },
+      {
+        key: "avg",
+        header: "平均同接",
+        align: "right",
+        sortable: true,
+        width: "6rem",
+        render: row => numberCell(row.avgConcurrent),
+      },
+      {
+        key: "max",
+        header: "峰值",
+        align: "right",
+        sortable: true,
+        width: "5rem",
+        render: row => numberCell(row.maxConcurrent),
+      },
+      {
+        key: "views",
+        header: "播放",
+        align: "right",
+        sortable: true,
+        width: "5.5rem",
+        render: row => numberCell(row.vstatsViews ?? row.snapshotViews),
+      },
+      {
+        key: "chat",
+        header: "弹幕",
+        align: "right",
+        sortable: true,
+        width: "5.5rem",
+        render: row => numberCell(row.chatTotal),
+      },
+      {
+        key: "authors",
+        header: "人数",
+        align: "right",
+        sortable: true,
+        width: "5rem",
+        render: row => numberCell(row.uniqueAuthors),
+      },
+      {
+        key: "sc",
+        header: "SC",
+        align: "right",
+        sortable: true,
+        width: "3.5rem",
+        render: row => numberCell(row.superchats),
+      },
+      {
+        key: "comments",
+        header: "评论",
+        align: "right",
+        sortable: true,
+        width: "4.5rem",
+        render: row => numberCell(row.commentsCaptured),
+      },
+      {
+        key: "likeRate",
+        header: "点赞率",
+        align: "right",
+        width: "4.5rem",
+        render: row => likeRateCell(row.likesPer1000Views),
+      },
+    ],
+    [],
+  );
+
+  function handleSort(key: string): void {
+    if (!isTableSortKey(key)) return;
+    if (key === sort) {
+      onParamsChange({ ...params, dir: dir === "asc" ? "desc" : "asc" });
       return;
     }
     onParamsChange({ ...params, sort: key, dir: "desc" });
+  }
+
+  function resetFilters(): void {
+    onParamsChange({ ...DEFAULT_TABLE_PARAMS });
   }
 
   function exportCsv(): void {
     const headers = [
       "日期",
       "标题",
+      "类型",
       "videoId",
       "时长",
       "平均同接",
@@ -160,6 +276,7 @@ export function StreamsView({ rows, onSelect, params, onParamsChange }: StreamsV
     const body = visible.map(row => [
       row.date,
       row.title,
+      CONTENT_TYPE_LABELS[classifyTitle(row.title).key],
       row.videoId,
       row.durationHms,
       row.avgConcurrent,
@@ -172,233 +289,66 @@ export function StreamsView({ rows, onSelect, params, onParamsChange }: StreamsV
       row.superchats,
       row.commentsCaptured,
     ]);
-    const csv = [headers, ...body]
-      .map(line => line.map(escapeCsv).join(","))
-      .join("\n");
+    const csv = [headers, ...body].map(line => line.map(escapeCsv).join(",")).join("\n");
     const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "yumemita-streams.csv";
+    anchor.download = `${datasetId}-streams.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
 
-  function resetFilters(): void {
-    onParamsChange({ ...DEFAULT_TABLE_PARAMS });
-  }
-
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-56 flex-1">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
-            aria-label="搜索直播"
-            className="pl-8"
-            onChange={event => onParamsChange({ ...params, q: event.target.value })}
-            placeholder="搜索标题 / 日期 / videoId"
-            type="search"
-            value={query}
-          />
-        </div>
-        <Label className="flex items-center gap-2 whitespace-nowrap text-xs">
-          <Checkbox
-            checked={onlyVstats}
-            onCheckedChange={checked => onParamsChange({ ...params, vstats: checked === true })}
-          />
-          仅有 VSTATS
-        </Label>
-        <Button onClick={resetFilters} size="sm" type="button" variant="ghost">
-          <RotateCcw aria-hidden="true" />
-          重置
-        </Button>
-        <Button onClick={exportCsv} size="sm" type="button" variant="outline">
-          <Download aria-hidden="true" />
-          导出 CSV
-        </Button>
-      </div>
+      <PageHeader facts={facts} title="场次" />
 
-      <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
-        <span>
-          共 {rows.length} 场，筛选后 {visible.length} 场
-        </span>
-        <Badge variant="outline">点击表头排序</Badge>
-        <Badge variant="outline">点击行查看单场</Badge>
-      </div>
+      <section aria-label="场次列表" className="flex flex-col gap-2">
+        <StreamsToolbar onExport={exportCsv} onParamsChange={onParamsChange} params={params} />
 
-      <Table variant="card">
-        <TableHeader>
-          <TableRow>
-            <SortableHead
-              active={sortKey}
-              direction={direction}
-              label="日期"
+        {visible.length === 0 ? (
+          <div className="flex flex-col items-start gap-3 rounded-panel bg-card px-4 py-8 shadow-surface">
+            <p className="text-body text-muted-foreground">
+              没有匹配的场次：当前搜索与筛选条件排除了全部 {rows.length} 场。
+            </p>
+            <Button onClick={resetFilters} size="sm" type="button" variant="outline">
+              <RotateCcw aria-hidden="true" />
+              清除筛选
+            </Button>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "rounded-panel bg-card shadow-surface",
+              // coss Table 把 <table> 包在 overflow-x-auto 的容器里且没有高度上限，
+              // 直接 sticky 无效。这里把该容器变成有界滚动视口（桌面），
+              // 并把吸顶偏移从 top-14 归零，让表头真正贴住滚动区域顶部。
+              "lg:[&>[data-slot=table-container]]:max-h-[calc(100dvh-13rem)] lg:[&>[data-slot=table-container]]:overflow-auto",
+              "[&>[data-slot=table-container]]:rounded-panel",
+              "[&_thead_th]:top-0 [&_thead_th]:h-8 [&_thead_th]:border-b [&_thead_th]:border-hairline",
+            )}
+          >
+            <DataTable
+              ariaLabel="场次列表"
+              columns={columns}
               onSort={handleSort}
-              sortKey="date"
+              rowHref={row => streamPath(datasetId, row.videoId)}
+              rowKey={row => row.videoId}
+              rowLabel={row => `打开 ${row.title}`}
+              rows={visible}
+              sort={{ key: sort, dir }}
+              stickyHeader
             />
-            <TableHead>直播</TableHead>
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="时长"
-              onSort={handleSort}
-              sortKey="duration"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="平均"
-              onSort={handleSort}
-              sortKey="avg"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="最大"
-              onSort={handleSort}
-              sortKey="max"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="视聴"
-              onSort={handleSort}
-              sortKey="watch"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="播放"
-              onSort={handleSort}
-              sortKey="views"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="点赞"
-              onSort={handleSort}
-              sortKey="likes"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="弹幕"
-              onSort={handleSort}
-              sortKey="chat"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="人数"
-              onSort={handleSort}
-              sortKey="authors"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="SC"
-              onSort={handleSort}
-              sortKey="sc"
-            />
-            <SortableHead
-              active={sortKey}
-              className="text-right"
-              direction={direction}
-              label="评论"
-              onSort={handleSort}
-              sortKey="comments"
-            />
-            <TableHead className="text-right">点赞率</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {visible.map(row => {
-            const memberOnly = row.availability === "subscriber_only";
-            return (
-              <TableRow
-                className="cursor-pointer"
-                key={row.videoId}
-                onClick={() => onSelect(row.videoId)}
-              >
-                <TableCell className="font-mono text-xs">
-                  <div className="flex flex-col gap-0.5">
-                    <span>{formatDate(row.startedAt)}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatTime(row.startedAt)}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <span className="max-w-[340px] truncate">{row.title}</span>
-                    {memberOnly ? (
-                      <Badge className="shrink-0 text-[10px]" variant="outline">
-                        会员
-                      </Badge>
-                    ) : null}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatDuration(row.durationSec)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.avgConcurrent)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.maxConcurrent)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.watchTimeHours)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.vstatsViews ?? row.snapshotViews)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.vstatsLikes ?? row.snapshotLikes)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.chatTotal)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.uniqueAuthors)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {row.superchats}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatInteger(row.commentsCaptured)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {formatPercent(
-                    row.likesPer1000Views != null ? row.likesPer1000Views / 10 : null,
-                    2,
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-          {visible.length === 0 ? (
-            <TableRow>
-              <TableCell className="py-10 text-center text-muted-foreground" colSpan={13}>
-                没有匹配的直播
-              </TableCell>
-            </TableRow>
-          ) : null}
-        </TableBody>
-      </Table>
+          </div>
+        )}
+
+        <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-caption text-ink-3">
+          <p className="tabular-nums">
+            共 {formatInteger(rows.length)} 场 · 筛选后 {formatInteger(visible.length)} 场
+          </p>
+          <p>排序与筛选会写进 URL</p>
+        </footer>
+      </section>
     </div>
   );
 }

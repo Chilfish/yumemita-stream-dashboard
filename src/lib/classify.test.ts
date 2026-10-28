@@ -15,7 +15,9 @@ describe("classifyTitle", () => {
   });
 
   it("recognises games before singing practice", () => {
-    expect(classifyTitle("【Our Notes先行プレイ!】フルコンするまでギター練習!")).toEqual({
+    expect(
+      classifyTitle("【Our Notes先行プレイ!】フルコンするまでギター練習!上手に演奏できるもん!"),
+    ).toEqual({
       key: "game",
       matched: true,
     });

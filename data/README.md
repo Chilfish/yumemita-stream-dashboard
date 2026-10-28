@@ -13,9 +13,11 @@ data/
 
 | id | 成员 | 场次 | 时间范围 | channelId |
 | --- | --- | --- | --- | --- |
-| `nonoka` | 宮永ののか | 30 | 2026-08-10 – 2026-10-22 | `UCGeCnpimiSN5rgiKbJzHd3A` |
+| `nonoka` | 宮永ののか | 48 | 2024-12-13 – 2026-10-22 | `UCGeCnpimiSN5rgiKbJzHd3A` |
 
-- `nonoka/manifest.json`：场次摘要索引（来自 `batch30_manifest.json`）。
+- 抓取进度、跳过判定与下一批候选见 [../docs/data-progress.md](../docs/data-progress.md)。
+
+- `nonoka/manifest.json`：场次摘要索引（由 `scripts/stream-datapack.ts` 维护）。
 - `nonoka/<videoId>.datapack.json`：每场完整数据，schema `yumemita.stream-datapack/v1`。
 
 ## 文件命名

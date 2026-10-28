@@ -1,6 +1,5 @@
 import { max, scaleBand, scaleLinear } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
-import { EmptyChart } from "@/components/charts/chart-card";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatCompact } from "@/lib/format";
 
@@ -22,6 +21,9 @@ function truncate(text: string, length = 14): string {
   return text.length > length ? `${text.slice(0, length - 1)}…` : text;
 }
 
+const ROW_HEIGHT = 26;
+
+/** 横向条形：没有网格，数值直接标在条尾（直接标注优先于图例）。 */
 export function TopBars({
   items,
   emptyMessage = "暂无数据",
@@ -30,12 +32,11 @@ export function TopBars({
   labelWidth = 112,
 }: TopBarsProps) {
   if (items.length === 0) {
-    return <EmptyChart height={180} message={emptyMessage} />;
+    return <p className="py-10 text-center text-footnote text-muted-foreground">{emptyMessage}</p>;
   }
 
   const maxValue = max(items, item => item.value) ?? 1;
-  const rowHeight = 26;
-  const height = items.length * rowHeight + 8;
+  const height = items.length * ROW_HEIGHT + 8;
 
   return (
     <ChartCanvas ariaLabel="Top 排行条形图" height={height}>
@@ -54,10 +55,11 @@ export function TopBars({
             {items.map(item => {
               const bandY = y(item.label) ?? 0;
               const barWidth = Math.max(2, x(item.value));
+
               return (
                 <g key={item.label}>
                   <text
-                    className="fill-foreground text-[11px]"
+                    className="fill-foreground text-footnote"
                     dominantBaseline="middle"
                     textAnchor="end"
                     x={-8}
@@ -67,7 +69,7 @@ export function TopBars({
                   </text>
                   <rect
                     fill={color}
-                    fillOpacity={0.82}
+                    fillOpacity={0.9}
                     height={y.bandwidth()}
                     rx={3}
                     width={barWidth}
@@ -77,7 +79,7 @@ export function TopBars({
                     <title>{`${item.label}：${item.hint ?? valueLabel(item.value)}`}</title>
                   </rect>
                   <text
-                    className="fill-muted-foreground text-[10px]"
+                    className="fill-foreground text-caption font-semibold tabular-nums"
                     dominantBaseline="middle"
                     x={barWidth + 6}
                     y={bandY + y.bandwidth() / 2}

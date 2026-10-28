@@ -1,9 +1,17 @@
 import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { PointerEvent } from "react";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import {
+  AreaGradient,
+  AxisLabel,
+  CHART_LINE_WIDTH,
+  ChartReadout,
+  DirectLabel,
+  TickText,
+  YAxis,
+} from "@/components/charts/axis";
 import { CHART_COLORS } from "@/lib/chart-colors";
-import { AxisLabel, YAxis } from "@/components/charts/axis";
 import type { StreamRow } from "@/lib/aggregate";
 import { formatCompact, formatMinuteOffset } from "@/lib/format";
 
@@ -21,22 +29,40 @@ function pointerHoverIndex(
   return Math.min(Math.max(index, 0), Math.max(0, length - 1));
 }
 
+function clamp(value: number, min: number, maxValue: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, maxValue));
+}
+
 export function ChatDensity({ row }: ChatDensityProps) {
+  const gradientId = useId();
   const [hover, setHover] = useState<number | null>(null);
   const { perMinute, perMinuteSc, peakMinute } = row.pack.chat.density;
+  const hasData = perMinute.some(value => value > 0);
+
+  if (!hasData) {
+    return (
+      <p className="py-12 text-center text-footnote text-muted-foreground">
+        本场没有抓取到逐分钟弹幕，无法画出密度曲线。
+      </p>
+    );
+  }
+
   const maxChat = max(perMinute) ?? 1;
   const maxSc = max(perMinuteSc) ?? 1;
+  const memberColor = CHART_COLORS[0];
 
   return (
     <ChartCanvas ariaLabel={`${row.summary.title} 的逐分钟弹幕密度`} height={300}>
       {({ width, height }) => {
-        const margin = { top: 18, right: 16, bottom: 42, left: 44 };
+        const margin = { top: 22, right: 16, bottom: 42, left: 44 };
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
-        const scStripHeight = 24;
-        const mainHeight = Math.max(40, innerHeight - scStripHeight - 12);
-        const scTop = mainHeight + 12;
-        const x = scaleLinear().domain([0, Math.max(1, perMinute.length - 1)]).range([0, innerWidth]);
+        const scStripHeight = 22;
+        const mainHeight = Math.max(40, innerHeight - scStripHeight - 14);
+        const scTop = mainHeight + 14;
+        const x = scaleLinear()
+          .domain([0, Math.max(1, perMinute.length - 1)])
+          .range([0, innerWidth]);
         const y = scaleLinear().domain([0, maxChat]).nice().range([mainHeight, 0]);
         const scScale = scaleLinear().domain([0, maxSc]).range([0, scStripHeight]);
         const linePath = line<number>()
@@ -53,22 +79,32 @@ export function ChatDensity({ row }: ChatDensityProps) {
           (_, index) => index * 15,
         ).filter(tick => tick <= perMinute.length - 1);
 
-        const hoverMinute = hover == null ? null : perMinute[hover] ?? 0;
-        const hoverSc = hover == null ? 0 : perMinuteSc[hover] ?? 0;
+        const hoverMinute = hover == null ? null : (perMinute[hover] ?? 0);
+        const hoverSc = hover == null ? 0 : (perMinuteSc[hover] ?? 0);
 
         return (
           <g transform={`translate(${margin.left},${margin.top})`}>
+            <defs>
+              <AreaGradient color={memberColor} id={gradientId} />
+            </defs>
+
             <YAxis scale={y} x={innerWidth} />
+
             {areaPath ? (
-              <path d={areaPath} fill={CHART_COLORS[0]} opacity={0.16} />
+              <path d={areaPath} fill={`url(#${gradientId})`}>
+                <title>{`逐分钟弹幕面积：峰值 ${formatCompact(maxChat)} 条/分`}</title>
+              </path>
             ) : null}
             {linePath ? (
               <path
                 d={linePath}
                 fill="none"
-                stroke={CHART_COLORS[0]}
-                strokeWidth={1.8}
-              />
+                stroke={memberColor}
+                strokeLinejoin="round"
+                strokeWidth={CHART_LINE_WIDTH}
+              >
+                <title>{`逐分钟弹幕：峰值 ${formatCompact(maxChat)} 条/分`}</title>
+              </path>
             ) : null}
 
             {perMinuteSc.map((count, index) => {
@@ -79,7 +115,7 @@ export function ChatDensity({ row }: ChatDensityProps) {
                   fill={CHART_COLORS[3]}
                   height={barHeight}
                   key={`sc-${index}`}
-                  opacity={0.75}
+                  opacity={0.8}
                   rx={1}
                   width={Math.max(2, innerWidth / Math.max(1, perMinute.length) - 1)}
                   x={x(index)}
@@ -89,41 +125,49 @@ export function ChatDensity({ row }: ChatDensityProps) {
                 </rect>
               );
             })}
-            <AxisLabel anchor="start" x={0} y={scTop + scStripHeight + 12}>
-              SC 笔数
+            <AxisLabel anchor="end" x={-8} y={scTop + scStripHeight / 2 + 3}>
+              SC
             </AxisLabel>
 
-            {peakMinute ? (
+            {peakMinute && peakMinute.count > 0 ? (
               <g>
                 <circle
                   cx={x(peakMinute.offsetMin)}
                   cy={y(peakMinute.count)}
-                  fill={CHART_COLORS[2]}
+                  fill={memberColor}
                   r={3.5}
-                  stroke="var(--background)"
+                  stroke="var(--card)"
                   strokeWidth={1.5}
+                >
+                  <title>{`峰值：第 ${formatMinuteOffset(peakMinute.offsetMin)}，${peakMinute.count} 条`}</title>
+                </circle>
+                <DirectLabel
+                  anchor={
+                    x(peakMinute.offsetMin) > innerWidth * 0.72 ? "end" : "start"
+                  }
+                  label={formatMinuteOffset(peakMinute.offsetMin)}
+                  value={`${formatCompact(peakMinute.count)} 条`}
+                  x={x(peakMinute.offsetMin) + (x(peakMinute.offsetMin) > innerWidth * 0.72 ? -8 : 8)}
+                  y={clamp(y(peakMinute.count) - 12, 10, mainHeight)}
                 />
-                <title>{`峰值：第 ${formatMinuteOffset(peakMinute.offsetMin)}，${peakMinute.count} 条`}</title>
               </g>
             ) : null}
 
             {xTicks.map(tick => (
-              <text
-                className="fill-muted-foreground text-[10px]"
-                key={tick}
-                textAnchor="middle"
-                x={x(tick)}
-                y={innerHeight + 14}
-              >
+              <TickText key={tick} x={x(tick)} y={innerHeight + 16}>
                 {tick} 分
-              </text>
+              </TickText>
             ))}
+            <AxisLabel x={innerWidth / 2} y={innerHeight + 32}>
+              开播后分钟
+            </AxisLabel>
 
             {hover != null && hoverMinute != null ? (
               <g pointerEvents="none">
                 <line
                   className="stroke-foreground/25"
-                  strokeDasharray="3 3"
+                  shapeRendering="crispEdges"
+                  strokeWidth={1}
                   x1={x(hover)}
                   x2={x(hover)}
                   y1={0}
@@ -132,19 +176,21 @@ export function ChatDensity({ row }: ChatDensityProps) {
                 <circle
                   cx={x(hover)}
                   cy={y(hoverMinute)}
-                  fill={CHART_COLORS[0]}
+                  fill={memberColor}
                   r={3.5}
-                  stroke="var(--background)"
+                  stroke="var(--card)"
                   strokeWidth={1.5}
                 />
-                <text
-                  className="fill-foreground text-[10px]"
-                  textAnchor={x(hover) > innerWidth * 0.7 ? "end" : "start"}
-                  x={x(hover) + (x(hover) > innerWidth * 0.7 ? -6 : 6)}
-                  y={12}
-                >
-                  {`第 ${formatMinuteOffset(hover)} · ${formatCompact(hoverMinute)} 条 · SC ${hoverSc}`}
-                </text>
+                <ChartReadout
+                  rows={[
+                    { label: "时间", value: formatMinuteOffset(hover) },
+                    { label: "弹幕", value: `${formatCompact(hoverMinute)} 条` },
+                    { label: "SC", value: `${hoverSc} 笔` },
+                  ]}
+                  width={112}
+                  x={clamp(x(hover) + 12, 0, innerWidth - 112)}
+                  y={0}
+                />
               </g>
             ) : null}
 
