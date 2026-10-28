@@ -57,10 +57,10 @@ function Stat({ label, value, hint, icon: Icon }: StatProps) {
 }
 
 export function StreamView({ rows, selectedId, onSelect }: StreamViewProps) {
-  const row = findStreamRow(rows, selectedId) ?? rows[0];
+  const row = findStreamRow(rows, selectedId);
 
   if (!row) {
-    return <EmptyChart message="没有可展示的直播" />;
+    return <EmptyChart message="找不到该场次" />;
   }
 
   const { pack, summary } = row;

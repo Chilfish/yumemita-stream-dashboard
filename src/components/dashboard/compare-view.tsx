@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ChartCard } from "@/components/charts/chart-card";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { MultiLineChart } from "@/components/charts/multi-line-chart";
@@ -27,6 +27,8 @@ const MAX_SELECTED = 4;
 
 interface CompareViewProps {
   rows: StreamRow[];
+  selectedIds: string[];
+  onToggle: (videoId: string) => void;
 }
 
 interface Metric {
@@ -61,11 +63,7 @@ const METRICS: Metric[] = [
   { key: "comments", label: "评论", value: row => row.pack.comments?.total ?? null, format: formatInteger },
 ];
 
-export function CompareView({ rows }: CompareViewProps) {
-  const [selectedIds, setSelectedIds] = useState<string[]>(() =>
-    rows.slice(0, 3).map(row => row.summary.videoId),
-  );
-
+export function CompareView({ rows, selectedIds, onToggle }: CompareViewProps) {
   const selected = useMemo(
     () =>
       selectedIds
@@ -73,14 +71,6 @@ export function CompareView({ rows }: CompareViewProps) {
         .filter((row): row is StreamRow => row != null),
     [rows, selectedIds],
   );
-
-  function toggle(videoId: string): void {
-    setSelectedIds(current => {
-      if (current.includes(videoId)) return current.filter(id => id !== videoId);
-      if (current.length >= MAX_SELECTED) return current;
-      return [...current, videoId];
-    });
-  }
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -109,7 +99,7 @@ export function CompareView({ rows }: CompareViewProps) {
                       checked={checked}
                       className="mt-0.5"
                       disabled={disabled}
-                      onCheckedChange={() => toggle(row.summary.videoId)}
+                      onCheckedChange={() => onToggle(row.summary.videoId)}
                     />
                     <span className="min-w-0">
                       <span className="block font-mono text-[11px] text-muted-foreground">
