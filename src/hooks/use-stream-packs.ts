@@ -36,7 +36,7 @@ export function useStreamPacks(
 
     Promise.all(
       ids.map(async videoId => {
-        const pack = await fetchDatapack(datasetId, videoId, controller.signal);
+        const pack = await fetchDatapack(datasetId, videoId);
         return [videoId, pack] as const;
       }),
     )

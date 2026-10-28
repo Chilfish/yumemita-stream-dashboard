@@ -45,11 +45,7 @@ export async function fetchInsights(
 const packCache = new Map<string, StreamDatapack>();
 const inflightPacks = new Map<string, Promise<StreamDatapack>>();
 
-export function fetchDatapack(
-  datasetId: string,
-  videoId: string,
-  signal?: AbortSignal,
-): Promise<StreamDatapack> {
+export function fetchDatapack(datasetId: string, videoId: string): Promise<StreamDatapack> {
   const key = `${datasetId}/${videoId}`;
   const cached = packCache.get(key);
   if (cached) return Promise.resolve(cached);
@@ -57,7 +53,9 @@ export function fetchDatapack(
   const inflight = inflightPacks.get(key);
   if (inflight) return inflight;
 
-  const request = fetchJson<StreamDatapack>(`${datasetId}/${videoId}.datapack.json`, signal)
+  // Shared requests are not tied to one component's AbortSignal: aborting a
+  // consumer must not reject the promise a later mount reuses.
+  const request = fetchJson<StreamDatapack>(`${datasetId}/${videoId}.datapack.json`)
     .then(pack => {
       packCache.set(key, pack);
       return pack;
