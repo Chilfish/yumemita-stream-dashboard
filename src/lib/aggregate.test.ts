@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StreamDatapack } from "@/types/datapack";
 import type { StreamSummary } from "@/types/dataset";
-import { aggregateDataset, buildStreamRows, buildSummaryRows, currencyRows, findStreamRow, findStreamSummary } from "./aggregate";
+import { aggregateDataset, buildStreamRows, buildStreamShape, buildSummaryRows, currencyRows, findStreamRow, findStreamSummary } from "./aggregate";
 
 function makeSummary(
   overrides: Partial<StreamSummary> & {
@@ -287,5 +287,47 @@ describe("aggregate", () => {
       { currency: "₩", count: 1, amount: 20 },
       { currency: "¥", count: 1, amount: 10 },
     ]);
+  });
+
+  it("builds a relative stream shape aligned by progress", () => {
+    const a = makePack({
+      id: "a",
+      startedAt: "2026-10-01T20:00:00+09:00",
+      durationSec: 240,
+      avg: null,
+      chat: 40,
+    });
+    const b = makePack({
+      id: "b",
+      startedAt: "2026-10-02T20:00:00+09:00",
+      durationSec: 240,
+      avg: null,
+      chat: 80,
+    });
+    a.chat.density.perMinute = [10, 10, 10, 10];
+    b.chat.density.perMinute = [40, 0, 0, 40];
+
+    const shape = buildStreamShape([{ pack: a }, { pack: b }], 4);
+    expect(shape?.bucketCount).toBe(4);
+    expect(shape?.streams).toBe(2);
+    expect(shape?.buckets.map(bucket => bucket.relative)).toEqual([1.5, 0.5, 0.5, 1.5]);
+    expect(shape?.buckets[0]?.perMinute).toBe(25);
+    expect(shape?.headRelative).toBe(1.5);
+    expect(shape?.midRelative).toBe(0.5);
+    expect(shape?.tailRelative).toBe(1.5);
+    expect(shape?.peak).toEqual({ position: 0.125, relative: 1.5 });
+  });
+
+  it("returns null when no stream has minute density", () => {
+    const pack = makePack({
+      id: "empty",
+      startedAt: "2026-10-01T20:00:00+09:00",
+      durationSec: 240,
+      avg: null,
+      chat: 0,
+    });
+    pack.chat.density.perMinute = [];
+
+    expect(buildStreamShape([{ pack }])).toBeNull();
   });
 });

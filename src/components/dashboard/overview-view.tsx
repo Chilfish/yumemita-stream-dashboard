@@ -2,6 +2,7 @@ import { ChartCard } from "@/components/charts/chart-card";
 import { CurrencyDonut } from "@/components/charts/currency-donut";
 import { ScatterPlot } from "@/components/charts/scatter-plot";
 import { StreamBars } from "@/components/charts/stream-bars";
+import { StreamShapeChart } from "@/components/charts/stream-shape";
 import { TopBars } from "@/components/charts/top-bars";
 import { KpiGrid } from "@/components/dashboard/kpi-grid";
 import { StreamTable } from "@/components/dashboard/stream-table";
@@ -62,10 +63,19 @@ export function OverviewView({
 
       <KpiGrid totals={totals} />
 
+      {totals.streamShape ? (
+        <ChartCard
+          description={`把 ${totals.streamShape.streams} 场按直播进度对齐后平均：纵轴为相对该场自身弹幕浓度的倍数（×1 = 该场均值），阴影为 25–75 分位。`}
+          title="典型节奏曲线"
+        >
+          <StreamShapeChart shape={totals.streamShape} />
+        </ChartCard>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <ChartCard
           className="xl:col-span-2"
-          description={`仅显示有 VSTATS 的 ${totals.withVstatsCount} 场；灰条为最大同接。点击柱子可跳到单场。`}
+          description={`仅显示有同接数据的 ${totals.withVstatsCount} 场；灰条为最大同接。点击柱子可跳到单场。`}
           title="每场同接"
         >
           <StreamBars onSelect={onSelectStream} rows={rows} />

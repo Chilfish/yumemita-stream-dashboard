@@ -37,6 +37,34 @@ export interface PeakChatMinute extends StreamExtreme {
   at: string | null;
 }
 
+/** 典型节奏曲线的分桶数；每桶代表 1/20 的直播进度。 */
+export const STREAM_SHAPE_BUCKETS = 20;
+
+export interface StreamShapeBucket {
+  /** 桶中心的相对进度（0–1）。 */
+  position: number;
+  /** 平均相对活跃度：1 = 该场自身的每分钟弹幕均值。 */
+  relative: number;
+  /** 平均每分钟弹幕条数。 */
+  perMinute: number;
+  /** 相对活跃度的 25 分位。 */
+  p25: number;
+  /** 相对活跃度的 75 分位。 */
+  p75: number;
+  /** 参与该桶的场次数。 */
+  streams: number;
+}
+
+export interface StreamShape {
+  bucketCount: number;
+  streams: number;
+  buckets: StreamShapeBucket[];
+  headRelative: number | null;
+  midRelative: number | null;
+  tailRelative: number | null;
+  peak: { position: number; relative: number } | null;
+}
+
 export interface DatasetTotals {
   streamCount: number;
   memberOnlyCount: number;
@@ -65,6 +93,7 @@ export interface DatasetTotals {
   bestByChat: StreamExtreme | null;
   bestBySc: StreamExtreme | null;
   peakChatMinute: PeakChatMinute | null;
+  streamShape: StreamShape | null;
 }
 
 export function buildSummaryRows(manifest: { streams: StreamSummary[] }): StreamSummary[] {
@@ -117,6 +146,92 @@ function maxBy<T>(items: T[], value: (item: T) => number | null | undefined): T 
     }
   }
   return best;
+}
+
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function quantile(sorted: number[], q: number): number {
+  if (sorted.length === 0) return 0;
+  const position = (sorted.length - 1) * q;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower] ?? 0;
+  const low = sorted[lower] ?? 0;
+  const high = sorted[upper] ?? low;
+  return low + (high - low) * (position - lower);
+}
+
+/**
+ * 把每场直播的逐分钟弹幕曲线按「直播进度」对齐，得到典型节奏。
+ *
+ * 各场时长和绝对热度差异很大，因此先按场次自身均值归一化（1 = 该场平均每分钟弹幕），
+ * 再等权平均；这样长场和高热度场不会压过其余场次。分桶内取该桶每分钟速率，
+ * 避免长度不整除导致某个桶被少算。
+ */
+export function buildStreamShape(
+  rows: Pick<StreamRow, "pack">[],
+  bucketCount = STREAM_SHAPE_BUCKETS,
+): StreamShape | null {
+  const buckets = Math.max(4, Math.floor(bucketCount));
+  const relativeBuckets: number[][] = Array.from({ length: buckets }, () => []);
+  const rateBuckets: number[][] = Array.from({ length: buckets }, () => []);
+  let streams = 0;
+
+  for (const { pack } of rows) {
+    const minutes = pack.chat.density?.perMinute ?? [];
+    if (minutes.length < buckets) continue;
+    const mean = average(minutes);
+    if (!(mean > 0)) continue;
+
+    const sums = new Array<number>(buckets).fill(0);
+    const counts = new Array<number>(buckets).fill(0);
+    for (let index = 0; index < minutes.length; index += 1) {
+      const bucket = Math.min(buckets - 1, Math.floor((index * buckets) / minutes.length));
+      sums[bucket] = (sums[bucket] ?? 0) + (minutes[index] ?? 0);
+      counts[bucket] = (counts[bucket] ?? 0) + 1;
+    }
+
+    for (let bucket = 0; bucket < buckets; bucket += 1) {
+      const count = counts[bucket] ?? 0;
+      if (count === 0) continue;
+      const rate = (sums[bucket] ?? 0) / count;
+      relativeBuckets[bucket]?.push(rate / mean);
+      rateBuckets[bucket]?.push(rate);
+    }
+    streams += 1;
+  }
+
+  if (streams === 0) return null;
+
+  const shapeBuckets: StreamShapeBucket[] = relativeBuckets.map((values, bucket) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return {
+      position: (bucket + 0.5) / buckets,
+      relative: average(values),
+      perMinute: average(rateBuckets[bucket] ?? []),
+      p25: quantile(sorted, 0.25),
+      p75: quantile(sorted, 0.75),
+      streams: values.length,
+    };
+  });
+
+  const head = shapeBuckets[0] ?? null;
+  const mid = shapeBuckets[Math.floor(shapeBuckets.length / 2)] ?? null;
+  const tail = shapeBuckets.at(-1) ?? null;
+  const peakBucket = maxBy(shapeBuckets, item => item.relative);
+
+  return {
+    bucketCount: buckets,
+    streams,
+    buckets: shapeBuckets,
+    headRelative: head?.relative ?? null,
+    midRelative: mid?.relative ?? null,
+    tailRelative: tail?.relative ?? null,
+    peak: peakBucket ? { position: peakBucket.position, relative: peakBucket.relative } : null,
+  };
 }
 
 export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
@@ -284,6 +399,7 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
       ? { videoId: bestByScRow.row.summary.videoId, title: bestByScRow.row.summary.title, value: bestByScRow.sc }
       : null,
     peakChatMinute: bestPeak,
+    streamShape: buildStreamShape(rows),
   };
 }
 
