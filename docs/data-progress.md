@@ -10,11 +10,12 @@
 | 项 | 值 |
 | --- | --- |
 | 频道 | 宮永ののか（`UCGeCnpimiSN5rgiKbJzHd3A`） |
-| 频道 `/streams` 公开列表 | **262** 条（2 场会员限定不在公开列表里，但已入库） |
-| 已入库 datapack | **48**（46 来自公开列表 + 2 场会员限定） |
-| 公开列表内待抓 | **216**（含 1 条未来占位、1 条同名摘要；可抓 **214**） |
-| 已覆盖时间范围 | 2024-12-13 – 2026-10-22 |
-| 数据体积 | `data/nonoka/` 约 **1.49 MB** |
+| 频道 `/streams` 公开列表 | **262** 条 |
+| 已入库 datapack | **262**（公开列表与会员限定场次已全部补齐） |
+| 公开列表内待抓 | **0** |
+| 已覆盖时间范围 | 2023-11-19 – 2026-10-22 |
+| 有 VSTATS 快照的场次 | **15**（越往前越可能缺失） |
+| 数据体积 | `data/nonoka/` 约 **6.91 MB** |
 
 抓取来源与命令见 [scripts/README.md](../scripts/README.md)。原始会话留在归档工程
 `claude-messages/temp/youtube-live/`，本仓库只接收 datapack。
@@ -61,16 +62,14 @@
 | 2026-08-28 | `5APd1wj9QlA` | 4:48 的同名摘要/预告，正片是会员限定的 `8pLN7zBYnc`（2:04:15）。按「同名去重、保留正片」跳过。 |
 | — | `2Q5A9SWgHtA` | 未来场占位（yt-dlp 提示 680 天后开播），没有可抓内容。 |
 
+## 批次三：2026-10-28（+214，全量补齐）
+
+继续按频道顺序向前抓取，直到公开列表与会员限定场次全部入库：新增 **214** 场，累计 **262** 场。
+逐场清单以 [`data/nonoka/manifest.json`](../data/nonoka/manifest.json) 为准，本页不再逐条抄录。
+
 ## 下一批候选
 
-按频道 `/streams` 顺序（最新在前），紧接本批之后的 10 条：
-
-```text
-bjqND7iYbDY  oxbQCw0Z82E  msBPTJnaNvY  Z5ua_L7KxVY  UsHw7o8LVbQ
-pM8DSILAEyE  a_0nqkCcAk4  knW10JImXQw  vx2EOvm7Ur0  jJcHRZgcKqA
-```
-
-重新生成候选列表：
+当前没有待抓场次。频道新增直播后，用下面的命令重新生成差值列表：
 
 ```powershell
 yt-dlp --flat-playlist --print "%(id)s" `
