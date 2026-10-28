@@ -50,13 +50,16 @@ export default defineConfig({
 | Build command | `bun run build` |
 | Output directory | `dist` |
 | Install command | `bun install --frozen-lockfile` |
-| Node version | 20+ |
+| Node version | 22.22+ |
 
 这些平台通常支持 Bun；如果没有，用 `npm install && npm run build` 也可以（脚本内部调用 `vite`）。
 
 ### 单页应用回退
 
-项目没有前端路由，只有一个 `index.html`，一般不需要 SPA fallback。若平台强制要求，把 `/*` 回退到 `/index.html` 即可。
+不需要。项目使用 **hash 路由**（`#/:datasetId/...`），所有页面都由 `index.html` 加载，路径不会出现在 HTTP 请求里。
+
+- 不需要配置 `/* -> /index.html` 的 rewrite。
+- 子路径部署（`https://user.github.io/repo/`）也直接可用，hash 不参与 base 解析。
 
 ## 缓存策略
 
@@ -90,8 +93,8 @@ bun run ci
 ## 体积
 
 - 当前 30 场数据约 1 MB；构建后 `dist/data/` 同量级。
-- JS bundle 约 550 KB（gzip ~180 KB），CSS 约 240 KB（gzip ~32 KB）。
-- 需要更小首屏时，可按页签 `React.lazy()` 拆包；数据仍按 manifest 懒加载。
+- JS 主包约 447 KB（gzip ~144 KB），CSS 约 240 KB（gzip ~32 KB）。
+- 视图已按路由 `React.lazy()` 拆包，总览/单场/对比/数据表/说明各自是独立 chunk；数据仍按 manifest 懒加载。
 
 ## 回滚
 

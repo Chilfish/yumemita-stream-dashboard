@@ -39,9 +39,11 @@
 └───────────────────────┬─────────────────────────────────┘
                         │ StreamRow[] + DatasetTotals
 ┌───────────────────────▼─────────────────────────────────┐
-│ src/components/dashboard/  页面级视图                    │
-│ src/components/charts/     D3 图表                       │
-│ src/components/ui/         coss ui primitives（生成）    │
+│ src/components/dashboard/  页面级视图、Sidebar、Header       │
+│ src/pages/                 路由包装层（页面 ↔ URL）          │
+│ src/router.tsx             hash 路由表                       │
+│ src/components/charts/     D3 图表                           │
+│ src/components/ui/         coss ui primitives（生成）        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -63,15 +65,34 @@
 7. `aggregateDataset(rows)` 算出全量 KPI、币种、Top 词/发言者、最佳场次、峰值分钟。
 8. 各视图消费 `rows` / `totals`；图表组件只接收已整理好的数据。
 
+## 路由与 URL 状态
+
+使用 **React Router v8** 的 hash 路由（`createHashRouter`）。选 hash 而不是 history：
+
+- 任意静态托管 / 子路径都不需要 SPA fallback，和部署承诺一致。
+- 单场、对比选择可以直接分享、刷新、前进后退。
+
+| URL | 页面 |
+| --- | --- |
+| `#/` | 重定向到 `#/<firstDataset>/overview` |
+| `#/:datasetId/overview` | 总览 |
+| `#/:datasetId/stream` | 跳转到最新一场 |
+| `#/:datasetId/stream/:videoId` | 单场 |
+| `#/:datasetId/compare?ids=a,b,c` | 对比，最多 4 场 |
+| `#/:datasetId/table` | 数据表 |
+| `#/:datasetId/about` | 说明 |
+
+路由表在 `src/router.tsx`；`src/pages/` 是薄包装层：从 `useDatasetView()` 取数据、把导航动作接到 `navigate`，视图组件本身不依赖 router。
+
 ## 状态管理
 
 没有引入 Redux/Zustand。状态分三层：
 
 | 状态 | 位置 | 说明 |
 | --- | --- | --- |
-| dataset 选择、当前页签、当前场次 | `App.tsx` | 页面级，切 dataset 时重置选中场次 |
-| 数据加载状态 | `useDatasetIndex` / `useDataset` | loading / error / progress / ready |
-| 图表交互（hover、对比选择） | 各组件内部 | 局部状态，不跨组件共享 |
+| dataset、当前页面、选中场次、对比选择 | URL（React Router） | 可分享、可刷新、可前进后退 |
+| 数据加载状态 | `useDatasetIndex` / `useDataset` | 在 `DatasetLayout` 加载一次，路由切换不重复请求 |
+| 表格搜索/排序、图表 hover | 各组件内部 | 仅本页使用，不跨组件共享 |
 
 选这个方案的原因：数据量小（30 场约 1 MB），页面结构简单，引入全局 store 只会增加理解成本。
 
@@ -96,16 +117,29 @@
 
 ```text
 src/components/dashboard/
-  app-header.tsx      顶栏：品牌、dataset 选择、主题切换
+  dataset-layout.tsx   Sidebar + Header + 数据加载 + Outlet
+  dataset-index-gate.tsx  索引加载/错误门禁 + context
+  app-sidebar.tsx     侧边导航：品牌、dataset 选择、页面、主题
+  app-header.tsx      顶栏：折叠按钮、面包屑、场次统计
+  dataset-view-context.ts  页面共享 rows / totals
+  loading-screen.tsx  加载骨架屏
   kpi-grid.tsx        6 个 KPI 卡
   overview-view.tsx   总览
   stream-view.tsx     单场（左侧选择器 + 右侧详情）
-  compare-view.tsx    对比（最多 4 场）
+  compare-view.tsx    对比（最多 4 场，受控选择）
   table-view.tsx      数据表（搜索/排序/筛选/CSV）
   about-view.tsx      口径与更新说明
   stream-picker.tsx   单场选择器
   stream-table.tsx    场次表格
   sc-table.tsx        SC 明细表
+```
+
+```text
+src/pages/
+  lazy-pages.tsx      路由级 lazy() 包装
+  home-redirect.tsx   重定向到首个 dataset
+  overview-page.tsx / stream-index-page.tsx / stream-page.tsx
+  compare-page.tsx / table-page.tsx / about-page.tsx
 ```
 
 ```text
@@ -126,10 +160,12 @@ src/components/charts/
 
 ### 加一个视图
 
-1. 在 `src/components/dashboard/` 新建组件，接收 `StreamRow[]` / `DatasetTotals`。
-2. 在 `App.tsx` 的 `VIEWS` 增加 key。
-3. 在 `TabsList` 增加 `TabsTab`，在对应 `TabsPanel` 渲染（保持 `view === "..."` 条件，避免隐藏页也渲染图表）。
-4. 需要新指标时，先加到 `src/lib/aggregate.ts`，不要在视图里重复算。
+1. 在 `src/components/dashboard/` 新建视图组件，接收 `StreamRow[]` / `DatasetTotals`。
+2. 在 `src/pages/` 新建路由页面，从 `useDatasetView()` 取数据。
+3. 在 `src/pages/lazy-pages.tsx` 导出 `lazy()` 组件。
+4. 在 `src/router.tsx` 的 `:datasetId` children 加一条 route。
+5. 在 `src/lib/routes.ts` 的 `VIEWS` 加 key，并在 `app-sidebar.tsx` 的 `NAV_ITEMS` 加导航项。
+6. 需要新指标时，先加到 `src/lib/aggregate.ts`，不要在视图里重复算。
 
 ### 加一个图表
 
@@ -168,4 +204,5 @@ src/components/charts/
 - `aggregateDataset` 用 `useMemo`，只在 `packs` 变化时重算。
 - 图表用 ResizeObserver，窗口缩放不会重建数据。
 - 词频/发言者是“各场 Top 列表相加”，不是全量重扫；精确聚合需要扩展 datapack schema。
-- 没有路由；刷新会回到总览。需要分享单场链接时，后续可加 URL hash 状态。
+- 使用 hash 路由，刷新/分享任一页面都能还原；视图按路由 `React.lazy()` 拆包，首屏只加载当前页。
+- `DatasetLayout` 一次加载整份 dataset，页面切换不会重新请求 datapack。

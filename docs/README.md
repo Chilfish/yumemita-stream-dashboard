@@ -4,7 +4,7 @@
 
 | 文档 | 内容 | 什么时候读 |
 | --- | --- | --- |
-| [architecture.md](architecture.md) | 分层、数据流、状态管理、图表策略、扩展点 | 想改页面结构或加新视图 |
+| [architecture.md](architecture.md) | 分层、数据流、路由、状态管理、图表策略、扩展点 | 想改页面结构或加新视图 |
 | [data-model.md](data-model.md) | manifest / datapack 的字段、口径、版本演进 | 读写 JSON、排查数据问题 |
 | [adding-data.md](adding-data.md) | 加场次、加成员、加数据集、数据校验 | 数据有更新 |
 | [development.md](development.md) | 本地开发、代码规范、coss ui、D3 图表写法、测试 | 日常开发 |

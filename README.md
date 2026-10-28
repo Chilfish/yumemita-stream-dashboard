@@ -22,11 +22,13 @@
 - **对比**：最多选 4 场，逐分钟弹幕叠加对比 + 指标横表（最高值高亮）。
 - **数据表**：可搜索、排序、筛选（仅有 VSTATS）、导出 CSV。
 - **说明**：数据口径、已知限制、更新方式。
+- **导航**：侧边栏 + hash 路由；单场/对比有独立 URL，可刷新、分享、前进后退。
+- 视图按路由懒加载；切换数据集时停留在当前页面。
 - 深色/浅色主题、响应式布局、多数据集切换（为后续成员预留）。
 
 ## 快速开始
 
-需要 **Bun ≥ 1.4**（推荐）和 Node.js ≥ 20。
+需要 **Bun ≥ 1.4**（推荐）和 Node.js ≥ 22.22。
 
 ```bash
 bun install
@@ -96,9 +98,11 @@ stream-dashboard/
 │  │  ├─ dashboard/          # 页面级组件与视图
 │  │  └─ ui/                 # coss ui primitives（生成物，避免手改）
 │  ├─ hooks/                 # 数据加载、主题、尺寸测量
-│  ├─ lib/                   # 纯函数：data / aggregate / format
+│  ├─ lib/                   # 纯函数：data / aggregate / format / routes
+│  ├─ pages/                 # 路由页面（数据 ↔ 视图 ↔ navigate）
 │  ├─ types/                 # datapack / dataset schema 的 TS 镜像
-│  ├─ App.tsx
+│  ├─ router.tsx             # hash 路由表（createHashRouter）
+│  ├─ App.tsx                # RouterProvider
 │  └─ index.css              # Tailwind v4 + coss 主题 token
 ├─ data-sources.json         # dataset 注册表
 ├─ components.json           # shadcn/coss 配置
@@ -108,6 +112,7 @@ stream-dashboard/
 ## 技术栈
 
 - **React 19 + Vite + TypeScript**
+- **React Router v8**：hash 路由 + 路由级懒加载
 - **Tailwind CSS v4** + **coss ui**（Base UI + shadcn 风格组件）
 - **D3**：`scale` / `shape` / `pie` / `arc`，只负责数学与路径，不接管 DOM
 - **Vitest**：数据聚合与格式化单元测试

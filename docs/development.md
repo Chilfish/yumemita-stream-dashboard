@@ -3,7 +3,7 @@
 ## 环境
 
 - **Bun ≥ 1.4**（推荐，仓库带 `bun.lock`）
-- Node.js ≥ 20（Vite / 工具链需要）
+- Node.js ≥ 22.22（React Router v8 / Vite 工具链需要）
 - 不需要后端、数据库或环境变量
 
 ```bash
@@ -36,13 +36,16 @@ src/
 ├─ lib/             纯函数，不 import React
 │  ├─ data.ts       fetch / 并发加载
 │  ├─ aggregate.ts  合并、聚合、找极值
+│  ├─ routes.ts     URL 构造与对比 id 解析
 │  └─ format.ts     数字 / 时间 / 币种格式化
 ├─ hooks/           异步状态、主题、尺寸
+├─ pages/           路由页面（数据 ↔ 视图 ↔ navigate）
 ├─ components/
 │  ├─ charts/       D3 + SVG 图表
-│  ├─ dashboard/    页面级视图与业务组件
+│  ├─ dashboard/    视图、Sidebar、Header、布局与 context
 │  └─ ui/           coss ui primitives（生成物）
-├─ App.tsx          壳：dataset、页签、选中场次、加载/错误态
+├─ router.tsx       createHashRouter 路由表
+├─ App.tsx          RouterProvider
 └─ index.css        Tailwind v4 + coss token
 ```
 
@@ -75,14 +78,23 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 ### 本页用到的组件
 
-`Card` / `CardHeader` / `CardTitle` / `CardDescription` / `CardPanel` / `CardAction`、`Tabs`、`Table`、`Select`、`Badge`、`Button`、`Checkbox`、`Label`、`Input`、`ScrollArea`、`Alert`、`Skeleton`。
+`Card` / `CardHeader` / `CardTitle` / `CardDescription` / `CardPanel` / `CardAction`、`Sidebar` 系列、`Breadcrumb`、`Table`、`Select`、`Badge`、`Button`、`Checkbox`、`Label`、`Input`、`ScrollArea`、`Alert`、`Skeleton`。
 
 ### 常见坑
 
 - `Select` 用 **items-first**：`<Select items={items}>` + `<SelectItem value={item}>`；不要沿用 Radix 的纯 children 写法。
 - `Button` 默认 `type="button"`；表单里要显式写 `type`。
 - `Table` 自身不带排序/分页；排序在 `table-view.tsx` 里用 React state 实现。
-- `TabsPanel` 即使隐藏也会挂载；本项目用 `view === "..."` 条件避免隐藏页渲染图表。
+- 导航用 `SidebarMenuButton render={<NavLink to={...} />}`；active 状态自己算好传给 `isActive`，不要给 `NavLink` 传函数式 `className`。
+- 侧边栏折叠样式靠祖先的 `group-data-[collapsible=icon]`；只在折叠时隐藏的内容加这个 class。
+
+## 路由
+
+- 使用 React Router v8 的 **hash 路由**（`createHashRouter`），静态托管/子路径不需要服务端回退。
+- URL 形态：`#/:datasetId/<view>`；单场是 `#/:datasetId/stream/:videoId`，对比是 `#/:datasetId/compare?ids=a,b,c`。
+- `src/pages/` 只做三件事：取 `useDatasetView()` 数据、调用 `navigate`、渲染 `dashboard/` 里的视图。
+- 页面按路由 `lazy()`（`src/pages/lazy-pages.tsx`），`DatasetLayout` 用 `Suspense` 包住 `Outlet`。
+- 数据只在 `DatasetLayout` 加载一次，路由切换不会重复请求 datapack。
 
 ## D3 图表写法
 
@@ -127,12 +139,14 @@ bunx --bun shadcn@latest add @coss/ui -y
 | `top-bars.tsx` | 横向 Top 排行（词/发言者/徽章） |
 | `multi-line-chart.tsx` | 多场逐分钟弹幕叠加 |
 
-## 加一个页签
+## 加一个路由页面
 
 1. 在 `src/components/dashboard/` 新建视图组件，props 只接收 `StreamRow[]` / `DatasetTotals` / 单场 `StreamRow`。
-2. 在 `App.tsx` 的 `VIEWS` 加 key。
-3. 在 `TabsList` 加 `TabsTab`，在对应 `TabsPanel` 里用 `view === "..."` 条件渲染。
-4. 如果新视图需要新聚合，先在 `lib/aggregate.ts` 加函数和测试。
+2. 在 `src/pages/` 新建页面，从 `useDatasetView()` 取数据，把跳转接到 `navigate`。
+3. 在 `src/pages/lazy-pages.tsx` 用 `lazy()` 导出页面。
+4. 在 `src/router.tsx` 的 `:datasetId` children 加 route。
+5. 在 `src/lib/routes.ts` 的 `VIEWS` 加 key，并在 `app-sidebar.tsx` 的 `NAV_ITEMS` 加导航项。
+6. 如果新视图需要新聚合，先在 `lib/aggregate.ts` 加函数和测试。
 
 ## 加一个聚合指标
 
@@ -157,7 +171,7 @@ bun run test:watch
 - `tsc -b` 使用 project references：`tsconfig.app.json`（src）+ `tsconfig.node.json`（vite.config）。
 - TypeScript 7 已移除 `baseUrl`；路径别名只写在 `paths`，相对于 tsconfig 解析。
 - 构建产物：`dist/`；数据在 `dist/data/`。
-- 当前 bundle 约 550 KB（gzip ~180 KB），主要来自 D3 + Base UI。需要进一步瘦身时，可按视图 `lazy()` 拆包。
+- 当前主包约 447 KB（gzip ~144 KB），主要来自 D3 + Base UI；视图已按路由 `lazy()` 拆包。
 
 ## 提交前
 

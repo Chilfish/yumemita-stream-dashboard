@@ -85,7 +85,14 @@ bun run dev -- --port 5174
 
 ## 对比页最多只能选 4 场
 
-这是产品限制（`MAX_SELECTED = 4`），避免逐分钟叠加图过密。需要更多时改 `src/components/dashboard/compare-view.tsx` 的常量，并考虑图例/颜色的可读性。
+这是产品限制（`MAX_COMPARE = 4`，在 `src/lib/routes.ts`），避免逐分钟叠加图过密。需要更多时改常量，并考虑图例/颜色的可读性。
+
+## 分享的链接打开后不是原来的页面
+
+- 路由是 hash 形式：完整链接必须带上 `#`，例如 `https://example.com/repo/#/nonoka/stream/<videoId>`。
+- 链接里的 `videoId` 或 `datasetId` 不存在时会重定向/提示：dataset 不合法回到首个数据集；场次不存在显示「找不到这场直播」。
+- 旧版本没有路由，之前的页面链接（只有根路径）会回到总览，这是预期行为。
+- 切换数据集时只会保留当前 section（单场会回到该数据集最新一场），不会保留原来的 `videoId`。
 
 ## 数据更新后页面还是旧的
 
