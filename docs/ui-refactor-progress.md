@@ -27,7 +27,7 @@
 | 跳到主要内容 / 焦点可见 | 已完成 | `dashboard/dataset-layout.tsx` |
 | 320px 窄屏复核 | 已完成 | 页面无横向溢出，表格容器内部滚动 |
 | 200% 缩放复核 | 待手动验证 | — |
-| 数据入场动画 | 不做 | 设计明确禁止数字/柱子入场动画 |
+| 数据入场动画 | 已完成 | 折线自绘 / 柱子生长，仅在视图挂载时播一次；见 P9 |
 
 ## P6 后续迭代
 
@@ -59,6 +59,21 @@
 | 逐字稿 | 已完成 | `content/transcripts/`、`scripts/transcript-*.ts`、`scripts/publish-transcripts.ts`、`hooks/use-transcript.ts`、`dashboard/transcript-view.tsx`、`transcripts-view.tsx` |
 | 单场「逐字稿」分段 | 已完成 | 只在索引里有当前 `videoId` 时出现；移动端分段控件改为容器内横向滚动，避免页面溢出 |
 | 验证 | 已完成 | 1440 / 390 / 320 复核；相册 287 张图 0 破图；页面横向溢出 0；`typecheck` / 101 个单测 / lint 通过 |
+
+## P9 动效
+
+| 项 | 状态 | 落点 |
+| --- | --- | --- |
+| 动效令牌与工具类 | 已完成 | `src/index.css`：`--ease-standard` / `--ease-emphasized`、`.motion-view` / `.motion-swap` / `.press` / `.chart-*` / `.scroll-edge` |
+| 路由切换 | 已完成 | `dashboard/dataset-layout.tsx`、`dashboard/group-layout.tsx`：按「成员 + 栏目」重挂，只在新视图挂载时淡入 |
+| 单场子视图互换 | 已完成 | `dashboard/stream-detail-view.tsx`：`.motion-swap` 按 `view` 重挂 |
+| 折线自绘 | 已完成 | `charts/trend-line|sparkline|multi-line-chart|stream-timeline|chat-density|stream-shape`：`pathLength="1"` + `stroke-dashoffset` |
+| 柱子生长 | 已完成 | `charts/stream-bars.tsx`：`.chart-bar` 以柱底为原点 scaleY |
+| 按压反馈 | 已完成 | `ui/button.tsx`（`active` / `data-pressed` 缩放）、`dashboard/gallery-view.tsx` 的 `.press` |
+| 封面淡入 | 已完成 | `dashboard/stream-cover.tsx`：按已解码的 `src` 淡入，缓存命中时补一次检查 |
+| 主题切换 | 已完成 | `hooks/use-theme.ts`：`document.startViewTransition` + `flushSync`，不支持或 reduce 时直接切换 |
+| 顶栏滚动阴影 | 已完成 | `dashboard/app-header.tsx`：`.scroll-edge`，`@supports (animation-timeline: scroll())` |
+| 验证 | 已完成 | Chromium 1440 复核：路由过渡 `opacity`/`translate` 在跑；折线 `stroke-dashoffset` 1px → 0px；主题切换触发 1 次 `startViewTransition` 并落盘 `dark`；相册与趋势页截图无破图/无未绘制图表；`typecheck` / `lint` / `build` 通过 |
 
 ## 文件归属（同一时刻只允许一个工作流修改）
 
@@ -171,3 +186,4 @@ bun run test:smoke   # 需先启动 dev/preview
 - 场次表在窄屏保留横向滚动，首列（日期）吸附；不做卡片化。
 - `<md` 的类型筛选与“仅有 VSTATS”收进底部 Sheet，桌面布局不变。
 - 数据规模以对象存储上的 `manifest.json` 为准；本页不写死场次数，避免抓取推进后文档过期。
+- 路由切换只给内容区做淡入，不用整页 View Transition：整页快照会把侧栏与顶栏一起拖进淡入，观感更像重载。View Transition 只用在主题切换这种「颜色是唯一变化」的场景。

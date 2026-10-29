@@ -343,16 +343,27 @@ L3 单场详情  ──  下钻：这一场发生了什么？
 
 ### 7.6 动效
 
-| 场景 | 时长 | 曲线 |
-| --- | --- | --- |
-| hover / focus | 120ms | ease-out |
-| 视图切换 | 180ms | cubic-bezier(0.22, 1, 0.36, 1) |
-| 浮层进入 | 220ms | 同上，位移 8px + 透明度 |
-| 退出 | 进入时长的 70% | ease-in |
+曲线只有两条，都取 HIG：`--ease-standard`（`cubic-bezier(0.32, 0.72, 0, 1)`）负责常规位移与淡入，`--ease-emphasized`（`cubic-bezier(0.2, 0, 0, 1)`）只给一次性展开。
 
-- 只动 `transform` 与 `opacity`；不动宽度、高度、`top/left`。
-- **数据不做入场动画。** 数字不跳动、柱子不生长，避免延误阅读。
-- 必须实现 `prefers-reduced-motion: reduce`：取消位移与缩放，只保留 100ms 淡入。
+| 场景 | 时长 | 实现 |
+| --- | --- | --- |
+| hover / focus | 120ms | 各组件的 `transition-colors` |
+| 按压 | 100ms | `.press`：`scale: 0.975`，按钮与相册卡片 |
+| 路由切换 | 220ms | `.motion-view`：`opacity` + `translate 6px` |
+| 单场子视图互换 | 170ms | `.motion-swap`：`opacity` + `translate 3px` |
+| 折线自绘 | 760ms | `.chart-line` + `pathLength="1"`，`stroke-dashoffset` 1 → 0 |
+| 柱子生长 | 480ms | `.chart-bar`：`scaleY(0 → 1)`，以柱底为原点 |
+| 面积 / 数据点 | 420 / 240ms | 晚于折线出现，先看到形状再看到刻度 |
+| 封面解码 | 300ms | 按已解码的 `src` 淡入，逐张不闪白 |
+| 主题切换 | 220ms | View Transition 整页交叉淡入 |
+| 浮层进入 / 退出 | 220 / 150ms | coss 原语自带 |
+
+- 只动 `opacity` / `translate` / `scale` / `stroke-dashoffset`；不动宽度、高度、`top/left`。
+- 入场首帧交给 `@starting-style`，不加挂载动画脚本：元素插入即过渡。
+- **数据入场动画只播一次，而且不循环、不做数字跳动。** 折线与柱子只在视图挂载时画一次，容器缩放不重播，避免读表时被反复打断。
+- 路由只按「成员 + 栏目」重挂（`key`）；同一栏目内的前后场切换、`?view=` 不重挂，避免无谓闪烁。
+- 顶栏阴影由滚动驱动（`animation-timeline: scroll(root block)`），不支持时保持静态外观。
+- `prefers-reduced-motion: reduce`：全局取消位移与缩放，只留 100ms 淡入，并停用 View Transition。
 
 ### 7.7 状态与焦点
 
