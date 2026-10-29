@@ -152,6 +152,12 @@
  * 桌面值即 HIG 的 28/21/16/14/12/11；手机端在下面的媒体查询里放大。
  */
 @theme {
+    /*
+     * 动效曲线。standard 对应 Apple HIG 的常规位移：起步快、收尾长，
+     * 视觉上「一下到位」而不是匀速滑行；emphasized 只给图表展开这类一次性动作。
+     */
+    --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
     --text-display: 1.75rem;
     --text-display--line-height: 2.125rem;
     --text-display--letter-spacing: -0.01em;
@@ -338,6 +344,150 @@
     }
 }
 
+/*
+ * ── 动效 ────────────────────────────────────────────────────────────
+ * 只动 opacity / translate / scale / stroke-dashoffset：全部落在合成层，
+ * 不触发布局。元素插入时的首帧交给 @starting-style，不需要 JS 挂载动画。
+ */
+@layer utilities {
+  /* 路由内容：新视图从下方 6px 淡入。位移只用来「说明换了页」，不表演。 */
+  .motion-view {
+    transition-property: opacity, translate;
+    transition-duration: 220ms;
+    transition-timing-function: var(--ease-standard);
+  }
+
+  /* 单场子视图互换：更短、位移更小。读表时视线不该被打断太久。 */
+  .motion-swap {
+    transition-property: opacity, translate;
+    transition-duration: 170ms;
+    transition-timing-function: var(--ease-standard);
+  }
+
+  /* 按压反馈：HIG 的 0.97–0.98 区间，100ms 内完成，和手指的速度对齐。 */
+  .press {
+    transition-property: scale, color, background-color, border-color;
+    transition-duration: 100ms;
+    transition-timing-function: var(--ease-standard);
+  }
+
+  .press:active {
+    scale: 0.975;
+  }
+
+  /* 折线自绘：配合 pathLength="1" 使用，避免每个图表算一遍总长。 */
+  .chart-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    animation: chart-draw 760ms var(--ease-emphasized) both;
+  }
+
+  .chart-area {
+    animation: chart-fade 420ms var(--ease-standard) both;
+  }
+
+  /* 数据点晚于线条出现：先看到形状，再看到刻度。 */
+  .chart-dot {
+    animation: chart-fade 240ms var(--ease-standard) both;
+    animation-delay: 380ms;
+  }
+
+  /* 柱状从基线长出来。transform-box 让 scaleY 以柱子底边为原点。 */
+  .chart-bar {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: chart-grow 480ms var(--ease-emphasized) both;
+  }
+}
+
+/* 滚动派生的头部阴影：内容滑到顶栏下面时才出现，不支持时保持原样。 */
+@supports (animation-timeline: scroll()) {
+  .scroll-edge::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -1px;
+    height: 12px;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--foreground) 9%, transparent),
+      transparent
+    );
+    opacity: 0;
+    animation: scroll-edge linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 64px;
+  }
+}
+
+@starting-style {
+  .motion-view {
+    opacity: 0;
+    translate: 0 6px;
+  }
+
+  .motion-swap {
+    opacity: 0;
+    translate: 0 3px;
+  }
+}
+
+@keyframes motion-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chart-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chart-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes chart-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes scroll-edge {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 主题切换交给 View Transition：整页做一次 220ms 交叉淡入，而不是硬切。 */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 220ms;
+    animation-timing-function: var(--ease-standard);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -352,4 +502,19 @@
     transition-duration: 100ms !important;
     transition-property: opacity !important;
     }
+
+  /* View Transition 自己接管快照，上面的 transition 覆盖管不到它。 */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+
+  @starting-style {
+    .motion-view,
+    .motion-swap {
+      opacity: 1;
+      translate: none;
+    }
+  }
 }

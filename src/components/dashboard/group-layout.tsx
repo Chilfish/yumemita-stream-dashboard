@@ -76,7 +76,9 @@ export function GroupLayout() {
             ) : null}
             <GroupDataContext.Provider value={data}>
               <Suspense fallback={<ViewSkeleton />}>
-                <Outlet />
+                <div className="motion-view" key={section}>
+                  <Outlet />
+                </div>
               </Suspense>
             </GroupDataContext.Provider>
           </div>

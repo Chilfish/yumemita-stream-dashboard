@@ -127,7 +127,11 @@ export function DatasetLayout() {
             ) : null}
             <DatasetViewContext.Provider value={{ dataset, manifest, rows, totals }}>
               <Suspense fallback={<ViewSkeleton />}>
-                <Outlet />
+                {/* 只按「成员 + 栏目」重新挂载：换页时整块视图淡入；
+                    同一栏目内部（前后场切换、?view=）不重挂，避免无谓的闪烁。 */}
+                <div className="motion-view" key={`${dataset.id}/${section}`}>
+                  <Outlet />
+                </div>
               </Suspense>
             </DatasetViewContext.Provider>
           </div>

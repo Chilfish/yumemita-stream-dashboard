@@ -43,8 +43,11 @@ export function StreamCover({
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   // 变体缺失（旧数据还没重跑 fetch:thumbs）时退回原图，再失败才兜底。
   const [failedSrcSet, setFailedSrcSet] = useState<string | null>(null);
+  // 按 src 记录已解码的那一张：切换场次时新图会重新淡入，旧图不会闪白。
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const useSrcSet = srcSet !== null && failedSrcSet !== src;
   const showImage = src !== null && failedSrc !== src;
+  const loaded = !showImage || loadedSrc === src;
   const initial = firstGlyph(title);
 
   return (
@@ -58,13 +61,21 @@ export function StreamCover({
       {showImage ? (
         <img
           alt=""
-          className="size-full object-cover"
+          className={cn(
+            "size-full object-cover transition-opacity duration-300 ease-standard",
+            loaded ? "opacity-100" : "opacity-0",
+          )}
           decoding="async"
           fetchPriority={eager ? "high" : undefined}
           loading={eager ? "eager" : "lazy"}
           onError={() => {
             if (useSrcSet) setFailedSrcSet(src);
             else setFailedSrc(src);
+          }}
+          onLoad={() => setLoadedSrc(src)}
+          // 命中内存缓存的图片可能在 React 挂上 onLoad 之前就已解码，这里补一次。
+          ref={node => {
+            if (node?.complete && node.naturalWidth > 0) setLoadedSrc(src);
           }}
           sizes={sizes}
           src={src}

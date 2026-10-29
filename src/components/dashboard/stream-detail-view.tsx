@@ -207,7 +207,12 @@ export function StreamDetailView({
         ) : null}
       </div>
 
-      <Panel className="p-4 md:p-5">{renderSubview(view, row, datasetId)}</Panel>
+      <Panel className="p-4 md:p-5">
+        {/* 子视图互换：只做 170ms 的淡入位移，高度跳变由淡入盖住。 */}
+        <div className="motion-swap" key={view}>
+          {renderSubview(view, row, datasetId)}
+        </div>
+      </Panel>
     </div>
   );
 }

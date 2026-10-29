@@ -209,7 +209,7 @@ export function GalleryView({
                     return (
                       <li className="min-w-0" key={`${row.datasetId}/${row.videoId}`}>
                         <Link
-                          className="group flex flex-col gap-2 rounded-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
+                          className="press group flex flex-col gap-2 rounded-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
                           to={streamPath(row.datasetId, row.videoId)}
                         >
                           <StreamCover
