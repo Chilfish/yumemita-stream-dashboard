@@ -4,7 +4,7 @@ import { MultiLineChart, type ChartSeries } from "@/components/charts/multi-line
 import { CopyLinkButton } from "@/components/dashboard/copy-link-button";
 import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/panel";
+import { Panel, PanelBody, PanelHead } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -258,19 +258,10 @@ export function CompareView({
               </ul>
             </ScrollArea>
           </PanelBody>
-          <PanelNote>
-            {atLimit
-              ? "已达上限：取消一场后可继续勾选。"
-              : "最多选 4 场；勾选状态写入 URL，可直接分享这组对比。"}
-          </PanelNote>
         </Panel>
 
         <div className="flex min-w-0 flex-col gap-6">
-          <ChartFrame
-            meta="横轴按开播后分钟对齐，纵轴为每分钟弹幕条数；悬停查看同一分钟各场的数值。"
-            note="时长不同的场次各画到自己的最后分钟；少于 2 场时不画线。"
-            title="逐分钟弹幕对比"
-          >
+          <ChartFrame title="逐分钟弹幕对比">
             {series.length >= 2 ? (
               <MultiLineChart ariaLabel="所选场次的逐分钟弹幕对比" series={series} />
             ) : (
@@ -283,7 +274,7 @@ export function CompareView({
           <section className="flex flex-col gap-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-headline text-foreground">指标对比</h2>
-              <p className="text-caption text-ink-3">加粗 = 该指标最高；并列时同时加粗。</p>
+              <p className="text-caption text-ink-3">加粗为最高值</p>
             </div>
             {selected.length === 0 ? (
               <p className="py-6 text-footnote text-muted-foreground">

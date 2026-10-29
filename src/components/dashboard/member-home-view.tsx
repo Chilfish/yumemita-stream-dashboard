@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import type { DatasetTotals } from "@/lib/aggregate";
 import {
   formatDate,
+  formatDateTime,
   formatDurationLong,
   formatFullDate,
   formatInteger,
@@ -82,7 +83,7 @@ export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeVi
     `场均 ${formatDurationLong(totals.durationSec / Math.max(1, totals.streamCount))}`,
     `${totals.avgChatPerMinute?.toFixed(1) ?? "—"} 条/分`,
     `${formatInteger(totals.watchHours)} 人·时视聴`,
-    `${formatInteger(totals.withVstatsCount)} 场有 VSTATS`,
+    `${formatInteger(totals.withVstatsCount)} 场有同接数据`,
     `点赞率 ${formatPercent(totals.views > 0 ? (totals.likes / totals.views) * 100 : null, 2)}`,
     `${formatInteger(totals.commentTotal)} 条评论`,
     `${formatInteger(totals.memberOnlyCount)} 场会员限定`,
@@ -177,9 +178,7 @@ export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeVi
       <HomeCalendar rows={rows} />
 
       <p className="text-caption text-ink-3">
-        数据生成于 {manifest.generatedAt}；同接 / 视聴时间 / 播放优先取 VSTATS，
-        {totals.streamCount - totals.withVstatsCount} 场无 VSTATS，相关数字显示「—」。范围：
-        {manifest.scope}
+        数据更新于 {formatDateTime(manifest.generatedAt)} · 范围：{manifest.scope}
       </p>
     </div>
   );

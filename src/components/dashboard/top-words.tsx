@@ -1,5 +1,5 @@
 import { MeterRow } from "@/components/dashboard/meter-row";
-import { PanelHead, PanelBody, PanelNote } from "@/components/dashboard/panel";
+import { PanelHead, PanelBody } from "@/components/dashboard/panel";
 import type { AggregatedWord } from "@/lib/aggregate";
 import { formatInteger } from "@/lib/format";
 
@@ -30,7 +30,6 @@ export function TopWords({ words }: TopWordsProps) {
           ))}
         </ul>
       </PanelBody>
-      <PanelNote className="mt-auto">按各场 Top 40 词表相加，非全量分词；只看趋势，不当精确词频</PanelNote>
     </section>
   );
 }

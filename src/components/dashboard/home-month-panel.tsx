@@ -7,14 +7,6 @@ interface HomeMonthPanelProps {
   rows: StreamSummary[];
 }
 
-function currentMonthKey(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    month: "2-digit",
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-  }).format(new Date());
-}
-
 export function HomeMonthPanel({ rows }: HomeMonthPanelProps) {
   const series = buildMonthlySeries(rows);
   const current = series.at(-1);
@@ -23,7 +15,6 @@ export function HomeMonthPanel({ rows }: HomeMonthPanelProps) {
   if (!current) return null;
 
   const compareLabel = previous ? `vs ${previous.label}` : "无上月数据";
-  const isRunningMonth = current.month === currentMonthKey();
 
   const detail = [
     { label: "弹幕 / 分", unit: "条", value: formatDecimal(current.chatPerMinute) },
@@ -55,11 +46,6 @@ export function HomeMonthPanel({ rows }: HomeMonthPanelProps) {
           </div>
         ))}
       </dl>
-
-      <p className="mt-3 text-caption text-ink-3">
-        {isRunningMonth ? "本月尚未结束，环比仅供参考。" : null}
-        按自然月；同接为空时不计入平均。
-      </p>
     </div>
   );
 }

@@ -101,7 +101,7 @@ export function CalendarHeatmap({ days, metric, ariaLabel, className }: Calendar
     return (
       <EmptyChart
         height={120}
-        hint="需要场次的开播日期；当前 manifest 里没有可用日期。"
+        hint="没有可用的开播日期。"
         message="还没有可用的直播日期"
       />
     );

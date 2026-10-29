@@ -61,22 +61,17 @@ export function StreamPaidPanel({ row }: StreamPaidPanelProps) {
               </div>
             ))}
           </dl>
-          <p className="mt-2 text-caption text-ink-3">金额按原文表记，不换算汇率。</p>
         </section>
       ) : (
         <section className="flex flex-col items-center gap-1 py-8 text-center">
           <h2 className="text-headline text-foreground">本场没有 SC</h2>
-          <p className="max-w-md text-footnote text-muted-foreground">
-            抓取到的付费事件里没有 Super Chat，因此没有明细表与币种合计；时间轴的 SC 轨为空，
-            弹幕、评论与观看数据不受影响。
-          </p>
         </section>
       )}
 
       {hasSc ? (
         <section className="border-t border-hairline pt-5">
           <ChartFrame
-            meta={`共 ${formatInteger(superchats.length)} 笔；时间 / 作者 / 金额 / 留言，金额不换算汇率。`}
+            meta={`共 ${formatInteger(superchats.length)} 笔`}
             title="SC 明细"
           >
             <ScrollArea className="h-[min(62dvh,32.5rem)]">

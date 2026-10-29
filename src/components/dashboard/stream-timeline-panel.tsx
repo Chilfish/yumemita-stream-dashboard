@@ -44,8 +44,7 @@ export function StreamTimelinePanel({ row }: StreamTimelinePanelProps) {
     <div className="flex flex-col gap-5">
       <section>
         <ChartFrame
-          meta={`覆盖 ${pack.chat.coveragePct?.toFixed(1) ?? "—"}%；X 轴为直播第几分钟，三角为峰值分钟。`}
-          note="悬停或拖动可读出任一分钟的弹幕条数与 SC 笔数；完整明细见「付费」与「弹幕与词」。"
+          meta={`覆盖 ${pack.chat.coveragePct?.toFixed(1) ?? "—"}%`}
           title="时间轴"
         >
           <StreamTimeline
@@ -77,15 +76,11 @@ export function StreamTimelinePanel({ row }: StreamTimelinePanelProps) {
               }
             />
           ) : (
-            <Highlight label="峰值" main="没有峰值分钟数据" sub="逐分钟弹幕缺失，峰值无法定位。" />
+            <Highlight label="峰值" main="没有峰值分钟数据" />
           )}
 
           {superchats.length === 0 ? (
-            <Highlight
-              label="付费"
-              main="本场没有 SC"
-              sub="SC 轨为空；弹幕与评论不受影响。"
-            />
+            <Highlight label="付费" main="本场没有 SC" />
           ) : (
             <>
               <Highlight
@@ -105,7 +100,7 @@ export function StreamTimelinePanel({ row }: StreamTimelinePanelProps) {
                       {tailSuperchats.length > 3 ? " 等" : ""} · 全场共 {superchats.length} 笔
                     </>
                   ) : (
-                    <>收尾阶段没有付费；时间轴上 SC 刻度更靠前。</>
+                    <>收尾阶段没有付费。</>
                   )
                 }
               />
@@ -119,7 +114,7 @@ export function StreamTimelinePanel({ row }: StreamTimelinePanelProps) {
                       `${formatCurrency(superchat.currency, superchat.amount)}（${superchat.author}）`,
                   )
                   .join(" · ")}
-                sub={`按币种分别取最高面额，不换算汇率；本场共 ${superchats.length} 笔 SC。`}
+                sub={`本场共 ${superchats.length} 笔 SC`}
               />
             </>
           )}

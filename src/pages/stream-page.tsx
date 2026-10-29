@@ -27,7 +27,6 @@ export function StreamPage() {
       <Card>
         <CardPanel className="flex flex-col items-center gap-2 py-12 text-center">
           <p className="font-medium text-sm">找不到这场直播</p>
-          <p className="text-muted-foreground text-xs">{videoId}</p>
           <Button
             className="mt-2"
             render={<Link to={streamsPath(dataset.id)} />}

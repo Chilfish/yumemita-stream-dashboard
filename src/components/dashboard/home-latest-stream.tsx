@@ -99,9 +99,9 @@ export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamPr
       </div>
 
       <div className="mt-5 grid grid-cols-3">
-        {primary.map((item, index) => (
+        {primary.map(item => (
           <div
-            className={index === 0 ? "min-w-0 pe-3" : "min-w-0 border-s border-hairline px-3"}
+            className={"min-w-0 border-s border-hairline px-3"}
             key={item.label}
           >
             <p className="flex items-baseline text-stat tabular-nums text-foreground">

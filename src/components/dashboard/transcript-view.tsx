@@ -238,11 +238,6 @@ function TranscriptEmpty({ datasetId, videoId }: { datasetId: string; videoId: s
   return (
     <div className="flex flex-col items-start gap-2 py-2">
       <p className="text-body font-medium text-foreground">这场还没有逐字稿</p>
-      <p className="max-w-[60ch] text-footnote text-muted-foreground">
-        逐字稿由作者手动维护在 <code className="font-mono text-caption">content/transcripts/&lt;datasetId&gt;/&lt;videoId&gt;.md</code>：
-        用 <code className="font-mono text-caption">bun run transcript:new</code> 建文件，写完跑一次{" "}
-        <code className="font-mono text-caption">bun run publish:transcripts</code> 就会出现在这里。
-      </p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <Button render={<Link to={transcriptsPath(datasetId)} />} size="sm" variant="outline">
           <ListTree aria-hidden="true" />

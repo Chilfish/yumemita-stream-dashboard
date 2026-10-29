@@ -46,7 +46,7 @@ function versioned(path: string): string {
 async function fetchJson<T>(url: string, signal?: AbortSignal, cache?: RequestCache): Promise<T> {
   const response = await fetch(url, { signal, cache, headers: { Accept: "application/json" } });
   if (!response.ok) {
-    throw new Error(`加载 ${url} 失败（HTTP ${response.status}）`);
+    throw new Error("数据加载失败。");
   }
   return (await response.json()) as T;
 }
@@ -68,7 +68,7 @@ async function fetchRemoteFirst<T>(path: string, signal?: AbortSignal, fresh = f
 export async function fetchDatasetIndex(signal?: AbortSignal): Promise<DatasetIndex> {
   const index = await fetchRemoteFirst<DatasetIndex>("index.json", signal, true);
   if (!Array.isArray(index.datasets) || index.datasets.length === 0) {
-    throw new Error("index.json 里没有可用的 dataset，请先运行 bun run publish:data");
+    throw new Error("没有可用的成员数据。");
   }
   dataVersion = index.generatedAt ?? "";
   return index;
@@ -77,7 +77,7 @@ export async function fetchDatasetIndex(signal?: AbortSignal): Promise<DatasetIn
 export async function fetchManifest(datasetId: string, signal?: AbortSignal): Promise<BatchManifest> {
   const manifest = await fetchRemoteFirst<BatchManifest>(`${datasetId}/manifest.json`, signal);
   if (!Array.isArray(manifest.streams) || manifest.streams.length === 0) {
-    throw new Error(`${datasetId} 的 manifest 没有 streams`);
+    throw new Error("成员数据为空。");
   }
   return manifest;
 }
@@ -91,7 +91,7 @@ export async function fetchInsights(
     signal,
   );
   if (!file.totals) {
-    throw new Error(`${datasetId} 的 insights.json 缺少 totals，请重新运行 bun run publish:data`);
+    throw new Error("汇总数据不完整。");
   }
   return file.totals;
 }

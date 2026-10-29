@@ -36,7 +36,6 @@ export function TopAuthors({ authors }: TopAuthorsProps) {
             </Button>
           ) : null
         }
-        meta="按各场 Top 20 发言者相加，跨场同名合并；受各场截断影响"
         title="全期高频发言者"
       />
       <PanelBody className="pb-4">

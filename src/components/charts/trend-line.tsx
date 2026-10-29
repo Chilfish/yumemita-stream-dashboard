@@ -39,7 +39,7 @@ export function TrendLine({
     return (
       <EmptyChart
         height={height}
-        hint="检查 manifest 的 startedAt 是否完整。"
+        hint="没有可用的日期数据。"
         message="没有可用的月度数据"
       />
     );

@@ -490,8 +490,8 @@ export function TrendsView({ rows, totals }: TrendsViewProps) {
 
   const metricNote =
     metric === "avgConcurrent"
-      ? `只有 ${formatInteger(totals.withVstatsCount)} 场有 VSTATS 同接；没有数据的月份会断开折线。`
-      : "按月聚合；悬停数据点查看当月读数。";
+      ? `${formatInteger(totals.withVstatsCount)} 场有同接`
+      : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -523,7 +523,7 @@ export function TrendsView({ rows, totals }: TrendsViewProps) {
             ))}
           </ToggleGroup>
         }
-        description={`${active.unit} · ${metricNote}`}
+        description={metricNote ? `${active.unit} · ${metricNote}` : active.unit}
         title="月度趋势"
       >
         <TrendLine
@@ -535,10 +535,7 @@ export function TrendsView({ rows, totals }: TrendsViewProps) {
       </ChartCard>
 
       <Panel>
-        <PanelHead
-          meta="按月聚合；点击表头排序，环比对应当前所选指标，合计行为全期汇总。"
-          title="月度明细"
-        />
+        <PanelHead title="月度明细" />
         <PanelBody className="px-2.5 pb-0">
           <DataTable
             ariaLabel="月度明细"
@@ -556,10 +553,7 @@ export function TrendsView({ rows, totals }: TrendsViewProps) {
       </Panel>
 
       <Panel>
-        <PanelHead
-          meta="按标题关键词分类；点击表头排序，加粗为该列最高，比较时看比率与场均。"
-          title="内容类型对比"
-        />
+        <PanelHead title="内容类型对比" />
         <PanelBody className="px-2.5 pb-0">
           <DataTable
             ariaLabel="内容类型对比"
@@ -573,14 +567,12 @@ export function TrendsView({ rows, totals }: TrendsViewProps) {
             stickyFirstColumn
           />
         </PanelBody>
-        <PanelNote>
-          自动分类，仅供参考；未匹配关键词的标题计入「杂谈」。
-        </PanelNote>
+        <PanelNote>标题未匹配关键词时归入「杂谈」。</PanelNote>
       </Panel>
 
       {totals.streamShape ? (
         <ChartCard
-          description={`把 ${totals.streamShape.streams} 场按直播进度对齐后平均：纵轴为相对该场自身弹幕浓度的倍数（×1 = 该场均值），阴影为 25–75 分位。`}
+          description={`按直播进度对齐的 ${totals.streamShape.streams} 场平均；阴影为中间 50% 的范围。`}
           title="典型节奏曲线"
         >
           <StreamShapeChart shape={totals.streamShape} />

@@ -30,7 +30,6 @@ import {
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import {
   Sheet,
-  SheetDescription,
   SheetHeader,
   SheetPanel,
   SheetPopup,
@@ -159,7 +158,7 @@ export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsTool
           checked={params.vstats}
           onCheckedChange={checked => onParamsChange({ ...params, vstats: checked === true })}
         />
-        仅有 VSTATS
+        仅有同接数据
       </label>
     );
   }
@@ -256,7 +255,7 @@ export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsTool
             <InputGroupInput
               aria-label="搜索直播"
               onChange={event => onParamsChange({ ...params, q: event.target.value })}
-              placeholder="搜索标题 / 日期 / videoId"
+              placeholder="搜索标题或日期"
               type="search"
               value={params.q}
             />
@@ -340,7 +339,6 @@ export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsTool
         <SheetPopup side="bottom">
           <SheetHeader>
             <SheetTitle>筛选</SheetTitle>
-            <SheetDescription>筛选与排序状态会写进 URL，可分享。</SheetDescription>
           </SheetHeader>
           <SheetPanel className="pb-[max(--spacing(6),env(safe-area-inset-bottom))]">
             <div className="flex flex-col gap-5">
@@ -352,7 +350,7 @@ export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsTool
               {renderMemberToggle()}
               <div>
                 <p className="text-caption text-muted-foreground">显示列</p>
-                <div className="mt-1.5 grid grid-cols-2 gap-x-4">
+                <div className="mt-1.5 grid grid-cols-2 gap-4">
                   {OPTIONAL_TABLE_COLUMNS.map(key => (
                     <label
                       className="flex min-h-11 items-center gap-2 text-footnote text-muted-foreground"

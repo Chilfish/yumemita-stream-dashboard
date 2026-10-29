@@ -115,11 +115,11 @@ async function fetchRemoteIndex(): Promise<TranscriptIndexEntry[]> {
   // 还没发布过逐字稿时远端就是 404，这属于空状态，不是故障。
   if (response.status === 404) return [];
   if (!response.ok) {
-    throw new Error(`加载逐字稿索引失败（HTTP ${response.status}）`);
+    throw new Error("加载逐字稿列表失败。");
   }
   const file = (await response.json()) as TranscriptIndexFile;
   if (file?.schema !== TRANSCRIPT_INDEX_SCHEMA || !Array.isArray(file.entries)) {
-    throw new Error("逐字稿索引格式不对，请重新运行 bun run publish:transcripts");
+    throw new Error("逐字稿列表格式异常。");
   }
   return file.entries;
 }
@@ -184,7 +184,7 @@ function loadTranscript(datasetId: string, videoId: string, force = false): Prom
   if (!REMOTE_DATA_BASE) {
     const promise = local
       ? Promise.resolve(local)
-      : Promise.reject(new TranscriptMissingError(`${videoId} 还没有逐字稿`));
+      : Promise.reject(new TranscriptMissingError("这场还没有逐字稿"));
     transcriptCache.set(key, promise);
     // 没有远端时失败是确定性的，不必让缓存挡住重试。
     promise.catch(() => transcriptCache.delete(key));
@@ -196,10 +196,10 @@ function loadTranscript(datasetId: string, videoId: string, force = false): Prom
   })
     .then(async response => {
       if (response.status === 404) {
-        throw new TranscriptMissingError(`远端还没有 ${videoId} 的逐字稿`);
+        throw new TranscriptMissingError("这场还没有逐字稿");
       }
       if (!response.ok) {
-        throw new Error(`加载逐字稿失败（HTTP ${response.status}）`);
+        throw new Error("加载逐字稿失败。");
       }
       return (await response.json()) as TranscriptPayload;
     })

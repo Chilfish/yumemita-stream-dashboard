@@ -23,7 +23,7 @@ const COLUMN_CLASS = {
 
 export function MetricStrip({ items, columns = 6, className, highlight }: MetricStripProps) {
   return (
-    <div className={cn("grid", COLUMN_CLASS[columns], className)}>
+    <div className={cn("grid gap-2", COLUMN_CLASS[columns], className)}>
       {items.map((item, index) => {
         const emphasized = highlight === true && index === 0;
 
@@ -31,7 +31,7 @@ export function MetricStrip({ items, columns = 6, className, highlight }: Metric
           <div
             className={cn(
               "min-w-0",
-              index === 0 ? "pe-3" : "border-l border-hairline px-3",
+              "border-l border-hairline px-3",
             )}
             key={item.label}
           >

@@ -10,7 +10,7 @@ export function DatasetIndexGate() {
   const { index, loading, error } = useDatasetIndex();
 
   if (loading) {
-    return <LoadingScreen label="正在加载 dataset 索引…" />;
+    return <LoadingScreen label="正在加载成员列表…" />;
   }
 
   if (error || !index) {
@@ -19,11 +19,9 @@ export function DatasetIndexGate() {
         <Alert variant="error">
           <TriangleAlert aria-hidden="true" />
           <AlertTitle>数据加载失败</AlertTitle>
-          <AlertDescription>{error ?? "找不到 dataset 索引"}</AlertDescription>
+          <AlertDescription>{error ?? "找不到成员列表"}</AlertDescription>
         </Alert>
-        <p className="mt-3 text-footnote text-muted-foreground">
-          先运行 <code>bun run sync:data</code>，确认 <code>public/data/index.json</code> 存在。
-        </p>
+        <p className="mt-3 text-footnote text-muted-foreground">数据还没有准备好，请稍后重试。</p>
         <Button className="mt-4" onClick={() => window.location.reload()} type="button">
           重新加载
         </Button>

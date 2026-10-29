@@ -69,7 +69,7 @@ export function HomeCalendar({ rows }: HomeCalendarProps) {
             ))}
           </ToggleGroup>
         }
-        meta={`按 JST 自然日；颜色越深表示当日${active.label}越多`}
+        meta="按日本时间"
         title="更新日历"
       />
       <PanelBody>

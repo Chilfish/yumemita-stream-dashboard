@@ -17,7 +17,6 @@ import { useTranscriptIndex } from "@/hooks/use-transcript";
 import type { StreamRow } from "@/lib/aggregate";
 import {
   formatDuration,
-  formatDurationLong,
   formatFullDate,
   formatInteger,
   formatTime,
@@ -145,7 +144,7 @@ export function StreamDetailView({
             <span className="flex flex-wrap items-center gap-1.5">
               {memberOnly ? <Badge variant="warning">会员限定</Badge> : null}
               {missingVstats ? (
-                <Badge title="没有 VSTATS 同接快照，同接与视聴时间为空" variant="outline">
+                <Badge title="没有同接快照" variant="outline">
                   数据缺失
                 </Badge>
               ) : null}
@@ -209,11 +208,6 @@ export function StreamDetailView({
       </div>
 
       <Panel className="p-4 md:p-5">{renderSubview(view, row, datasetId)}</Panel>
-
-      <p className="text-caption text-ink-3">
-        本场时长 {formatDurationLong(summary.durationSec)}；数据包生成于 {pack.generatedAt}；
-        videoId {summary.videoId}。
-      </p>
     </div>
   );
 }

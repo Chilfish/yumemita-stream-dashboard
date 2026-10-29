@@ -48,7 +48,7 @@ export function StreamTimeline({
     return (
       <EmptyChart
         height={height}
-        hint="直播回放的逐分钟时间戳不可用，或抓取时没有拿到聊天回放。"
+        hint="没有可用的逐分钟数据。"
         message="本场没有逐分钟弹幕数据"
       />
     );

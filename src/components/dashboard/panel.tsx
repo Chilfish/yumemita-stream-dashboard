@@ -69,7 +69,7 @@ export function PanelNote({ className, children }: PanelNoteProps) {
   return (
     <div
       className={cn(
-        "border-t border-hairline px-5 py-2.5 text-caption text-muted-foreground",
+        "border-t border-hairline px-5 py-2.5 text-muted-foreground",
         className,
       )}
     >

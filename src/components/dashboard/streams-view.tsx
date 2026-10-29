@@ -342,9 +342,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
 
         {visible.length === 0 ? (
           <div className="flex flex-col items-start gap-3 rounded-panel bg-card px-4 py-8 shadow-surface">
-            <p className="text-body text-muted-foreground">
-              没有匹配的场次：当前搜索与筛选条件排除了全部 {rows.length} 场。
-            </p>
+            <p className="text-body text-muted-foreground">没有匹配的场次</p>
             <Button onClick={resetFilters} size="sm" type="button" variant="outline">
               <RotateCcw aria-hidden="true" />
               清除筛选
@@ -388,7 +386,6 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
           <p className="tabular-nums">
             共 {formatInteger(rows.length)} 场 · 筛选后 {formatInteger(visible.length)} 场
           </p>
-          <p>排序、筛选与列设置会写进 URL</p>
         </footer>
       </section>
     </div>

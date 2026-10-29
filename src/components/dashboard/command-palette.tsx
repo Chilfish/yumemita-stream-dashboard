@@ -50,7 +50,7 @@ export function CommandPalette({
         id: `member:${member.id}`,
         group: "成员" as const,
         label: member.label,
-        meta: `${member.count} 场 · ${member.channelId ?? "未记录频道"}`,
+        meta: `${member.count} 场`,
         avatar: member.avatar,
         run: () => navigate(homePath(member.id)),
       }));
@@ -65,7 +65,7 @@ export function CommandPalette({
         id: `stream:${row.videoId}`,
         group: "场次" as const,
         label: row.title,
-        meta: `${formatDate(row.startedAt)} · ${formatDuration(row.durationSec)} · ${row.videoId}`,
+        meta: `${formatDate(row.startedAt)} · ${formatDuration(row.durationSec)}`,
         run: () => navigate(streamPath(datasetId, row.videoId)),
       }));
 

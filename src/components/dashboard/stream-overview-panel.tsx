@@ -22,13 +22,12 @@ export function StreamOverviewPanel({ row }: StreamOverviewPanelProps) {
       value: `${formatInteger(vstats?.avgConcurrent ?? null)} / ${formatInteger(vstats?.maxConcurrent ?? null)}`,
       hint: vstats?.maxConcurrentAt
         ? `峰值于 ${vstats.maxConcurrentAt}`
-        : "没有 VSTATS 同接快照",
+        : "无同接快照",
     },
     {
       label: "视聴时间",
       unit: "人·时",
       value: formatInteger(vstats?.watchTimeHours ?? null),
-      hint: "VSTATS 口径",
     },
     {
       label: "播放",
@@ -41,7 +40,6 @@ export function StreamOverviewPanel({ row }: StreamOverviewPanelProps) {
     {
       label: "点赞",
       value: formatInteger(vstats?.likes ?? pack.video.snapshot.likes),
-      hint: vstats?.likes != null ? "VSTATS 快照" : "抓取时点",
     },
     {
       label: "弹幕",
@@ -74,14 +72,11 @@ export function StreamOverviewPanel({ row }: StreamOverviewPanelProps) {
       <section>
         <h2 className="sr-only">本场指标</h2>
         <MetricStrip columns={4} items={items} />
-        <p className="mt-3 text-caption text-ink-3">
-          同接 / 视聴时间 / 播放优先取 VSTATS 快照，缺失时回落到抓取时点。
-        </p>
       </section>
 
       <section className="border-t border-hairline pt-5">
         <ChartFrame
-          meta={`覆盖 ${pack.chat.coveragePct?.toFixed(1) ?? "—"}%；下方金色刻度为逐分钟 SC 笔数。悬停查看该分钟数值。`}
+          meta={`覆盖 ${pack.chat.coveragePct?.toFixed(1) ?? "—"}%`}
           title="逐分钟弹幕"
         >
           <ChatDensity row={row} />
@@ -89,7 +84,7 @@ export function StreamOverviewPanel({ row }: StreamOverviewPanelProps) {
       </section>
 
       <section className="border-t border-hairline pt-5">
-        <ChartFrame meta="每 10 分钟汇总；金色点表示该段有 SC。" title="每 10 分钟">
+        <ChartFrame title="每 10 分钟">
           <TenMinuteBars row={row} />
         </ChartFrame>
       </section>

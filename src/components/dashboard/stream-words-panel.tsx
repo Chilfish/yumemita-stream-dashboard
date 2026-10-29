@@ -68,14 +68,14 @@ export function StreamWordsPanel({ row }: StreamWordsPanelProps) {
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ChartFrame
-          meta="本场 Top 40 词表截断到 16；日语分词，不合并表记揺れ。"
+          meta={`${formatInteger(words.length)} 个词`}
           title="高频词"
         >
           <TopBars emptyMessage="本场没有抓取到高频词" items={words} />
         </ChartFrame>
 
         <ChartFrame
-          meta={`本场 Top 20 发言者截断到 12；共 ${formatInteger(chat.uniqueAuthors)} 人发言。`}
+          meta={`共 ${formatInteger(chat.uniqueAuthors)} 人发言`}
           title="发言者"
         >
           <TopBars emptyMessage="本场没有发言者排行" items={authors} labelWidth={128} />

@@ -15,12 +15,6 @@ import {
   type TranscriptIndexEntry,
 } from "@/lib/transcripts";
 
-const COMMANDS: [string, string][] = [
-  ["bun run transcript:new <videoId> --dataset nonoka", "从模板建一篇，日期 / 标题自动从 manifest 带出"],
-  ['bun run transcript:import "<path>" --dataset nonoka', "把已经写好的 Markdown 复制进 content/transcripts/"],
-  ["bun run publish:transcripts", "校验并发布到对象存储；加 --no-upload 只校验"],
-];
-
 function EntryRow({ datasetId, entry }: { datasetId: string; entry: TranscriptIndexEntry }) {
   return (
     <li className="border-t border-hairline first:border-t-0">
@@ -59,24 +53,6 @@ function TranscriptsEmpty() {
   return (
     <div className="flex flex-col items-start gap-3 rounded-panel bg-card px-4 py-8 shadow-surface">
       <p className="text-body font-medium text-foreground">还没有逐字稿</p>
-      <p className="max-w-[70ch] text-footnote text-muted-foreground">
-        逐字稿是作者手动维护的 Markdown，放在{" "}
-        <code className="font-mono text-caption">content/transcripts/&lt;datasetId&gt;/&lt;videoId&gt;.md</code>{" "}
-        并提交到 git；页面只读渲染，不在站内编辑。
-      </p>
-      <dl className="flex w-full max-w-[70ch] flex-col divide-y divide-hairline text-footnote">
-        {COMMANDS.map(([command, description]) => (
-          <div className="grid gap-1 py-2 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,1fr)]" key={command}>
-            <dt>
-              <code className="font-mono text-caption text-foreground">{command}</code>
-            </dt>
-            <dd className="text-muted-foreground">{description}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="text-caption text-ink-3">
-        格式与字段说明见 <code className="font-mono">content/transcripts/README.md</code>。
-      </p>
     </div>
   );
 }
@@ -103,7 +79,7 @@ export interface TranscriptsViewProps {
 }
 
 export function TranscriptsView({ datasetId, datasetLabel }: TranscriptsViewProps) {
-  const { entries, status, error, source, retry } = useTranscriptIndex(datasetId);
+  const { entries, status, error, retry } = useTranscriptIndex(datasetId);
   const groups = useMemo(() => groupTranscriptsByMonth(entries), [entries]);
 
   return (
@@ -139,7 +115,7 @@ export function TranscriptsView({ datasetId, datasetLabel }: TranscriptsViewProp
         <>
           {error ? (
             <p className="text-caption text-ink-3">
-              远端索引暂时读不到（{error}），下面是构建时的快照。
+              暂时无法获取最新列表（{error}），以下是本地缓存。
             </p>
           ) : null}
           <div className="flex flex-col gap-6">
@@ -159,9 +135,6 @@ export function TranscriptsView({ datasetId, datasetLabel }: TranscriptsViewProp
               </section>
             ))}
           </div>
-          <p className="text-caption text-ink-3">
-            {source === "remote" ? "索引来自对象存储，发布后刷新即可。" : "索引来自构建快照。"}
-          </p>
         </>
       ) : null}
     </div>

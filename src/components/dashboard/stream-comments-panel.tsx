@@ -13,14 +13,6 @@ export function StreamCommentsPanel({ row }: StreamCommentsPanelProps) {
     return (
       <div className="flex flex-col items-center gap-1 py-10 text-center">
         <p className="text-headline text-foreground">本场没有抓取到评论</p>
-        <p className="max-w-md text-footnote text-muted-foreground">
-          评论区可能在抓取时未开放、已关闭，或抓取时点之后才有评论；弹幕与付费数据不受影响。
-        </p>
-        {comments ? (
-          <p className="text-caption text-ink-3">
-            数据包记录评论数 {formatInteger(comments.total)}，但没有可展示的条目。
-          </p>
-        ) : null}
       </div>
     );
   }
@@ -61,8 +53,7 @@ export function StreamCommentsPanel({ row }: StreamCommentsPanelProps) {
 
       <p className="border-t border-hairline pt-2 text-caption text-ink-3">
         抓取到 {formatInteger(total)} 条（一级 {formatInteger(topLevel)} · 回复{" "}
-        {formatInteger(replies)}）；置顶 {formatInteger(pinned)}；数据包内全部{" "}
-        {formatInteger(items.length)} 条条目已在上面列出。
+        {formatInteger(replies)}）· 置顶 {formatInteger(pinned)}
       </p>
     </div>
   );
