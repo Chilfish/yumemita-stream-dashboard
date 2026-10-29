@@ -114,14 +114,15 @@ bun run publish:data --no-upload
 
 ## CI
 
-仓库自带 `.github/workflows/ci.yml`：
+仓库自带 `.github/workflows/ci.yml`。需要在 **Settings → Secrets and variables → Actions → Variables** 配置仓库变量 `VITE_DATAPACK_BASE`，指向公开数据根地址；缺失时 CI 会在 “Check datapack base” 步骤给出明确报错。
 
 ```text
-checkout → setup Bun → bun install → sync:data → validate:data
+checkout → setup Bun → bun install → check VITE_DATAPACK_BASE
+        → sync:data（从对象存储拉 manifest/insights）→ validate:data
         → typecheck → test → lint → build
 ```
 
-本地同款：
+本地同款（先在同一 shell 设置 `VITE_DATAPACK_BASE`，或使用 `.env`）：
 
 ```bash
 bun run ci
@@ -129,9 +130,9 @@ bun run ci
 
 ## 数据与隐私
 
-- 部署前确认 `data/` 里没有会员限定/会限等不适合公开的内容。
-- `data/` 会原样进入 `dist/data/`，对访问者可见；不要放 cookie、邮箱、付款信息等隐私数据。
-- 如需只公开部分场次，做法是**只把可公开的 datapack 放进 `data/<dataset>/`**，而不是在前端做隐藏（前端隐藏不等于不可访问）。
+- `data/` 是本地暂存区，不进 git；构建产物只含 `index.json`、`manifest.json`、`insights.json`。
+- 公开范围由上传到对象存储的 datapack 决定；确认没有会员限定/会限等不适合公开的内容。
+- 不要上传 cookie、邮箱、付款信息等隐私数据；前端隐藏不等于不可访问。
 
 ## 体积
 

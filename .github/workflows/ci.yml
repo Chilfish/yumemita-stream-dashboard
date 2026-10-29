@@ -11,6 +11,8 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      VITE_DATAPACK_BASE: ${{ vars.VITE_DATAPACK_BASE }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,6 +29,13 @@ jobs:
 
       - name: Install
         run: bun install --frozen-lockfile
+
+      - name: Check datapack base
+        run: |
+          if [ -z "$VITE_DATAPACK_BASE" ]; then
+            echo "::error::Set the repository variable VITE_DATAPACK_BASE to the public object storage root."
+            exit 1
+          fi
 
       - name: Verify
         run: bun run ci

@@ -4,9 +4,9 @@
 
 页面消费的是 `stream-datapack` 生成的归一化 JSON。生产这些 JSON 的 pipeline（yt-dlp 元信息 / 弹幕 / 评论区 / VSTATS 快照）不在本仓库内。
 
-- **场次索引与预聚合**（`manifest.json` / `insights.json`）提交进本仓库。
+- **场次索引与预聚合**（`manifest.json` / `insights.json`）由 `publish:data` 从 pack 派生，和 datapack 一起上传对象存储，不进 git。
 - **逐场 datapack** 上传到对象存储（Cloudflare R2 等），不进 git；浏览器按 `VITE_DATAPACK_BASE/<datasetId>/<videoId>.datapack.json` 拉取。
-- `data/<datasetId>/` 下的 datapack 只是上传前的本地暂存区。
+- `data/<datasetId>/` 下的 pack、manifest、insights 都是上传前的本地暂存/派生物。
 
 ## 目录约定
 
@@ -14,9 +14,9 @@
 data/
 ├─ README.md
 └─ <datasetId>/
-   ├─ manifest.json            # 场次索引（提交）
-   ├─ insights.json            # 预聚合摘要（提交）
-   └─ <videoId>.datapack.json  # 上传前的本地暂存区（不提交）
+   ├─ manifest.json            # 场次索引（由 pack 派生，本地）
+   ├─ insights.json            # 预聚合摘要（由 pack 派生，本地）
+   └─ <videoId>.datapack.json  # 唯一真源（本地暂存）
 ```
 
 - `datasetId`：小写字母/数字/连字符，例如 `nonoka`。
