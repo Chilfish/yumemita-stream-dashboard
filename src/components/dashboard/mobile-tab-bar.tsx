@@ -25,7 +25,7 @@ interface TabItem {
 
 /** HIG 标签栏：图标 22、标签 11、条目高 44+，只靠着色标记选中，不加指示条。 */
 const ITEM_CLASS =
-  "relative flex min-h-11 flex-col items-center justify-center gap-1 rounded-lg py-1 text-[11px] font-medium leading-[15px] transition-colors duration-120 ease-out active:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-member";
+  "relative flex min-h-11 flex-col items-center justify-center gap-1 rounded-lg py-1 text-[11px] font-medium leading-[15px] transition-colors duration-120 ease-out active:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-member-ink";
 
 export function MobileTabBar({
   datasetId,
@@ -64,7 +64,7 @@ export function MobileTabBar({
               <li key={item.key}>
                 <Link
                   aria-current={active ? "page" : undefined}
-                  className={cn(ITEM_CLASS, active ? "text-member" : "text-muted-foreground")}
+                  className={cn(ITEM_CLASS, active ? "text-member-ink" : "text-muted-foreground")}
                   to={item.to}
                 >
                   <Icon aria-hidden="true" className="size-[22px]" />

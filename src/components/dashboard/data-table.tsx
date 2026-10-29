@@ -84,7 +84,7 @@ export function DataTable<T>({
                 {sortable && onSort ? (
                   <button
                     className={cn(
-                      "inline-flex items-center gap-1 rounded-control transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member",
+                      "inline-flex items-center gap-1 rounded-control transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink",
                       column.align === "right" && "flex-row-reverse",
                       active ? "text-foreground" : "text-muted-foreground",
                     )}
@@ -137,7 +137,7 @@ export function DataTable<T>({
                   <TableCell className="w-0 p-0">
                     <Link
                       aria-label={rowLabel?.(row) ?? "打开详情"}
-                      className="absolute inset-0 z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-member"
+                      className="absolute inset-0 z-20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-member-ink"
                       to={href}
                     />
                   </TableCell>

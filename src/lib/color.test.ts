@@ -11,14 +11,14 @@ describe("color", () => {
   });
 
   it("darkens brand colors that fail on the light background", () => {
-    const accent = memberAccent("#FFEE55", "light");
-    expect(accent).not.toBe("#FFEE55");
+    const accent = memberAccent("#ffcb5b", "light");
+    expect(accent).not.toBe("#ffcb5b");
     expect(contrastRatio(accent, LIGHT_BG)).toBeGreaterThanOrEqual(4.5);
   });
 
   it("keeps colors that already pass", () => {
     expect(memberAccent("#b8461f", "light")).toBe("#b8461f");
-    expect(memberAccent("#FFEE55", "dark")).toBe("#FFEE55");
+    expect(memberAccent("#ffcb5b", "dark")).toBe("#ffcb5b");
   });
 
   it("lightens colors on the dark background when needed", () => {
@@ -31,7 +31,7 @@ describe("color", () => {
   });
 
   it("picks a readable foreground for member color chips", () => {
-    expect(readableOn("#FFEE55")).toBe("#1b1b1d");
+    expect(readableOn("#ffcb5b")).toBe("#1b1b1d");
     expect(readableOn("#b8461f")).toBe("#ffffff");
   });
 });

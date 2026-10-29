@@ -149,7 +149,7 @@ export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeVi
                         <dd className="min-w-0 truncate text-right tabular-nums text-foreground">
                           <span className="font-medium">{formatInteger(bestSc.value)} 笔</span>
                           <Link
-                            className="ml-1.5 text-ink-3 underline-offset-2 transition-colors duration-120 ease-out hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member"
+                            className="ml-1.5 text-ink-3 underline-offset-2 transition-colors duration-120 ease-out hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
                             to={streamPath(dataset.id, bestSc.videoId)}
                           >
                             {bestSc.title}

@@ -114,7 +114,7 @@ function StreamInfoSection({ pack, videoId }: StreamInfoSectionProps) {
 
   return (
     <details className="border-t border-hairline pt-4">
-      <summary className="cursor-pointer text-footnote font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member">
+      <summary className="cursor-pointer text-footnote font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink">
         本场简介与链接
         <span className="ms-2 font-normal text-ink-3 tabular-nums">
           {videoId}
@@ -137,7 +137,7 @@ function StreamInfoSection({ pack, videoId }: StreamInfoSectionProps) {
             {links.map(link => (
               <li className="min-w-0 truncate text-footnote" key={link}>
                 <a
-                  className="text-member underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member"
+                  className="text-member-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
                   href={link}
                   rel="noreferrer"
                   target="_blank"

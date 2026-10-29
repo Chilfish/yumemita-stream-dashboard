@@ -96,7 +96,7 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
       </PanelBody>
       <PanelNote>
         <Link
-          className="text-muted-foreground transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member"
+          className="text-muted-foreground transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
           to={streamsPath(datasetId)}
         >
           完整表格与筛选 →

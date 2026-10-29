@@ -47,12 +47,12 @@ export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamPr
   return (
     <div className="flex min-w-0 flex-col px-5 pt-4 pb-5">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="flex min-w-0 items-center gap-1.5 text-caption text-member">
+        <p className="flex min-w-0 items-center gap-1.5 text-caption text-member-ink">
           <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-member" />
           <span className="truncate">最近一场 · {formatDate(stream.startedAt)}</span>
         </p>
         <Link
-          className="-my-1 flex min-h-9 shrink-0 items-center text-caption text-muted-foreground transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member"
+          className="-my-1 flex min-h-9 shrink-0 items-center text-caption text-muted-foreground transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
           to={streamPath(datasetId, stream.videoId)}
         >
           打开单场详情 →
@@ -61,7 +61,7 @@ export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamPr
 
       <h2 className="mt-2 text-title text-foreground">
         <Link
-          className="line-clamp-3 transition-colors duration-120 ease-out hover:text-member focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member md:line-clamp-2"
+          className="line-clamp-3 transition-colors duration-120 ease-out hover:text-member-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink md:line-clamp-2"
           to={streamPath(datasetId, stream.videoId)}
         >
           {stream.title}

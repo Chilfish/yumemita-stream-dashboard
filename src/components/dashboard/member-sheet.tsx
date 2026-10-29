@@ -50,7 +50,7 @@ export function MemberSheet({
                     <button
                       aria-current={active ? "true" : undefined}
                       className={cn(
-                        "flex min-h-12 w-full items-center gap-3 py-2 text-left transition-colors duration-120 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member",
+                        "flex min-h-12 w-full items-center gap-3 py-2 text-left transition-colors duration-120 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink",
                         active ? "text-foreground" : "text-muted-foreground",
                       )}
                       onClick={() => {
@@ -84,7 +84,7 @@ export function MemberSheet({
                         </span>
                       </span>
                       {active ? (
-                        <Check aria-hidden="true" className="size-4 shrink-0 text-member" />
+                        <Check aria-hidden="true" className="size-4 shrink-0 text-member-ink" />
                       ) : null}
                     </button>
                   </li>

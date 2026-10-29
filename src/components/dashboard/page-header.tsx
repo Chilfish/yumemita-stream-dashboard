@@ -34,7 +34,7 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        {eyebrow ? <p className="text-caption text-member">{eyebrow}</p> : null}
+        {eyebrow ? <p className="text-caption text-member-ink">{eyebrow}</p> : null}
         <h1 className={cn("tabular-nums text-foreground", titleClassName ?? "text-display")}>
           {title}
         </h1>

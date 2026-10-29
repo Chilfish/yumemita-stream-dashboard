@@ -42,10 +42,9 @@ export function DatasetLayout() {
   const { manifest, totals, status, error } = useDataset(dataset?.id ?? null);
 
   const rows = useMemo(() => (manifest ? buildSummaryRows(manifest) : []), [manifest]);
-  const memberColor = useMemo(
-    () => memberAccent(dataset?.color ?? DEFAULT_MEMBER_COLOR, theme),
-    [dataset?.color, theme],
-  );
+  // 品牌色本身不做处理（图表、色点用原色）；只有文字/焦点环用小字可读的加深色。
+  const memberColor = dataset?.color ?? DEFAULT_MEMBER_COLOR;
+  const memberInk = useMemo(() => memberAccent(memberColor, theme), [memberColor, theme]);
   const openCommandPalette = useCallback(() => setCommandOpen(true), []);
 
   useKeyboardShortcuts({
@@ -74,7 +73,7 @@ export function DatasetLayout() {
 
   return (
     <SidebarProvider
-      style={{ "--member-color": memberColor } as CSSProperties}
+      style={{ "--member-color": memberColor, "--member-ink": memberInk } as CSSProperties}
     >
       <a
         className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-control focus:bg-card focus:px-3 focus:py-2 focus:text-footnote focus:shadow-surface"
