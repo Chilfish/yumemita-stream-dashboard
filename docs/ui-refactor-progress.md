@@ -34,6 +34,7 @@
 | 项 | 状态 | 落点 |
 | --- | --- | --- |
 | 更新日历（场次 / 弹幕 / SC 热力图） | 已完成 | `charts/calendar-heatmap.tsx`、`dashboard/home-calendar.tsx`、`lib/aggregate.ts` |
+| 趋势页（月度趋势 + 类型对比） | 已完成 | `charts/trend-line.tsx`、`dashboard/trends-view.tsx`、`pages/trends-page.tsx`、`lib/aggregate.ts` |
 | 对象存储数据链路 | 已完成 | `publish:data` / `sync:data` / `validate:data`；datapack 不进 git |
 | 文档同步 | 已完成 | README、roadmap、architecture、development |
 
@@ -50,7 +51,7 @@
 | P5-a 移动端 | `dashboard/mobile-tab-bar.tsx`、`dashboard/member-sheet.tsx` |
 | P5-b 搜索 | `dashboard/command-palette.tsx`、`lib/keyboard.ts`、`lib/keyboard.test.ts`、`hooks/use-keyboard-shortcuts.ts` |
 | P5-c 表格 | `dashboard/data-table.tsx`、`dashboard/streams-view.tsx`、`dashboard/streams-toolbar.tsx` |
-| P6 日历 | `charts/calendar-heatmap.tsx`、`dashboard/home-calendar.tsx`、`lib/aggregate.ts`、`lib/aggregate.test.ts` |
+| P6 日历与趋势 | `charts/calendar-heatmap.tsx`、`dashboard/home-calendar.tsx`、`charts/trend-line.tsx`、`dashboard/trends-view.tsx`、`pages/trends-page.tsx`、`lib/aggregate.ts`、`lib/aggregate.test.ts` |
 
 > P5 完成后，`data-table.tsx` 回到 F1，`streams-view.tsx` / `streams-toolbar.tsx` 回到 L2。
 
@@ -109,7 +110,7 @@
 ## 验证
 
 ```bash
-bun run check        # typecheck + 75 个单测 + lint
+bun run check        # typecheck + 77 个单测 + lint
 bun run build        # sync:data + tsc -b + vite build
 bun run test:smoke   # 需先启动 dev/preview
 ```
@@ -117,16 +118,17 @@ bun run test:smoke   # 需先启动 dev/preview
 当前基线（2026-10-28）：
 
 - `bun run typecheck`：通过。
-- `bun run test`：6 个文件 / 75 个用例通过。
+- `bun run test`：6 个文件 / 77 个用例通过。
 - `bun run lint`：0 warning / 0 error。
 - `bun run build`：通过，主包约 349 KB（gzip ~112 KB）。
-- `bun run test:smoke`：5/5 场景通过（首页重定向、单场深链、无效 id、对比深链、前进后退）。
+- `bun run test:smoke`：6/6 场景通过（首页重定向、单场深链、无效 id、对比深链、趋势深链、前进后退）。
 - 浏览器复核（390 / 320 / 1440）：
   - 底栏贴底（间距 0）、高 53px，≥44px 触控目标；
   - 场次表横向滚动 260px 时首列位移 0（吸附生效）；
   - 筛选 Sheet 与成员 Sheet 均可打开；
   - `⌘K` 命令面板可打开、可过滤场次；
   - 更新日历渲染 1085 个日期格，覆盖 258 个直播日；场次 / 弹幕 / SC 切换会更新读数；
+  - 趋势页渲染 36 个月折线、36 行月度明细、4 类内容对比；深链刷新与移动端无溢出；
   - 页面无 console error，320px 下页面横向溢出为 0。
 
 ## 已知取舍
