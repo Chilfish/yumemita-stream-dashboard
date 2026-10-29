@@ -74,9 +74,20 @@ bun run publish:data
 
 # 只重算本地 manifest/insights，不上传
 bun run publish:data --no-upload
+
+# 忽略本地进度，全量重传
+bun run publish:data --force
 ```
 
-`publish:data` 以本地 `data/<id>/*.datapack.json` 为唯一真源：先上传全部 pack，再上传 manifest 与 insights。中途失败只会多出一个未被引用的 pack，不会出现指向不存在文件的索引。
+`publish:data` 以本地 `data/<id>/*.datapack.json` 为唯一真源：先上传变化的 pack，再上传 manifest 与 insights。中途失败只会多出一个未被引用的 pack，不会出现指向不存在文件的索引。
+
+增量上传的进度记在本地 `data/.publish-state.json`（不进 git）：
+
+- 每个对象按 sha256 + 字节数记录；重跑时列一次桶，本地摘要没变、远端对象还在且大小一致就跳过。
+- pack 变了、远端缺对象、远端大小对不上，都会重传。
+- 列桶失败（凭据没有 ListBucket 权限 / 网络问题）时只按本地进度判断，并打印提示；要强制全量加 `--force`。
+- 换桶或改 `R2_PREFIX` 后进度自动作废，重新全量传一次。
+- manifest / insights 每次都重传（`generatedAt` 会变），只有 2 × dataset 数个小文件。
 
 ### 构建
 

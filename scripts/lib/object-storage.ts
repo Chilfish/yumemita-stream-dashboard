@@ -46,7 +46,13 @@ export function readCredentials(): Credentials | null {
   return { accountId, accessKeyId, secretAccessKey, bucket, prefix }
 }
 
-export function createUploader(credentials: Credentials) {
+export interface ObjectStore {
+  put: (key: string, body: string) => Promise<void>
+  /** 桶内对象相对 `R2_PREFIX` 的 key → 字节数；用于增量发布时核对远端。 */
+  list: () => Promise<Map<string, number>>
+}
+
+export function createObjectStore(credentials: Credentials): ObjectStore {
   const client = new S3Client({
     accessKeyId: credentials.accessKeyId,
     secretAccessKey: credentials.secretAccessKey,
@@ -56,7 +62,7 @@ export function createUploader(credentials: Credentials) {
 
   const prefix = credentials.prefix ? `${credentials.prefix}/` : ''
 
-  return async function put(key: string, body: string): Promise<void> {
+  async function put(key: string, body: string): Promise<void> {
     const objectKey = `${prefix}${key}`
     try {
       await client.file(objectKey).write(body, { type: 'application/json' })
@@ -66,6 +72,30 @@ export function createUploader(credentials: Credentials) {
       throw new Error(`上传 ${objectKey} 失败：${detail}`, { cause: error })
     }
   }
+
+  async function list(): Promise<Map<string, number>> {
+    const sizes = new Map<string, number>()
+    let continuationToken: string | undefined
+    do {
+      let page
+      try {
+        page = await client.list({ prefix, continuationToken })
+      }
+      catch (error) {
+        const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+        throw new Error(`列出 ${prefix || '桶根'} 下的对象失败：${detail}`, { cause: error })
+      }
+      for (const object of page.contents ?? []) {
+        if (typeof object.size !== 'number') continue
+        const key = prefix && object.key.startsWith(prefix) ? object.key.slice(prefix.length) : object.key
+        sizes.set(key, object.size)
+      }
+      continuationToken = page.isTruncated ? page.nextContinuationToken : undefined
+    } while (continuationToken)
+    return sizes
+  }
+
+  return { put, list }
 }
 
 /** 有限并发地跑完一批任务，避免把 200+ 个 PUT 同时打出去。 */

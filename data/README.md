@@ -5,6 +5,7 @@
 
 ```text
 data/
+├─ .publish-state.json           # 发布进度（publish:data 用，增量上传）
 └─ nonoka/
    ├─ <videoId>.datapack.json   # 每场完整数据（真源）
    ├─ manifest.json             # 由 pack 派生
@@ -44,7 +45,7 @@ data/
 # 单场：放进暂存区并更新本地 manifest
 bun run add:datapack nonoka /path/to/<videoId>.datapack.json
 
-# 从全部 pack 重建 manifest + insights，并上传到 R2
+# 从全部 pack 重建 manifest + insights，并增量上传到 R2
 bun run publish:data
 
 # 构建/开发前同步到 public/data

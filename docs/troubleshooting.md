@@ -110,4 +110,5 @@ bun run dev -- --port 5174
 
 - 发布后缓存：`data/*.json` 在 `vercel.json` 里是 300s 短缓存，对象存储侧的 manifest/insights 也是短缓存，等一会儿或强制刷新。
 - 改了本地 pack 后忘了 `bun run publish:data`，远端仍是旧索引。
+- 增量发布没传某个 pack：进度记在 `data/.publish-state.json`（上次上传的内容摘要 + 字节数）。远端对象被删、大小对不上会自动重传；怀疑进度记录有问题（例如手工改过桶里的文件）时用 `bun run publish:data --force` 全量重传。
 - 本地开发 Vite 会热更新；如果是 `preview`，重新 `bun run build && bun run preview`。

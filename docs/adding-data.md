@@ -29,7 +29,7 @@ data/
 # 1. 放进暂存区，顺带更新本地 manifest
 bun run add:datapack nonoka /path/to/abc123XYZ.datapack.json
 
-# 2. 由全部 pack 重建 manifest + insights，并上传到 R2
+# 2. 由全部 pack 重建 manifest + insights，并增量上传到 R2
 bun run publish:data
 
 # 3. 本地看效果

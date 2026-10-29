@@ -2,14 +2,16 @@
 /**
  * 发布数据到对象存储（Cloudflare R2 等）。
  *
- *   bun scripts/publish-data.ts               # 生成并上传
+ *   bun scripts/publish-data.ts               # 生成并增量上传
  *   bun scripts/publish-data.ts --no-upload   # 只生成本地文件
  *   bun scripts/publish-data.ts --dataset nonoka
+ *   bun scripts/publish-data.ts --force       # 忽略进度，全量重传
  *
  * 本地 `data/<id>/*.datapack.json` 是**唯一真源**：
  * 1. 由 pack 派生 manifest（摘要索引）与 insights（预聚合）；
  * 2. 写回本地 `data/<id>/`（gitignore，本地 dev 直接复用）；
- * 3. pack → manifest → insights 的顺序上传，索引永远指向已存在的 pack。
+ * 3. pack → manifest → insights 的顺序上传，索引永远指向已存在的 pack；
+ * 4. 增量上传：内容摘要记在 `data/.publish-state.json`，未变化且远端对得上的 pack 跳过。
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -22,7 +24,7 @@ import { buildStreamSummary, isoJst } from './lib/dataset-manifest.ts'
 import {
   INSIGHTS_SCHEMA,
   MANIFEST_SCHEMA,
-  createUploader,
+  createObjectStore,
   datapackKey,
   insightsKey,
   manifestKey,
@@ -30,6 +32,7 @@ import {
   remoteBase,
   runPool,
 } from './lib/object-storage.ts'
+import { digestBody, isUnchanged, readPublishState, writePublishState } from './lib/publish-state.ts'
 
 interface DatasetSource {
   id: string
@@ -49,6 +52,7 @@ const { values } = parseArgs({
   options: {
     dataset: { type: 'string' },
     'no-upload': { type: 'boolean' },
+    force: { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
   allowPositionals: false,
@@ -61,6 +65,7 @@ const USAGE = `用法：bun scripts/publish-data.ts [选项]
 选项：
   --dataset <id>   只发布指定 dataset
   --no-upload      只生成本地文件，不上传
+  --force          忽略 data/.publish-state.json 的进度，全量重传
   -h, --help       显示本帮助
 
 上传需要环境变量：R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET`
@@ -125,7 +130,7 @@ const credentials = readCredentials()
 if (!values['no-upload'] && !credentials)
   fail('缺少 R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET；只生成文件请加 --no-upload')
 
-const upload = credentials && !values['no-upload'] ? createUploader(credentials) : null
+const store = credentials && !values['no-upload'] ? createObjectStore(credentials) : null
 const publishStartedAt = isoJst(new Date())
 const packUploads: { key: string, body: string }[] = []
 const indexUploads: { key: string, body: string }[] = []
@@ -165,21 +170,62 @@ for (const source of selected) {
   indexUploads.push({ key: insightsKey(source.id), body: JSON.stringify(insights) })
 }
 
-if (!upload) {
+if (!store || !credentials) {
   console.log('[publish-data] 已跳过上传（--no-upload）')
   console.log(`[publish-data] 手动上传示例：rclone sync data/<id> r2:<bucket>/<id>`)
   process.exit(0)
 }
 
-console.log(`[publish-data] 上传 ${packUploads.length} 个 datapack...`)
-await runPool(packUploads, 8, async (item) => {
-  await upload(item.key, item.body)
+// 进度记录：内容摘要对齐就不重传；同时列一次远端，确认对象还在、大小对得上。
+const statePath = join(APP_ROOT, 'data', '.publish-state.json')
+const state = readPublishState(statePath, `${credentials.bucket}/${credentials.prefix}`)
+
+let remote: Map<string, number> | null = null
+if (!values.force) {
+  try {
+    remote = await store.list()
+  }
+  catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    console.warn(`[publish-data]   ! 列远端对象失败（${detail}），只按本地进度判断；要全量重传加 --force`)
+  }
+}
+
+const planned = packUploads.map((item) => {
+  const digest = digestBody(item.body)
+  const unchanged = isUnchanged(state.objects[item.key], digest, remote, item.key)
+  return { ...item, digest, skip: !values.force && unchanged }
 })
+const pending = planned.filter(item => !item.skip)
+const skipped = planned.length - pending.length
+
+if (values.force)
+  console.log(`[publish-data] --force：忽略本地进度，全量上传 ${pending.length} 个 datapack...`)
+else if (skipped > 0)
+  console.log(`[publish-data] 上传 ${pending.length} 个 datapack（跳过 ${skipped} 个未变化）...`)
+else
+  console.log(`[publish-data] 上传 ${pending.length} 个 datapack...`)
+
+let uploaded = 0
+try {
+  await runPool(pending, 8, async (item) => {
+    await store.put(item.key, item.body)
+    state.objects[item.key] = { ...item.digest, uploadedAt: new Date().toISOString() }
+    uploaded += 1
+    // 中途被打断时最多丢掉这一批的进度，不至于下次全量重传。
+    if (uploaded % 20 === 0)
+      writePublishState(statePath, state)
+  })
+}
+finally {
+  if (uploaded > 0)
+    writePublishState(statePath, state)
+}
 
 // 索引最后写：即使中途失败，也是“多一个 pack”而不是“指向不存在的 pack”。
 console.log(`[publish-data] 上传 ${indexUploads.length} 个索引...`)
 await runPool(indexUploads, 2, async (item) => {
-  await upload(item.key, item.body)
+  await store.put(item.key, item.body)
 })
 
 const base = remoteBase()
