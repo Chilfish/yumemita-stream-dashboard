@@ -134,9 +134,16 @@ export function StreamTimeline({
               >
                 弹幕
               </text>
-              {areaPath ? <path d={areaPath} fill={`url(#${gradientId})`} /> : null}
+              {areaPath ? <path className="chart-area" d={areaPath} fill={`url(#${gradientId})`} /> : null}
               {linePath ? (
-                <path d={linePath} fill="none" stroke={CHART_COLORS[0]} strokeWidth={1.7} />
+                <path
+                  className="chart-line"
+                  d={linePath}
+                  fill="none"
+                  pathLength={1}
+                  stroke={CHART_COLORS[0]}
+                  strokeWidth={1.7}
+                />
               ) : null}
 
               {/* SC 轨：逐分钟刻度 */}

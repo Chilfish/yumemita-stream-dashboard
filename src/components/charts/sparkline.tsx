@@ -78,12 +78,16 @@ export function Sparkline({
               </defs>
             ) : null}
 
-            {area && areaPath ? <path d={areaPath} fill={`url(#${gradientId})`} /> : null}
+            {area && areaPath ? (
+              <path className="chart-area" d={areaPath} fill={`url(#${gradientId})`} />
+            ) : null}
 
             {linePath ? (
               <path
+                className="chart-line"
                 d={linePath}
                 fill="none"
+                pathLength={1}
                 stroke={stroke}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -93,6 +97,7 @@ export function Sparkline({
 
             {peak !== undefined ? (
               <circle
+                className="chart-dot"
                 cx={x(peak)}
                 cy={y(values[peak])}
                 fill={stroke}

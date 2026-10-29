@@ -93,11 +93,15 @@ export function TrendLine({
 
             <YAxis scale={y} x={innerWidth} />
 
-            {areaPath ? <path d={areaPath} fill={`url(#${gradientId})`} /> : null}
+            {areaPath ? (
+              <path className="chart-area" d={areaPath} fill={`url(#${gradientId})`} />
+            ) : null}
             {linePath ? (
               <path
+                className="chart-line"
                 d={linePath}
                 fill="none"
+                pathLength={1}
                 stroke={color}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -108,6 +112,7 @@ export function TrendLine({
             {points.map((point, index) =>
               point.value == null ? null : (
                 <circle
+                  className="chart-dot"
                   cx={x(index)}
                   cy={y(point.value)}
                   fill={color}

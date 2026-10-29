@@ -169,14 +169,16 @@ export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }
               return (
                 <g key={item.id}>
                   {areaPath ? (
-                    <path d={areaPath} fill={`url(#${gradientId}-${index})`}>
+                    <path className="chart-area" d={areaPath} fill={`url(#${gradientId}-${index})`}>
                       <title>{`${item.label}：逐分钟弹幕面积`}</title>
                     </path>
                   ) : null}
                   {linePath ? (
                     <path
+                      className="chart-line"
                       d={linePath}
                       fill="none"
+                      pathLength={1}
                       stroke={color}
                       strokeLinejoin="round"
                       strokeWidth={CHART_LINE_WIDTH}

@@ -97,14 +97,16 @@ export function ChatDensity({ row }: ChatDensityProps) {
             <YAxis scale={y} x={innerWidth} />
 
             {areaPath ? (
-              <path d={areaPath} fill={`url(#${gradientId})`}>
+              <path className="chart-area" d={areaPath} fill={`url(#${gradientId})`}>
                 <title>{`逐分钟弹幕面积：峰值 ${formatCompact(maxChat)} 条/分`}</title>
               </path>
             ) : null}
             {linePath ? (
               <path
+                className="chart-line"
                 d={linePath}
                 fill="none"
+                pathLength={1}
                 stroke={memberColor}
                 strokeLinejoin="round"
                 strokeWidth={CHART_LINE_WIDTH}

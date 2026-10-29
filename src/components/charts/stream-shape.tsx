@@ -60,12 +60,20 @@ export function StreamShapeChart({ shape }: StreamShapeChartProps) {
               />
 
               {band ? (
-                <path d={band} fill={CHART_COLORS[0]} fillOpacity={0.18} stroke="none" />
+                <path
+                  className="chart-area"
+                  d={band}
+                  fill={CHART_COLORS[0]}
+                  fillOpacity={0.18}
+                  stroke="none"
+                />
               ) : null}
               {averageLine ? (
                 <path
+                  className="chart-line"
                   d={averageLine}
                   fill="none"
+                  pathLength={1}
                   stroke={CHART_COLORS[0]}
                   strokeLinecap="round"
                   strokeWidth={2}

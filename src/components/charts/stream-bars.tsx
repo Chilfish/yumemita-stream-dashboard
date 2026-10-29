@@ -91,6 +91,7 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
                   style={{ cursor: onSelect ? "pointer" : "default" }}
                 >
                   <rect
+                    className="chart-bar"
                     fill={CHART_COLORS[0]}
                     height={innerHeight - y(avg)}
                     rx={2}
@@ -102,6 +103,7 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
                   </rect>
                   {peak != null ? (
                     <rect
+                      className="chart-bar"
                       fill={CHART_COLORS[1]}
                       height={innerHeight - y(peak)}
                       rx={2}
