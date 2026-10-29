@@ -113,6 +113,7 @@ async function verifyRemote() {
   }
 
   const urls = [
+    `${remoteBase}/index.json`,
     ...indexResult.output.datasets.flatMap((dataset) => [
       `${remoteBase}/${dataset.id}/manifest.json`,
       `${remoteBase}/${dataset.id}/insights.json`,

@@ -48,6 +48,8 @@ export function readCredentials(): Credentials | null {
 
 export interface ObjectStore {
   put: (key: string, body: string) => Promise<void>
+  /** 读取对象；不存在时返回 null。 */
+  get: (key: string) => Promise<string | null>
   /** 桶内对象相对 `R2_PREFIX` 的 key → 字节数；用于增量发布时核对远端。 */
   list: () => Promise<Map<string, number>>
 }
@@ -73,6 +75,20 @@ export function createObjectStore(credentials: Credentials): ObjectStore {
     }
   }
 
+  async function get(key: string): Promise<string | null> {
+    const objectKey = `${prefix}${key}`
+    const file = client.file(objectKey)
+    try {
+      if (!(await file.exists()))
+        return null
+      return await file.text()
+    }
+    catch (error) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      throw new Error(`读取 ${objectKey} 失败：${detail}`, { cause: error })
+    }
+  }
+
   async function list(): Promise<Map<string, number>> {
     const sizes = new Map<string, number>()
     let continuationToken: string | undefined
@@ -95,7 +111,7 @@ export function createObjectStore(credentials: Credentials): ObjectStore {
     return sizes
   }
 
-  return { put, list }
+  return { put, get, list }
 }
 
 /** 有限并发地跑完一批任务，避免把 200+ 个 PUT 同时打出去。 */

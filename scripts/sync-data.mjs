@@ -2,10 +2,12 @@
 /**
  * 把 manifest / insights 同步到 public/data/，供页面同源加载。
  *
- * 真源在对象存储（R2）：<base>/<id>/manifest.json + insights.json + <videoId>.datapack.json
+ * 真源在对象存储（R2）：<base>/index.json + <id>/manifest.json + insights.json +
+ * <videoId>.datapack.json。页面运行时直接读远端；这里生成的 public/data/ 只是
+ * 离线开发和远端不可达时的兜底快照。
  *
- * - 配了 DATAPACK_BASE / VITE_DATAPACK_BASE：从远端拉 manifest 与 insights（带本地缓存），
- *   datapack 由浏览器直接向远端请求，不进构建产物。
+ * - 配了 DATAPACK_BASE / VITE_DATAPACK_BASE：拉远端 index / manifest / insights（带本地缓存），
+ *   原样写进 public/data/；datapack 不进构建产物。
  * - 没配：回退到本地 data/<id>/（由 publish:data 生成），连同 datapack 一起复制，离线可用。
  */
 import {
@@ -167,5 +169,24 @@ for (const source of config.datasets) {
   console.log(`[sync-data] ${label} (${id}) -> ${manifest.streams.length} 场，${sourceNote}`);
 }
 
-writeJson(join(outputRoot, "index.json"), index);
-console.log(`[sync-data] 完成：${index.datasets.length} 个 dataset -> public/data/index.json`);
+// 远端 index 由 publish:data 生成，是页面实际会读的那份；能用就用它，避免构建快照漂移。
+let publishedIndex = null;
+if (remoteBase) {
+  publishedIndex = await fetchJson(`${remoteBase}/index.json`, join(cacheRoot, "index.json"));
+}
+const publishedIds = new Set(
+  Array.isArray(publishedIndex?.datasets) ? publishedIndex.datasets.map(dataset => dataset.id) : [],
+);
+const covered =
+  index.datasets.length > 0 && index.datasets.every(dataset => publishedIds.has(dataset.id));
+if (publishedIndex && !covered) {
+  console.warn("[sync-data]   ! 远端 index 与本仓库 data-sources.json 不一致，先用本地构造的索引");
+}
+const outputIndex = covered ? publishedIndex : index;
+
+writeJson(join(outputRoot, "index.json"), outputIndex);
+console.log(
+  `[sync-data] 完成：${outputIndex.datasets.length} 个 dataset -> public/data/index.json${
+    covered ? "（来自对象存储）" : ""
+  }`,
+);

@@ -10,16 +10,21 @@
  * 本地 `data/<id>/*.datapack.json` 是**唯一真源**：
  * 1. 由 pack 派生 manifest（摘要索引）与 insights（预聚合）；
  * 2. 写回本地 `data/<id>/`（gitignore，本地 dev 直接复用）；
- * 3. pack → manifest → insights 的顺序上传，索引永远指向已存在的 pack；
+ * 3. pack → manifest → insights → dataset index 的顺序上传，索引永远指向已存在的文件；
  * 4. 增量上传：内容摘要记在 `data/.publish-state.json`，未变化且远端对得上的 pack 跳过。
+ *
+ * `index.json` 是页面的入口：浏览器启动时直接向对象存储读它，再按 dataset 拉
+ * manifest / insights / datapack。发布后刷新即可，不需要重新构建前端。
  */
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { aggregateDataset, buildStreamRows } from '../src/lib/aggregate.ts'
 import type { StreamDatapack } from '../src/types/datapack.ts'
 import type { BatchManifest } from '../src/types/dataset.ts'
+import { INDEX_KEY, buildDatasetIndex } from './lib/dataset-index.ts'
+import type { DatasetIndex, DatasetIndexSource } from './lib/dataset-index.ts'
 import { buildStreamSummary, isoJst } from './lib/dataset-manifest.ts'
 import {
   INSIGHTS_SCHEMA,
@@ -38,6 +43,7 @@ interface DatasetSource {
   id: string
   label: string
   color?: string | null
+  avatar?: string | null
   channelId?: string | null
   datapackDir: string
   subject?: string
@@ -134,6 +140,7 @@ const store = credentials && !values['no-upload'] ? createObjectStore(credential
 const publishStartedAt = isoJst(new Date())
 const packUploads: { key: string, body: string }[] = []
 const indexUploads: { key: string, body: string }[] = []
+const indexSources = new Map<string, DatasetIndexSource>()
 
 for (const source of selected) {
   const packs = readPacks(source)
@@ -168,6 +175,16 @@ for (const source of selected) {
     packUploads.push({ key: datapackKey(source.id, pack.video.id as string), body: JSON.stringify(pack) })
   indexUploads.push({ key: manifestKey(source.id), body: JSON.stringify(manifest) })
   indexUploads.push({ key: insightsKey(source.id), body: JSON.stringify(insights) })
+
+  indexSources.set(source.id, {
+    id: source.id,
+    label: source.label,
+    color: source.color,
+    avatar: source.avatar,
+    channelId: source.channelId ?? manifest.channelId,
+    count: streams.length,
+    generatedAt: manifest.generatedAt,
+  })
 }
 
 if (!store || !credentials) {
@@ -175,6 +192,52 @@ if (!store || !credentials) {
   console.log(`[publish-data] 手动上传示例：rclone sync data/<id> r2:<bucket>/<id>`)
   process.exit(0)
 }
+
+// --dataset 只重算了一部分：其余 dataset 沿用远端索引里的条目，远端没有再看本地 manifest。
+const missing = config.datasets.filter(source => !indexSources.has(source.id))
+if (missing.length > 0) {
+  let published: DatasetIndex | null = null
+  try {
+    const text = await store.get(INDEX_KEY)
+    if (text)
+      published = JSON.parse(text) as DatasetIndex
+  }
+  catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    console.warn(`[publish-data]   ! 读取远端 ${INDEX_KEY} 失败（${detail}）`)
+  }
+
+  for (const source of missing) {
+    const entry = published?.datasets?.find(item => item.id === source.id)
+    if (entry) {
+      indexSources.set(source.id, entry)
+      continue
+    }
+    const manifestPath = join(resolve(APP_ROOT, source.datapackDir), 'manifest.json')
+    if (!existsSync(manifestPath)) {
+      console.warn(`[publish-data]   ! ${source.id} 没有可用的 manifest，dataset 索引里跳过`)
+      continue
+    }
+    const manifest = readJson<BatchManifest>(manifestPath)
+    indexSources.set(source.id, {
+      id: source.id,
+      label: source.label,
+      color: source.color,
+      avatar: source.avatar,
+      channelId: source.channelId ?? manifest.channelId,
+      count: manifest.count ?? manifest.streams?.length ?? 0,
+      generatedAt: manifest.generatedAt ?? null,
+    })
+  }
+}
+
+const datasetIndex = buildDatasetIndex(
+  config.datasets.flatMap((source) => {
+    const entry = indexSources.get(source.id)
+    return entry ? [entry] : []
+  }),
+  publishStartedAt,
+)
 
 // 进度记录：内容摘要对齐就不重传；同时列一次远端，确认对象还在、大小对得上。
 const statePath = join(APP_ROOT, 'data', '.publish-state.json')
@@ -223,10 +286,13 @@ finally {
 }
 
 // 索引最后写：即使中途失败，也是“多一个 pack”而不是“指向不存在的 pack”。
-console.log(`[publish-data] 上传 ${indexUploads.length} 个索引...`)
+console.log(`[publish-data] 上传 ${indexUploads.length} 个 manifest / insights...`)
 await runPool(indexUploads, 2, async (item) => {
   await store.put(item.key, item.body)
 })
+
+console.log(`[publish-data] 上传 dataset 索引 ${INDEX_KEY}（${datasetIndex.datasets.length} 个 dataset）...`)
+await store.put(INDEX_KEY, JSON.stringify(datasetIndex))
 
 const base = remoteBase()
 console.log(`[publish-data] 完成${base ? `：${base}` : ''}`)
