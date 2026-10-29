@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { EmptyChart } from "@/components/charts/chart-card";
 import {
   calendarMetricValue,
@@ -42,6 +42,7 @@ function startOfWeek(date: Date): Date {
 }
 
 export function CalendarHeatmap({ days, metric, ariaLabel, className }: CalendarHeatmapProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const view = useMemo(() => {
     if (days.length === 0) return null;
 
@@ -90,6 +91,12 @@ export function CalendarHeatmap({ days, metric, ariaLabel, className }: Calendar
     };
   }, [days, metric]);
 
+  // 首页更关心最近：渲染后滚到右端，让最新的月份先进入视野。
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (element) element.scrollLeft = element.scrollWidth;
+  }, [days, metric]);
+
   if (!view) {
     return (
       <EmptyChart
@@ -106,7 +113,7 @@ export function CalendarHeatmap({ days, metric, ariaLabel, className }: Calendar
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <div className="overflow-x-auto pb-1 [contain:inline-size]">
+      <div ref={scrollRef} className="overflow-x-auto pb-1 [contain:inline-size]">
         <svg
           aria-label={ariaLabel}
           className="block"
@@ -116,7 +123,7 @@ export function CalendarHeatmap({ days, metric, ariaLabel, className }: Calendar
         >
           {view.months.map(month => (
             <text
-              className="fill-ink-3 text-[9px] font-semibold"
+              className="fill-ink-3 text-caption font-semibold"
               key={`${month.label}-${month.week}`}
               x={LEFT + month.week * (CELL + GAP)}
               y={10}
@@ -128,7 +135,7 @@ export function CalendarHeatmap({ days, metric, ariaLabel, className }: Calendar
           {WEEKDAY_LABELS.map((label, row) =>
             row % 2 === 0 ? (
               <text
-                className="fill-ink-3 text-[9px]"
+                className="fill-ink-3 text-caption"
                 key={label}
                 x={0}
                 y={TOP + row * (CELL + GAP) + CELL - 2}

@@ -1,6 +1,6 @@
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 
-interface HomeMeterRowProps {
+interface MeterRowProps {
   label: string;
   count: string;
   note?: string;
@@ -8,7 +8,7 @@ interface HomeMeterRowProps {
   max: number;
 }
 
-export function HomeMeterRow({ label, count, note, value, max }: HomeMeterRowProps) {
+export function MeterRow({ label, count, note, value, max }: MeterRowProps) {
   return (
     <li className="grid grid-cols-[1fr_auto] items-baseline gap-x-2 gap-y-1">
       <span className="min-w-0 truncate text-body text-foreground">{label}</span>

@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { HomeMeterRow } from "@/components/dashboard/home-meter-row";
+import { MeterRow } from "@/components/dashboard/meter-row";
 import { PanelBody, PanelHead } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
 import type { AggregatedAuthor } from "@/lib/aggregate";
@@ -8,11 +8,11 @@ import { formatInteger } from "@/lib/format";
 const COLLAPSED = 5;
 const EXPANDED = 12;
 
-interface HomeTopAuthorsProps {
+interface TopAuthorsProps {
   authors: AggregatedAuthor[];
 }
 
-export function HomeTopAuthors({ authors }: HomeTopAuthorsProps) {
+export function TopAuthors({ authors }: TopAuthorsProps) {
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
   const limit = expanded ? EXPANDED : COLLAPSED;
@@ -21,7 +21,7 @@ export function HomeTopAuthors({ authors }: HomeTopAuthorsProps) {
   const canExpand = authors.length > COLLAPSED;
 
   return (
-    <section className="flex min-w-0 flex-col border-t border-hairline">
+    <section className="flex min-w-0 flex-col">
       <PanelHead
         actions={
           canExpand ? (
@@ -40,9 +40,9 @@ export function HomeTopAuthors({ authors }: HomeTopAuthorsProps) {
         title="全期高频发言者"
       />
       <PanelBody className="pb-4">
-        <ul className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2" id={listId}>
+        <ul className="grid gap-x-6 gap-y-2.5" id={listId}>
           {visible.map(author => (
-            <HomeMeterRow
+            <MeterRow
               count={formatInteger(author.messages)}
               key={author.author}
               label={author.author}

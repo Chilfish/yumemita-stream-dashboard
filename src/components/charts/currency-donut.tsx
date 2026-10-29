@@ -34,7 +34,7 @@ export function CurrencyDonut({ rows }: CurrencyDonutProps) {
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <ChartCanvas ariaLabel="SC 笔数的币种构成" className="shrink-0" height={220}>
+      <ChartCanvas ariaLabel="SC 笔数的币种构成" className="w-[220px] shrink-0" height={220}>
         {({ width }) => {
           const outerRadius = Math.min(84, Math.max(48, width / 2 - 8));
           const innerRadius = outerRadius * 0.62;

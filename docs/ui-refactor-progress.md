@@ -1,7 +1,7 @@
 # UI 重构实施进度
 
 > 方案见 [ui-refactor.md](ui-refactor.md)。本文件只记录**实施状态与文件归属**，避免并行改动互相覆盖。
-> 最近更新：2026-10-28。
+> 最近更新：2026-10-29。
 
 ## 阶段与状态
 
@@ -38,13 +38,23 @@
 | 对象存储数据链路 | 已完成 | `publish:data` / `sync:data` / `validate:data`；datapack 不进 git |
 | 文档同步 | 已完成 | README、roadmap、architecture、development |
 
+## P7 首页降噪与溢出修复
+
+| 项 | 状态 | 落点 |
+| --- | --- | --- |
+| 横向溢出 | 已完成 | `dataset-layout.tsx`（`SidebarInset` 加 `min-w-0`）；`charts/chart-canvas.tsx`、`charts/calendar-heatmap.tsx` 用 `contain: inline-size` 隔离测量宽度 |
+| 首页层级 | 已完成 | `dashboard/member-home-view.tsx`：页面头 → 规模指标条 → 最近一场 / 本月 / 全期记录 → 最近场次 → 更新日历 |
+| 分析内容下放趋势页 | 已完成 | 典型节奏曲线、全期高频词/发言者移入 `dashboard/trends-view.tsx`；内容构成由「内容类型对比」表覆盖，`home-content-mix.tsx` 删除 |
+| 更新日历默认定位最近 | 已完成 | `charts/calendar-heatmap.tsx` 渲染后滚到右端 |
+| 指标字阶 | 已完成 | `index.css` 新增 `--text-stat`（24/30，600），用于规模指标与最近一场主指标 |
+
 ## 文件归属（同一时刻只允许一个工作流修改）
 
 | 工作流 | 独占文件 |
 | --- | --- |
 | F1 | `src/index.css`、`dashboard/panel.tsx`、`dashboard/metric-strip.tsx`、`dashboard/page-header.tsx`、`dashboard/delta.tsx`、`charts/sparkline.tsx`、`charts/chart-frame.tsx`、`charts/chart-card.tsx`、`lib/chart-colors.ts` |
 | F2 | `lib/routes.ts`、`router.tsx`、`pages/*`、`dashboard/app-sidebar.tsx`、`dashboard/app-header.tsx`、`dashboard/dataset-layout.tsx`、`dashboard/loading-screen.tsx`、`lib/classify.ts`、`lib/aggregate.ts`、`data-sources.json`、`scripts/sync-data.mjs` |
-| L1 | `dashboard/member-home-view.tsx`、`dashboard/home-*.tsx`（新增）、`pages/home-page.tsx` |
+| L1 | `dashboard/member-home-view.tsx`、`dashboard/home-*.tsx`、`dashboard/meter-row.tsx`、`dashboard/top-words.tsx`、`dashboard/top-authors.tsx`、`pages/home-page.tsx` |
 | L2 | `pages/streams-page.tsx`、`lib/table-params.ts`、`lib/table-params.test.ts` |
 | L3 | `dashboard/stream-detail-view.tsx`、`dashboard/stream-*.tsx`（子视图）、`charts/stream-timeline.tsx`、`pages/stream-page.tsx` |
 | L4 | `dashboard/compare-view.tsx`、`dashboard/about-view.tsx`、`charts/` 下的现有图表（除 F1、L3 新增文件） |
@@ -63,7 +73,7 @@
 | --- | --- |
 | 表面 | `bg-card rounded-panel shadow-surface` |
 | 发丝线 | `border-hairline` / `divide-hairline` |
-| 字阶 | `text-display`(28/34) `text-title`(21/28) `text-headline`(16/22) `text-body`(14/21) `text-footnote`(12/17) `text-caption`(11/15) |
+| 字阶 | `text-display`(28/34) `text-stat`(24/30) `text-title`(21/28) `text-headline`(16/22) `text-body`(14/21) `text-footnote`(12/17) `text-caption`(11/15) |
 | 语义色 | `text-member` `bg-member` `text-positive` `text-paid` `text-muted-foreground` |
 | 圆角 | `rounded-panel`(14) `rounded-control`(9) |
 | 数值 | `tabular-nums`，右对齐，单位降一级 |

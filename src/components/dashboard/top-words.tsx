@@ -1,15 +1,15 @@
-import { HomeMeterRow } from "@/components/dashboard/home-meter-row";
+import { MeterRow } from "@/components/dashboard/meter-row";
 import { PanelHead, PanelBody, PanelNote } from "@/components/dashboard/panel";
 import type { AggregatedWord } from "@/lib/aggregate";
 import { formatInteger } from "@/lib/format";
 
 const TOP_WORDS = 8;
 
-interface HomeTopWordsProps {
+interface TopWordsProps {
   words: AggregatedWord[];
 }
 
-export function HomeTopWords({ words }: HomeTopWordsProps) {
+export function TopWords({ words }: TopWordsProps) {
   const visible = words.slice(0, TOP_WORDS);
   const max = visible[0]?.count ?? 1;
 
@@ -19,7 +19,7 @@ export function HomeTopWords({ words }: HomeTopWordsProps) {
       <PanelBody className="flex-1 pb-3">
         <ul className="flex flex-col gap-2.5">
           {visible.map(word => (
-            <HomeMeterRow
+            <MeterRow
               count={formatInteger(word.count)}
               key={word.word}
               label={word.word}

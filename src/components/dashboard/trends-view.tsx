@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
 import { ChartCard } from "@/components/charts/chart-card";
+import { StreamShapeChart } from "@/components/charts/stream-shape";
 import { TrendLine } from "@/components/charts/trend-line";
 import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
 import { PageHeader, type Fact } from "@/components/dashboard/page-header";
 import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/panel";
+import { TopAuthors } from "@/components/dashboard/top-authors";
+import { TopWords } from "@/components/dashboard/top-words";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   buildContentTypeStats,
@@ -286,6 +289,22 @@ export function TrendsView({ rows, totals }: TrendsViewProps) {
         <PanelNote>
           自动分类，仅供参考；未匹配关键词的标题计入「杂谈」。
         </PanelNote>
+      </Panel>
+
+      {totals.streamShape ? (
+        <ChartCard
+          description={`把 ${totals.streamShape.streams} 场按直播进度对齐后平均：纵轴为相对该场自身弹幕浓度的倍数（×1 = 该场均值），阴影为 25–75 分位。`}
+          title="典型节奏曲线"
+        >
+          <StreamShapeChart shape={totals.streamShape} />
+        </ChartCard>
+      ) : null}
+
+      <Panel>
+        <div className="grid grid-cols-1 divide-y divide-hairline lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+          <TopWords words={totals.topWords} />
+          <TopAuthors authors={totals.topAuthors} />
+        </div>
       </Panel>
     </div>
   );

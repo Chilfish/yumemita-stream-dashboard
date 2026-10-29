@@ -20,6 +20,10 @@
     --text-title--line-height: 1.75rem;
     --text-title--letter-spacing: -0.015em;
     --text-title--font-weight: 600;
+    --text-stat: 1.5rem;
+    --text-stat--line-height: 1.875rem;
+    --text-stat--letter-spacing: -0.02em;
+    --text-stat--font-weight: 600;
     --text-headline: 1rem;
     --text-headline--line-height: 1.375rem;
     --text-headline--letter-spacing: -0.01em;
