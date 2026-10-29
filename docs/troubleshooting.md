@@ -37,6 +37,18 @@ bun run validate:data -- --remote  # 逐条 HEAD 确认可达
 - **没有评论**：评论区显示空状态；`comments` 可能为 `null`。
 - **词频/发言者为空**：datapack 的 `topWords` / `topAuthors` 是 Top 截断列表，场次太短可能不足阈值。
 
+## 更新日历是空的
+
+- manifest 里 `date` / `startedAt` 缺失的场次不会进日历。
+- 日历按 **JST 自然日**聚合：同一天多场只算一格；切到「场次」指标时显示 1–2 是正常的。
+- 热力图在窄屏横向滚动，需要左右滑动才能看到更早的月份。
+
+## CI 报缺少 VITE_DATAPACK_BASE
+
+- 在 GitHub 仓库 **Settings → Secrets and variables → Actions → Variables** 添加 `VITE_DATAPACK_BASE`，值为公开数据根地址。
+- 本地跑 CI 时用 `.env` 或 shell 环境变量；如果对象存储在桶内前缀下，地址要带同一前缀（例如 `https://example.com/stream-dashboard`）。
+- 地址变更后重新构建，`VITE_DATAPACK_BASE` 会在构建时内联进产物。
+
 ## 数字看起来不对
 
 先确认口径（见 [data-model.md](data-model.md)）：

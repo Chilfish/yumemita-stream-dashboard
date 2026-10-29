@@ -3,10 +3,12 @@ import type { StreamDatapack } from "@/types/datapack";
 import type { StreamSummary } from "@/types/dataset";
 import {
   aggregateDataset,
+  buildCalendarDays,
   buildMonthlySeries,
   buildStreamRows,
   buildStreamShape,
   buildSummaryRows,
+  calendarMetricValue,
   currencyRows,
   findStreamRow,
   findStreamSummary,
@@ -385,6 +387,63 @@ describe("buildMonthlySeries", () => {
   it("skips rows without a usable start date", () => {
     const rows = [makeSummary({ startedAt: null, videoId: "a", durationSec: 60 })];
     expect(buildMonthlySeries(rows)).toEqual([]);
+  });
+});
+
+describe("buildCalendarDays", () => {
+  it("merges streams on the same JST date", () => {
+    const rows = [
+      makeSummary({
+        startedAt: "2026-10-01T20:00:00+09:00",
+        videoId: "a",
+        durationSec: 600,
+        chatTotal: 100,
+        superchats: 2,
+      }),
+      makeSummary({
+        startedAt: "2026-10-01T23:00:00+09:00",
+        videoId: "b",
+        durationSec: 1200,
+        chatTotal: 50,
+        superchats: 1,
+      }),
+      makeSummary({
+        startedAt: "2026-10-03T20:00:00+09:00",
+        videoId: "c",
+        durationSec: 600,
+        chatTotal: 30,
+      }),
+    ];
+
+    const days = buildCalendarDays(rows);
+    expect(days.map(day => day.date)).toEqual(["2026-10-01", "2026-10-03"]);
+    expect(days[0]).toEqual({
+      date: "2026-10-01",
+      streams: 2,
+      chat: 150,
+      superchats: 3,
+      durationSec: 1800,
+    });
+    expect(calendarMetricValue(days[0]!, "streams")).toBe(2);
+    expect(calendarMetricValue(days[0]!, "chat")).toBe(150);
+    expect(calendarMetricValue(days[0]!, "superchats")).toBe(3);
+  });
+
+  it("falls back to startedAt when date is empty", () => {
+    const rows = [
+      makeSummary({
+        startedAt: "2026-09-12T20:00:00+09:00",
+        videoId: "a",
+        durationSec: 60,
+        date: "",
+      }),
+    ];
+    expect(buildCalendarDays(rows).map(day => day.date)).toEqual(["2026-09-12"]);
+  });
+
+  it("skips rows without a usable date", () => {
+    const rows = [makeSummary({ startedAt: null, videoId: "a", durationSec: 60, date: "" })];
+    expect(buildCalendarDays(rows)).toEqual([]);
   });
 });
 

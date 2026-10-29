@@ -4,7 +4,7 @@
 
 - **Bun ≥ 1.4**（推荐，仓库带 `bun.lock`）
 - Node.js ≥ 22.22（React Router v8 / Vite 工具链需要）
-- 不需要后端、数据库或环境变量
+- 不需要后端或数据库；连对象存储时在 `.env` 填 `VITE_DATAPACK_BASE`（留空则走本地 `data/`）
 
 ```bash
 bun install
@@ -150,6 +150,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 | `sparkline.tsx` | 迷你曲线 / 面积，供首页与行内复用 |
 | `stream-timeline.tsx` | 单场双轨时间轴：弹幕面积 + SC 刻度 + 悬停读数 |
 | `chart-frame.tsx` | 无卡片图表容器：标题 + 口径 + 动作 |
+| `calendar-heatmap.tsx` | 按日热力图：场次 / 弹幕 / SC，横向滚动 + 原生 tooltip |
 
 ## 加一个路由页面
 
@@ -187,7 +188,7 @@ bun run test:watch
 
 - `tsc -b` 使用 project references：`tsconfig.app.json`（src）+ `tsconfig.node.json`（vite.config）。
 - TypeScript 7 已移除 `baseUrl`；路径别名只写在 `paths`，相对于 tsconfig 解析。
-- 构建产物：`dist/`；数据在 `dist/data/`。
+- 构建产物：`dist/`；`dist/data/` 只含 `index.json`、`manifest.json`、`insights.json`，datapack 由浏览器向对象存储请求。
 - 当前主包约 349 KB（gzip ~112 KB），主要来自 D3 + Base UI；视图已按路由 `lazy()` 拆包。
 
 ## 提交前

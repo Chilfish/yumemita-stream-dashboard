@@ -29,6 +29,14 @@
 | 200% 缩放复核 | 待手动验证 | — |
 | 数据入场动画 | 不做 | 设计明确禁止数字/柱子入场动画 |
 
+## P6 后续迭代
+
+| 项 | 状态 | 落点 |
+| --- | --- | --- |
+| 更新日历（场次 / 弹幕 / SC 热力图） | 已完成 | `charts/calendar-heatmap.tsx`、`dashboard/home-calendar.tsx`、`lib/aggregate.ts` |
+| 对象存储数据链路 | 已完成 | `publish:data` / `sync:data` / `validate:data`；datapack 不进 git |
+| 文档同步 | 已完成 | README、roadmap、architecture、development |
+
 ## 文件归属（同一时刻只允许一个工作流修改）
 
 | 工作流 | 独占文件 |
@@ -42,6 +50,7 @@
 | P5-a 移动端 | `dashboard/mobile-tab-bar.tsx`、`dashboard/member-sheet.tsx` |
 | P5-b 搜索 | `dashboard/command-palette.tsx`、`lib/keyboard.ts`、`lib/keyboard.test.ts`、`hooks/use-keyboard-shortcuts.ts` |
 | P5-c 表格 | `dashboard/data-table.tsx`、`dashboard/streams-view.tsx`、`dashboard/streams-toolbar.tsx` |
+| P6 日历 | `charts/calendar-heatmap.tsx`、`dashboard/home-calendar.tsx`、`lib/aggregate.ts`、`lib/aggregate.test.ts` |
 
 > P5 完成后，`data-table.tsx` 回到 F1，`streams-view.tsx` / `streams-toolbar.tsx` 回到 L2。
 
@@ -100,7 +109,7 @@
 ## 验证
 
 ```bash
-bun run check        # typecheck + 72 个单测 + lint
+bun run check        # typecheck + 75 个单测 + lint
 bun run build        # sync:data + tsc -b + vite build
 bun run test:smoke   # 需先启动 dev/preview
 ```
@@ -108,7 +117,7 @@ bun run test:smoke   # 需先启动 dev/preview
 当前基线（2026-10-28）：
 
 - `bun run typecheck`：通过。
-- `bun run test`：6 个文件 / 72 个用例通过。
+- `bun run test`：6 个文件 / 75 个用例通过。
 - `bun run lint`：0 warning / 0 error。
 - `bun run build`：通过，主包约 349 KB（gzip ~112 KB）。
 - `bun run test:smoke`：5/5 场景通过（首页重定向、单场深链、无效 id、对比深链、前进后退）。
@@ -117,6 +126,7 @@ bun run test:smoke   # 需先启动 dev/preview
   - 场次表横向滚动 260px 时首列位移 0（吸附生效）；
   - 筛选 Sheet 与成员 Sheet 均可打开；
   - `⌘K` 命令面板可打开、可过滤场次；
+  - 更新日历渲染 1085 个日期格，覆盖 258 个直播日；场次 / 弹幕 / SC 切换会更新读数；
   - 页面无 console error，320px 下页面横向溢出为 0。
 
 ## 已知取舍
@@ -128,4 +138,4 @@ bun run test:smoke   # 需先启动 dev/preview
 - `⌘K` 命令面板是全局搜索，输入框内也生效；`⌘B` 由 coss `SidebarProvider` 提供。
 - 场次表在窄屏保留横向滚动，首列（日期）吸附；不做卡片化。
 - `<md` 的类型筛选与“仅有 VSTATS”收进底部 Sheet，桌面布局不变。
-- 数据规模以 `data/nonoka/manifest.json` 为准；本页不写死场次数，避免抓取推进后文档过期。
+- 数据规模以对象存储上的 `manifest.json` 为准；本页不写死场次数，避免抓取推进后文档过期。

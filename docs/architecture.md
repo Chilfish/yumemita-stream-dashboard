@@ -145,6 +145,7 @@ src/components/dashboard/
   data-table.tsx      列定义驱动的表格（排序、吸附首列、行链接）
   member-home-view.tsx  L1 成员首页
   home-latest-stream.tsx / home-month-panel.tsx / home-recent-streams.tsx
+  home-calendar.tsx    更新日历：按日热力图 + 场次 / 弹幕 / SC 指标切换
   home-content-mix.tsx / home-meter-row.tsx / home-top-words.tsx / home-top-authors.tsx
   streams-view.tsx    L2 场次页（表格 + 工具条）
   streams-toolbar.tsx 搜索、类型筛选、仅有 VSTATS、导出 CSV、移动端筛选 Sheet
@@ -176,6 +177,7 @@ src/components/charts/
   chart-frame.tsx     无卡片图表容器（标题 + 口径 + 动作）
   axis.tsx            网格线 / 刻度 / 轴标题
   sparkline.tsx       迷你曲线 / 面积，供首页与行内复用
+  calendar-heatmap.tsx 按日热力图（场次 / 弹幕 / SC）
   stream-bars.tsx     每场平均/最大同接
   chat-density.tsx    逐分钟弹幕 + SC 条 + hover
   ten-minute-bars.tsx 每 10 分钟分布

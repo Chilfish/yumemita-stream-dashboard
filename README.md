@@ -14,18 +14,18 @@
 
 ![单场](docs/assets/stream.png)
 
-> 截图来自本地 48 场数据；右上角可切换深浅色主题。
+> 截图为早期 48 场快照；当前数据集 262 场。右上角可切换深浅色主题。
 
 ## 功能
 
-- **总览**：月度 KPI、典型节奏曲线（全部场次按进度对齐）、每场平均/最大同接、SC 币种构成、弹幕浓度 × 同接散点、全月高频词/发言者、最近场次。
-- **单场**：逐分钟弹幕曲线（含 SC 标记）、每 10 分钟分布、SC 全表、Top 词/发言者、徽章、评论区。
-- **对比**：最多选 4 场，逐分钟弹幕叠加对比 + 指标横表（最高值高亮）。
-- **数据表**：可搜索、排序、筛选（仅有 VSTATS）、导出 CSV。
+- **成员首页**：最近一场、本月变化、最近场次、更新日历（按日看场次 / 弹幕 / SC 热度）、内容构成、全期高频词与发言者、典型节奏曲线。
+- **场次页**：完整表格、搜索、内容类型筛选、仅有 VSTATS、排序、导出 CSV；筛选与排序写进 URL。
+- **单场详情**：概览 / 时间轴 / 弹幕与词 / 付费 / 评论五个子视图；子视图可深链。
+- **对比**：最多选 4 场，逐分钟弹幕叠加对比 + 指标横表（最高值加粗）。
 - **说明**：数据口径、已知限制、更新方式。
-- **导航**：侧边栏 + hash 路由；单场/对比有独立 URL，可刷新、分享、前进后退。
-- 视图按路由懒加载；切换数据集时停留在当前页面。
-- 深色/浅色主题、响应式布局、多数据集切换（为后续成员预留）。
+- **导航**：侧边栏 + 移动端底部标签栏；单场/对比/子视图有独立 URL，可刷新、分享、前进后退。
+- **效率**：`j` / `k` 翻场、`1`–`5` 切页、`/` 搜索、`⌘K` 全局搜索场次与成员。
+- 深色/浅色主题、响应式布局、多成员数据结构（当前接入 1 位）。
 
 ## 快速开始
 
@@ -135,15 +135,16 @@ stream-dashboard/
 
 ### 加一场直播
 
-1. 把 `<videoId>.datapack.json` 放进 `data/<dataset>/`。
-2. 更新 `data/<dataset>/manifest.json` 的 `streams` 数组、`count`、`generatedAt`。
-3. `bun run sync:data && bun run validate:data`。
+1. `bun run add:datapack nonoka /path/to/<videoId>.datapack.json`：写入本地暂存区并 upsert manifest。
+2. `bun run publish:data`：由 pack 重建 manifest + insights，并上传对象存储。
+3. `bun run sync:data && bun run validate:data`：本地校验。
 
 ### 加一位成员
 
-1. 新建 `data/<id>/`，放入 `manifest.json` 和 datapack。
+1. 新建 `data/<id>/`，放入该成员的 `<videoId>.datapack.json`。
 2. 在 `data-sources.json` 增加一条 dataset。
-3. 重新同步；页面会自动出现 dataset 选择器，不需要改组件。
+3. `bun run publish:data --dataset <id>` 生成索引并上传；再 `sync:data`。
+4. 页面会自动出现成员入口，不需要改组件。
 
 详细步骤与字段说明见 [docs/adding-data.md](docs/adding-data.md)。
 

@@ -493,6 +493,55 @@ export function buildMonthlySeries(rows: StreamSummary[], limit = 6): MonthlyPoi
     }));
 }
 
+export type CalendarMetric = "streams" | "chat" | "superchats";
+
+export interface CalendarDay {
+  /** JST 自然日，`YYYY-MM-DD`。 */
+  date: string;
+  streams: number;
+  chat: number;
+  superchats: number;
+  durationSec: number;
+}
+
+/** 按 JST 自然日聚合场次；同一天多场会合并。 */
+export function buildCalendarDays(rows: StreamSummary[]): CalendarDay[] {
+  const byDate = new Map<string, CalendarDay>();
+
+  for (const row of rows) {
+    const candidate = /^\d{4}-\d{2}-\d{2}$/.test(row.date)
+      ? row.date
+      : (row.startedAt?.slice(0, 10) ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate)) continue;
+
+    const day = byDate.get(candidate) ?? {
+      date: candidate,
+      streams: 0,
+      chat: 0,
+      superchats: 0,
+      durationSec: 0,
+    };
+    day.streams += 1;
+    day.chat += row.chatTotal ?? 0;
+    day.superchats += row.superchats ?? 0;
+    day.durationSec += row.durationSec ?? 0;
+    byDate.set(candidate, day);
+  }
+
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function calendarMetricValue(day: CalendarDay, metric: CalendarMetric): number {
+  switch (metric) {
+    case "streams":
+      return day.streams;
+    case "chat":
+      return day.chat;
+    case "superchats":
+      return day.superchats;
+  }
+}
+
 /** 环比变化（%）；任一值为空或分母为 0 时返回 null。 */
 export function percentChange(
   current: number | null | undefined,

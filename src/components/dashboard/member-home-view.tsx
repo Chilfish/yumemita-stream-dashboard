@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { ChartCard } from "@/components/charts/chart-card";
 import { StreamShapeChart } from "@/components/charts/stream-shape";
 import { CopyLinkButton } from "@/components/dashboard/copy-link-button";
+import { HomeCalendar } from "@/components/dashboard/home-calendar";
 import { HomeContentMix } from "@/components/dashboard/home-content-mix";
 import { HomeLatestStream } from "@/components/dashboard/home-latest-stream";
 import { HomeMonthPanel } from "@/components/dashboard/home-month-panel";
@@ -92,6 +93,8 @@ export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeVi
       ) : null}
 
       <HomeRecentStreams datasetId={dataset.id} rows={rows} />
+
+      <HomeCalendar rows={rows} />
 
       <Panel>
         <div className="grid grid-cols-1 divide-y divide-hairline lg:grid-cols-2 lg:divide-x lg:divide-y-0">
