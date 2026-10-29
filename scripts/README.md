@@ -66,6 +66,8 @@ bun scripts/fetch-streams.ts --dataset nonoka --root .\temp\youtube-live
 | `--ids <文件>` | 直接读视频 ID 列表（每行一个），跳过频道列表抓取 |
 | `--dry-run` | 只列出候选 |
 | `--no-build` | 只抓素材 |
+| `--restore` | 从对象存储恢复 manifest 与缺失的 datapack；本地没有 manifest 时默认开启 |
+| `--no-restore` | 关闭自动恢复 |
 
 监控：
 
@@ -74,10 +76,22 @@ Get-Content -Wait "<root>/.fetch-state/fetch.log"
 Get-Content "<root>/.fetch-state/fetch-progress.json"
 ```
 
-- 已入库（manifest 里有的 videoId）直接跳过；已有 meta/jsonl/comments 也不会重抓。
+- 已入库（manifest 或 `data/<id>/*.datapack.json` 里有的 videoId）直接跳过；已有 meta/jsonl/comments 也不会重抓。
 - 未来场（`will begin in …`）记作「跳过」，不计失败、不阻塞后续场次。
 - 同名短摘要/预告会让位正片；会员限定场次需要已登录的 Firefox cookie，或 `--cookies <jar>`。
 - 频道 `/streams` 偶发 SSL 错误时会回退到 `<state-dir>/channel-ids.txt`；也可以用 `--ids`。
+
+### 换设备 / 新环境
+
+跳过判定依赖本地 `data/<id>/`，所以空环境直接续跑会把整个频道重抓一遍。脚本在本地没有
+manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` 可关闭）：
+
+1. 按 `DATAPACK_BASE` / `VITE_DATAPACK_BASE` 的公开地址拉 `manifest.json`；
+2. 拉不到的 pack 再从 `R2_*` 凭据读（需要 `R2_BUCKET`，可选 `R2_PREFIX`）；
+3. 只下载本地缺失的 pack，已存在的不重复下载。
+
+恢复后再按正常的「已入库 + 已有素材」逻辑跳过。公开地址要带桶内前缀，例如
+`https://s3.example.com/stream-dashboard`。
 
 ## 抓取侧（不在本仓库）
 

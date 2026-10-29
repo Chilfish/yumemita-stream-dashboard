@@ -26,6 +26,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat } from './lib/live-chat.ts'
+import { restoreDataset } from './lib/restore-datapacks.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
@@ -83,6 +84,8 @@ const OPTIONS = {
   'cookies-from-browser': { type: 'string', default: 'firefox' },
   'dry-run': { type: 'boolean' },
   'no-build': { type: 'boolean' },
+  restore: { type: 'boolean' },
+  'no-restore': { type: 'boolean' },
   ids: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
 } as const
@@ -104,8 +107,13 @@ const USAGE = `用法：bun scripts/fetch-streams.ts --dataset <id> --root <会�
   --cookies-from-browser <b> 默认 firefox
   --dry-run                  只列出候选，不抓取
   --no-build                 只抓素材，不生成 datapack
+  --restore                  从对象存储恢复 manifest 与缺失的 datapack 后再规划
+  --no-restore               不自动恢复（本地没有 manifest 时也不拉远端）
   --ids <文件>               直接读视频 ID 列表（每行一个），跳过频道列表抓取
-  -h, --help                 显示本帮助`
+  -h, --help                 显示本帮助
+
+恢复：本地没有 manifest 时默认自动执行，已存在的 pack 不会重复下载。
+远端来源按顺序尝试 DATAPACK_BASE / VITE_DATAPACK_BASE，再试 R2_*。`
 
 function logFile(path: string, message: string): void {
   const line = `[${new Date().toISOString()}] ${message}`
@@ -176,7 +184,30 @@ function isValidInfoJson(path: string, videoId: string): boolean {
   }
 }
 
-function main(): void {
+const PACK_SUFFIX = '.datapack.json'
+
+function localPackIds(dir: string): Set<string> {
+  const ids = new Set<string>()
+  if (!existsSync(dir))
+    return ids
+  for (const name of readdirSync(dir)) {
+    if (name.endsWith(PACK_SUFFIX))
+      ids.add(name.slice(0, -PACK_SUFFIX.length))
+  }
+  return ids
+}
+
+function readLocalPackMeta(path: string): { title: string, durationSec: number | null } | null {
+  try {
+    const pack = readJson<{ video?: { title?: string, durationSec?: number } }>(path)
+    return { title: pack.video?.title ?? '', durationSec: pack.video?.durationSec ?? null }
+  }
+  catch {
+    return null
+  }
+}
+
+async function main(): Promise<void> {
   const { values } = parseArgs({ options: OPTIONS, args: process.argv.slice(2), allowPositionals: true })
   if (values.help) {
     console.log(USAGE)
@@ -200,8 +231,7 @@ function main(): void {
   }
 
   const manifestPath = resolve(APP_ROOT, dataset.manifest)
-  if (!existsSync(manifestPath))
-    console.warn(`[fetch-streams] 还没有 manifest（${dataset.manifest}），按空索引开始`)
+  const datapackDir = resolve(APP_ROOT, dataset.datapackDir)
 
   const root = resolve(values.root ?? process.env.STREAM_SESSION_ROOT ?? join(APP_ROOT, 'temp', 'youtube-live'))
   const dataRoot = join(APP_ROOT, 'data')
@@ -234,13 +264,50 @@ function main(): void {
   const ytdlpBase = ['--no-warnings', '--socket-timeout', '30', '--retries', '3']
   const startedAt = new Date().toISOString()
 
+  // 换设备 / 丢缓存时先拉回远端的 manifest 与 pack；本地已有 manifest 时不自动跑，
+  // 避免每次抓取都多一次网络请求（要强制刷新用 --restore）。
+  const shouldRestore = Boolean(values.restore) || (!values['no-restore'] && !existsSync(manifestPath))
+  const restoreFailed = new Set<string>()
+  if (shouldRestore) {
+    try {
+      logFile(logPath, '恢复对象存储里的 manifest / datapack…')
+      const result = await restoreDataset({ datasetId: dataset.id, datapackDir, manifestPath })
+      for (const id of result.failed)
+        restoreFailed.add(id)
+      if (result.sources.length === 0) {
+        logFile(logPath, '恢复跳过：没有配置 DATAPACK_BASE / VITE_DATAPACK_BASE，也没有 R2_* 凭据')
+      }
+      else {
+        const failedNote = result.failed.length > 0 ? `，失败 ${result.failed.length}` : ''
+        logFile(logPath, `恢复完成（${result.sources.join(' / ')}）：manifest ${result.manifest}，本次补 ${result.restored} 份，本地共 ${result.present} 份${failedNote}`)
+      }
+    }
+    catch (error) {
+      logFile(logPath, `恢复失败，按本地数据继续：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  if (!existsSync(manifestPath))
+    console.warn(`[fetch-streams] 还没有 manifest（${dataset.manifest}），按空索引开始`)
+
   const manifest: { streams?: StreamSummary[] } = existsSync(manifestPath)
     ? readJson<{ streams?: StreamSummary[] }>(manifestPath)
     : { streams: [] }
-  const knownIds = new Set((manifest.streams ?? []).map(stream => stream.videoId))
+  const manifestIds = new Set((manifest.streams ?? []).map(stream => stream.videoId))
+  const localIds = localPackIds(datapackDir)
+  const knownIds = new Set([...manifestIds, ...localIds])
+  for (const id of restoreFailed)
+    knownIds.delete(id)
   const knownByTitle = new Map<string, number>()
   for (const stream of manifest.streams ?? []) {
     knownByTitle.set(stream.title, Math.max(knownByTitle.get(stream.title) ?? 0, stream.durationSec ?? 0))
+  }
+  // manifest 缺失/过期时，用本地 pack 补上同名去重需要的标题与时长。
+  for (const id of localIds) {
+    if (manifestIds.has(id))
+      continue
+    const meta = readLocalPackMeta(join(datapackDir, `${id}${PACK_SUFFIX}`))
+    if (meta?.title)
+      knownByTitle.set(meta.title, Math.max(knownByTitle.get(meta.title) ?? 0, meta.durationSec ?? 0))
   }
 
   const progress: Record<string, unknown> = {
@@ -596,4 +663,4 @@ function main(): void {
   })
 }
 
-main()
+await main()
