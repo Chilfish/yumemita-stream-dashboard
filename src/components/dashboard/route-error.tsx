@@ -57,13 +57,13 @@ export function RouteError() {
           </span>
 
           <div className="flex flex-col gap-1.5">
-            <p className="font-heading font-semibold text-base">页面出错了</p>
-            <p className="text-muted-foreground text-sm">
+            <p className="font-heading font-semibold text-headline">页面出错了</p>
+            <p className="text-body text-muted-foreground">
               页面渲染时遇到问题，可以重试一次，或者回到总览继续浏览。
             </p>
           </div>
 
-          <p className="max-h-32 w-full overflow-auto break-words rounded-lg border bg-muted/48 px-3 py-2 text-left font-mono text-muted-foreground text-xs">
+          <p className="max-h-32 w-full overflow-auto break-words rounded-lg border bg-muted/48 px-3 py-2 text-left font-mono text-footnote text-muted-foreground">
             {detail}
           </p>
 
@@ -78,8 +78,8 @@ export function RouteError() {
 
           {import.meta.env.DEV && stack ? (
             <details className="w-full text-left">
-              <summary className="cursor-pointer text-muted-foreground text-xs">错误详情</summary>
-              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted/48 p-3 font-mono text-[11px] leading-relaxed">
+              <summary className="cursor-pointer text-caption text-muted-foreground">错误详情</summary>
+              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted/48 p-3 font-mono text-caption leading-relaxed">
                 {stack}
               </pre>
             </details>

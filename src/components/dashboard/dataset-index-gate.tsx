@@ -21,7 +21,7 @@ export function DatasetIndexGate() {
           <AlertTitle>数据加载失败</AlertTitle>
           <AlertDescription>{error ?? "找不到 dataset 索引"}</AlertDescription>
         </Alert>
-        <p className="mt-3 text-muted-foreground text-xs">
+        <p className="mt-3 text-footnote text-muted-foreground">
           先运行 <code>bun run sync:data</code>，确认 <code>public/data/index.json</code> 存在。
         </p>
         <Button className="mt-4" onClick={() => window.location.reload()} type="button">

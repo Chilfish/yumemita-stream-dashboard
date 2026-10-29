@@ -2,6 +2,7 @@ import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
 import { useId } from "react";
 import { AreaGradient, TickText, YAxis } from "@/components/charts/axis";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import { EmptyChart } from "@/components/charts/chart-card";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatCompact } from "@/lib/format";
@@ -47,9 +48,13 @@ export function TrendLine({
   const maxValue = Math.max(1, max(numeric) ?? 1);
 
   return (
-    <ChartCanvas ariaLabel={ariaLabel} height={height}>
-      {({ width, height: canvasHeight }) => {
-        const margin = { top: 16, right: 20, bottom: 30, left: 46 };
+    <ChartCanvas
+      ariaLabel={ariaLabel}
+      height={height}
+      minWidth={minWidthForPoints(points.length, 22)}
+    >
+      {({ compact, width, height: canvasHeight }) => {
+        const margin = resolveMargin({ top: 16, right: 20, bottom: 30, left: 46 }, compact);
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, canvasHeight - margin.top - margin.bottom);
         const x = (index: number) =>
@@ -69,13 +74,16 @@ export function TrendLine({
           .y1(value => y(value ?? 0))
           .curve(curveMonotoneX)(values);
 
-        const tickStep = Math.max(1, Math.ceil(points.length / 8));
-        const tickIndices: number[] = [];
-        for (let index = 0; index < points.length; index += tickStep) {
-          tickIndices.push(index);
-        }
+        // 刻度数量跟着绘图区宽度走，并在首尾之间均匀取点：窄屏少放几个月，标签不叠字。
         const lastIndex = points.length - 1;
-        if (tickIndices.at(-1) !== lastIndex) tickIndices.push(lastIndex);
+        const labelCount = Math.min(points.length, Math.max(2, Math.floor(innerWidth / 64)));
+        const tickIndices = [
+          ...new Set(
+            Array.from({ length: labelCount }, (_, step) =>
+              Math.round((step / Math.max(1, labelCount - 1)) * lastIndex),
+            ),
+          ),
+        ];
 
         return (
           <g transform={`translate(${margin.left},${margin.top})`}>

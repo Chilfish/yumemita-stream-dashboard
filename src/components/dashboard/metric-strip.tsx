@@ -39,7 +39,7 @@ export function MetricStrip({ items, columns = 6, className, highlight }: Metric
             <p
               className={cn(
                 "flex items-baseline font-semibold tabular-nums",
-                emphasized ? "text-title" : "text-[18px] leading-[22px]",
+                emphasized ? "text-title" : "text-stat-sm",
               )}
             >
               <span className="min-w-0 truncate">{item.value}</span>

@@ -55,7 +55,7 @@ export function StreamPaidPanel({ row }: StreamPaidPanelProps) {
                   {currencyLabel(currency)}{" "}
                   <span className="tabular-nums">· {formatInteger(total.count)} 笔</span>
                 </dt>
-                <dd className="font-semibold text-[18px] text-paid tabular-nums leading-[22px]">
+                <dd className="font-semibold text-paid text-stat-sm tabular-nums">
                   {formatCurrency(currency, total.amount)}
                 </dd>
               </div>
@@ -79,7 +79,7 @@ export function StreamPaidPanel({ row }: StreamPaidPanelProps) {
             meta={`共 ${formatInteger(superchats.length)} 笔；时间 / 作者 / 金额 / 留言，金额不换算汇率。`}
             title="SC 明细"
           >
-            <ScrollArea className="h-[520px]">
+            <ScrollArea className="h-[min(62dvh,32.5rem)]">
               <Table aria-label="SC 明细">
                 <TableHeader>
                   <TableRow>
@@ -104,7 +104,7 @@ export function StreamPaidPanel({ row }: StreamPaidPanelProps) {
                       <TableCell className="text-right text-footnote font-semibold text-paid tabular-nums">
                         {superchat.amountText}
                       </TableCell>
-                      <TableCell className="max-w-[520px] whitespace-normal text-footnote leading-relaxed">
+                      <TableCell className="max-w-[32.5rem] whitespace-normal text-footnote leading-relaxed">
                         {superchat.message || (
                           <span className="text-ink-3">（无留言）</span>
                         )}

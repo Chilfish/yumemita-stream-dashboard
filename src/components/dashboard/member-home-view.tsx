@@ -32,6 +32,9 @@ interface HeadlineStat {
   unit?: string;
 }
 
+/** 手机首屏只放得下四条次级事实，其余从 md 起展开。 */
+const MOBILE_NOTE_COUNT = 4;
+
 /** 全站规模：四个最大的数字，先给尺度，再给细节。 */
 function HeadlineStats({ items }: { items: HeadlineStat[] }) {
   return (
@@ -108,7 +111,12 @@ export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeVi
           eyebrow={range ?? "活动范围"}
           title={dataset.label}
         >
-          {notes.join(" · ")}
+          {notes.slice(0, MOBILE_NOTE_COUNT).join(" · ")}
+          {/* 手机上只留规模四项，其余事实在桌面展开；信息仍在页面上，只是不占首屏。 */}
+          <span className="hidden md:inline">
+            {" · "}
+            {notes.slice(MOBILE_NOTE_COUNT).join(" · ")}
+          </span>
         </PageHeader>
 
         <HeadlineStats items={headline} />

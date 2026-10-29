@@ -2,6 +2,7 @@ import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
 import { useId, useState } from "react";
 import type { PointerEvent } from "react";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import {
   AreaGradient,
   AxisLabel,
@@ -86,9 +87,17 @@ export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }
 
   return (
     <div className="flex flex-col gap-3">
-      <ChartCanvas ariaLabel={ariaLabel} height={300}>
-      {({ width, height }) => {
-        const margin = { top: 20, right: direct ? 92 : 20, bottom: 40, left: 44 };
+      <ChartCanvas
+        ariaLabel={ariaLabel}
+        height={300}
+        minWidth={minWidthForPoints(maxMinutes + 1, 7)}
+      >
+      {({ compact, width, height }) => {
+        const margin = resolveMargin(
+          { top: 20, right: direct ? 92 : 20, bottom: 40, left: 44 },
+          compact,
+        );
+        const readoutWidth = compact ? 108 : 132;
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const x = scaleLinear().domain([0, Math.max(1, maxMinutes)]).range([0, innerWidth]);
@@ -238,8 +247,8 @@ export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }
                       value: formatCompact(value),
                     })),
                   ]}
-                  width={132}
-                  x={clamp(x(hover) + 12, 0, innerWidth - 132)}
+                  width={readoutWidth}
+                  x={clamp(x(hover) + 12, 0, innerWidth - readoutWidth)}
                   y={0}
                 />
               </g>
@@ -252,7 +261,8 @@ export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }
               onPointerDown={event => setHover(pointerHoverIndex(event, x, maxMinutes + 1))}
               onPointerLeave={() => setHover(null)}
               onPointerMove={event => setHover(pointerHoverIndex(event, x, maxMinutes + 1))}
-              style={{ touchAction: "pan-y" }}
+              // 窄屏图表可横向滚动：让浏览器接管双指/横滑，点按仍能出读数。
+              style={{ touchAction: "pan-x pan-y" }}
               width={innerWidth}
               x={0}
               y={0}

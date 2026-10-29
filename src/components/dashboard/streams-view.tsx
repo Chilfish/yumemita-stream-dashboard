@@ -2,6 +2,7 @@ import { RotateCcw } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
 import { PageHeader, type Fact } from "@/components/dashboard/page-header";
+import { StreamList } from "@/components/dashboard/stream-list";
 import { StreamsToolbar } from "@/components/dashboard/streams-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -317,31 +318,37 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
             </Button>
           </div>
         ) : (
-          <div
-            className={cn(
-              "rounded-panel bg-card shadow-surface",
-              // coss Table 把 <table> 包在 overflow-x-auto 的容器里且没有高度上限，
-              // 直接 sticky 无效。这里把该容器变成有界滚动视口（桌面），
-              // 并把吸顶偏移从 top-14 归零，让表头真正贴住滚动区域顶部。
-              "lg:[&>[data-slot=table-container]]:max-h-[calc(100dvh-13rem)] lg:[&>[data-slot=table-container]]:overflow-auto",
-              "[&>[data-slot=table-container]]:rounded-panel",
-              "[&_thead_th]:top-0 [&_thead_th]:h-8 [&_thead_th]:border-b [&_thead_th]:border-hairline",
-            )}
-          >
-            <DataTable
-              ariaLabel="场次列表"
-              className="min-w-[1080px]"
-              columns={columns}
-              onSort={handleSort}
-              rowHref={row => streamPath(datasetId, row.videoId)}
-              rowKey={row => row.videoId}
-              rowLabel={row => `打开 ${row.title}`}
-              rows={visible}
-              sort={{ key: sort, dir }}
-              stickyFirstColumn
-              stickyHeader
-            />
-          </div>
+          <>
+            <div className="overflow-hidden rounded-panel bg-card shadow-surface md:hidden">
+              <StreamList datasetId={datasetId} empty="没有匹配的场次" rows={visible} />
+            </div>
+
+            <div
+              className={cn(
+                "hidden rounded-panel bg-card shadow-surface md:block",
+                // coss Table 把 <table> 包在 overflow-x-auto 的容器里且没有高度上限，
+                // 直接 sticky 无效。这里把该容器变成有界滚动视口（桌面），
+                // 并把吸顶偏移从 top-14 归零，让表头真正贴住滚动区域顶部。
+                "lg:[&>[data-slot=table-container]]:max-h-[calc(100dvh-13rem)] lg:[&>[data-slot=table-container]]:overflow-auto",
+                "[&>[data-slot=table-container]]:rounded-panel",
+                "[&_thead_th]:top-0 [&_thead_th]:h-8 [&_thead_th]:border-b [&_thead_th]:border-hairline",
+              )}
+            >
+              <DataTable
+                ariaLabel="场次列表"
+                className="min-w-[67.5rem]"
+                columns={columns}
+                onSort={handleSort}
+                rowHref={row => streamPath(datasetId, row.videoId)}
+                rowKey={row => row.videoId}
+                rowLabel={row => `打开 ${row.title}`}
+                rows={visible}
+                sort={{ key: sort, dir }}
+                stickyFirstColumn
+                stickyHeader
+              />
+            </div>
+          </>
         )}
 
         <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-caption text-ink-3">

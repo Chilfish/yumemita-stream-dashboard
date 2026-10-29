@@ -52,7 +52,7 @@ export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamPr
           <span className="truncate">最近一场 · {formatDate(stream.startedAt)}</span>
         </p>
         <Link
-          className="shrink-0 text-caption text-muted-foreground transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member"
+          className="-my-1 flex min-h-9 shrink-0 items-center text-caption text-muted-foreground transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member"
           to={streamPath(datasetId, stream.videoId)}
         >
           打开单场详情 →

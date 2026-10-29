@@ -1,6 +1,7 @@
 import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
 import { AxisLabel, YAxis } from "@/components/charts/axis";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { resolveMargin } from "@/lib/chart-layout";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatDecimal, formatInteger } from "@/lib/format";
 import type { StreamShape, StreamShapeBucket } from "@/lib/aggregate";
@@ -24,8 +25,8 @@ export function StreamShapeChart({ shape }: StreamShapeChartProps) {
   return (
     <div className="flex flex-col gap-3">
       <ChartCanvas ariaLabel="所有场次按直播进度对齐后的弹幕活跃度曲线" height={280}>
-        {({ width, height }) => {
-          const margin = { top: 16, right: 16, bottom: 34, left: 44 };
+        {({ compact, width, height }) => {
+          const margin = resolveMargin({ top: 16, right: 16, bottom: 34, left: 44 }, compact);
           const innerWidth = Math.max(0, width - margin.left - margin.right);
           const innerHeight = Math.max(0, height - margin.top - margin.bottom);
           const x = scaleLinear().domain([0, 100]).range([0, innerWidth]);
@@ -87,7 +88,7 @@ export function StreamShapeChart({ shape }: StreamShapeChartProps) {
 
               {X_TICKS.map(tick => (
                 <text
-                  className="fill-muted-foreground text-[10px]"
+                  className="fill-muted-foreground text-caption"
                   key={tick}
                   textAnchor="middle"
                   x={x(tick)}
@@ -104,7 +105,7 @@ export function StreamShapeChart({ shape }: StreamShapeChartProps) {
         }}
       </ChartCanvas>
 
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted-foreground">
         <li>虚线 ×1 = 自身均值</li>
         <li>首段 {relativeLabel(shape.headRelative)}</li>
         <li>中段 {relativeLabel(shape.midRelative)}</li>

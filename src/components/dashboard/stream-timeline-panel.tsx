@@ -140,7 +140,7 @@ interface HighlightProps {
 
 function Highlight({ label, main, sub }: HighlightProps) {
   return (
-    <div className="grid grid-cols-[52px_minmax(0,1fr)] gap-3 py-3 first:pt-0 last:pb-0">
+    <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 py-3 first:pt-0 last:pb-0">
       <p className="pt-0.5 text-caption text-ink-3">{label}</p>
       <div className="min-w-0">
         <p className="text-body text-foreground">{main}</p>

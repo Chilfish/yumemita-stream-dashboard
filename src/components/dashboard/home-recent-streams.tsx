@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
 import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/panel";
+import { StreamList } from "@/components/dashboard/stream-list";
 import { CONTENT_TYPE_LABELS, classifyTitle } from "@/lib/classify";
 import { formatDate, formatDuration, formatInteger } from "@/lib/format";
 import { streamsPath, streamPath } from "@/lib/routes";
@@ -74,16 +75,24 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
   return (
     <Panel>
       <PanelHead meta={`最近 ${recent.length} 场，按开播时间倒序`} title="最近场次" />
-      <PanelBody className="px-3 pb-0">
-        <DataTable
-          ariaLabel="最近场次"
-          columns={columns}
+      <PanelBody className="px-0 pb-0 md:px-3">
+        <StreamList
+          className="md:hidden"
+          datasetId={datasetId}
           empty="没有加载到场次"
-          rowHref={row => streamPath(datasetId, row.videoId)}
-          rowKey={row => row.videoId}
-          rowLabel={row => `打开单场：${row.title}`}
           rows={recent}
         />
+        <div className="hidden md:block">
+          <DataTable
+            ariaLabel="最近场次"
+            columns={columns}
+            empty="没有加载到场次"
+            rowHref={row => streamPath(datasetId, row.videoId)}
+            rowKey={row => row.videoId}
+            rowLabel={row => `打开单场：${row.title}`}
+            rows={recent}
+          />
+        </div>
       </PanelBody>
       <PanelNote>
         <Link

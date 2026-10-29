@@ -117,7 +117,7 @@ export function DataTable<T>({
             const href = rowHref?.(row);
 
             return (
-              <TableRow className="h-[33px] border-b-0" key={rowKey(row)}>
+              <TableRow className="h-11 border-b-0 md:h-[2.0625rem]" key={rowKey(row)}>
                 {columns.map((column, columnIndex) => (
                   <TableCell
                     className={cn(

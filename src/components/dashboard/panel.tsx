@@ -22,13 +22,18 @@ interface PanelHeadProps {
 
 export function PanelHead({ eyebrow, title, meta, actions, className }: PanelHeadProps) {
   return (
-    <div className={cn("flex items-start justify-between gap-3 px-5 pb-3 pt-4", className)}>
+    <div
+      className={cn(
+        "flex flex-col gap-2 px-5 pb-3 pt-4 sm:flex-row sm:items-start sm:justify-between sm:gap-x-3",
+        className,
+      )}
+    >
       <div className="min-w-0">
         {eyebrow ? <p className="text-caption text-muted-foreground">{eyebrow}</p> : null}
         <h2 className="text-headline text-foreground">{title}</h2>
         {meta ? <p className="mt-0.5 text-caption text-muted-foreground">{meta}</p> : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-1">{actions}</div> : null}
     </div>
   );
 }

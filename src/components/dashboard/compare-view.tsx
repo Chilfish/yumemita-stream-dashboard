@@ -206,7 +206,7 @@ export function CompareView({
         title="对比"
       />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[18.75rem_minmax(0,1fr)]">
         <Panel className="self-start">
           <PanelHead
             actions={
@@ -221,7 +221,7 @@ export function CompareView({
             title="叠加哪些场次"
           />
           <PanelBody flush>
-            <ScrollArea className="h-64 sm:h-80 xl:h-[540px]">
+            <ScrollArea className="h-64 sm:h-80 xl:h-[33.75rem]">
               <ul className="divide-y divide-hairline">
                 {rows.map(row => {
                   const checked = selectedIds.includes(row.videoId);

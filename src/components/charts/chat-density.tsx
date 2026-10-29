@@ -2,6 +2,7 @@ import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
 import { useId, useState } from "react";
 import type { PointerEvent } from "react";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import {
   AreaGradient,
   AxisLabel,
@@ -52,9 +53,14 @@ export function ChatDensity({ row }: ChatDensityProps) {
   const memberColor = CHART_COLORS[0];
 
   return (
-    <ChartCanvas ariaLabel={`${row.summary.title} 的逐分钟弹幕密度`} height={300}>
-      {({ width, height }) => {
-        const margin = { top: 22, right: 16, bottom: 42, left: 44 };
+    <ChartCanvas
+      ariaLabel={`${row.summary.title} 的逐分钟弹幕密度`}
+      height={300}
+      minWidth={minWidthForPoints(perMinute.length, 7)}
+    >
+      {({ compact, width, height }) => {
+        const margin = resolveMargin({ top: 22, right: 16, bottom: 42, left: 44 }, compact);
+        const readoutWidth = compact ? 96 : 112;
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const scStripHeight = 22;
@@ -187,8 +193,8 @@ export function ChatDensity({ row }: ChatDensityProps) {
                     { label: "弹幕", value: `${formatCompact(hoverMinute)} 条` },
                     { label: "SC", value: `${hoverSc} 笔` },
                   ]}
-                  width={112}
-                  x={clamp(x(hover) + 12, 0, innerWidth - 112)}
+                  width={readoutWidth}
+                  x={clamp(x(hover) + 12, 0, innerWidth - readoutWidth)}
                   y={0}
                 />
               </g>
@@ -201,7 +207,8 @@ export function ChatDensity({ row }: ChatDensityProps) {
               onPointerDown={event => setHover(pointerHoverIndex(event, x, perMinute.length))}
               onPointerLeave={() => setHover(null)}
               onPointerMove={event => setHover(pointerHoverIndex(event, x, perMinute.length))}
-              style={{ touchAction: "pan-y" }}
+              // 窄屏图表可横向滚动：让浏览器接管双指/横滑，点按仍能出读数。
+              style={{ touchAction: "pan-x pan-y" }}
               width={innerWidth}
               x={0}
               y={0}

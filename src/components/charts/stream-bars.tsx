@@ -1,5 +1,6 @@
 import { max, scaleBand, scaleLinear } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import { DirectLabel, TickText, YAxis } from "@/components/charts/axis";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import type { StreamSummary } from "@/types/dataset";
@@ -36,9 +37,13 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
   );
 
   return (
-    <ChartCanvas ariaLabel="每场直播的平均与最大同接" height={300}>
-      {({ width, height }) => {
-        const margin = { top: 30, right: 16, bottom: 32, left: 48 };
+    <ChartCanvas
+      ariaLabel="每场直播的平均与最大同接"
+      height={300}
+      minWidth={minWidthForPoints(sorted.length, 44)}
+    >
+      {({ compact, width, height }) => {
+        const margin = resolveMargin({ top: 30, right: 16, bottom: 32, left: 48 }, compact);
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const x = scaleBand()
@@ -47,7 +52,9 @@ export function StreamBars({ rows, selectedId, onSelect }: StreamBarsProps) {
           .paddingInner(0.3);
         const y = scaleLinear().domain([0, maxValue]).nice().range([innerHeight, 0]);
         const barWidth = Math.max(2, x.bandwidth() / 2 - 1);
-        const labelEvery = Math.max(1, Math.ceil(sorted.length / 6));
+        // 日期刻度按可用宽度决定密度，窄屏只标少数几场。
+        const maxLabels = Math.max(2, Math.floor(innerWidth / 64));
+        const labelEvery = Math.max(1, Math.ceil(sorted.length / maxLabels));
 
         // 直接标注：把两条系列的名字与数值挂在最高的一组柱子上，不再另设图例。
         const peakCenter = (x(peakRow.videoId) ?? 0) + x.bandwidth() / 2;

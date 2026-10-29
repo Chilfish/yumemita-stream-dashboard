@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function LoadingScreen({ label }: { label: string }) {
   return (
-    <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-10 md:px-6">
+    <div className="mx-auto flex w-full max-w-[82.5rem] flex-col gap-6 px-4 py-10 md:px-6">
       <div className="flex flex-col gap-2 border-b border-hairline pb-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-4 w-96 max-w-full" />

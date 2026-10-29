@@ -1,8 +1,17 @@
-import { Download, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowUpDown, Download, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import {
+  Menu,
+  MenuItem,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuTrigger,
+} from "@/components/ui/menu";
 import {
   Sheet,
   SheetDescription,
@@ -15,9 +24,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CONTENT_TYPE_LABELS, CONTENT_TYPES } from "@/lib/classify";
 import {
   DEFAULT_TABLE_PARAMS,
+  TABLE_SORT_KEYS,
   type StreamTypeFilter,
-  isStreamTypeFilter,
   type TableParams,
+  type TableSortKey,
+  isStreamTypeFilter,
+  isTableSortKey,
 } from "@/lib/table-params";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +43,20 @@ const TYPE_FILTER_OPTIONS: { value: StreamTypeFilter; label: string }[] = [
   { value: "all", label: "全部" },
   ...CONTENT_TYPES.map(key => ({ value: key as StreamTypeFilter, label: CONTENT_TYPE_LABELS[key] })),
 ];
+
+const SORT_LABELS: Record<TableSortKey, string> = {
+  date: "日期",
+  duration: "时长",
+  avg: "平均同接",
+  max: "峰值同接",
+  watch: "视聴时间",
+  views: "播放",
+  likes: "点赞",
+  chat: "弹幕",
+  authors: "发言人数",
+  sc: "SC",
+  comments: "评论",
+};
 
 function isDefaultParams(params: TableParams): boolean {
   return (
@@ -100,7 +126,7 @@ export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsTool
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-        <div className="relative min-w-0 flex-1 sm:max-w-64">
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-0 sm:max-w-64">
           <Search
             aria-hidden="true"
             className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-3"
@@ -131,6 +157,39 @@ export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsTool
         </div>
 
         <div className="ms-auto flex shrink-0 items-center gap-1.5">
+          <Menu>
+            <MenuTrigger
+              render={
+                <Button className="md:hidden" size="sm" type="button" variant="outline">
+                  <ArrowUpDown aria-hidden="true" />
+                  排序
+                </Button>
+              }
+            />
+            <MenuPopup align="end">
+              <MenuRadioGroup
+                onValueChange={value => {
+                  if (isTableSortKey(value)) onParamsChange({ ...params, sort: value });
+                }}
+                value={params.sort}
+              >
+                {TABLE_SORT_KEYS.map(key => (
+                  <MenuRadioItem key={key} value={key}>
+                    {SORT_LABELS[key]}
+                  </MenuRadioItem>
+                ))}
+              </MenuRadioGroup>
+              <MenuSeparator />
+              <MenuItem
+                onClick={() =>
+                  onParamsChange({ ...params, dir: params.dir === "asc" ? "desc" : "asc" })
+                }
+              >
+                {params.dir === "asc" ? "改为降序" : "改为升序"}
+              </MenuItem>
+            </MenuPopup>
+          </Menu>
+
           <Button
             aria-label={panelDirty ? "筛选（已启用）" : "筛选"}
             className="md:hidden"

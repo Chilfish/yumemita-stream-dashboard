@@ -1,5 +1,6 @@
 import { max, scaleLinear, scaleSqrt } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { resolveMargin } from "@/lib/chart-layout";
 import { AxisLabel, DirectLabel, TickText, YAxis } from "@/components/charts/axis";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import type { StreamSummary } from "@/types/dataset";
@@ -48,8 +49,8 @@ export function ScatterPlot({ rows, selectedId, onSelect }: ScatterPlotProps) {
 
   return (
     <ChartCanvas ariaLabel="平均同接与每千同接弹幕数的散点图" height={320}>
-      {({ width, height }) => {
-        const margin = { top: 18, right: 20, bottom: 44, left: 56 };
+      {({ compact, width, height }) => {
+        const margin = resolveMargin({ top: 18, right: 20, bottom: 44, left: 56 }, compact);
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const x = scaleLinear().domain([0, maxX * 1.08]).nice().range([0, innerWidth]);

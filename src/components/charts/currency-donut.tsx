@@ -34,9 +34,13 @@ export function CurrencyDonut({ rows }: CurrencyDonutProps) {
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <ChartCanvas ariaLabel="SC 笔数的币种构成" className="w-[220px] shrink-0" height={220}>
-        {({ width }) => {
-          const outerRadius = Math.min(84, Math.max(48, width / 2 - 8));
+      <ChartCanvas
+        ariaLabel="SC 笔数的币种构成"
+        className="w-full shrink-0 sm:w-[13.75rem]"
+        height={220}
+      >
+        {({ height, width }) => {
+          const outerRadius = Math.min(84, Math.max(40, Math.min(width, height) / 2 - 8));
           const innerRadius = outerRadius * 0.62;
           const arcGenerator = arc<PieArcDatum<CurrencyRow>>()
             .innerRadius(innerRadius)
@@ -45,7 +49,7 @@ export function CurrencyDonut({ rows }: CurrencyDonutProps) {
             .cornerRadius(3);
 
           return (
-            <g transform={`translate(${width / 2},110)`}>
+            <g transform={`translate(${width / 2},${height / 2})`}>
               {arcs.map((slice, index) => (
                 <path
                   d={arcGenerator(slice) ?? ""}

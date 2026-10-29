@@ -23,6 +23,7 @@ import { useDataset } from "@/hooks/use-dataset";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useTheme } from "@/hooks/use-theme";
 import { buildSummaryRows, findStreamSummary } from "@/lib/aggregate";
+import { memberAccent } from "@/lib/color";
 import { rememberMember } from "@/lib/preferences";
 import { homePath, sectionFromPathname, viewPath } from "@/lib/routes";
 import type { DatasetIndexEntry } from "@/types/dataset";
@@ -41,6 +42,10 @@ export function DatasetLayout() {
   const { manifest, totals, status, error } = useDataset(dataset?.id ?? null);
 
   const rows = useMemo(() => (manifest ? buildSummaryRows(manifest) : []), [manifest]);
+  const memberColor = useMemo(
+    () => memberAccent(dataset?.color ?? DEFAULT_MEMBER_COLOR, theme),
+    [dataset?.color, theme],
+  );
   const openCommandPalette = useCallback(() => setCommandOpen(true), []);
 
   useKeyboardShortcuts({
@@ -69,7 +74,7 @@ export function DatasetLayout() {
 
   return (
     <SidebarProvider
-      style={{ "--member-color": dataset.color ?? DEFAULT_MEMBER_COLOR } as CSSProperties}
+      style={{ "--member-color": memberColor } as CSSProperties}
     >
       <a
         className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-control focus:bg-card focus:px-3 focus:py-2 focus:text-footnote focus:shadow-surface"
@@ -116,7 +121,7 @@ export function DatasetLayout() {
         ) : null}
 
         {status === "ready" && manifest && totals ? (
-          <div className="mx-auto w-full max-w-[1320px] px-4 pt-6 pb-20 md:px-6 md:pb-6">
+          <div className="mx-auto w-full max-w-[82.5rem] px-4 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
             {rows.length === 0 ? (
               <p className="mb-4 text-footnote text-muted-foreground">
                 没有加载到 manifest。确认 <code>public/data/&lt;dataset&gt;/manifest.json</code> 存在。

@@ -55,7 +55,7 @@ interface SectionProps {
 /** 标题 + 分组列表：靠发丝线分组，不再用卡片。 */
 function Section({ title, meta, children }: SectionProps) {
   return (
-    <section className="grid gap-2 border-t border-hairline py-6 first:border-t-0 first:pt-0 md:grid-cols-[180px_minmax(0,1fr)] md:gap-8">
+    <section className="grid gap-2 border-t border-hairline py-6 first:border-t-0 first:pt-0 md:grid-cols-[11.25rem_minmax(0,1fr)] md:gap-8">
       <div className="min-w-0">
         <h2 className="text-headline text-foreground">{title}</h2>
         {meta ? <p className="mt-1 text-caption text-ink-3">{meta}</p> : null}

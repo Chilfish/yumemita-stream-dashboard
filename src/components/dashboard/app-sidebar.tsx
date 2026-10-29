@@ -27,7 +27,8 @@ import type { Theme } from "@/hooks/use-theme";
 import { formatInteger } from "@/lib/format";
 import { sectionFromPathname, viewPath, type ViewKey } from "@/lib/routes";
 import type { DatasetIndexEntry } from "@/types/dataset";
-import { cn } from "@/lib/utils";
+import { assetUrl, cn } from "@/lib/utils";
+import { readableOn } from "@/lib/color";
 
 const DEFAULT_MEMBER_COLOR = "#b8461f";
 
@@ -94,7 +95,7 @@ export function AppSidebar({
                 <Guitar aria-hidden="true" className="size-4" />
               </span>
               <span className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate font-semibold text-sm">ゆめみた 配信数据台</span>
+                <span className="truncate font-semibold text-body">ゆめみた 配信数据台</span>
                 <span className="truncate text-caption text-muted-foreground">
                   {formatInteger(chatTotal)} 条弹幕
                 </span>
@@ -120,12 +121,21 @@ export function AppSidebar({
                       tooltip={member.label}
                       type="button"
                     >
-                      <span
-                        className="flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] text-white"
-                        style={{ backgroundColor: color }}
-                      >
-                        {member.label.slice(0, 1)}
-                      </span>
+                      {member.avatar ? (
+                        <img
+                          alt=""
+                          aria-hidden="true"
+                          className="size-5 shrink-0 rounded-full object-cover"
+                          src={assetUrl(member.avatar)}
+                        />
+                      ) : (
+                        <span
+                          className="flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]"
+                          style={{ backgroundColor: color, color: readableOn(color) }}
+                        >
+                          {member.label.slice(0, 1)}
+                        </span>
+                      )}
                       <span className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
                         <span className="truncate">{member.label}</span>
                         <span className="shrink-0 text-caption text-ink-3">

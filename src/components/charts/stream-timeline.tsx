@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 import type { PointerEvent } from "react";
 import { AxisLabel, YAxis } from "@/components/charts/axis";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import { EmptyChart } from "@/components/charts/chart-card";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatCompact, formatMinuteOffset } from "@/lib/format";
@@ -74,9 +75,13 @@ export function StreamTimeline({
         )}
       </p>
 
-      <ChartCanvas ariaLabel={ariaLabel} height={height}>
-        {({ width, height: canvasHeight }) => {
-          const margin = { top: 28, right: 16, bottom: 34, left: 46 };
+      <ChartCanvas
+        ariaLabel={ariaLabel}
+        height={height}
+        minWidth={minWidthForPoints(minutes.length, 8)}
+      >
+        {({ compact, width, height: canvasHeight }) => {
+          const margin = resolveMargin({ top: 28, right: 16, bottom: 34, left: 46 }, compact);
           const innerWidth = Math.max(0, width - margin.left - margin.right);
           const innerHeight = Math.max(0, canvasHeight - margin.top - margin.bottom);
           const scTrackHeight = 20;
@@ -122,7 +127,7 @@ export function StreamTimeline({
               {/* 弹幕轨：横向网格 + 面积 + 折线 */}
               <YAxis scale={y} x={innerWidth} />
               <text
-                className="fill-ink-3 text-[10px] font-semibold"
+                className="fill-ink-3 text-caption font-semibold"
                 textAnchor="end"
                 x={-8}
                 y={8}
@@ -137,7 +142,7 @@ export function StreamTimeline({
               {/* SC 轨：逐分钟刻度 */}
               <line className="stroke-border" x1={0} x2={innerWidth} y1={trackBottom} y2={trackBottom} />
               <text
-                className="fill-ink-3 text-[10px] font-semibold"
+                className="fill-ink-3 text-caption font-semibold"
                 textAnchor="end"
                 x={-8}
                 y={trackBottom - 2}
@@ -179,7 +184,7 @@ export function StreamTimeline({
                     d={`M ${peakX - 4} ${peakY + 6} L ${peakX + 4} ${peakY + 6} L ${peakX} ${peakY} Z`}
                   />
                   <text
-                    className="fill-foreground text-[10px] font-semibold tabular-nums"
+                    className="fill-foreground text-caption font-semibold tabular-nums"
                     textAnchor={peakLabelOnLeft ? "end" : "start"}
                     x={peakX + (peakLabelOnLeft ? -8 : 8)}
                     y={-10}
@@ -234,7 +239,8 @@ export function StreamTimeline({
                 onPointerDown={event => setHover(pointerIndex(event, x, minutes.length))}
                 onPointerLeave={() => setHover(null)}
                 onPointerMove={event => setHover(pointerIndex(event, x, minutes.length))}
-                style={{ touchAction: "pan-y" }}
+                // 窄屏图表可横向滚动：让浏览器接管双指/横滑，点按仍能出读数。
+                style={{ touchAction: "pan-x pan-y" }}
                 width={innerWidth}
                 x={0}
                 y={0}

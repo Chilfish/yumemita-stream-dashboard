@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDate, formatDuration } from "@/lib/format";
 import { homePath, streamPath } from "@/lib/routes";
 import type { DatasetIndexEntry, StreamSummary } from "@/types/dataset";
-import { cn } from "@/lib/utils";
+import { assetUrl, cn } from "@/lib/utils";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -24,6 +24,7 @@ interface CommandEntry {
   group: "成员" | "场次";
   label: string;
   meta: string;
+  avatar?: string | null;
   run: () => void;
 }
 
@@ -50,6 +51,7 @@ export function CommandPalette({
         group: "成员" as const,
         label: member.label,
         meta: `${member.count} 场 · ${member.channelId ?? "未记录频道"}`,
+        avatar: member.avatar,
         run: () => navigate(homePath(member.id)),
       }));
 
@@ -164,6 +166,14 @@ export function CommandPalette({
                       role="option"
                       type="button"
                     >
+                      {entry.avatar ? (
+                        <img
+                          alt=""
+                          aria-hidden="true"
+                          className="size-6 shrink-0 rounded-full object-cover"
+                          src={assetUrl(entry.avatar)}
+                        />
+                      ) : null}
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-footnote">{entry.label}</span>
                         <span className="block truncate text-caption text-ink-3">

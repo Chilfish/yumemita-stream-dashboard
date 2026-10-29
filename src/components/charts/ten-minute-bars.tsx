@@ -1,5 +1,6 @@
 import { max, scaleBand, scaleLinear } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import { DirectLabel, TickText, YAxis } from "@/components/charts/axis";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import type { StreamRow } from "@/lib/aggregate";
@@ -35,9 +36,13 @@ export function TenMinuteBars({ row }: TenMinuteBarsProps) {
   );
 
   return (
-    <ChartCanvas ariaLabel={`${row.summary.title} 的每十分钟弹幕量`} height={230}>
-      {({ width, height }) => {
-        const margin = { top: 22, right: 16, bottom: 30, left: 44 };
+    <ChartCanvas
+      ariaLabel={`${row.summary.title} 的每十分钟弹幕量`}
+      height={230}
+      minWidth={minWidthForPoints(buckets.length, 48, { floor: 420 })}
+    >
+      {({ compact, width, height }) => {
+        const margin = resolveMargin({ top: 22, right: 16, bottom: 30, left: 44 }, compact);
         const innerWidth = Math.max(0, width - margin.left - margin.right);
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const x = scaleBand()
