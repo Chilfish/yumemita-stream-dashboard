@@ -83,17 +83,24 @@ function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
 }
 
-function readPacks(source: DatasetSource): StreamDatapack[] {
+function readPacks(source: DatasetSource): StreamDatapack[] | null {
   const dir = resolve(APP_ROOT, source.datapackDir)
   let files: string[]
   try {
     files = readdirSync(dir).filter(name => name.endsWith('.datapack.json'))
   }
   catch {
-    fail(`找不到暂存目录：${dir}`)
+    if (values.dataset)
+      fail(`找不到暂存目录：${dir}`)
+    console.warn(`[publish-data]   ! ${source.id} 找不到暂存目录 ${source.datapackDir}/，跳过`)
+    return null
   }
-  if (files.length === 0)
-    fail(`${source.id} 在 ${source.datapackDir}/ 里没有 datapack，先运行抓取或从备份恢复`)
+  if (files.length === 0) {
+    if (values.dataset)
+      fail(`${source.id} 在 ${source.datapackDir}/ 里没有 datapack，先运行抓取或从备份恢复`)
+    console.warn(`[publish-data]   ! ${source.id} 还没有 datapack，跳过`)
+    return null
+  }
 
   return files.map((name) => {
     const pack = readJson<StreamDatapack>(join(dir, name))
@@ -118,13 +125,14 @@ const credentials = readCredentials()
 if (!values['no-upload'] && !credentials)
   fail('缺少 R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET；只生成文件请加 --no-upload')
 
-const upload = credentials ? createUploader(credentials) : null
+const upload = credentials && !values['no-upload'] ? createUploader(credentials) : null
 const publishStartedAt = isoJst(new Date())
 const packUploads: { key: string, body: string }[] = []
 const indexUploads: { key: string, body: string }[] = []
 
 for (const source of selected) {
   const packs = readPacks(source)
+  if (!packs) continue
   const packsById = new Map(packs.map(pack => [pack.video.id, pack]))
 
   const streams = packs

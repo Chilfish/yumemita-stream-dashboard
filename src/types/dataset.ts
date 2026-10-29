@@ -53,6 +53,7 @@ export interface DatasetIndexEntry {
   id: string;
   label: string;
   color?: string | null;
+  avatar?: string | null;
   channelId: string | null;
   count: number;
   generatedAt: string | null;

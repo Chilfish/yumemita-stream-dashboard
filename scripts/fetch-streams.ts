@@ -200,10 +200,8 @@ function main(): void {
   }
 
   const manifestPath = resolve(APP_ROOT, dataset.manifest)
-  if (!existsSync(manifestPath)) {
-    console.error(`找不到 manifest：${manifestPath}`)
-    process.exit(1)
-  }
+  if (!existsSync(manifestPath))
+    console.warn(`[fetch-streams] 还没有 manifest（${dataset.manifest}），按空索引开始`)
 
   const root = resolve(values.root ?? process.env.STREAM_SESSION_ROOT ?? join(APP_ROOT, 'temp', 'youtube-live'))
   const dataRoot = join(APP_ROOT, 'data')
@@ -236,7 +234,9 @@ function main(): void {
   const ytdlpBase = ['--no-warnings', '--socket-timeout', '30', '--retries', '3']
   const startedAt = new Date().toISOString()
 
-  const manifest = readJson<{ streams?: StreamSummary[] }>(manifestPath)
+  const manifest: { streams?: StreamSummary[] } = existsSync(manifestPath)
+    ? readJson<{ streams?: StreamSummary[] }>(manifestPath)
+    : { streams: [] }
   const knownIds = new Set((manifest.streams ?? []).map(stream => stream.videoId))
   const knownByTitle = new Map<string, number>()
   for (const stream of manifest.streams ?? []) {

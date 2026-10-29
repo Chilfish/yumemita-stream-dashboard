@@ -20,6 +20,8 @@ export const DatasetIndexSchema = v.object({
   datasets: v.pipe(v.array(v.object({
     id: v.string(),
     label: v.string(),
+    color: v.optional(v.nullable(v.string())),
+    avatar: v.optional(v.nullable(v.string())),
     count: v.number(),
     generatedAt: v.nullable(v.string()),
     manifest: v.string(),

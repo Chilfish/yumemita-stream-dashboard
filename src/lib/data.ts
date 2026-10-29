@@ -66,9 +66,11 @@ export function fetchDatapack(datasetId: string, videoId: string): Promise<Strea
 
   // Shared requests are not tied to one component's AbortSignal: aborting a
   // consumer must not reject the promise a later mount reuses.
-  const request = fetchJson<StreamDatapack>(
-    `${DATAPACK_BASE || DATA_BASE}/${datasetId}/${videoId}.datapack.json`,
-  )
+  const localUrl = `${DATA_BASE}/${datasetId}/${videoId}.datapack.json`;
+  const request = (DATAPACK_BASE
+    ? fetchJson<StreamDatapack>(`${DATAPACK_BASE}/${datasetId}/${videoId}.datapack.json`)
+        .catch(() => fetchJson<StreamDatapack>(localUrl))
+    : fetchJson<StreamDatapack>(localUrl))
     .then(pack => {
       packCache.set(key, pack);
       return pack;

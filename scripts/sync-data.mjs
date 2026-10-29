@@ -58,7 +58,8 @@ async function fetchJson(url, cachePath) {
     return JSON.parse(text);
   } catch (error) {
     if (!existsSync(cachePath)) {
-      throw new Error(`${url} 拉取失败，且没有本地缓存：${describe(error)}`);
+      console.warn(`[sync-data]   ! ${url} 拉取失败（${describe(error)}），且没有本地缓存`);
+      return null;
     }
     console.warn(`[sync-data]   ! ${url} 拉取失败（${describe(error)}），使用本地缓存`);
     return readJson(cachePath);
@@ -79,47 +80,59 @@ const index = {
 };
 
 for (const source of config.datasets) {
-  const { id, label, color, channelId, datapackDir } = source;
+  const { id, label, color, avatar, channelId, datapackDir } = source;
   if (!id || !/^[a-z0-9-]+$/.test(id)) fail(`dataset id 非法：${id}`);
   if (!label) fail(`dataset ${id} 缺少 label`);
   if (!datapackDir) fail(`dataset ${id} 缺少 datapackDir`);
 
   const destDir = join(outputRoot, id);
-  mkdirSync(destDir, { recursive: true });
+  const stagingDir = resolve(appRoot, datapackDir);
+  const localManifestPath = join(stagingDir, "manifest.json");
+  const localInsightsPath = join(stagingDir, "insights.json");
 
   let manifest;
   let insights;
-  let packCount = 0;
+  let fromRemote = Boolean(remoteBase);
 
-  if (remoteBase) {
+  if (fromRemote) {
     manifest = await fetchJson(
       `${remoteBase}/${id}/manifest.json`,
       join(cacheRoot, id, "manifest.json"),
     );
-    insights = await fetchJson(
-      `${remoteBase}/${id}/insights.json`,
-      join(cacheRoot, id, "insights.json"),
-    );
-    // datapack 由浏览器直接向远端请求，产物里不留旧副本。
-    for (const name of readdirSync(destDir)) {
-      if (name.endsWith(".datapack.json")) rmSync(join(destDir, name));
-    }
-  } else {
-    const stagingDir = resolve(appRoot, datapackDir);
-    const manifestPath = join(stagingDir, "manifest.json");
-    const insightsPath = join(stagingDir, "insights.json");
-    if (!existsSync(manifestPath) || !existsSync(insightsPath)) {
-      fail(`${id} 缺少本地 ${datapackDir}/manifest.json 或 insights.json；先运行 bun run publish:data --no-upload`);
-    }
-    manifest = readJson(manifestPath);
-    insights = readJson(insightsPath);
-
-    if (existsSync(stagingDir)) {
-      for (const name of readdirSync(stagingDir)) {
-        if (!name.endsWith(".datapack.json")) continue;
-        copyFileSync(join(stagingDir, name), join(destDir, name));
-        packCount += 1;
+    insights = manifest
+      ? await fetchJson(`${remoteBase}/${id}/insights.json`, join(cacheRoot, id, "insights.json"))
+      : null;
+    if (manifest && insights) {
+      mkdirSync(destDir, { recursive: true });
+      // datapack 由浏览器直接向远端请求，产物里不留旧副本。
+      for (const name of readdirSync(destDir)) {
+        if (name.endsWith(".datapack.json")) rmSync(join(destDir, name));
       }
+    } else if (existsSync(localManifestPath) && existsSync(localInsightsPath)) {
+      console.warn(`[sync-data]   ! ${id} 远端还没有数据，回退本地暂存区`);
+      fromRemote = false;
+    } else {
+      console.warn(`[sync-data]   ! ${id} 远端和本地都没有数据，跳过`);
+      continue;
+    }
+  }
+
+  if (!fromRemote) {
+    if (!existsSync(localManifestPath) || !existsSync(localInsightsPath)) {
+      console.warn(`[sync-data]   ! ${id} 还没有本地 ${datapackDir}/manifest.json 或 insights.json，跳过`);
+      continue;
+    }
+    manifest = readJson(localManifestPath);
+    insights = readJson(localInsightsPath);
+  }
+
+  mkdirSync(destDir, { recursive: true });
+  let packCount = 0;
+  if (!fromRemote) {
+    for (const name of readdirSync(stagingDir)) {
+      if (!name.endsWith(".datapack.json")) continue;
+      copyFileSync(join(stagingDir, name), join(destDir, name));
+      packCount += 1;
     }
   }
 
@@ -140,6 +153,7 @@ for (const source of config.datasets) {
     id,
     label,
     color: color ?? null,
+    avatar: avatar ?? null,
     channelId: channelId ?? manifest.channelId ?? null,
     count: manifest.streams.length,
     generatedAt: manifest.generatedAt ?? null,
@@ -147,7 +161,7 @@ for (const source of config.datasets) {
     insights: `data/${id}/insights.json`,
   });
 
-  const sourceNote = remoteBase
+  const sourceNote = fromRemote
     ? `manifest/insights 来自 ${remoteBase}`
     : `本地 datapack ${packCount} 份`;
   console.log(`[sync-data] ${label} (${id}) -> ${manifest.streams.length} 场，${sourceNote}`);
