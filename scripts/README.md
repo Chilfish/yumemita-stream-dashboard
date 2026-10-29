@@ -68,6 +68,24 @@ bun scripts/fetch-streams.ts --dataset nonoka --root .\temp\youtube-live
 | `--no-build` | 只抓素材 |
 | `--restore` | 从对象存储恢复 manifest 与缺失的 datapack；本地没有 manifest 时默认开启 |
 | `--no-restore` | 关闭自动恢复 |
+| `--force <id[,id...]>` | 定点重抓这些场次（只跑它们，不补跑其他待抓场次）；可重复传，`all` = 全频道候选都重抓 |
+| `--publish` | 抓完调用 `publish:data` 发布；有 `--force` 时默认开启 |
+| `--no-publish` | 即使有 `--force` 也不发布 |
+
+单场返工 / 修数据：
+
+```powershell
+# 重抓一场（meta → 弹幕 → 评论 → VSTATS → datapack），完成后自动增量发布
+bun scripts/fetch-streams.ts --dataset nonoka --force 5xYz1234567
+
+# 只发布本地 pack，不重抓
+bun run publish:data --dataset nonoka
+```
+
+`--force` 只跑点名的场次（不拉频道列表、不补跑其他待抓场次），会先删掉该场的
+`danmaku_*.jsonl` / 评论 / VSTATS / 「不可用」标记再抓，所以结果一定是这次新拉的；
+同名/时长等去重规则对强制场次不生效。任一步失败时不会发布，避免把缺数据的 pack 推上去；
+修好后手动跑 `bun run publish:data --dataset <id>` 即可。
 
 监控：
 

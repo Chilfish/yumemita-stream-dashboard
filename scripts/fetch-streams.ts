@@ -3,6 +3,7 @@
  * 批量补齐某个 dataset 的历史直播：元信息、弹幕回放、评论、VSTATS，并增量生成 datapack。
  *
  *   bun scripts/fetch-streams.ts --dataset nonoka --root "D:/path/to/temp/youtube-live"
+ *   bun scripts/fetch-streams.ts --dataset nonoka --force abcdEFGH123 --publish
  *
  * 特性：
  *   - 可重入：已存在的 meta / danmaku jsonl / comments 不重抓，按 videoId 跳过已入库场次
@@ -10,6 +11,7 @@
  *   - 增量落库：每 N 场调用一次 stream-datapack.ts，manifest 始终是当前进度
  *   - 可观测：进度写 `<state-dir>/fetch-progress.json`，日志追加 `<state-dir>/fetch.log`
  *   - 去重：同名场次保留时长正常的一条（短摘要/预告让位正片）
+ *   - 强制重抓：`--force <id>` 只跑点名的场次，清掉本地素材后重抓并覆盖结果，默认顺手发布
  */
 import { spawn } from 'node:child_process'
 import {
@@ -26,11 +28,13 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat } from './lib/live-chat.ts'
+import { readCredentials } from './lib/object-storage.ts'
 import { restoreDataset } from './lib/restore-datapacks.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
 const DATAPACK_SCRIPT = join(APP_ROOT, 'scripts', 'stream-datapack.ts')
+const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
 
 interface DatasetSource {
   id: string
@@ -64,6 +68,8 @@ interface Candidate {
   title?: string
   durationSec?: number | null
   reason?: string
+  /** --force 指定：忽略本地已有素材、覆盖重抓，也不参与同名去重。 */
+  forced?: boolean
 }
 
 interface Failure {
@@ -87,6 +93,9 @@ const OPTIONS = {
   restore: { type: 'boolean' },
   'no-restore': { type: 'boolean' },
   ids: { type: 'string' },
+  force: { type: 'string', multiple: true },
+  publish: { type: 'boolean' },
+  'no-publish': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
 } as const
 
@@ -110,6 +119,11 @@ const USAGE = `用法：bun scripts/fetch-streams.ts --dataset <id> --root <会�
   --restore                  从对象存储恢复 manifest 与缺失的 datapack 后再规划
   --no-restore               不自动恢复（本地没有 manifest 时也不拉远端）
   --ids <文件>               直接读视频 ID 列表（每行一个），跳过频道列表抓取
+  --force <id[,id...]>       定点重抓：只处理点名的场次（meta/弹幕/评论/VSTATS 全覆盖），
+                             不补跑频道里的其他待抓场次，也不拉频道列表；可重复传。
+                             all = 忽略已入库，把本次全频道候选都重抓
+  --publish                  抓完调用 publish:data 发布；有 --force 时默认开启
+  --no-publish               即使有 --force 也不发布
   -h, --help                 显示本帮助
 
 恢复：本地没有 manifest 时默认自动执行，已存在的 pack 不会重复下载。
@@ -225,6 +239,29 @@ async function main(): Promise<void> {
     console.error(`可用：${sources.map(item => item.id).join(', ') || '(data-sources.json 为空)'}`)
     process.exit(1)
   }
+
+  // --force 可以重复传、逗号分隔；all 表示本次所有候选。
+  const forcedIds = new Set<string>()
+  let forceAll = false
+  for (const raw of values.force ?? []) {
+    for (const token of raw.split(',')) {
+      const id = token.trim()
+      if (!id)
+        continue
+      if (id === 'all') {
+        forceAll = true
+        continue
+      }
+      if (!/^[A-Za-z0-9_-]{11}$/.test(id)) {
+        console.error(`--force 里的视频 ID 不合法：${id}`)
+        process.exit(1)
+      }
+      forcedIds.add(id)
+    }
+  }
+  const forced = forceAll || forcedIds.size > 0
+  const shouldPublish = !values['no-publish'] && (values.publish || forced)
+
   if (!dataset.channelId) {
     console.error(`dataset ${dataset.id} 缺少 channelId`)
     process.exit(1)
@@ -335,8 +372,14 @@ async function main(): Promise<void> {
   logFile(logPath, `=== start dataset=${dataset.id} root=${root} known=${knownIds.size} limit=${limit}`)
 
   void (async () => {
+    // --force <id> 是单场返工：只处理点名的场次，不顺手补跑频道里其他待抓场次，
+    // 也不值得为它去拉一遍频道列表。
+    const onlyForced = forcedIds.size > 0 && !forceAll
     let channelIds: string[] = []
-    if (values.ids) {
+    if (onlyForced) {
+      logFile(logPath, `定点重抓：${[...forcedIds].join(', ')}（跳过频道列表）`)
+    }
+    else if (values.ids) {
       const idsPath = resolve(values.ids)
       channelIds = [...new Set(readFileSync(idsPath, 'utf8').split(/\r?\n/).map(line => line.trim()).filter(Boolean))]
       writeFileSync(channelCache, `${channelIds.join('\n')}\n`, 'utf8')
@@ -359,15 +402,22 @@ async function main(): Promise<void> {
       }
     }
 
-    const candidates: Candidate[] = channelIds
-      .filter(id => !knownIds.has(id))
-      .slice(0, limit > 0 ? limit : undefined)
-      .map(id => ({ id }))
+    const isForced = (id: string): boolean => forceAll || forcedIds.has(id)
+    const pendingIds = channelIds.filter(id => forceAll || !knownIds.has(id))
+    // 强制场次排在最前并跳过「已入库」判定；不在频道列表里的 ID 也能补进来。
+    const orderedIds = onlyForced ? [...forcedIds] : [...new Set([...forcedIds, ...pendingIds])]
+    const selectedIds = limit > 0 && !forced ? orderedIds.slice(0, limit) : orderedIds
+    const candidates: Candidate[] = selectedIds.map(id => ({ id, forced: isForced(id) }))
+    const forcedCount = candidates.filter(candidate => candidate.forced).length
     progress.channelTotal = channelIds.length
     progress.candidates = candidates.length
+    progress.forced = candidates.filter(candidate => candidate.forced).map(candidate => candidate.id)
     progress.phase = 'meta'
     saveProgress()
-    logFile(logPath, `频道 ${channelIds.length} 条 / 已入库 ${knownIds.size} / 候选 ${candidates.length}`)
+    if (onlyForced)
+      logFile(logPath, `定点重抓 ${candidates.length} 场`)
+    else
+      logFile(logPath, `频道 ${channelIds.length} 条 / 已入库 ${knownIds.size} / 候选 ${candidates.length}${forcedCount > 0 ? `（强制 ${forcedCount}）` : ''}`)
 
     if (values['dry-run']) {
       for (const candidate of candidates)
@@ -388,7 +438,7 @@ async function main(): Promise<void> {
       try {
         const existing = sessions.get(candidate.id)
         const infoPath = existing ? join(existing, 'meta', 'info.json') : null
-        if (existing && infoPath && existsSync(infoPath) && isValidInfoJson(infoPath, candidate.id)) {
+        if (!candidate.forced && existing && infoPath && existsSync(infoPath) && isValidInfoJson(infoPath, candidate.id)) {
           const info = readJson<InfoJson>(infoPath)
           candidate.session = existing
           candidate.info = info
@@ -401,8 +451,8 @@ async function main(): Promise<void> {
           const info = JSON.parse(raw) as InfoJson
           if (info.id !== candidate.id)
             throw new Error(`id 不匹配：${info.id}`)
-          const session = `${jstDate(info.release_timestamp ?? info.timestamp)}_${dataset.label}_${info.id}`
-          const sessionDir = join(root, session)
+          // 强制重抓沿用已有会话目录，避免日期/标题变化时多出一份孤立素材。
+          const sessionDir = existing ?? join(root, `${jstDate(info.release_timestamp ?? info.timestamp)}_${dataset.label}_${info.id}`)
           for (const sub of ['meta', 'danmaku', 'comments', 'web', 'work'])
             mkdirSync(join(sessionDir, sub), { recursive: true })
           writeFileSync(join(sessionDir, 'meta', 'info.json'), raw, 'utf8')
@@ -451,6 +501,9 @@ async function main(): Promise<void> {
 
     const groups = new Map<string, Candidate[]>()
     for (const candidate of usable) {
+      // 强制重抓的场次是用户点名要的，不参与同名去重。
+      if (candidate.forced)
+        continue
       const title = candidate.title ?? ''
       groups.set(title, [...(groups.get(title) ?? []), candidate])
     }
@@ -593,8 +646,40 @@ async function main(): Promise<void> {
     }
 
     const chunkSize = buildEvery > 0 ? buildEvery : kept.length || 1
+    const resetDone = new Set<string>()
+    // --force：先清掉旧的素材，让下面的「已存在就跳过」逻辑失效，结果被完整覆盖。
+    const resetSession = (candidate: Candidate): void => {
+      if (!candidate.forced || !candidate.session || resetDone.has(candidate.id))
+        return
+      resetDone.add(candidate.id)
+      const session = candidate.session
+      const id = candidate.id
+      const stale = [
+        join(session, 'danmaku', `danmaku_${id}.jsonl`),
+        join(session, 'danmaku', `${id}.live_chat.json`),
+        join(session, 'comments', `comments_${id}.json`),
+        join(session, 'web', `vstats_video_${id}.html`),
+        join(session, 'work', 'chat-unavailable.txt'),
+        join(session, 'work', 'vstats-unavailable.txt'),
+      ]
+      for (const path of stale) {
+        if (existsSync(path))
+          unlinkSync(path)
+      }
+      logFile(logPath, `${id} force：已清空本地素材，重新抓取`)
+    }
+
     for (let offset = 0; offset < kept.length; offset += chunkSize) {
       const chunk = kept.slice(offset, offset + chunkSize)
+      for (const candidate of chunk) {
+        try {
+          resetSession(candidate)
+        }
+        catch (error) {
+          failures.push({ id: candidate.id, step: 'reset', error: error instanceof Error ? error.message : String(error) })
+          logFile(logPath, `${candidate.id} force 清空失败：${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
       await pool(chunk, concurrency, async (candidate) => {
         try {
           await fetchMedia(candidate)
@@ -621,7 +706,7 @@ async function main(): Promise<void> {
     }
 
     const previousFailures = [...failures]
-    const retryIds = [...new Set(previousFailures.filter(item => item.step !== 'build').map(item => item.id))]
+    const retryIds = [...new Set(previousFailures.filter(item => item.step !== 'build' && item.step !== 'reset').map(item => item.id))]
     if (retryIds.length > 0) {
       logFile(logPath, `retry ${retryIds.length} 场失败项`)
       const retryCandidates = kept.filter(candidate => retryIds.includes(candidate.id))
@@ -642,6 +727,38 @@ async function main(): Promise<void> {
       }
       await buildSessions(retryCandidates.map(candidate => candidate.session).filter((session): session is string => Boolean(session)))
       logFile(logPath, `retry 完成，剩余失败 ${failures.length}`)
+    }
+
+    // 强制重抓只有一两场，本地 datapack 一更新就顺手发布：publish:data 是增量的，
+    // 只会传这一份 pack + manifest / insights / index，不会全量重传。
+    if (shouldPublish) {
+      if (values['no-build']) {
+        progress.publish = 'skipped: --no-build'
+        logFile(logPath, 'publish 跳过：--no-build 没有重新生成 datapack')
+      }
+      else if (failures.length > 0) {
+        progress.publish = `skipped: ${failures.length} failures`
+        logFile(logPath, `publish 跳过：仍有 ${failures.length} 项失败，修好后手动运行 bun scripts/publish-data.ts --dataset ${dataset.id}`)
+      }
+      else if (!readCredentials()) {
+        progress.publish = 'skipped: no credentials'
+        logFile(logPath, 'publish 跳过：没有 R2_* 凭据；本地 datapack 已更新，配好凭据后手动运行 bun scripts/publish-data.ts')
+      }
+      else {
+        try {
+          logFile(logPath, `publish：bun scripts/publish-data.ts --dataset ${dataset.id}`)
+          const output = await run('bun', [PUBLISH_SCRIPT, '--dataset', dataset.id], true, 0)
+          for (const line of output.split('\n').map(item => item.trim()).filter(Boolean))
+            logFile(logPath, `publish | ${line}`)
+          progress.publish = 'ok'
+        }
+        catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          progress.publish = `failed: ${message}`
+          failures.push({ id: dataset.id, step: 'publish', error: message })
+          logFile(logPath, `publish failed：${message}`)
+        }
+      }
     }
 
     progress.phase = 'done'

@@ -89,6 +89,9 @@ bun scripts/fetch-streams.ts --dataset nonoka `
 Get-Content -Wait "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch.log"
 Get-Content "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch-progress.json"
 
+# 单场返工：清掉该场本地素材重抓，datapack 更新后自动增量发布
+bun scripts/fetch-streams.ts --dataset nonoka --force <videoId>
+
 # 最后同步/校验
 bun run sync:data
 bun run validate:data
