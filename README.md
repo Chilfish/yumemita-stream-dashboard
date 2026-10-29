@@ -2,11 +2,11 @@
 
 把 **夢限大みゅーたいぷ** 成员直播的归一化 JSON 做成可交互的数据可视化页面：同接、弹幕密度、SC、评论、词频与跨场对比。
 
-当前内置数据集：**宮永ののか**，**262 场**不重复直播（2023-11-19 – 2026-10-22，持续补历史场次）。
+当前接入 **5 位成员**：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1469 场**不重复直播（持续补历史场次）。
 
-> **数据全部放在对象存储**（Cloudflare R2 等）：`manifest.json`、`insights.json` 与逐场 datapack。
+> **数据全部放在对象存储**（Cloudflare R2 等）：`index.json`、`manifest.json`、`insights.json` 与逐场 datapack。
 > git 里只有代码和 `data-sources.json` 配置，`bun run publish:data` 是唯一的写入入口。
-> 构建时拉取索引与预聚合，页面内只做局部计算。
+> 页面启动时直接读远端索引与预聚合，发布后刷新即可，不需要重新构建前端。
 
 ## 界面
 
@@ -26,7 +26,7 @@
 - **说明**：数据口径、已知限制、更新方式。
 - **导航**：侧边栏 + 移动端底部标签栏；单场/对比/子视图有独立 URL，可刷新、分享、前进后退。
 - **效率**：`j` / `k` 翻场、`1`–`5` 切页、`/` 搜索、`⌘K` 全局搜索场次与成员。
-- 深色/浅色主题、响应式布局、多成员数据结构（当前接入 1 位）。
+- 深色/浅色主题、响应式布局、多成员数据结构（当前接入 5 位）。
 
 ## 快速开始
 
@@ -38,7 +38,7 @@ bun run dev
 # http://localhost:5173
 ```
 
-`dev` 会先运行 `sync:data`：配了 `VITE_DATAPACK_BASE` 就从对象存储拉索引与预聚合（带本地缓存），没配就用本地 `data/` 暂存区。单场 datapack 由浏览器按需向对象存储请求。
+页面启动时按 `VITE_DATAPACK_BASE` 直接向对象存储请求 `index.json`、manifest、insights 与单场 datapack；`dev` / `build` 前置的 `sync:data` 只生成一份同源兜底快照（配了远端时也从对象存储拉，没配时用本地 `data/` 暂存区），远端不可达或还没发布过索引时页面会回退到它。
 
 需要连对象存储时，复制 `.env.example` 为 `.env` 并填写 `VITE_DATAPACK_BASE`（构建时注入）；留空则完全走本地 `data/`，离线开发不受影响。上传侧另需 `R2_*` 凭据，可选 `R2_PREFIX` 指定桶内前缀。
 
@@ -49,8 +49,8 @@ bun run dev
 | `bun run dev` | 同步数据 + 启动开发服务器 |
 | `bun run build` | 同步数据 + 类型检查 + 生产构建（`dist/`） |
 | `bun run preview` | 预览生产构建 |
-| `bun run sync:data` | 拉取 manifest + insights 到 `public/data/`，生成 dataset 索引 |
-| `bun run publish:data` | 由 pack 重建 manifest + insights 并上传对象存储 |
+| `bun run sync:data` | 生成 `public/data/` 兜底快照（远端优先，失败回退本地暂存区） |
+| `bun run publish:data` | 由 pack 重建 manifest + insights + dataset 索引并上传对象存储 |
 | `bun run validate:data` | 校验 index → manifest → insights；加 `--remote` 检查对象存储 |
 | `bun run add:datapack` | 加一份 datapack，自动更新 manifest |
 | `bun run typecheck` | TypeScript 类型检查 |
@@ -66,17 +66,14 @@ data/<dataset>/*.datapack.json          # 本地暂存（gitignore，唯一真�
         │
         │  scripts/publish-data.ts
         ▼
-manifest.json + insights.json           # 由 pack 派生
+index.json + manifest.json + insights.json   # 由 pack 派生
         │
-        │  上传
+        │  上传（index 最后写）
         ▼
-对象存储（R2）: <base>/<dataset>/manifest.json · insights.json · <videoId>.datapack.json
+对象存储（R2）: <base>/index.json
+               <base>/<dataset>/manifest.json · insights.json · <videoId>.datapack.json
         │
-        │  scripts/sync-data.mjs（构建时拉索引，带本地缓存）
-        ▼
-public/data/index.json + <dataset>/manifest.json + insights.json
-        │
-        │  fetch（浏览器）
+        │  fetch（浏览器启动时；远端不可达时回退 public/data/）
         ▼
 useDatasetIndex → useDataset → StreamSummary[] + DatasetTotals
         │
@@ -90,8 +87,8 @@ buildStreamRows / aggregateDataset（纯函数）
 ```
 
 - `data/<id>/*.datapack.json` 是**唯一真源**（本地暂存，不提交）。
-- `manifest.json` / `insights.json` 由 `publish:data` 从 pack 派生，与 pack 一起上传，保证索引不会指向不存在的 pack。
-- 构建时 `sync:data` 只拉 manifest/insights（带本地缓存），datapack 不进构建产物。
+- `index.json` / `manifest.json` / `insights.json` 由 `publish:data` 从 pack 派生，与 pack 一起上传，保证索引不会指向不存在的 pack。
+- 页面运行时直接读对象存储，发布后刷新即可；`sync:data` 只生成 `public/data/` 兜底快照。
 - `public/data/` 是**构建中间产物**，不提交；`data-sources.json` 是唯一入库的数据配置。
 
 ## 目录结构
@@ -137,14 +134,14 @@ stream-dashboard/
 ### 加一场直播
 
 1. `bun run add:datapack nonoka /path/to/<videoId>.datapack.json`：写入本地暂存区并 upsert manifest。
-2. `bun run publish:data`：由 pack 重建 manifest + insights，并上传对象存储。
+2. `bun run publish:data`：由 pack 重建 manifest + insights + dataset 索引，并上传对象存储。生产页面刷新即生效。
 3. `bun run sync:data && bun run validate:data`：本地校验。
 
 ### 加一位成员
 
 1. 新建 `data/<id>/`，放入该成员的 `<videoId>.datapack.json`。
 2. 在 `data-sources.json` 增加一条 dataset。
-3. `bun run publish:data --dataset <id>` 生成索引并上传；再 `sync:data`。
+3. `bun run publish:data --dataset <id>` 生成该成员的 manifest/insights，并刷新 `index.json` 后上传。
 4. 页面会自动出现成员入口，不需要改组件。
 
 详细步骤与字段说明见 [docs/adding-data.md](docs/adding-data.md)。
@@ -153,10 +150,10 @@ stream-dashboard/
 
 ```bash
 bun run build
-# 产物在 dist/，包含 dist/data/
+# 产物在 dist/，包含 dist/data/（远端不可达时的兜底快照）
 ```
 
-部署在 Vercel（构建 `bun run build`，输出 `dist/`）；`vercel.json` 已配好缓存头。构建前设置 `VITE_DATAPACK_BASE` 指向对象存储；子路径部署用 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
+部署在 Vercel（构建 `bun run build`，输出 `dist/`）；`vercel.json` 已配好缓存头。构建前设置 `VITE_DATAPACK_BASE` 指向对象存储；数据更新只需 `bun run publish:data`，不用重新构建。子路径部署用 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
 
 ## 文档
 

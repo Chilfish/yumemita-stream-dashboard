@@ -18,8 +18,8 @@ bun run dev
 | `bun run dev` | `sync:data` → `vite` |
 | `bun run build` | `sync:data` → `tsc -b` → `vite build` |
 | `bun run preview` | 预览 `dist/` |
-| `bun run sync:data` | 拉 manifest/insights 到 `public/data/` |
-| `bun run publish:data` | 由 pack 重建 manifest + insights，增量上传对象存储 |
+| `bun run sync:data` | 生成 `public/data/` 兜底快照（远端优先） |
+| `bun run publish:data` | 由 pack 重建 index + manifest + insights，增量上传对象存储 |
 | `bun run validate:data` | 校验数据引用链（`--remote` 检查对象存储） |
 | `bun run add:datapack` | 加一份 datapack 并更新 manifest |
 | `bun run typecheck` | `tsc -b` |
@@ -189,7 +189,7 @@ bun run test:watch
 
 - `tsc -b` 使用 project references：`tsconfig.app.json`（src）+ `tsconfig.node.json`（vite.config）。
 - TypeScript 7 已移除 `baseUrl`；路径别名只写在 `paths`，相对于 tsconfig 解析。
-- 构建产物：`dist/`；`dist/data/` 只含 `index.json`、`manifest.json`、`insights.json`，datapack 由浏览器向对象存储请求。
+- 构建产物：`dist/`；`dist/data/` 只含兜底快照（`index.json`、`manifest.json`、`insights.json`），页面运行时直接向对象存储请求。
 - 当前主包约 349 KB（gzip ~112 KB），主要来自 D3 + Base UI；视图已按路由 `lazy()` 拆包。
 
 ## 提交前

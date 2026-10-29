@@ -4,8 +4,9 @@
 
 页面消费的是 `stream-datapack` 生成的归一化 JSON。生产这些 JSON 的 pipeline（yt-dlp 元信息 / 弹幕 / 评论区 / VSTATS 快照）不在本仓库内。
 
-- **场次索引与预聚合**（`manifest.json` / `insights.json`）由 `publish:data` 从 pack 派生，和 datapack 一起上传对象存储，不进 git。
+- **dataset 索引与预聚合**（`index.json` / `manifest.json` / `insights.json`）由 `publish:data` 从 pack 派生，和 datapack 一起上传对象存储，不进 git。
 - **逐场 datapack** 上传到对象存储（Cloudflare R2 等），不进 git；浏览器按 `VITE_DATAPACK_BASE/<datasetId>/<videoId>.datapack.json` 拉取。
+- 页面运行时直接读对象存储，发布后刷新即可，不需要重新构建前端。
 - `data/<datasetId>/` 下的 pack、manifest、insights 都是上传前的本地暂存/派生物。
 
 ## 目录约定
@@ -29,10 +30,10 @@ data/
 # 1. 放进暂存区，顺带更新本地 manifest
 bun run add:datapack nonoka /path/to/abc123XYZ.datapack.json
 
-# 2. 由全部 pack 重建 manifest + insights，并增量上传到 R2
+# 2. 由全部 pack 重建 index + manifest + insights，并增量上传到 R2
 bun run publish:data
 
-# 3. 本地看效果
+# 3. 本地看效果（sync 只生成 public/data/ 兜底快照）
 bun run sync:data
 bun run validate:data
 bun run dev
@@ -70,8 +71,8 @@ bun run dev
 }
 ```
 
-3. `bun run publish:data --dataset arare` 生成并上传该 dataset 的 manifest / insights。
-4. `bun run sync:data`，`public/data/index.json` 会多一条 dataset，页面顶部自动出现选择器。
+3. `bun run publish:data --dataset arare` 生成并上传该 dataset 的 manifest / insights，并在最后刷新根 `index.json`。
+4. 刷新页面，成员入口自动出现；不需要重新构建。离线开发时再跑 `bun run sync:data` 更新兜底快照。
 
 不需要改 React 组件。
 
@@ -108,7 +109,7 @@ bun run dev
 ## 数据体积与 Git
 
 - **git 里不存数据**：只有 `data-sources.json` 和 `data/README.md`。
-- datapack 合计约 7 MB（262 场，均 26 KB），放在对象存储；几千场也不会撑大仓库。
+- 单个 dataset 约 300 场、均 26 KB，放在对象存储；几千场也不会撑大仓库。
 - `data/<id>/` 下的 pack、manifest、insights 都是本地暂存/派生物，已 gitignore。
 - `public/data/` 是构建生成物，同样不提交。
 - 回滚数据靠对象存储的版本控制，不是 `git revert`。

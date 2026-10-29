@@ -1,7 +1,7 @@
 # data/
 
 **本地暂存区，不进 git。** 真源是每个 dataset 下的 `*.datapack.json`，发布时由它们派生出
-`manifest.json` 与 `insights.json`，三者一起上传到对象存储（R2 等）。
+`manifest.json`、`insights.json`，以及桶根的 `index.json`，一起上传到对象存储（R2 等）。
 
 ```text
 data/
@@ -16,8 +16,12 @@ data/
 ## 当前数据集
 
 | id | 成员 | 场次 | 时间范围 | channelId |
-| --- | --- | --- | --- | --- |
-| `nonoka` | 宮永ののか | 262 | 2023-11-19 – 2026-10-22 | `UCGeCnpimiSN5rgiKbJzHd3A` |
+| --- | --- | ---: | --- | --- |
+| `nonoka` | 宮永ののか | 287 | 2023-11-19 – 2026-10-29 | `UCGeCnpimiSN5rgiKbJzHd3A` |
+| `arale` | 仲町あられ | 286 | 2025-06-08 – 2026-10-29 | `UCWfF0DB6m_t2CE3KcOOOX7g` |
+| `ritsu` | 峰月律 | 339 | 2023-11-19 – 2026-10-27 | `UCxc0MrPoACKTFlV24GqX2sg` |
+| `miyako` | 藤都子 | 321 | 2023-11-18 – 2026-10-28 | `UCZXxRYaP7mfuglPnptnBBCA` |
+| `yuno` | 千石ユノ | 236 | 2025-05-08 – 2026-10-24 | `UC99kOG6_9RD0mR3OG4EOfxw` |
 
 - 抓取进度、跳过判定与下一批候选见 [../docs/data-progress.md](../docs/data-progress.md)。
 - `<videoId>.datapack.json`：每场完整数据，schema `yumemita.stream-datapack/v1`。
@@ -45,16 +49,16 @@ data/
 # 单场：放进暂存区并更新本地 manifest
 bun run add:datapack nonoka /path/to/<videoId>.datapack.json
 
-# 从全部 pack 重建 manifest + insights，并增量上传到 R2
+# 从全部 pack 重建 index + manifest + insights，并增量上传到 R2
 bun run publish:data
 
-# 构建/开发前同步到 public/data
+# 生成 public/data/ 兜底快照并校验
 bun run sync:data
 bun run validate:data
 ```
 
-`sync:data` 在配了 `VITE_DATAPACK_BASE` 时从对象存储拉 manifest/insights（带本地缓存），
-没配时直接用这里的本地文件，离线也能开发。
+页面运行时直接读对象存储，发布后刷新即可。`sync:data` 在配了 `VITE_DATAPACK_BASE` 时从远端拉
+index/manifest/insights（带本地缓存）写进 `public/data/`，没配时直接用这里的本地文件，离线也能开发。
 
 ## 不要放什么
 

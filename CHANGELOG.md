@@ -4,11 +4,14 @@
 
 ### 数据
 
+- 数据集扩展为 5 位成员：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1469 场**。
 - `nonoka` 分两批从最近 30 场向前续抓 18 场（2026-06-22 – 2026-08-09，以及 2024-12-13 的存档），共 **48 场**。
 - 新增 [docs/data-progress.md](docs/data-progress.md)：频道历史抓取进度、跳过判定、下一批候选。
 
 ### 界面
 
+- 成员色拆成两个 token：`--member-color` 保留 `data-sources.json` 里的品牌原色（图表、色点、色条），
+  `--member-ink` 用对比度达标的加深色（小号文字、焦点环）。浅色主题下 `#ffcb5b` 不再被压成棕色。
 - 首页重排为四层：页面头 → 规模指标条 → 最近一场 / 本月 / 全期记录 → 最近场次 → 更新日历。
   规模指标从页头的一组小字提为 24px 数字条；最近一场只保留 3 个主指标，其余降为一行次级读数。
 - 内容构成、全期高频词/发言者、典型节奏曲线移到趋势页；首页不再与趋势页重复堆叠分析块。
@@ -31,12 +34,17 @@
 
 ### 工程
 
+- **数据发布即生效**：`publish:data` 现在同时生成并最后上传根 `index.json`；页面启动时直接从对象存储读
+  `index.json` / `manifest.json` / `insights.json` / datapack，发布后刷新即可，不需要重新构建前端。
+  manifest / insights 用索引的 `generatedAt` 做版本参数，绕开 CDN 旧缓存。
+- `sync:data` 改为只生成 `public/data/` 兜底快照（远端 index 可用时原样复用）；`validate:data --remote`
+  同时校验根 `index.json`。
 - **数据源迁到对象存储**：manifest / insights / datapack 全部放 R2，git 里只保留 `data-sources.json`。
 - 新增 `bun run publish:data`：以本地 pack 为唯一真源，派生 manifest + insights 后先传 pack、再传索引，
   避免索引指向不存在的文件；`--no-upload` 可只生成本地文件。
-- `sync:data` 改为构建时从 `VITE_DATAPACK_BASE` 拉 manifest/insights，带 `node_modules/.cache` 缓存兜底；
+- `sync:data` 支持从 `VITE_DATAPACK_BASE` 拉 manifest/insights，带 `node_modules/.cache` 缓存兜底；
   没配地址时回退本地 `data/` 暂存区。
-- `validate:data --remote` 逐条 HEAD 校验对象存储上的 manifest / insights / datapack。
+- `validate:data --remote` 逐条 HEAD 校验对象存储上的 index / manifest / insights / datapack。
 - 新增 `vercel.json`（缓存头）与 `.env.example`。
 - `publish:data` 支持 `R2_PREFIX`：对象写进桶内指定前缀，`VITE_DATAPACK_BASE` 指向同一前缀。
 - 上传改用 Bun 原生 `S3Client`，移除 `aws4fetch` 依赖。

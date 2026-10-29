@@ -144,7 +144,7 @@ bun run test:smoke   # 需先启动 dev/preview
 ## 已知取舍
 
 - 路由从 `#/:id/overview|table` 改为 `#/:id`（成员首页）与 `#/:id/streams`（场次页）；旧地址保留重定向。
-- 成员色写入 `data-sources.json` 的 `color`，由 `sync:data` 透传到 `index.json`，页面通过 `--member-color` 注入。
+- 成员色写入 `data-sources.json` 的 `color`，由 `publish:data` 写进 `index.json`；页面注入 `--member-color`（品牌原色，图表/色点）与 `--member-ink`（对比度达标的前景色，文字/焦点环）。
 - 原型 `.commandcode/design/prototype-v2.html` 仅作视觉校验，不进入生产代码。
 - 移动端使用底部标签栏 + 成员 Sheet；侧栏在移动端仍可通过顶栏按钮以抽屉打开。
 - `⌘K` 命令面板是全局搜索，输入框内也生效；`⌘B` 由 coss `SidebarProvider` 提供。

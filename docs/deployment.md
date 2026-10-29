@@ -13,10 +13,10 @@ bun run build
 dist/
 ├─ index.html
 ├─ assets/        # JS/CSS/字体（带 hash）
-└─ data/          # index.json + <dataset>/manifest.json + insights.json
+└─ data/          # 兜底快照：index.json + <dataset>/manifest.json + insights.json
 ```
 
-`dist/` 是纯静态文件，不需要 Node 运行时。逐场 datapack 不在 `dist/` 里，由浏览器向对象存储请求。
+`dist/` 是纯静态文件，不需要 Node 运行时。页面启动时直接向对象存储请求数据；`dist/data/` 只在远端不可达时兜底（例如离线预览）。逐场 datapack 不在 `dist/` 里。
 
 ## 本地预览
 
@@ -40,9 +40,9 @@ bun run preview
 | Output directory | `dist` |
 | Install command | `bun install --frozen-lockfile` |
 | Node version | 22.22+ |
-| 环境变量 | `VITE_DATAPACK_BASE` — 数据根地址（manifest / insights / datapack） |
+| 环境变量 | `VITE_DATAPACK_BASE` — 数据根地址（index / manifest / insights / datapack） |
 
-`VITE_DATAPACK_BASE` 在构建时被 Vite 内联进产物，改动后需要重新构建。留空则回退到本地 `data/` 暂存区。
+`VITE_DATAPACK_BASE` 在构建时被 Vite 内联进产物，地址本身改动后需要重新构建；**数据更新不需要**，`bun run publish:data` 后刷新即可。留空则回退到本地 `data/` 暂存区。
 
 这些平台通常支持 Bun；如果没有，用 `npm install && npm run build` 也可以（脚本内部调用 `vite`）。
 
@@ -55,11 +55,12 @@ bun run preview
 
 ## 数据发布与对象存储
 
-所有数据（manifest / insights / datapack）都在 Cloudflare R2（或任意 S3 兼容存储）上，git 里只有代码与 `data-sources.json`。
+所有数据（index / manifest / insights / datapack）都在 Cloudflare R2（或任意 S3 兼容存储）上，git 里只有代码与 `data-sources.json`。
 
 ```text
 <bucket>/
 └─ stream-dashboard/        # R2_PREFIX：桶内前缀，留空则直接写桶根
+   ├─ index.json            # dataset 索引（页面入口）
    └─ nonoka/
       ├─ manifest.json
       ├─ insights.json
@@ -79,7 +80,7 @@ bun run publish:data --no-upload
 bun run publish:data --force
 ```
 
-`publish:data` 以本地 `data/<id>/*.datapack.json` 为唯一真源：先上传变化的 pack，再上传 manifest 与 insights。中途失败只会多出一个未被引用的 pack，不会出现指向不存在文件的索引。
+`publish:data` 以本地 `data/<id>/*.datapack.json` 为唯一真源：先上传变化的 pack，再上传 manifest 与 insights，最后写根目录的 `index.json`。中途失败只会多出一个未被引用的 pack，不会出现指向不存在文件的索引。发布完成后页面刷新即生效，不需要重新构建。
 
 增量上传的进度记在本地 `data/.publish-state.json`（不进 git）：
 
@@ -92,8 +93,8 @@ bun run publish:data --force
 ### 构建
 
 - 构建只需要 `VITE_DATAPACK_BASE`（公开根地址，例如 `https://pub-xxxx.r2.dev`），不需要写权限凭据。用了 `R2_PREFIX` 时，这里也要带上同一前缀（如 `https://example.com/stream-dashboard`）。
-- `sync:data` 从该地址拉 `manifest.json` 与 `insights.json`，缓存到 `node_modules/.cache/stream-dashboard/`；拉取失败时回退缓存，无缓存则构建失败。
-- 浏览器直接请求 `<base>/<datasetId>/<videoId>.datapack.json`。
+- 页面运行时直接请求 `<base>/index.json`、`<base>/<datasetId>/manifest.json`、`insights.json` 与 `<base>/<datasetId>/<videoId>.datapack.json`。
+- `sync:data` 从该地址拉 `index.json`、`manifest.json` 与 `insights.json`，缓存到 `node_modules/.cache/stream-dashboard/`，写进 `public/data/` 作为兜底快照；拉取失败时回退缓存，远端 index 不可用则按本地配置构造。
 
 ### CORS
 
@@ -113,15 +114,15 @@ bun run publish:data --force
 ### 缓存
 
 - datapack 内容随 videoId 固定，可以长缓存：`Cache-Control: public, max-age=31536000, immutable`。
-- manifest / insights 用短缓存（60 秒左右），发布后尽快生效。
-- 发布后跑 `bun run validate:data -- --remote` 逐条 HEAD，确认地址可达。
+- `index.json` 每次启动带时间戳请求，CDN 缓存不影响新鲜度；manifest / insights 用索引的 `generatedAt` 作查询参数，发布后自动换 URL，可以放心短缓存或长缓存。
+- 发布后跑 `bun run validate:data -- --remote` 逐条 HEAD（含根目录 `index.json`），确认地址可达。
 
 ## 缓存策略
 
 - `assets/*` 带 content hash，可以长缓存（`Cache-Control: public, max-age=31536000, immutable`）。
-- `data/*.json`（索引与预聚合）用短缓存：`public, max-age=300, must-revalidate`，避免数据更新后看到旧值。
+- `data/*.json`（构建兜底快照）用短缓存：`public, max-age=300, must-revalidate`。
 - `index.html` 用 `no-cache`。
-- 仓库自带 `vercel.json` 已按上述规则配置；datapack 的缓存由对象存储侧控制。
+- 运行时数据主要来自对象存储，其缓存由存储侧控制；仓库自带 `vercel.json` 只影响兜底快照。
 
 ## CI
 
@@ -129,7 +130,7 @@ bun run publish:data --force
 
 ```text
 checkout → setup Bun → bun install → check VITE_DATAPACK_BASE
-        → sync:data（从对象存储拉 manifest/insights）→ validate:data
+        → sync:data（从对象存储拉 index/manifest/insights 作兜底）→ validate:data
         → typecheck → test → lint → build
 ```
 
@@ -141,18 +142,18 @@ bun run ci
 
 ## 数据与隐私
 
-- `data/` 是本地暂存区，不进 git；构建产物只含 `index.json`、`manifest.json`、`insights.json`。
+- `data/` 是本地暂存区，不进 git；`dist/data/` 只作为兜底快照。
 - 公开范围由上传到对象存储的 datapack 决定；确认没有会员限定/会限等不适合公开的内容。
 - 不要上传 cookie、邮箱、付款信息等隐私数据；前端隐藏不等于不可访问。
 
 ## 体积
 
-- 首屏数据是 `index.json` + `manifest.json` + `insights.json`：262 场时约 400 KB，gzip 后约 47 KB。
-- `dist/data/` 只含这三个文件，datapack 不在构建产物里。
-- 262 份 datapack 合计约 7 MB，放在对象存储；单场页只取 1 份，对比页最多 4 份。
+- 首屏数据是根 `index.json` + 当前 dataset 的 `manifest.json` 与 `insights.json`；单个 dataset 约 300 场时约 400 KB，gzip 后约 47 KB。
+- `dist/data/` 只含兜底快照，datapack 不在构建产物里。
+- datapack 放在对象存储；单场页只取 1 份，对比页最多 4 份。
 - JS 主包约 349 KB（gzip ~112 KB），CSS 约 240 KB（gzip ~32 KB）。
 - 视图已按路由 `React.lazy()` 拆包，总览/单场/对比/数据表/说明各自是独立 chunk。
 
 ## 回滚
 
-静态站点回滚 = 重新部署上一版 `dist/`。数据回滚 = 恢复 `data/` 的上一版提交并重新构建。两者都在 Git 历史里。
+静态站点回滚 = 重新部署上一版 `dist/`。数据回滚 = 恢复对象存储的上一版对象（R2 版本控制 / 备份），或把本地暂存区的对应 pack 放回去重新 `bun run publish:data`；数据本身不在 Git 历史里。

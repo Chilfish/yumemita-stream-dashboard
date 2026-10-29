@@ -2,22 +2,23 @@
 
 ## 页面空白 / 一直显示加载
 
-1. 确认 `public/data/index.json` 存在：
+1. 配了 `VITE_DATAPACK_BASE` 时，先确认对象存储根目录有 `index.json`：
 
    ```bash
-   bun run sync:data
-   ls public/data
+   bun run validate:data -- --remote
    ```
 
-2. 浏览器 Network 面板看 `data/index.json` 是否 404。
+   没有就先跑 `bun run publish:data`。
+
+2. 浏览器 Network 面板看 `<base>/index.json` 是否 404；远端不可达时页面会回退到同源 `data/index.json`，本地快照可用 `bun run sync:data` 生成。
 3. 如果部署在子路径，确认 `vite.config.ts` 的 `base` 与访问路径一致。
 4. 硬刷新（Ctrl/Cmd + Shift + R）排除旧缓存。
 
 ## “index.json 里没有可用的 dataset”
 
 - `data-sources.json` 为空或 `id` 不合法。
-- 配了 `VITE_DATAPACK_BASE` 时检查 `<base>/<id>/manifest.json` 是否存在；没配时先跑 `bun run publish:data --no-upload` 生成本地文件。
-- `sync:data` 的输出会写每个 dataset 的场次数。
+- 远端 `index.json` 是旧版本或不存在：重新跑 `bun run publish:data`。
+- 离线开发时先跑 `bun run publish:data --no-upload` 生成 manifest，再 `bun run sync:data` 生成本地索引。
 
 ## “datapack 加载失败（HTTP 404）”
 

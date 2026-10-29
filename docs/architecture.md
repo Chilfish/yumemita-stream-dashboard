@@ -22,22 +22,18 @@
 │ data/<dataset>/*.datapack.json   本地暂存（gitignore）    │
 └───────────────────────┬─────────────────────────────────┘
                         │ scripts/publish-data.ts
-                        │ 派生 manifest + insights，三者一起上传
+                        │ 派生 index + manifest + insights，一起上传
 ┌───────────────────────▼─────────────────────────────────┐
 │ 对象存储（R2 等）                                        │
+│  <base>/index.json                                      │
 │  <base>/<dataset>/manifest.json                         │
 │                  insights.json                          │
 │                  <videoId>.datapack.json                │
 └───────────────────────┬─────────────────────────────────┘
-                        │ 构建时 scripts/sync-data.mjs（带缓存）
-                        │ 只拉 manifest + insights
+                        │ fetch（浏览器启动时直接读取）
+                        │ 索引 / manifest / insights / datapack
 ┌───────────────────────▼─────────────────────────────────┐
-│ public/data/             生成物（gitignore）             │
-│  index.json + <dataset>/manifest.json + insights.json   │
-└───────────────────────┬─────────────────────────────────┘
-                        │ fetch（浏览器）
-┌───────────────────────▼─────────────────────────────────┐
-│ src/lib/data.ts          索引同源加载；datapack 走远端    │
+│ src/lib/data.ts          远端优先；public/data/ 只做兜底  │
 │ src/lib/table-params.ts  数据表 URL 参数解析/序列化       │
 │ src/hooks/               useDatasetIndex / useDataset /  │
 │                          useStreamPacks（按需）           │
@@ -67,10 +63,10 @@
 
 ## 数据流
 
-1. `scripts/sync-data.mjs` 读 `data-sources.json`。
-2. 配了 `DATAPACK_BASE` / `VITE_DATAPACK_BASE` 时，从对象存储拉 `<id>/manifest.json` 与 `insights.json`（写本地缓存；拉取失败且无缓存才报错）；没配时直接用本地 `data/<id>/`。
-3. manifest 与 insights 由 `publish:data` 从 pack 派生，构建阶段不重算。
-4. 写 `public/data/<id>/manifest.json`、`insights.json` 与 `public/data/index.json`（dataset 列表 + 数量 + 生成时间）。
+1. `scripts/publish-data.ts` 从 `data/<id>/*.datapack.json` 派生 `index.json`、`manifest.json`、`insights.json`，按 pack → manifest/insights → index 的顺序上传对象存储。
+2. 页面启动时 `src/lib/data.ts` 先向对象存储请求 `<base>/index.json`。索引请求带时间戳，避免 CDN 返回旧副本；远端不可达或还没发布过索引时回退到 `public/data/index.json`。
+3. manifest 与 insights 用索引的 `generatedAt` 作版本参数请求同一个 `<base>`，同样在失败时回退同源快照；构建阶段不重算。
+4. `scripts/sync-data.mjs` 只负责生成兜底快照：配了 `DATAPACK_BASE` / `VITE_DATAPACK_BASE` 时原样拉取远端的 index / manifest / insights（带本地缓存），没配时用本地 `data/<id>/`。
 5. `useDatasetIndex()` 拉 index；默认选中第一个 dataset。
 6. `useDataset(datasetId)` 并行拉 manifest 与 insights，然后用 `buildSummaryRows` 得到按开播时间倒序的 `StreamSummary[]`。列表页不再等待所有 datapack。
 7. 列表视图（总览 / 数据表 / 对比指标）只消费 summary 与预聚合 totals；单场和对比的逐分钟曲线通过 `useStreamPacks` 按 videoId 向对象存储请求 datapack（`VITE_DATAPACK_BASE`），`lib/data.ts` 里有缓存与并发去重。
@@ -232,15 +228,15 @@ src/components/charts/
 | 数据加载 | 索引静态托管 + datapack 对象存储 | 无后端；大文件不进 git，按需拉取 |
 | 聚合位置 | 发布时预聚合 + 浏览器局部计算 | 列表页不需要任何 datapack；预聚合由 publish 生成 |
 | 状态管理 | React 局部状态 | 页面简单，避免全局 store |
-| 数据源 | pack 派生 manifest/insights，整体上传对象存储 | 单一真源，索引不会与 pack 漂移 |
+| 数据源 | pack 派生 index/manifest/insights，整体上传对象存储 | 单一真源，索引不会与 pack 漂移；发布即生效 |
 
 ## 性能与限制
 
-- 首屏只加载 `index.json` + `manifest.json` + `insights.json`（262 场时约 400 KB，gzip 后约 47 KB），不拉任何 datapack。
+- 首屏只加载 `index.json` + 当前 dataset 的 `manifest.json` + `insights.json`（单个 dataset 约 300 场时约 400 KB，gzip 后约 47 KB），不拉任何 datapack。
 - 单场页只请求该场的 datapack；对比页最多请求所选 4 场。`fetchDatapack` 用模块级缓存与 in-flight 去重，来回切换不会重复下载。
 - `insights.json` 由 `publish:data` 预聚合，页面内不再对全部场次重算 totals；`buildSummaryRows` 只做排序。
 - 图表用 ResizeObserver，窗口缩放不会重建数据。
 - 词频/发言者是“各场 Top 列表相加”，不是全量重扫；精确聚合需要扩展 datapack schema。
 - 使用 hash 路由，刷新/分享任一页面都能还原；视图按路由 `React.lazy()` 拆包，首屏只加载当前页。
-- `/data/*.json` 走短缓存（`vercel.json` 里 300s），datapack 由对象存储按 videoId 长缓存；仓库体积与场次数无关。
+- 索引每次启动带时间戳重新取；manifest / insights 用索引的 `generatedAt` 做版本参数，发布后自动换 URL，不吃 CDN 旧缓存；datapack 按 videoId 长缓存。仓库体积与场次数无关。
 - manifest 会随场次线性增长（3000 场约 4 MB raw / 460 KB gzip）。再往上需要按年份切片或引入服务端分页。

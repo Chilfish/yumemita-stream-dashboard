@@ -97,6 +97,10 @@ bun run validate:data
 `--root` 是**原始会话目录**，不是 `data/`；datapack 仍按 `data-sources.json` 写到 `data/nonoka/`。
 已入库和已有素材的场次会自动跳过，中断后直接重跑同一条命令即可。
 
+换设备或清掉 `data/` 后不需要先跑别的脚本：本地没有 manifest 时，`fetch-streams` 会先从
+`VITE_DATAPACK_BASE`（或 `R2_*` 凭据）恢复 manifest 与缺失的 datapack，再按同样的规则跳过
+已抓场次。要强制刷新本地暂存区时加 `--restore`，不想联网时加 `--no-restore`。
+
 ## 口径提醒
 
 - **同名去重**：教学/游戏系列会同一标题分多场，manifest 只保留时长正常的正片；摘要、预告、切片不进数据集。

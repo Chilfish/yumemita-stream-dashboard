@@ -48,7 +48,8 @@
 - [x] agent-browser 冒烟测试：首页、单场深链刷新、无效 id、对比深链、趋势深链、前进后退。
 - [x] 可访问性审计：首页 / 场次 / 单场 / 对比（桌面 + 移动）axe 0 violations。
 - [x] 对象存储：datapack 与索引走 S3 / R2，`VITE_DATAPACK_BASE` 构建时注入。
-- [x] 索引与明细拆分：构建只拉 `manifest.json` + `insights.json`，单场按需拉 datapack。
+- [x] 发布即生效：页面运行时直接读远端 `index.json` + `manifest.json` + `insights.json`，`publish:data` 后刷新即可，不再依赖重新构建。
+- [x] 索引与明细拆分：首屏只拉 `index.json` + 当前 dataset 的 manifest/insights，单场按需拉 datapack。
 - [x] CI 从对象存储拉索引；`VITE_DATAPACK_BASE` 缺失时给出明确报错。
 - [x] 在 GitHub 仓库设置 `VITE_DATAPACK_BASE` repository variable（HTTPS 地址）。
 - [ ] 200% 缩放复核（320px 已通过）。
