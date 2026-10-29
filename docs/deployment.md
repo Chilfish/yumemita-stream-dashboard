@@ -59,16 +59,17 @@ bun run preview
 
 ```text
 <bucket>/
-└─ nonoka/
-   ├─ manifest.json
-   ├─ insights.json
-   └─ <videoId>.datapack.json
+└─ stream-dashboard/        # R2_PREFIX：桶内前缀，留空则直接写桶根
+   └─ nonoka/
+      ├─ manifest.json
+      ├─ insights.json
+      └─ <videoId>.datapack.json
 ```
 
 ### 发布
 
 ```bash
-# 需要 R2_* 凭据（见 .env.example），只在本地跑
+# 需要 R2_* 凭据与可选的 R2_PREFIX（桶内前缀，见 .env.example），只在本地跑
 bun run publish:data
 
 # 只重算本地 manifest/insights，不上传
@@ -79,7 +80,7 @@ bun run publish:data --no-upload
 
 ### 构建
 
-- 构建只需要 `VITE_DATAPACK_BASE`（公开根地址，例如 `https://pub-xxxx.r2.dev`），不需要写权限凭据。
+- 构建只需要 `VITE_DATAPACK_BASE`（公开根地址，例如 `https://pub-xxxx.r2.dev`），不需要写权限凭据。用了 `R2_PREFIX` 时，这里也要带上同一前缀（如 `https://example.com/stream-dashboard`）。
 - `sync:data` 从该地址拉 `manifest.json` 与 `insights.json`，缓存到 `node_modules/.cache/stream-dashboard/`；拉取失败时回退缓存，无缓存则构建失败。
 - 浏览器直接请求 `<base>/<datasetId>/<videoId>.datapack.json`。
 

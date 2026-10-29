@@ -16,6 +16,8 @@
   没配地址时回退本地 `data/` 暂存区。
 - `validate:data --remote` 逐条 HEAD 校验对象存储上的 manifest / insights / datapack。
 - 新增 `vercel.json`（缓存头）与 `.env.example`。
+- `publish:data` 支持 `R2_PREFIX`：对象写进桶内指定前缀，`VITE_DATAPACK_BASE` 指向同一前缀。
+- 上传改用 Bun 原生 `S3Client`，移除 `aws4fetch` 依赖。
 - 移除 GitHub Pages 部署 workflow（`.github/workflows/deploy.yml`），部署迁到 Vercel。
 - 修复：`data/.gitignore` 的全忽略规则导致 232 份 datapack 从未被提交，远端构建缺数据。
 

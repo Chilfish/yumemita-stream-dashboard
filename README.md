@@ -39,7 +39,7 @@ bun run dev
 
 `dev` 会先运行 `sync:data`：配了 `VITE_DATAPACK_BASE` 就从对象存储拉索引与预聚合（带本地缓存），没配就用本地 `data/` 暂存区。单场 datapack 由浏览器按需向对象存储请求。
 
-需要连对象存储时，复制 `.env.example` 为 `.env` 并填写 `VITE_DATAPACK_BASE`（构建时注入）；留空则完全走本地 `data/`，离线开发不受影响。
+需要连对象存储时，复制 `.env.example` 为 `.env` 并填写 `VITE_DATAPACK_BASE`（构建时注入）；留空则完全走本地 `data/`，离线开发不受影响。上传侧另需 `R2_*` 凭据，可选 `R2_PREFIX` 指定桶内前缀。
 
 ### 常用命令
 

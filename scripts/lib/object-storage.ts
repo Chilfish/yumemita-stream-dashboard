@@ -4,7 +4,7 @@
  * 数据只有一份真源：本地 `data/<id>/*.datapack.json`。publish 时由 pack 派生出
  * manifest / insights，与 pack 一起上传到同一个桶，避免两份数据漂移。
  */
-import { AwsClient } from 'aws4fetch'
+import { S3Client } from 'bun'
 
 export const MANIFEST_SCHEMA = 'yumemita.stream-datapack.batch/v1'
 export const INSIGHTS_SCHEMA = 'yumemita.dashboard.insights/v1'
@@ -31,6 +31,8 @@ interface Credentials {
   accessKeyId: string
   secretAccessKey: string
   bucket: string
+  /** 桶内前缀（目录），空串表示直接写桶根目录。 */
+  prefix: string
 }
 
 export function readCredentials(): Credentials | null {
@@ -40,26 +42,29 @@ export function readCredentials(): Credentials | null {
   const bucket = process.env.R2_BUCKET
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket)
     return null
-  return { accountId, accessKeyId, secretAccessKey, bucket }
+  const prefix = (process.env.R2_PREFIX ?? '').replace(/^\/+|\/+$/g, '')
+  return { accountId, accessKeyId, secretAccessKey, bucket, prefix }
 }
 
 export function createUploader(credentials: Credentials) {
-  const client = new AwsClient({
+  const client = new S3Client({
     accessKeyId: credentials.accessKeyId,
     secretAccessKey: credentials.secretAccessKey,
-    service: 's3',
-    region: 'auto',
+    bucket: credentials.bucket,
+    endpoint: `https://${credentials.accountId}.r2.cloudflarestorage.com`,
   })
-  const endpoint = `https://${credentials.accountId}.r2.cloudflarestorage.com/${credentials.bucket}`
+
+  const prefix = credentials.prefix ? `${credentials.prefix}/` : ''
 
   return async function put(key: string, body: string): Promise<void> {
-    const response = await client.fetch(`${endpoint}/${key}`, {
-      method: 'PUT',
-      body,
-      headers: { 'Content-Type': 'application/json' },
-    })
-    if (!response.ok)
-      throw new Error(`上传 ${key} 失败：HTTP ${response.status} ${await response.text()}`)
+    const objectKey = `${prefix}${key}`
+    try {
+      await client.file(objectKey).write(body, { type: 'application/json' })
+    }
+    catch (error) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      throw new Error(`上传 ${objectKey} 失败：${detail}`, { cause: error })
+    }
   }
 }
 
