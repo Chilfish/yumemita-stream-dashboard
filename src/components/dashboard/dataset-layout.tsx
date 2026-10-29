@@ -89,7 +89,7 @@ export function DatasetLayout() {
         theme={theme}
       />
 
-      <SidebarInset id="main-content" tabIndex={-1}>
+      <SidebarInset className="min-w-0" id="main-content" tabIndex={-1}>
         <ScrollRestoration />
         <AppHeader
           chatTotal={chatTotal}

@@ -106,7 +106,7 @@ export function CalendarHeatmap({ days, metric, ariaLabel, className }: Calendar
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <div className="overflow-x-auto pb-1">
+      <div className="overflow-x-auto pb-1 [contain:inline-size]">
         <svg
           aria-label={ariaLabel}
           className="block"

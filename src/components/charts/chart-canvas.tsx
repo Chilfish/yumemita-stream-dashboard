@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useElementWidth } from "@/hooks/use-element-width";
+import { cn } from "@/lib/utils";
 
 interface ChartCanvasProps {
   height: number;
@@ -16,7 +17,11 @@ export function ChartCanvas({ height, ariaLabel, children, className }: ChartCan
   const [ref, width] = useElementWidth<HTMLDivElement>();
 
   return (
-    <div ref={ref} className={className} style={{ minHeight: height }}>
+    <div
+      ref={ref}
+      className={cn("overflow-hidden [contain:inline-size]", className)}
+      style={{ minHeight: height }}
+    >
       {width > 0 ? (
         <svg
           aria-label={ariaLabel}
