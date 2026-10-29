@@ -1,7 +1,6 @@
 import { Check } from "lucide-react";
 import {
   Sheet,
-  SheetDescription,
   SheetHeader,
   SheetPanel,
   SheetPopup,
@@ -16,7 +15,8 @@ const DEFAULT_MEMBER_COLOR = "#b8461f";
 
 interface MemberSheetProps {
   datasets: DatasetIndexEntry[];
-  activeId: string;
+  /** `null` = 组级页面，没有当前成员。 */
+  activeId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (dataset: DatasetIndexEntry) => void;
@@ -34,11 +34,10 @@ export function MemberSheet({
       <SheetPopup side="bottom">
         <SheetHeader>
           <SheetTitle>成员</SheetTitle>
-          <SheetDescription>切换成员会保持当前页面层级。</SheetDescription>
         </SheetHeader>
         <SheetPanel className="pb-[max(--spacing(6),env(safe-area-inset-bottom))]">
           {datasets.length === 0 ? (
-            <p className="text-footnote text-muted-foreground">还没有接入成员。</p>
+            <p className="text-footnote text-muted-foreground">还没有成员。</p>
           ) : (
             <ul className="flex flex-col divide-y divide-hairline">
               {datasets.map(member => {

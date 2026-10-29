@@ -27,7 +27,14 @@ import {
 } from "@/components/ui/sidebar";
 import type { Theme } from "@/hooks/use-theme";
 import { formatInteger } from "@/lib/format";
-import { sectionFromPathname, viewPath, type ViewKey } from "@/lib/routes";
+import {
+  groupGalleryPath,
+  groupHomePath,
+  homePath,
+  viewPath,
+  type GroupViewKey,
+  type ViewKey,
+} from "@/lib/routes";
 import type { DatasetIndexEntry } from "@/types/dataset";
 import { assetUrl, cn } from "@/lib/utils";
 import { readableOn } from "@/lib/color";
@@ -50,11 +57,25 @@ const NAV_ITEMS: NavItem[] = [
   { key: "about", label: "说明", icon: Info },
 ];
 
+interface GroupNavItem {
+  key: GroupViewKey;
+  label: string;
+  icon: LucideIcon;
+  to: string;
+}
+
+const GROUP_NAV_ITEMS: GroupNavItem[] = [
+  { key: "home", label: "组首页", icon: LayoutDashboard, to: groupHomePath() },
+  { key: "gallery", label: "全组相册", icon: Images, to: groupGalleryPath() },
+];
+
 const ACTIVE_ITEM_CLASS =
   "relative before:absolute before:inset-y-2 before:-left-2 before:w-[2.5px] before:rounded-full before:bg-transparent data-[active=true]:before:bg-member data-[active=true]:bg-card! data-[active=true]:font-medium data-[active=true]:shadow-sm/5";
 
 interface AppSidebarProps {
-  dataset: DatasetIndexEntry;
+  /** 组级页面没有当前成员；此时侧栏只展示组导航。 */
+  dataset: DatasetIndexEntry | null;
+  section: ViewKey | GroupViewKey;
   datasets: DatasetIndexEntry[];
   chatTotal: number;
   theme: Theme;
@@ -63,6 +84,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({
   dataset,
+  section,
   datasets,
   chatTotal,
   theme,
@@ -70,17 +92,26 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const section = sectionFromPathname(pathname);
-  const activeSection: ViewKey = section === "stream" ? "streams" : section;
+  const activeSection: ViewKey | GroupViewKey = section === "stream" ? "streams" : section;
 
   function isActive(key: ViewKey): boolean {
-    if (key === "home") return pathname === viewPath(dataset.id, "home");
+    if (!dataset) return false;
+    if (key === "home") return pathname === homePath(dataset.id);
     const target = viewPath(dataset.id, key);
     return pathname === target || pathname.startsWith(`${target}/`);
   }
 
+  function isGroupActive(key: GroupViewKey): boolean {
+    if (dataset) return false;
+    return key === "home" ? pathname === groupHomePath() : pathname === groupGalleryPath();
+  }
+
   function handleMemberSelect(next: DatasetIndexEntry): void {
-    if (next.id === dataset.id) return;
+    if (next.id === dataset?.id) return;
+    if (!dataset) {
+      navigate(homePath(next.id));
+      return;
+    }
     const nextSection = section === "home" ? "home" : section;
     navigate(viewPath(next.id, nextSection));
   }
@@ -93,7 +124,7 @@ export function AppSidebar({
             <SidebarMenuButton
               size="lg"
               tooltip="ゆめみた 配信数据台"
-              render={<Link to={viewPath(dataset.id, "home")} />}
+              render={<Link to={groupHomePath()} />}
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-card text-foreground shadow-surface">
                 <Guitar aria-hidden="true" className="size-4" />
@@ -101,7 +132,9 @@ export function AppSidebar({
               <span className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-semibold text-body">ゆめみた 配信数据台</span>
                 <span className="truncate text-caption text-muted-foreground">
-                  {formatInteger(chatTotal)} 条弹幕
+                  {dataset
+                    ? `${formatInteger(chatTotal)} 条弹幕`
+                    : `${datasets.length} 位成员`}
                 </span>
               </span>
             </SidebarMenuButton>
@@ -120,7 +153,7 @@ export function AppSidebar({
                   <SidebarMenuItem key={member.id}>
                     <SidebarMenuButton
                       className={ACTIVE_ITEM_CLASS}
-                      isActive={member.id === dataset.id}
+                      isActive={member.id === dataset?.id}
                       onClick={() => handleMemberSelect(member)}
                       tooltip={member.label}
                       type="button"
@@ -158,22 +191,42 @@ export function AppSidebar({
           <SidebarGroupLabel>浏览</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map(item => {
-                const Icon = item.icon;
-                return (
-                  <SidebarMenuItem key={item.key}>
-                    <SidebarMenuButton
-                      className={cn(ACTIVE_ITEM_CLASS, isActive(item.key) && "font-medium")}
-                      isActive={item.key === activeSection}
-                      tooltip={item.label}
-                      render={<NavLink to={viewPath(dataset.id, item.key)} />}
-                    >
-                      <Icon aria-hidden="true" />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {dataset
+                ? NAV_ITEMS.map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <SidebarMenuItem key={item.key}>
+                        <SidebarMenuButton
+                          className={cn(ACTIVE_ITEM_CLASS, isActive(item.key) && "font-medium")}
+                          isActive={item.key === activeSection}
+                          tooltip={item.label}
+                          render={<NavLink to={viewPath(dataset.id, item.key)} />}
+                        >
+                          <Icon aria-hidden="true" />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })
+                : GROUP_NAV_ITEMS.map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <SidebarMenuItem key={item.key}>
+                        <SidebarMenuButton
+                          className={cn(
+                            ACTIVE_ITEM_CLASS,
+                            isGroupActive(item.key) && "font-medium",
+                          )}
+                          isActive={item.key === activeSection}
+                          tooltip={item.label}
+                          render={<NavLink to={item.to} />}
+                        >
+                          <Icon aria-hidden="true" />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

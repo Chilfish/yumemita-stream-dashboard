@@ -24,6 +24,11 @@ export type StreamSubView = (typeof STREAM_SUBVIEWS)[number];
 
 export const DEFAULT_STREAM_SUBVIEW: StreamSubView = "overview";
 
+/** 组级（跨成员）页面：没有 `:datasetId` 前缀，直接挂在根路由下。 */
+export const GROUP_VIEWS = ["home", "gallery"] as const;
+
+export type GroupViewKey = (typeof GROUP_VIEWS)[number];
+
 export const MAX_COMPARE = 4;
 
 export function isViewKey(value: unknown): value is ViewKey {
@@ -36,6 +41,18 @@ export function isStreamSubView(value: unknown): value is StreamSubView {
 
 export function datasetPath(datasetId: string): string {
   return `/${encodeURIComponent(datasetId)}`;
+}
+
+export function groupHomePath(): string {
+  return "/";
+}
+
+export function groupGalleryPath(): string {
+  return "/gallery";
+}
+
+export function groupSectionFromPathname(pathname: string): GroupViewKey {
+  return pathname === groupGalleryPath() ? "gallery" : "home";
 }
 
 export function homePath(datasetId: string): string {

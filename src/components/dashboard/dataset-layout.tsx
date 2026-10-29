@@ -90,6 +90,7 @@ export function DatasetLayout() {
         dataset={dataset}
         datasets={index.datasets}
         onToggleTheme={toggle}
+        section={section}
         theme={theme}
       />
 
@@ -104,7 +105,7 @@ export function DatasetLayout() {
           streamCount={rows.length || dataset.count}
         />
 
-        {status === "loading" ? <LoadingScreen label="正在加载 manifest 与聚合摘要…" /> : null}
+        {status === "loading" ? <LoadingScreen label="正在加载场次数据…" /> : null}
 
         {status === "error" ? (
           <div className="mx-auto max-w-2xl px-4 py-16">
@@ -122,9 +123,7 @@ export function DatasetLayout() {
         {status === "ready" && manifest && totals ? (
           <div className="mx-auto w-full max-w-[82.5rem] px-4 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
             {rows.length === 0 ? (
-              <p className="mb-4 text-footnote text-muted-foreground">
-                没有加载到 manifest。确认 <code>public/data/&lt;dataset&gt;/manifest.json</code> 存在。
-              </p>
+              <p className="mb-4 text-footnote text-muted-foreground">没有加载到场次数据。</p>
             ) : null}
             <DatasetViewContext.Provider value={{ dataset, manifest, rows, totals }}>
               <Suspense fallback={<ViewSkeleton />}>

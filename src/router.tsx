@@ -1,6 +1,7 @@
 import { createHashRouter } from "react-router";
 import { DatasetIndexGate } from "@/components/dashboard/dataset-index-gate";
 import { DatasetLayout } from "@/components/dashboard/dataset-layout";
+import { GroupLayout } from "@/components/dashboard/group-layout";
 import { RouteError } from "@/components/dashboard/route-error";
 import { HomeRedirect } from "@/pages/home-redirect";
 import {
@@ -11,6 +12,8 @@ import {
   AboutPage,
   ComparePage,
   GalleryPage,
+  GroupGalleryPage,
+  GroupHomePage,
   HomePage,
   StreamIndexPage,
   StreamPage,
@@ -25,7 +28,15 @@ export const router = createHashRouter([
     element: <DatasetIndexGate />,
     errorElement: <RouteError />,
     children: [
-      { index: true, element: <HomeRedirect /> },
+      {
+        element: <GroupLayout />,
+        errorElement: <RouteError />,
+        children: [
+          { index: true, element: <GroupHomePage /> },
+          { path: "gallery", element: <GroupGalleryPage /> },
+          { path: "*", element: <GroupHomePage /> },
+        ],
+      },
       {
         path: ":datasetId",
         element: <DatasetLayout />,
@@ -45,7 +56,6 @@ export const router = createHashRouter([
           { path: "*", element: <HomeRedirect /> },
         ],
       },
-      { path: "*", element: <HomeRedirect /> },
     ],
   },
 ]);

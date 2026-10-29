@@ -3,6 +3,12 @@ import { lazy } from "react";
 export const HomePage = lazy(() =>
   import("@/pages/home-page").then(module => ({ default: module.HomePage })),
 );
+export const GroupHomePage = lazy(() =>
+  import("@/pages/group-home-page").then(module => ({ default: module.GroupHomePage })),
+);
+export const GroupGalleryPage = lazy(() =>
+  import("@/pages/group-gallery-page").then(module => ({ default: module.GroupGalleryPage })),
+);
 export const StreamsPage = lazy(() =>
   import("@/pages/streams-page").then(module => ({ default: module.StreamsPage })),
 );
