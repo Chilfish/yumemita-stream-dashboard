@@ -81,10 +81,18 @@
 | `chatPer1000AvgViewers` | number \| null | 每千同接弹幕 |
 | `likesPer1000Views` | number \| null | 千播放点赞 |
 | `scPerHour` | number \| null | SC 笔/小时 |
+| `thumbnail` | string \| null | 封面原图相对 key（`thumbs/<videoId>.jpg`，WebP 变体由宽度后缀推导）；旧 pack 或没有封面时为 `null` |
 | `sessionDir` | string | 原始会话目录（归档侧） |
 | `datapack` | string | 归档侧相对路径 |
 
 > manifest 是**摘要**，页面图表需要的逐分钟序列、SC 明细、Top 列表在 datapack 里。
+
+封面图是这套数据里唯一的二进制对象：原图放在 `<base>/<dataset>/thumbs/<videoId>.jpg`，
+同目录另有 480 / 960 / 1280w 的 WebP 变体 `<videoId>.<width>.webp`（本地暂存为
+`data/<dataset>/thumbs/…`，gitignore），都由 `bun run fetch:thumbs` 生成（原图从 YouTube 镜像，变体由
+`Bun.Image` 编码）。key 只由 dataset + videoId（+ 宽度）推导，不依赖 manifest，离线也能拼出 URL；
+发布顺序是 **thumbs → pack → manifest / insights → index**，所以 `streams[].thumbnail` 出现时
+原图与全部 `srcset` 候选都一定已经在桶里。
 
 ## 3. insights
 
@@ -199,6 +207,55 @@
 | `likesPer1000Views` | 点赞 ÷ 播放 × 1000 |
 | `scPerHour` | SC 笔/小时 |
 | `vstatsVsYtdlpViews` | VSTATS 播放 − 抓取时点播放（可能为负） |
+
+## 5. 逐字稿
+
+逐字稿是作者手写的 Markdown，源文件在 `content/transcripts/<datasetId>/<videoId>.md`（进 git）。发布后页面读两份 JSON：
+
+`<base>/transcripts/index.json`：
+
+```json
+{
+  "schema": "yumemita.transcripts/v1",
+  "generatedAt": "2026-10-29T23:00:00+09:00",
+  "entries": [
+    {
+      "datasetId": "nonoka",
+      "videoId": "0Oom7elwKMo",
+      "date": "2026-10-13",
+      "title": "【ライブ振り返り】バンドリ！13thライブをふりかえる！",
+      "tags": ["杂谈", "13th live"],
+      "summary": "一句话摘要",
+      "updatedAt": "2026-10-29T22:55:00.000Z"
+    }
+  ]
+}
+```
+
+`<base>/<datasetId>/transcripts/<videoId>.json`：
+
+```json
+{
+  "schema": "yumemita.transcript/v1",
+  "datasetId": "nonoka",
+  "videoId": "0Oom7elwKMo",
+  "frontmatter": {
+    "videoId": "0Oom7elwKMo",
+    "date": "2026-10-13",
+    "title": "…",
+    "members": ["nonoka"],
+    "tags": ["杂谈"],
+    "summary": "…",
+    "tweets": []
+  },
+  "markdown": "## 开场\n\n[00:00:12] …",
+  "updatedAt": "2026-10-29T22:55:00.000Z"
+}
+```
+
+- 索引最后写；单篇失败只记日志，不阻塞其余稿件。
+- `videoId` 是关联场次的唯一键；`markdown` 保留原始时间码，渲染时再改写成深链。
+- 远端不可达时页面回退到构建期的 Markdown 快照（Vite `import.meta.glob`），所以本地不发布也能预览。
 
 ## 口径与限制
 

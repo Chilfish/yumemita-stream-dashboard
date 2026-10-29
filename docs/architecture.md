@@ -29,6 +29,10 @@
 │  <base>/<dataset>/manifest.json                         │
 │                  insights.json                          │
 │                  <videoId>.datapack.json                │
+│                  thumbs/<videoId>.jpg                   │
+│                  thumbs/<videoId>.<width>.webp          │
+│                  transcripts/<videoId>.json             │
+│  <base>/transcripts/index.json                          │
 └───────────────────────┬─────────────────────────────────┘
                         │ fetch（浏览器启动时直接读取）
                         │ 索引 / manifest / insights / datapack
@@ -72,6 +76,21 @@
 7. 列表视图（总览 / 数据表 / 对比指标）只消费 summary 与预聚合 totals；单场和对比的逐分钟曲线通过 `useStreamPacks` 按 videoId 向对象存储请求 datapack（`VITE_DATAPACK_BASE`），`lib/data.ts` 里有缓存与并发去重。
 8. 各视图消费 `rows` / `totals`；图表组件只接收已整理好的数据。
 
+### 封面图
+
+1. `bun run fetch:thumbs` 从 `manifest.streams[].videoId` 出发，把 YouTube 封面下载到 `data/<id>/thumbs/<videoId>.jpg`；`maxresdefault` → `mqdefault`，单张失败跳过。
+2. 同一张原图用 `Bun.Image` 编码 480 / 960 / 1280w 的 WebP（quality 78），写到 `thumbs/<videoId>.<width>.webp`；只有原图时自动补齐，不重新下载。宽度与命名约定在 `src/lib/thumb-variants.ts`，`fetch:thumbs`、`publish:data` 与页面共用。
+3. `publish:data` 按 **thumbs（原图 + 变体）→ pack → manifest / insights → index** 上传，增量判断与 pack 相同（`digestBytes` + 发布进度）。缺变体只警告，不阻塞发布。
+4. 页面不直连 YouTube：`src/lib/data.ts` 的 `thumbnailUrl()` 拼原图 URL，`thumbnailSrcSet()` 拼三档变体；未配置远端时读 `public/data`。
+5. `StreamCover` 统一 16:9，把 `srcset` + `sizes` 交给浏览器按布局宽度挑一档；首屏主图 `fetchPriority="high"`，其余懒加载。变体缺失时 `onError` 退回原图，再失败才走成员色兜底。
+
+### 逐字稿
+
+1. 源文件是 `content/transcripts/<datasetId>/<videoId>.md`（作者手写、进 git）。
+2. `publish:transcripts` 解析 frontmatter → 先传正文 `<base>/<dataset>/transcripts/<videoId>.json`，最后写 `<base>/transcripts/index.json`；失败只记日志。
+3. `useTranscriptIndex` / `useTranscript` 远端优先；远端不可达时回退到 Vite 的 `import.meta.glob("/content/transcripts/**/*.md")` 构建快照。
+4. `react-markdown` + `remark-gfm` 渲染；`rewriteTimecodes` 把行首 `[12:34]` 换成 YouTube 深链，`extractToc` 生成目录。原始 HTML 不渲染。
+
 ## 路由与 URL 状态
 
 使用 **React Router v8** 的 hash 路由（`createHashRouter`）。选 hash 而不是 history：
@@ -85,15 +104,17 @@
 | `#/:datasetId` | 成员首页（L1，glance） |
 | `#/:datasetId/streams?q=&type=&sort=&dir=&vstats=` | 场次页（L2，browse）；筛选/排序状态可分享 |
 | `#/:datasetId/trends` | 趋势页；月度趋势、月度明细、内容类型对比 |
+| `#/:datasetId/gallery?order=asc` | 相册；按 JST 自然月分组的封面墙，`order=asc` 为最早在前 |
+| `#/:datasetId/transcripts` | 逐字稿索引；按月份列出已有稿件 |
 | `#/:datasetId/stream` | 跳转到最新一场 |
-| `#/:datasetId/stream/:videoId?view=` | 单场详情（L3，inspect）；`view` 为 `overview`/`timeline`/`words`/`paid`/`comments` |
+| `#/:datasetId/stream/:videoId?view=` | 单场详情（L3，inspect）；`view` 为 `overview`/`timeline`/`words`/`paid`/`comments`/`transcript`（仅在有稿时出现） |
 | `#/:datasetId/compare?ids=a,b,c` | 对比，最多 4 场 |
 | `#/:datasetId/about` | 说明 |
 | `#/:datasetId/overview`、`#/:datasetId/table` | 旧地址，分别重定向到成员首页与场次页 |
 
 路由表在 `src/router.tsx`，根路由与 `:datasetId` 都配置了 `errorElement`（`route-error.tsx`），渲染或懒加载异常会显示兜底页而不是白屏。`src/pages/` 是薄包装层：从 `useDatasetView()` 取数据、把导航动作接到 `navigate`，视图组件本身不依赖 router。
 
-数据表的查询参数由 `src/lib/table-params.ts` 解析/序列化：`q` 搜索词、`type` 内容类型、`sort` 排序字段、`dir` 方向（`asc`/`desc`）、`vstats=1` 只看有 VSTATS 的场次。默认值不写进 URL，参数变化用 `replace`，避免输入搜索词时污染历史记录。
+数据表的查询参数由 `src/lib/table-params.ts` 解析/序列化：`q` 搜索词、`type` 内容类型、`sort` 排序字段、`dir` 方向（`asc`/`desc`）、`vstats=1` 只看有 VSTATS 的场次、`member=1` 只看会员限定、`cols` 追加显示的指标列（默认只显示日期/场次/时长/峰值/播放/弹幕）。默认值不写进 URL，参数变化用 `replace`，避免输入搜索词时污染历史记录。
 
 ## 状态管理
 
@@ -143,9 +164,13 @@ src/components/dashboard/
   member-home-view.tsx  L1 成员首页
   home-latest-stream.tsx / home-month-panel.tsx / home-recent-streams.tsx
   home-calendar.tsx    更新日历：按日热力图 + 场次 / 弹幕 / SC 指标切换
+  stream-cover.tsx     16:9 封面：远端优先、懒加载、成员色兜底
+  gallery-view.tsx     相册：按 JST 自然月分组的封面墙
+  transcript-view.tsx  单场逐字稿：Markdown 渲染、目录、时间戳跳转
+  transcripts-view.tsx 逐字稿索引：按月份列出已有稿件
   home-content-mix.tsx / home-meter-row.tsx / home-top-words.tsx / home-top-authors.tsx
   streams-view.tsx    L2 场次页（表格 + 工具条）
-  streams-toolbar.tsx 搜索、类型筛选、仅有 VSTATS、导出 CSV、移动端筛选 Sheet
+  streams-toolbar.tsx 搜索、类型筛选、仅有 VSTATS / 会员、列选择、导出 CSV、移动端筛选 Sheet
   trends-view.tsx     趋势：月度趋势、月度明细、内容类型对比
   stream-detail-view.tsx  L3 单场详情 + 分段控件
   stream-overview-panel.tsx / stream-timeline-panel.tsx
@@ -164,6 +189,7 @@ src/pages/
   lazy-pages.tsx      路由级 lazy() 包装
   home-redirect.tsx   重定向到上次访问 / 首个 dataset
   home-page.tsx / streams-page.tsx / stream-index-page.tsx / trends-page.tsx
+  gallery-page.tsx / transcripts-page.tsx
   stream-page.tsx / compare-page.tsx / about-page.tsx
   legacy-redirects.tsx 旧 overview / table 地址重定向
 ```
@@ -211,6 +237,10 @@ src/components/charts/
 
 见 [adding-data.md](adding-data.md)。页面不需要改代码；`AppHeader` 在 dataset 数 > 1 时自动显示选择器。
 
+### 加一篇逐字稿
+
+见 [adding-data.md](adding-data.md) 的「加逐字稿」。稿件只影响 `#/:datasetId/transcripts` 与单场页的「逐字稿」分段，不改路由或组件。
+
 ### 加一个字段
 
 1. 确认 JSON 里已存在该字段。
@@ -229,6 +259,8 @@ src/components/charts/
 | 聚合位置 | 发布时预聚合 + 浏览器局部计算 | 列表页不需要任何 datapack；预聚合由 publish 生成 |
 | 状态管理 | React 局部状态 | 页面简单，避免全局 store |
 | 数据源 | pack 派生 index/manifest/insights，整体上传对象存储 | 单一真源，索引不会与 pack 漂移；发布即生效 |
+| 封面 | 镜像到对象存储，不热链 YouTube | URL 稳定、无 CORS/限流，相册可懒加载 |
+| 逐字稿 | git 存 Markdown，发布成 JSON，运行时渲染 | 作者可版本管理；发布即生效，不重构建 |
 
 ## 性能与限制
 
@@ -240,3 +272,5 @@ src/components/charts/
 - 使用 hash 路由，刷新/分享任一页面都能还原；视图按路由 `React.lazy()` 拆包，首屏只加载当前页。
 - 索引每次启动带时间戳重新取；manifest / insights 用索引的 `generatedAt` 做版本参数，发布后自动换 URL，不吃 CDN 旧缓存；datapack 按 videoId 长缓存。仓库体积与场次数无关。
 - manifest 会随场次线性增长（3000 场约 4 MB raw / 460 KB gzip）。再往上需要按年份切片或引入服务端分页。
+- 封面原图约 144 KB（1280×720 JPEG），三档 WebP 分别约 24 / 56 / 78 KB；列表与相册靠 `srcset` 只下 480w，首屏主图下 960w 或 1280w。相册按可视区域懒加载，`StreamCover` 用 `aspect-video` 预留高度，避免 CLS。
+- 逐字稿的构建快照走 `import.meta.glob`，稿件数量大时 bundle 会增长；超过百篇后把兜底改为 `public/data` 快照。

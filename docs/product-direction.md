@@ -1,6 +1,6 @@
 # 产品方向：封面、相册与逐字稿
 
-> 状态：方案文档，尚未实施。2026-10-29。
+> 状态：P1 封面与成员相册、P2 逐字稿已实施（2026-10-29）；全组相册、组首页与跨成员对比待做。
 > 关联：[roadmap.md](roadmap.md)、[architecture.md](architecture.md)、[data-model.md](data-model.md)。
 
 ## 1. 定位
@@ -37,9 +37,9 @@
 | 组首页 | `#/` | 全组脉搏：最近 / 接下来 / 本周高光 | 规划（P3） |
 | 成员首页 | `#/:datasetId` | 单人近况与规模 | 已有 |
 | 场次 | `#/:datasetId/streams` | 表格浏览与筛选 | 已有 |
-| 单场 | `#/:datasetId/stream/:videoId?view=` | 读数 + 封面 + 逐字稿入口 | 已有，待扩展 |
-| 相册 | `#/:datasetId/gallery`、`#/gallery` | 封面墙，按时间回看 | 规划（P1） |
-| 逐字稿索引 | `#/:datasetId/transcripts` | 有逐字稿的场次列表 | 规划（P2） |
+| 单场 | `#/:datasetId/stream/:videoId?view=` | 读数 + 封面 + 逐字稿入口 | 已有 |
+| 相册 | `#/:datasetId/gallery`（`#/gallery` 待做） | 封面墙，按时间回看 | 成员相册已上线；全组待做 |
+| 逐字稿索引 | `#/:datasetId/transcripts` | 有逐字稿的场次列表 | 已上线 |
 | 趋势 / 对比 / 说明 | 现有路由 | 不变 | 已有 |
 
 新增页面一律写 URL 状态，保持可分享、可前进后退的既有约束。
@@ -65,20 +65,22 @@ bun run fetch:thumbs --dataset nonoka --limit 20 --dry-run
 - 单张失败记日志并继续，不阻塞其余场次；结束打印 `成功 / 跳过 / 失败` 计数。
 - 超时、UA、有限重试；并发默认 4，避免被 YouTube 限流。
 - 选图顺序：`maxresdefault.jpg`（1280×720，真 16:9）→ `mqdefault.jpg`（320×180，真 16:9）。不用 `hqdefault` / `sddefault`，它们是 4:3 letterbox，进页面会出现黑边。
-- v1 只存一份原图，不做转码、不引入图像处理依赖。字节数不值得为此增加一个长期维护项。
+- 原图之外再存 480 / 960 / 1280w 三档 WebP（quality 78），用 Bun 自带的 `Bun.Image` 编码，不引入额外依赖；
+  已有原图时自动补齐变体，不重新下载。宽度与命名约定见 `src/lib/thumb-variants.ts`。
 
 ### 4.2 对象存储布局
 
 ```text
 <base>/<dataset>/thumbs/<videoId>.jpg
+<base>/<dataset>/thumbs/<videoId>.<width>.webp      # width ∈ 480 / 960 / 1280
 ```
 
-- **key 由「dataset + videoId」确定**，不依赖 manifest；离线也能拼 URL。
+- **key 由「dataset + videoId（+ 变体宽度）」确定**，不依赖 manifest；离线也能拼 URL。
 - manifest 的 `streams[]` 增加可选字段 `thumbnail: string | null`，用于「有没有封面」与相册索引；旧 pack 缺失时为 `null`。
 - 上传顺序：`thumbs → pack → manifest / insights → index`。索引仍然最后写，任何中途失败都不会让索引指向不存在的文件。
 - 增量发布复用 `data/.publish-state.json`：内容摘要一致且远端大小对得上就跳过。
-- 缓存：封面按 `public, max-age=31536000, immutable` 处理。当前 `ObjectStore.put` 只支持字符串 + `application/json`，实施时需要新增二进制上传入口（`putObject(key, bytes, { contentType, cacheControl })`）；若 Bun 的 S3 写入不支持自定义 `Cache-Control`，就在桶侧配置规则，不为此换 SDK。
-- 体积预算：1500 场 × 约 80–150 KB ≈ 120–220 MB，只存在对象存储；列表页只加载可视区域。
+- 缓存：封面按 `public, max-age=31536000, immutable` 处理。`ObjectStore.putObject` 负责二进制上传与 `Content-Type`；Bun 的 S3 写入不支持自定义 `Cache-Control`，缓存规则配在桶 / CDN 侧（见 [deployment.md](deployment.md) 的「封面与变体」）。
+- 体积预算：1600 场 ×（144 KB 原图 + 约 158 KB 变体）≈ 480 MB，只存在对象存储；列表页按 `srcset` 只下 480w（约 24 KB）。
 
 ### 4.3 渲染规范
 
@@ -89,7 +91,7 @@ bun run fetch:thumbs --dataset nonoka --limit 20 --dry-run
 | 相册 | 2 列（390）→ 3 列（md）→ 4–5 列（xl） | 统一 16:9 网格 |
 
 - 统一 `aspect-video` + `object-cover` + `rounded-panel`，发丝线描边，不加厚阴影。
-- 加载：`loading="lazy"`、`decoding="async"`；只有单场页首图设 `fetchpriority="high"`。
+- 加载：`loading="lazy"`、`decoding="async"`；`srcset` 三档 + `sizes` 由浏览器选档，只有首屏主图设 `fetchpriority="high"`。
 - 兜底：成员色渐变 + 标题首字 + 播放图标，**不允许出现破图**；图片 `onError` 时切到兜底。
 - `alt` 用场次标题；悬停只做轻微亮度变化，不加缩放与位移。
 - 点击直接进入单场页，不做 lightbox（v1 不需要多一层交互）。
@@ -247,12 +249,12 @@ bun run transcript:import "D:/messages/archives/…/2026-10-13_ライブ振り�
 - 增量、可续跑、单条失败不阻塞（与 `fetch-streams` / `publish:data` 一致）。
 - 不新增常驻服务、数据库、账号体系；对象存储 + 静态托管仍是唯一运行时依赖。
 - 外部服务（YouTube、推文归档）一律可降级，不能成为首屏阻塞。
-- 新依赖需要维护性理由；封面不做转码、逐字稿不引编辑器，都是这个原则的体现。
+- 新依赖需要维护性理由；封面转码用 Bun 自带的 `Bun.Image`、逐字稿不引编辑器，都是这个原则的体现。
 - 路由和 URL 参数保持可分享、可刷新、可后退。
 
 ## 10. 待定
 
-1. 封面只存一份原图，还是同时生成 480w 变体？（v1 建议一份）
+1. ~~封面只存一份原图，还是同时生成 480w 变体？~~ 已定：原图 + 480 / 960 / 1280w WebP，`Bun.Image` 编码。
 2. `thumbnail` 写进 manifest，还是完全由 videoId 推导？（v1 建议写进去，便于相册判断缺失）
 3. 全组相册放在 `#/gallery`，还是并入未来的组首页？（先独立路由，组首页做入口卡片）
 4. 逐字稿时间戳是否需要与逐分钟弹幕曲线联动高亮？（先做跳转，联动放 P3）

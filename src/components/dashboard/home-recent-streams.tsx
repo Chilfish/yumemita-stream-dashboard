@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
 import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/panel";
+import { StreamCover } from "@/components/dashboard/stream-cover";
 import { StreamList } from "@/components/dashboard/stream-list";
 import { CONTENT_TYPE_LABELS, classifyTitle } from "@/lib/classify";
 import { formatDate, formatDuration, formatInteger } from "@/lib/format";
@@ -29,7 +30,19 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
       cellClassName: "max-w-[13rem] sm:max-w-[22rem]",
       header: "场次",
       key: "title",
-      render: row => <span className="block truncate text-foreground">{row.title}</span>,
+      render: row => (
+        <span className="flex min-w-0 items-center gap-2">
+          <StreamCover
+            className="w-16 shrink-0 [--cover-radius:4px]"
+            datasetId={datasetId}
+            sizes="64px"
+            thumbnail={row.thumbnail}
+            title={row.title}
+            videoId={row.videoId}
+          />
+          <span className="min-w-0 truncate text-foreground">{row.title}</span>
+        </span>
+      ),
     },
     {
       header: "类型",

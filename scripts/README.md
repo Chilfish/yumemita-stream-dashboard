@@ -93,6 +93,52 @@ manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` �
 恢复后再按正常的「已入库 + 已有素材」逻辑跳过。公开地址要带桶内前缀，例如
 `https://s3.example.com/stream-dashboard`。
 
+## 封面图
+
+`fetch-thumbnails.ts` 把每场直播的 YouTube 封面镜像到本地暂存区；页面运行时只读对象存储上的图，
+**不直连 YouTube**（避免热链、CORS 与慢请求拖慢首屏）。
+
+```powershell
+bun run fetch:thumbs --dataset nonoka                   # 只补缺失
+bun run fetch:thumbs --dataset nonoka --force           # 重抓全部
+bun run fetch:thumbs --dataset nonoka --limit 20 --dry-run
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dataset <id>` | dataset；不传则处理 `data-sources.json` 里的全部 |
+| `--limit <n>` | 本次最多抓 n 张（按 manifest 顺序，最近的场次优先）；0 = 全部 |
+| `--force` | 已存在的封面也重新下载 |
+| `--dry-run` | 只列出候选，不发请求、不写文件 |
+| `--concurrency <n>` | 并发，默认 4（太高会被 YouTube 限流） |
+| `-h, --help` | 帮助 |
+
+- 场次列表取自 `data/<id>/manifest.json` 的 `streams[].videoId`；没有 manifest 时退回
+  `data/<id>/*.datapack.json` 的文件名。
+- 选图：`maxresdefault.jpg`（1280×720）→ `mqdefault.jpg`（320×180），两个都是真 16:9。
+  不用 `hqdefault` / `sddefault`，它们是 4:3 letterbox，进页面会出现黑边。
+- 校验：`content-type` 是 `image/*` 且字节数 > 1500（YouTube 偶尔回小占位图）；15 秒超时、失败重试 2 次。
+- 单张失败只记日志，不阻塞其余场次；结束打印 `[fetch-thumbs] <id>：成功 N / 跳过 N / 失败 N / 变体 N`。
+- 原子写入（`.tmp` → rename）：中断不会留下半张图被下次当成“已有”。
+- 变体：每张原图用 `Bun.Image` 编码 480 / 960 / 1280w 的 WebP（quality 78，约 24 / 56 / 78 KB，
+  原图约 144 KB）。只有原图（例如以前抓过的旧数据）时自动补齐，不重新下载；`--force` 才重编码。
+
+本地与远端布局（key 由 dataset + videoId（+ 变体宽度）决定，不依赖 manifest，离线也能拼出 URL）：
+
+```text
+data/<datasetId>/thumbs/<videoId>.jpg          # 本地原图（data/ 整目录 gitignore）
+data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 / 1280
+<base>/<datasetId>/thumbs/<videoId>.jpg        # 对象存储
+<base>/<datasetId>/thumbs/<videoId>.<w>.webp   # 对象存储
+```
+
+`bun run publish:data` 的上传顺序是 **thumbs（原图 + 变体）→ pack → manifest / insights → index**：
+先保证图在，manifest 里的 `thumbnail` 出现时就一定有对应文件与全部 `srcset` 候选。要下架某张图，
+删掉本地文件后重跑发布即可；缺变体只警告，页面会退回原图。
+
+页面侧约定：`src/lib/thumb-variants.ts` 定义宽度与命名，`src/lib/data.ts` 拼 `thumbnailUrl()` /
+`thumbnailSrcSet()`，`StreamCover` 用 `srcset` + `sizes` 交给浏览器选档。
+
 ## 抓取侧（不在本仓库）
 
 本仓库只放结果。原始会话由归档工程的 `yt-dlp` + `scripts/danmaku` 产出：

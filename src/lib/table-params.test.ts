@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TABLE_PARAMS,
+  OPTIONAL_TABLE_COLUMNS,
   STREAM_TYPE_FILTERS,
   TABLE_SORT_KEYS,
+  isOptionalTableColumn,
   isSortDirection,
   isStreamTypeFilter,
   isTableSortKey,
   parseTableParams,
+  sameColumnSet,
   type TableParams,
   writeTableParams,
 } from "./table-params";
@@ -23,19 +26,33 @@ describe("parseTableParams", () => {
       sort: "date",
       dir: "desc",
       vstats: false,
+      member: false,
+      cols: [],
     });
     expect(parseTableParams(search(""))).toEqual(DEFAULT_TABLE_PARAMS);
   });
 
   it("reads every supported param", () => {
-    const params = parseTableParams(search("q=abc&type=event&sort=chat&dir=asc&vstats=1"));
+    const params = parseTableParams(
+      search("q=abc&type=event&sort=chat&dir=asc&vstats=1&member=1&cols=avg,type"),
+    );
     expect(params).toEqual({
       q: "abc",
       type: "event",
       sort: "chat",
       dir: "asc",
       vstats: true,
+      member: true,
+      cols: ["type", "avg"],
     });
+  });
+
+  it("keeps only known optional columns, deduped and in canonical order", () => {
+    expect(parseTableParams(search("cols=avg,avg,nope,likeRate")).cols).toEqual([
+      "avg",
+      "likeRate",
+    ]);
+    expect(parseTableParams(search("cols=")).cols).toEqual([]);
   });
 
   it("keeps the query as given and decodes url encoding", () => {
@@ -75,6 +92,14 @@ describe("parseTableParams", () => {
     expect(parseTableParams(search("vstats=yes")).vstats).toBe(false);
   });
 
+  it("accepts 1 and true for member and rejects everything else", () => {
+    expect(parseTableParams(search("member=1")).member).toBe(true);
+    expect(parseTableParams(search("member=true")).member).toBe(true);
+    expect(parseTableParams(search("member=0")).member).toBe(false);
+    expect(parseTableParams(search("member=false")).member).toBe(false);
+    expect(parseTableParams(search("member=yes")).member).toBe(false);
+  });
+
   it("uses the first value for duplicated params", () => {
     expect(parseTableParams(search("dir=asc&dir=desc")).dir).toBe("asc");
     expect(parseTableParams(search("type=game&type=sing")).type).toBe("game");
@@ -88,7 +113,7 @@ describe("writeTableParams", () => {
 
   it("removes defaults from an existing search string", () => {
     const next = writeTableParams(
-      search("q=abc&type=sing&sort=chat&dir=asc&vstats=1"),
+      search("q=abc&type=sing&sort=chat&dir=asc&vstats=1&member=1"),
       DEFAULT_TABLE_PARAMS,
     );
     expect(next.toString()).toBe("");
@@ -102,12 +127,15 @@ describe("writeTableParams", () => {
       sort: "likes",
       dir: "asc",
       vstats: true,
+      member: true,
+      cols: [],
     });
     expect(next.get("q")).toBe("直播");
     expect(next.get("type")).toBe("talk");
     expect(next.get("sort")).toBe("likes");
     expect(next.get("dir")).toBe("asc");
     expect(next.get("vstats")).toBe("1");
+    expect(next.get("member")).toBe("1");
   });
 
   it("writes asc explicitly because desc is the default", () => {
@@ -127,6 +155,23 @@ describe("writeTableParams", () => {
     expect(next.toString()).not.toContain("vstats");
   });
 
+  it("never emits member=0", () => {
+    const next = writeTableParams(search("member=1"), { ...DEFAULT_TABLE_PARAMS, member: false });
+    expect(next.has("member")).toBe(false);
+    expect(next.toString()).not.toContain("member");
+  });
+
+  it("writes optional columns in canonical order and drops them when empty", () => {
+    const next = writeTableParams(search(""), {
+      ...DEFAULT_TABLE_PARAMS,
+      cols: ["likeRate", "avg"],
+    });
+    expect(next.get("cols")).toBe("avg,likeRate");
+
+    const cleared = writeTableParams(next, { ...DEFAULT_TABLE_PARAMS, cols: [] });
+    expect(cleared.has("cols")).toBe(false);
+  });
+
   it("drops whitespace-only queries", () => {
     const next = writeTableParams(search(""), { ...DEFAULT_TABLE_PARAMS, q: "   " });
     expect(next.has("q")).toBe(false);
@@ -139,6 +184,8 @@ describe("writeTableParams", () => {
       sort: "chat",
       dir: "desc",
       vstats: false,
+      member: false,
+      cols: [],
     });
     expect(next.get("ids")).toBe("a,b");
     expect(next.get("ref")).toBe("share");
@@ -147,6 +194,7 @@ describe("writeTableParams", () => {
     expect(next.get("sort")).toBe("chat");
     expect(next.has("dir")).toBe(false);
     expect(next.has("vstats")).toBe(false);
+    expect(next.has("member")).toBe(false);
   });
 
   it("does not mutate the base search params", () => {
@@ -158,11 +206,19 @@ describe("writeTableParams", () => {
   it("round-trips through parse", () => {
     const cases: TableParams[] = [
       DEFAULT_TABLE_PARAMS,
-      { q: "abc", type: "all", sort: "chat", dir: "asc", vstats: true },
-      { q: "直播 测试", type: "sing", sort: "comments", dir: "desc", vstats: false },
-      { q: "", type: "game", sort: "sc", dir: "asc", vstats: true },
-      { q: "活动", type: "event", sort: "date", dir: "desc", vstats: false },
-      { q: "", type: "talk", sort: "authors", dir: "desc", vstats: false },
+      { q: "abc", type: "all", sort: "chat", dir: "asc", vstats: true, member: false, cols: [] },
+      {
+        q: "直播 测试",
+        type: "sing",
+        sort: "comments",
+        dir: "desc",
+        vstats: false,
+        member: true,
+        cols: ["avg", "likeRate"],
+      },
+      { q: "", type: "game", sort: "sc", dir: "asc", vstats: true, member: false, cols: ["sc"] },
+      { q: "活动", type: "event", sort: "date", dir: "desc", vstats: false, member: false, cols: [] },
+      { q: "", type: "talk", sort: "authors", dir: "desc", vstats: false, member: true, cols: [] },
     ];
 
     for (const params of cases) {
@@ -186,6 +242,8 @@ describe("writeTableParams", () => {
       sort: "watch",
       dir: "asc",
       vstats: true,
+      member: true,
+      cols: [],
     };
     const written = writeTableParams(search("ids=x,y"), params);
     const parsed = parseTableParams(written);
@@ -220,5 +278,20 @@ describe("table param validation helpers", () => {
     expect(isStreamTypeFilter("All")).toBe(false);
     expect(isStreamTypeFilter(null)).toBe(false);
     expect(isStreamTypeFilter(undefined)).toBe(false);
+  });
+
+  it("accepts exactly the optional column keys", () => {
+    for (const key of OPTIONAL_TABLE_COLUMNS) {
+      expect(isOptionalTableColumn(key)).toBe(true);
+    }
+    expect(isOptionalTableColumn("date")).toBe(false);
+    expect(isOptionalTableColumn(null)).toBe(false);
+    expect(isOptionalTableColumn(undefined)).toBe(false);
+  });
+
+  it("compares column sets regardless of order", () => {
+    expect(sameColumnSet(["avg", "sc"], ["sc", "avg"])).toBe(true);
+    expect(sameColumnSet(["avg"], ["avg", "sc"])).toBe(false);
+    expect(sameColumnSet([], [])).toBe(true);
   });
 });

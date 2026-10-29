@@ -21,3 +21,9 @@ export const TrendsPage = lazy(() =>
 export const AboutPage = lazy(() =>
   import("@/pages/about-page").then(module => ({ default: module.AboutPage })),
 );
+export const GalleryPage = lazy(() =>
+  import("@/pages/gallery-page").then(module => ({ default: module.GalleryPage })),
+);
+export const TranscriptsPage = lazy(() =>
+  import("@/pages/transcripts-page").then(module => ({ default: module.TranscriptsPage })),
+);

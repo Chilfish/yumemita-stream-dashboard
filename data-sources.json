@@ -3,7 +3,7 @@
     {
       "id": "nonoka",
       "label": "宮永ののか",
-      "color": "#f36982",
+      "color": "#ffa7e4",
       "avatar": "avatars/nonoka.jpg",
       "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
       "manifest": "data/nonoka/manifest.json",
@@ -51,7 +51,7 @@
     {
       "id": "yuno",
       "label": "千石ユノ",
-      "color": "#EE5577",
+      "color": "#ad0229",
       "avatar": "avatars/yuno.jpg",
       "channelId": "UC99kOG6_9RD0mR3OG4EOfxw",
       "manifest": "data/yuno/manifest.json",

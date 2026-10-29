@@ -76,6 +76,69 @@ bun run dev
 
 不需要改 React 组件。
 
+## 加逐字稿
+
+逐字稿是**作者手写的 Markdown**，和抓取数据不同：它进 git，页面只读渲染，站内没有编辑器。
+
+### 1. 建文件
+
+```bash
+# 从模板生成，日期 / 标题自动从 data/<dataset>/manifest.json 带出
+bun run transcript:new W0bKqP-Eyj4 --dataset nonoka
+
+# 或者把已经写好的 Markdown 复制进来（videoId 可从文件名日期匹配 manifest）
+bun run transcript:import "D:/messages/archives/2026-10-13_ライブ振り返り.md" --dataset nonoka
+bun run transcript:import "<path>" --dataset nonoka --video-id W0bKqP-Eyj4
+```
+
+落到 `content/transcripts/<datasetId>/<videoId>.md`；以 `_` / `.` 开头的文件是草稿，不参与发布。
+目标文件已存在时默认拒绝，`--force` 才覆盖。
+
+### 2. 写正文
+
+frontmatter 是极简 YAML（字符串、数字、引号、`[a, b]` 行内数组）：
+
+```markdown
+---
+videoId: W0bKqP-Eyj4
+date: 2026-10-13
+title: 【ライブ振り返り】13th ライブをふりかえる
+members: [nonoka]
+tags: [杂谈, 13th live]
+summary: 一场把 13th live 从头聊到尾的复盘。
+---
+
+## 开场
+
+[00:00:12] 大家好，今天想聊聊 13th live……
+```
+
+- `videoId` 必填且唯一，是关联场次的唯一键；文件名不参与匹配。
+- 行首 `[12:34]` / `[1:02:03]` 自动变成 YouTube 深链，可见文本仍是时间码。
+- `##` / `###` 生成目录；原始 HTML 不渲染（`react-markdown` 默认安全模式）。
+
+完整字段、命令与常见问题见 [content/transcripts/README.md](../content/transcripts/README.md)。
+
+### 3. 发布
+
+```bash
+bun run publish:transcripts --no-upload   # 只校验：缺 videoId / 未知 dataset / 重复 videoId 都会列出来
+bun run publish:transcripts               # 增量上传
+bun run publish:transcripts --force       # 忽略 data/.publish-state.json，全量重传
+```
+
+产物（远端优先，失败回退到构建时的 Markdown 快照，所以本地不发布也能预览）：
+
+```text
+<base>/<datasetId>/transcripts/<videoId>.json   # { frontmatter, markdown, updatedAt }
+<base>/transcripts/index.json                   # 有稿的场次列表，最后写
+```
+
+- 先传正文、最后写索引：中途失败只会「索引少一篇」，不会指向不存在的文件。
+- 单篇失败只记日志，不阻塞其余稿件；退出码仍为 1，CI 会拦住。
+- 单场页的「逐字稿」分段只在索引里有当前 `videoId` 时出现；索引页在 `#/:datasetId/transcripts`。
+- 发布后刷新页面即可，不需要重新构建前端。
+
 ## manifest 从哪来
 
 不需要手工维护。`publish:data` 用 `scripts/lib/dataset-manifest.ts` 的 `buildStreamSummary`

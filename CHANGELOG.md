@@ -10,11 +10,17 @@
 
 ### 界面
 
+- **封面层**：`fetch:thumbs` 把 YouTube 封面镜像到本地并随 `publish:data` 上传；首页最近一场、最近场次、单场页与相册统一 16:9 渲染，缺图走成员色兜底。
+- **相册页**：`#/:datasetId/gallery`，按 JST 自然月分组的封面墙，懒加载、`?order=` 可分享；侧栏与移动端标签栏新增入口。
+- **逐字稿**：`content/transcripts/<datasetId>/<videoId>.md` 手写 Markdown，`publish:transcripts` 上传后运行时渲染；单场页按需出现「逐字稿」分段，带目录、时间戳跳 YouTube，索引页 `#/:datasetId/transcripts`。
+- 单场页页头改为「标题 + 右侧 16:9 封面」网格；移动端分段控件改为容器内横向滚动，避免页面横向溢出。
 - 成员色拆成两个 token：`--member-color` 保留 `data-sources.json` 里的品牌原色（图表、色点、色条），
   `--member-ink` 用对比度达标的加深色（小号文字、焦点环）。浅色主题下 `#ffcb5b` 不再被压成棕色。
 - 首页重排为四层：页面头 → 规模指标条 → 最近一场 / 本月 / 全期记录 → 最近场次 → 更新日历。
   规模指标从页头的一组小字提为 24px 数字条；最近一场只保留 3 个主指标，其余降为一行次级读数。
 - 内容构成、全期高频词/发言者、典型节奏曲线移到趋势页；首页不再与趋势页重复堆叠分析块。
+- 趋势页两张表升级：月度明细与内容类型对比可按列排序（表头带 `aria-sort`），月度明细新增「当前指标环比」列与全期合计行；
+  内容类型对比把占比画成行内色条、加粗各列最高值；两表窄屏在面板内横向滚动并吸附首列，表内容与面板标题对齐。
 - 修复横向溢出：`SidebarInset` 是 `w-full` 的 flex item，自动最小宽度把它撑到内容固有宽度；
   图表 SVG 的测量宽度也会回灌父级 min-content。现在主列加 `min-w-0`，图表容器用
   `contain: inline-size` 隔离。
@@ -34,6 +40,9 @@
 
 ### 工程
 
+- **封面管线**：新增 `fetch:thumbs`（`maxresdefault` → `mqdefault`、并发、重试、单张失败跳过），`publish:data` 按 thumbs → pack → manifest/insights → index 上传，沿用增量发布进度。
+- **封面变体**：`fetch:thumbs` 用 `Bun.Image` 额外编码 480 / 960 / 1280w 的 WebP（480w 约 24 KB，原图约 144 KB），已有原图时自动补齐；`StreamCover` 用 `srcset` + `sizes` 由浏览器选档，变体缺失时退回原图。发布脚本把变体与 `Content-Type: image/webp` 一起上传，缺变体只警告。对象存储侧的长缓存规则见 [docs/deployment.md](docs/deployment.md) 的「封面与变体」。
+- **逐字稿管线**：新增 `transcript:new` / `transcript:import` / `publish:transcripts`；正文先传、索引最后写，单篇失败不阻塞；离线回退到构建期 Markdown 快照。
 - **数据发布即生效**：`publish:data` 现在同时生成并最后上传根 `index.json`；页面启动时直接从对象存储读
   `index.json` / `manifest.json` / `insights.json` / datapack，发布后刷新即可，不需要重新构建前端。
   manifest / insights 用索引的 `generatedAt` 做版本参数，绕开 CDN 旧缓存。

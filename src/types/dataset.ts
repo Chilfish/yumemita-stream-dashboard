@@ -33,6 +33,8 @@ export interface StreamSummary {
   chatPer1000AvgViewers: number | null;
   likesPer1000Views: number | null;
   scPerHour: number | null;
+  /** 封面原图的相对 key（`thumbs/<videoId>.jpg`）；WebP 变体由 videoId + 宽度推导。没有封面时为 null。 */
+  thumbnail?: string | null;
   sessionDir: string;
   datapack: string;
   generatedAt: string;

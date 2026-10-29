@@ -35,6 +35,14 @@ export function digestBody(body: string): BodyDigest {
   }
 }
 
+/** 二进制（封面图等）的摘要；与 `digestBody` 同一套判定，只是不做字符编码。 */
+export function digestBytes(body: Uint8Array): BodyDigest {
+  return {
+    sha256: createHash('sha256').update(body).digest('hex'),
+    size: body.byteLength,
+  }
+}
+
 function emptyState(target: string): PublishState {
   return {
     schema: PUBLISH_STATE_SCHEMA,

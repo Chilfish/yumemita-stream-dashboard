@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { Sparkline } from "@/components/charts/sparkline";
+import { StreamCover } from "@/components/dashboard/stream-cover";
 import { Badge } from "@/components/ui/badge";
 import {
   formatDate,
@@ -46,6 +47,19 @@ export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamPr
 
   return (
     <div className="flex min-w-0 flex-col px-5 pt-4 pb-5">
+      {/* 首屏唯一的大图锚点：手机与桌面都占满左栏单元格。
+          图片本身不是链接——下面的标题已经可达，避免重复的链接与空的链接名。 */}
+      <div className="mb-3">
+        <StreamCover
+          datasetId={datasetId}
+          eager
+          sizes="(min-width: 1024px) 60vw, 100vw"
+          thumbnail={stream.thumbnail}
+          title={stream.title}
+          videoId={stream.videoId}
+        />
+      </div>
+
       <div className="flex items-baseline justify-between gap-3">
         <p className="flex min-w-0 items-center gap-1.5 text-caption text-member-ink">
           <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-member" />

@@ -4,11 +4,12 @@
 
 方向与验收标准见 [product-direction.md](product-direction.md)。
 
-1. **封面图**：`fetch:thumbs` 镜像 `video.thumbnail`，发布到对象存储，单场页与最近场次展示。
-2. **相册页**：成员 / 全组封面墙，按月分组，懒加载，URL 可分享。
-3. **逐字稿**：作者手动维护 Markdown，发布到对象存储后运行时渲染；时间戳跳转 YouTube。
-4. **组首页与跨成员对比**：首屏回答「最近谁播了 / 下一场」，对比支持跨成员选场次。
-5. **精确词频 / 发言者**：需要 datapack schema v2（全量聚合或作者索引），先设计兼容层。
+1. [x] **封面图**：`fetch:thumbs` 镜像 `video.thumbnail`，发布到对象存储，单场页、首页与相册展示；缺图走成员色兜底。
+2. [x] **相册页（成员）**：`#/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
+3. [x] **逐字稿**：`content/transcripts/` 手动维护，`publish:transcripts` 发布后运行时渲染；时间戳跳 YouTube。
+4. [ ] **全组相册**：`#/gallery` 跨成员封面墙，等待组首页的信息架构确定。
+5. [ ] **组首页与跨成员对比**：首屏回答「最近谁播了 / 下一场」，对比支持跨成员选场次。
+6. [ ] **精确词频 / 发言者**：需要 datapack schema v2（全量聚合或作者索引），先设计兼容层。
 
 ## 数据
 
@@ -37,13 +38,15 @@
 - [x] 图表导出 PNG/SVG：ChartCard 右上角导出当前 SVG，PNG 为 2× 画布。
 - [x] 更新日历：按 JST 自然日查看场次 / 弹幕 / SC 热度，支持指标切换。
 - [x] 趋势页：月度趋势、月度明细、内容类型对比、典型节奏曲线、社群榜单。
+- [x] 趋势页表格：按月/按类型可排序、指标环比列、全期合计行、占比色条、窄屏面板内滚动并吸附首列。
 - [x] 首页层级：规模指标条 → 最近一场 + 本月 → 最近场次 → 更新日历；修复页面横向溢出（`min-w-0` + 图表行内尺寸隔离）。
 - [x] 键盘快捷键：`j` / `k` 翻场、`1`–`5` 切页、`/` 搜索、`⌘K` 全局搜索、`⌘B` 侧栏。
 - [x] 移动端优化：390 / 320px 无横向溢出，表格自身横向滚动，首列吸附。
-- [ ] 封面图：镜像 `video.thumbnail` 到对象存储，单场页 / 最近场次展示，含兜底图。
-- [ ] 相册页：成员与全组封面墙，按 JST 自然月分组，懒加载。
-- [ ] 逐字稿：`content/transcripts/` 手动维护，发布后运行时渲染，支持时间戳跳转。
-- [ ] 组首页与跨成员对比：全组脉搏与跨成员选场。
+- [x] 封面图：镜像 `video.thumbnail` 到对象存储，单场页 / 首页 / 相册展示，含成员色兜底。
+- [x] 相册页（成员）：`#/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
+- [x] 逐字稿：`content/transcripts/` 手动维护，发布后运行时渲染，支持时间戳跳转与目录。
+- [ ] 全组相册与组首页：跨成员封面墙、全组脉搏。
+- [ ] 跨成员对比：同一时间段 / 内容类型的横向对比。
 - [ ] 推文联动：先用手动 pin 验证价值，外部服务只做增强。
 - [ ] 空数据 / 部分数据的更明确提示（已有基础版）。
 
@@ -60,8 +63,9 @@
 - [x] 索引与明细拆分：首屏只拉 `index.json` + 当前 dataset 的 manifest/insights，单场按需拉 datapack。
 - [x] CI 从对象存储拉索引；`VITE_DATAPACK_BASE` 缺失时给出明确报错。
 - [x] 在 GitHub 仓库设置 `VITE_DATAPACK_BASE` repository variable（HTTPS 地址）。
-- [ ] `ObjectStore` 支持二进制上传与 `Content-Type` / `Cache-Control`，供封面与逐字稿资源使用。
-- [ ] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。
+- [x] `ObjectStore` 支持二进制上传与 `Content-Type`；缓存头交给桶侧规则（Bun S3 写接口不支持自定义 Cache-Control）。
+- [x] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。
+- [x] 逐字稿脚本：`transcript:new` / `transcript:import` 从模板或已有 Markdown 生成。
 - [ ] 200% 缩放复核（320px 已通过）。
 
 ## 非目标

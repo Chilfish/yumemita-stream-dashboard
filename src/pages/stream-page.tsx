@@ -71,6 +71,7 @@ export function StreamPage() {
 
   return (
     <StreamDetailView
+      datasetId={dataset.id}
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
       onViewChange={handleViewChange}
       row={{ summary, pack }}

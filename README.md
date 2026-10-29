@@ -21,7 +21,9 @@
 - **成员首页**：规模指标条、最近一场、本月变化、全期记录、最近场次、更新日历（按日看场次 / 弹幕 / SC 热度）。
 - **场次页**：完整表格、搜索、内容类型筛选、仅有 VSTATS、排序、导出 CSV；筛选与排序写进 URL。
 - **趋势页**：月度趋势（场次 / 弹幕每分 / SC / 平均同接）、月度明细、内容类型对比、典型节奏曲线、全期高频词与发言者。
-- **单场详情**：概览 / 时间轴 / 弹幕与词 / 付费 / 评论五个子视图；子视图可深链。
+- **单场详情**：概览 / 时间轴 / 弹幕与词 / 付费 / 评论五个子视图；有逐字稿时多一个「逐字稿」分段，支持目录与时间戳跳转。
+- **相册**：按 JST 自然月分组的封面墙，懒加载、可切最新/最早在前；单场页与首页也有封面。
+- **逐字稿**：作者手写 Markdown（`content/transcripts/`），发布后在站内渲染，不在站内编辑。
 - **对比**：最多选 4 场，逐分钟弹幕叠加对比 + 指标横表（最高值加粗）。
 - **说明**：数据口径、已知限制、更新方式。
 - **导航**：侧边栏 + 移动端底部标签栏；单场/对比/子视图有独立 URL，可刷新、分享、前进后退。
@@ -53,6 +55,10 @@ bun run dev
 | `bun run publish:data` | 由 pack 重建 manifest + insights + dataset 索引并上传对象存储 |
 | `bun run validate:data` | 校验 index → manifest → insights；加 `--remote` 检查对象存储 |
 | `bun run add:datapack` | 加一份 datapack，自动更新 manifest |
+| `bun run fetch:thumbs` | 从 YouTube 镜像封面到 `data/<id>/thumbs/`；发布后进对象存储 |
+| `bun run transcript:new` | 从模板建一篇逐字稿，日期 / 标题取自 manifest |
+| `bun run transcript:import` | 把已有 Markdown 复制进 `content/transcripts/` |
+| `bun run publish:transcripts` | 校验并增量上传逐字稿正文与索引 |
 | `bun run typecheck` | TypeScript 类型检查 |
 | `bun run test` | Vitest 单元测试 |
 | `bun run lint` | oxlint |
@@ -72,8 +78,11 @@ index.json + manifest.json + insights.json   # 由 pack 派生
         ▼
 对象存储（R2）: <base>/index.json
                <base>/<dataset>/manifest.json · insights.json · <videoId>.datapack.json
+               <base>/<dataset>/thumbs/<videoId>.jpg · <videoId>.<width>.webp
+               <base>/<dataset>/transcripts/<videoId>.json
+               <base>/transcripts/index.json
         │
-        │  fetch（浏览器启动时；远端不可达时回退 public/data/）
+        │  fetch（浏览器启动时；远端不可达时回退 public/data/ 与构建期 Markdown 快照）
         ▼
 useDatasetIndex → useDataset → StreamSummary[] + DatasetTotals
         │
@@ -81,12 +90,16 @@ useDatasetIndex → useDataset → StreamSummary[] + DatasetTotals
 buildStreamRows / aggregateDataset（纯函数）
         │
         ▼
-总览 / 单场 / 对比 / 数据表
+总览 / 单场 / 对比 / 数据表 / 相册
 
 单场 / 对比：useStreamPacks 直接向对象存储请求 datapack
+封面：fetch:thumbs → publish:data（thumbs 先于 manifest / index）
+逐字稿：content/transcripts/ → publish:transcripts
 ```
 
 - `data/<id>/*.datapack.json` 是**唯一真源**（本地暂存，不提交）。
+- 封面原图是 `data/<id>/thumbs/<videoId>.jpg`（本地暂存），另有 480 / 960 / 1280w 的 WebP 变体；key 由 dataset + videoId（+ 宽度）推导，不热链 YouTube。
+- 逐字稿源文件在 `content/transcripts/<datasetId>/<videoId>.md`（入库），发布后运行时读取。
 - `index.json` / `manifest.json` / `insights.json` 由 `publish:data` 从 pack 派生，与 pack 一起上传，保证索引不会指向不存在的 pack。
 - 页面运行时直接读对象存储，发布后刷新即可；`sync:data` 只生成 `public/data/` 兜底快照。
 - `public/data/` 是**构建中间产物**，不提交；`data-sources.json` 是唯一入库的数据配置。
@@ -95,6 +108,7 @@ buildStreamRows / aggregateDataset（纯函数）
 
 ```text
 stream-dashboard/
+├─ content/transcripts/       # 作者手写逐字稿（入库）
 ├─ data/                     # 本地暂存区（gitignore，仅 README 入库）
 │  ├─ README.md
 │  └─ nonoka/*.datapack.json
@@ -134,8 +148,15 @@ stream-dashboard/
 ### 加一场直播
 
 1. `bun run add:datapack nonoka /path/to/<videoId>.datapack.json`：写入本地暂存区并 upsert manifest。
-2. `bun run publish:data`：由 pack 重建 manifest + insights + dataset 索引，并上传对象存储。生产页面刷新即生效。
-3. `bun run sync:data && bun run validate:data`：本地校验。
+2. `bun run fetch:thumbs --dataset nonoka`：镜像这一场的封面（已存在的会跳过）。
+3. `bun run publish:data`：由 pack 重建 manifest + insights + dataset 索引，并上传对象存储（先传封面）。生产页面刷新即生效。
+4. `bun run sync:data && bun run validate:data`：本地校验。
+
+### 加一篇逐字稿
+
+1. `bun run transcript:new <videoId> --dataset nonoka`（或 `transcript:import <path>`）。
+2. 编辑 `content/transcripts/nonoka/<videoId>.md`。
+3. `bun run publish:transcripts`；单场页会出现「逐字稿」分段，索引页在 `#/nonoka/transcripts`。
 
 ### 加一位成员
 
@@ -153,7 +174,7 @@ bun run build
 # 产物在 dist/，包含 dist/data/（远端不可达时的兜底快照）
 ```
 
-部署在 Vercel（构建 `bun run build`，输出 `dist/`）；`vercel.json` 已配好缓存头。构建前设置 `VITE_DATAPACK_BASE` 指向对象存储；数据更新只需 `bun run publish:data`，不用重新构建。子路径部署用 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
+部署在 Vercel（构建 `bun run build`，输出 `dist/`）；`vercel.json` 已配好缓存头。构建前设置 `VITE_DATAPACK_BASE` 指向对象存储；数据更新只需 `bun run publish:data`，逐字稿更新 `bun run publish:transcripts`，都不用重新构建。子路径部署用 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
 
 ## 文档
 
@@ -165,6 +186,7 @@ bun run build
 - [docs/development.md](docs/development.md) — 本地开发、代码规范、图表写法
 - [docs/deployment.md](docs/deployment.md) — 构建与静态托管
 - [docs/troubleshooting.md](docs/troubleshooting.md) — 常见问题
+- [docs/product-direction.md](docs/product-direction.md) — 封面、相册、逐字稿的方向与阶段计划
 - [docs/roadmap.md](docs/roadmap.md) — 后续计划
 
 ## 数据与内容说明

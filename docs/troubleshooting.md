@@ -107,6 +107,20 @@ bun run dev -- --port 5174
 - 旧版本没有路由，之前的页面链接（只有根路径）会回到总览，这是预期行为。
 - 切换数据集时只会保留当前 section（单场会回到该数据集最新一场），不会保留原来的 `videoId`。
 
+## 封面不显示
+
+- 先确认本地有图：`data/<datasetId>/thumbs/<videoId>.jpg`；没有就 `bun run fetch:thumbs --dataset <id>`。
+- 生产读的是 `<base>/<dataset>/thumbs/<videoId>.jpg`，需要 `publish:data` 上传；只跑 `fetch:thumbs` 不会出现在线上。
+- 图存在但显示成员色兜底：检查 `VITE_DATAPACK_BASE` 是否包含桶内前缀（`R2_PREFIX`），以及对象是否公开可读。
+- 相册里个别卡片是兜底：说明那场没有 `video.thumbnail` 或下载失败，可加 `--force` 重抓。
+
+## 逐字稿不出现
+
+- 单场页的「逐字稿」分段只在索引里有该 `videoId` 时出现；先 `bun run publish:transcripts --no-upload` 看校验是否通过。
+- 本地开发会回退到构建期快照，但新增文件需要 Vite 重新加载（保存一次或重启 dev）。
+- 线上还看不到：检查 `<base>/transcripts/index.json` 是否已更新；发布时索引最后写，失败会保留旧索引。
+- `videoId` 写错不会拦发布，但会和场次对不上；用 `transcript:new` / `transcript:import` 从 manifest 匹配可避免。
+
 ## 数据更新后页面还是旧的
 
 - 发布后缓存：`data/*.json` 在 `vercel.json` 里是 300s 短缓存，对象存储侧的 manifest/insights 也是短缓存，等一会儿或强制刷新。

@@ -5,6 +5,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -31,6 +32,7 @@ export interface DataTableProps<T> {
   rowHref?: (row: T) => string;
   rowLabel?: (row: T) => string;
   empty?: ReactNode;
+  summary?: Record<string, ReactNode>;
   stickyHeader?: boolean;
   stickyFirstColumn?: boolean;
   className?: string;
@@ -53,6 +55,7 @@ export function DataTable<T>({
   rowHref,
   rowLabel,
   empty,
+  summary,
   stickyHeader,
   stickyFirstColumn,
   className,
@@ -117,7 +120,7 @@ export function DataTable<T>({
             const href = rowHref?.(row);
 
             return (
-              <TableRow className="h-11 border-b-0 md:h-[2.0625rem]" key={rowKey(row)}>
+              <TableRow className="h-11 border-b-0" key={rowKey(row)}>
                 {columns.map((column, columnIndex) => (
                   <TableCell
                     className={cn(
@@ -147,6 +150,27 @@ export function DataTable<T>({
           })
         )}
       </TableBody>
+      {summary && rows.length > 0 ? (
+        <TableFooter>
+          <TableRow className="border-b-0">
+            {columns.map((column, columnIndex) => (
+              <TableCell
+                className={cn(
+                  "py-2 text-footnote font-medium",
+                  stickyFirstColumn &&
+                    columnIndex === 0 &&
+                    "sticky left-0 z-10 border-e border-hairline bg-card",
+                  column.align === "right" && "text-right tabular-nums",
+                )}
+                key={column.key}
+              >
+                {summary[column.key] ?? null}
+              </TableCell>
+            ))}
+            {rowHref ? <TableCell className="w-0 p-0" /> : null}
+          </TableRow>
+        </TableFooter>
+      ) : null}
     </Table>
   );
 }

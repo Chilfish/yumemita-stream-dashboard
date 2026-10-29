@@ -21,6 +21,8 @@ const SECTION_LABELS: Record<ViewKey, string> = {
   stream: "单场",
   trends: "趋势",
   compare: "对比",
+  gallery: "相册",
+  transcripts: "逐字稿",
   about: "说明",
 };
 

@@ -42,6 +42,8 @@ export interface StreamSummary {
   chatPer1000AvgViewers: number | null
   likesPer1000Views: number | null
   scPerHour: number | null
+  /** 对象存储里的封面相对 key；没有封面时为 null。 */
+  thumbnail: string | null
   sessionDir: string
   datapack: string
   generatedAt: string
@@ -70,6 +72,7 @@ export interface DatapackSummarySource {
     durationSec?: number | null
     durationHms?: string | null
     availability?: string | null
+    thumbnail?: string | null
     snapshot?: {
       views?: number | null
       likes?: number | null
@@ -145,6 +148,7 @@ export function buildStreamSummary(pack: DatapackSummarySource, datapackRel: str
     chatPer1000AvgViewers: pack.derived?.chatPer1000AvgViewers ?? null,
     likesPer1000Views: pack.derived?.likesPer1000Views ?? null,
     scPerHour: pack.derived?.scPerHour ?? null,
+    thumbnail: video.id && video.thumbnail ? `thumbs/${video.id}.jpg` : null,
     sessionDir: '',
     datapack: datapackRel,
     generatedAt: pack.generatedAt ?? isoJst(new Date()),

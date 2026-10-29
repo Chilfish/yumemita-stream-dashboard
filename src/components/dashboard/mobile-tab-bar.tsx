@@ -1,9 +1,9 @@
-import { Activity, LayoutDashboard, Table2, Users } from "lucide-react";
+import { Activity, Images, LayoutDashboard, Table2, Users } from "lucide-react";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 import { MemberSheet } from "@/components/dashboard/member-sheet";
-import { homePath, streamPath, streamsPath, type ViewKey } from "@/lib/routes";
+import { galleryPath, homePath, streamPath, streamsPath, type ViewKey } from "@/lib/routes";
 import type { DatasetIndexEntry } from "@/types/dataset";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,7 @@ export function MobileTabBar({
   const items: TabItem[] = [
     { key: "home", label: "首页", icon: LayoutDashboard, to: homePath(datasetId) },
     { key: "streams", label: "场次", icon: Table2, to: streamsPath(datasetId) },
+    { key: "gallery", label: "相册", icon: Images, to: galleryPath(datasetId) },
     {
       key: "stream",
       label: "单场",
@@ -55,7 +56,7 @@ export function MobileTabBar({
         className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-card/92 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <ul className="grid grid-cols-4 gap-1 px-2 py-1.5">
+        <ul className="grid grid-cols-5 gap-1 px-2 py-1.5">
           {items.map(item => {
             const Icon = item.icon;
             const active = activeSection === item.key;

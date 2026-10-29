@@ -69,16 +69,23 @@ function escapeCsv(value: string | number | null | undefined): string {
 }
 
 function Missing() {
-  return <span className="text-ink-3">—</span>;
+  return <span className="text-ink-3 opacity-40">—</span>;
 }
 
-function numberCell(value: number | null | undefined): ReactNode {
-  return value == null ? <Missing /> : formatInteger(value);
+/** 数字默认退到二级色，只有主指标（峰值）用前景色加粗，给每行一个落点。 */
+function numberCell(value: number | null | undefined, strong = false): ReactNode {
+  if (value == null) return <Missing />;
+  return (
+    <span className={strong ? "font-medium text-foreground" : "text-muted-foreground"}>
+      {formatInteger(value)}
+    </span>
+  );
 }
 
 /** `likesPer1000Views` 是千次播放点赞数，换算成百分比。 */
 function likeRateCell(value: number | null | undefined): ReactNode {
-  return value == null ? <Missing /> : formatPercent(value / 10, 2);
+  if (value == null) return <Missing />;
+  return <span className="text-muted-foreground">{formatPercent(value / 10, 2)}</span>;
 }
 
 function averageDuration(rows: StreamSummary[]): number | null {
@@ -93,7 +100,7 @@ function averageDuration(rows: StreamSummary[]): number | null {
 }
 
 export function StreamsView({ rows, datasetId, params, onParamsChange }: StreamsViewProps) {
-  const { q, type: typeFilter, sort, dir, vstats: onlyVstats } = params;
+  const { q, type: typeFilter, sort, dir, vstats: onlyVstats, member: onlyMember } = params;
 
   const facts = useMemo<Fact[]>(() => {
     const chatTotal = rows.reduce((sum, row) => sum + row.chatTotal, 0);
@@ -110,6 +117,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
     const needle = q.trim().toLowerCase();
     const filtered = rows.filter(row => {
       if (onlyVstats && row.avgConcurrent == null) return false;
+      if (onlyMember && row.availability !== "subscriber_only") return false;
       if (typeFilter !== DEFAULT_TABLE_PARAMS.type && classifyTitle(row.title).key !== typeFilter) {
         return false;
       }
@@ -125,124 +133,149 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
       if (right == null) return -1;
       return dir === "asc" ? left - right : right - left;
     });
-  }, [rows, q, typeFilter, onlyVstats, sort, dir]);
+  }, [rows, q, typeFilter, onlyVstats, onlyMember, sort, dir]);
 
-  const columns: DataColumn<StreamSummary>[] = useMemo(
-    () => [
-      {
-        key: "date",
-        header: "日期",
-        sortable: true,
-        width: "7.25rem",
-        render: row => (
-          <span className="flex items-baseline gap-1.5">
-            <span className="tabular-nums">{formatDate(row.startedAt)}</span>
-            <span className="text-caption text-ink-3 tabular-nums">
-              {formatTime(row.startedAt)}
-            </span>
-          </span>
+  const extra = new Set(params.cols);
+
+  // 默认只铺六列；其余指标按 URL 里的 cols 追加，避免首屏十二列同时抢注意力。
+  const columns: DataColumn<StreamSummary>[] = [
+    {
+      key: "date",
+      header: "日期",
+      sortable: true,
+      width: "7.25rem",
+      render: row => (
+        <span className="flex items-baseline gap-1.5 text-muted-foreground">
+          <span className="tabular-nums">{formatDate(row.startedAt)}</span>
+          <span className="text-caption text-ink-3 tabular-nums">{formatTime(row.startedAt)}</span>
+        </span>
+      ),
+    },
+    {
+      key: "stream",
+      header: "场次",
+      headerClassName: "w-full",
+      cellClassName: "whitespace-normal py-2 leading-snug",
+      render: row => (
+        <>
+          <span className="break-words font-medium text-foreground">{row.title}</span>
+          {row.availability === "subscriber_only" ? (
+            <Badge className="ms-1.5 align-middle" size="sm" variant="outline">
+              会员
+            </Badge>
+          ) : null}
+        </>
+      ),
+    },
+    ...(extra.has("type")
+      ? [
+          {
+            key: "type",
+            header: "类型",
+            width: "4.25rem",
+            render: (row: StreamSummary) => (
+              <span className="text-ink-3">{CONTENT_TYPE_LABELS[classifyTitle(row.title).key]}</span>
+            ),
+          } satisfies DataColumn<StreamSummary>,
+        ]
+      : []),
+    {
+      key: "duration",
+      header: "时长",
+      align: "right",
+      sortable: true,
+      width: "5.5rem",
+      render: row =>
+        row.durationSec == null ? (
+          <Missing />
+        ) : (
+          <span className="text-muted-foreground">{formatDuration(row.durationSec)}</span>
         ),
-      },
-      {
-        key: "stream",
-        header: "场次",
-        headerClassName: "w-full",
-        render: row => (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="max-w-[38ch] truncate font-medium text-foreground">{row.title}</span>
-            {row.availability === "subscriber_only" ? (
-              <Badge className="shrink-0" size="sm" variant="outline">
-                会员
-              </Badge>
-            ) : null}
-          </span>
-        ),
-      },
-      {
-        key: "type",
-        header: "类型",
-        width: "4.25rem",
-        render: row => (
-          <span className="text-muted-foreground">
-            {CONTENT_TYPE_LABELS[classifyTitle(row.title).key]}
-          </span>
-        ),
-      },
-      {
-        key: "duration",
-        header: "时长",
-        align: "right",
-        sortable: true,
-        width: "5.5rem",
-        render: row =>
-          row.durationSec == null ? <Missing /> : <span>{formatDuration(row.durationSec)}</span>,
-      },
-      {
-        key: "avg",
-        header: "平均同接",
-        align: "right",
-        sortable: true,
-        width: "6rem",
-        render: row => numberCell(row.avgConcurrent),
-      },
-      {
-        key: "max",
-        header: "峰值",
-        align: "right",
-        sortable: true,
-        width: "5rem",
-        render: row => numberCell(row.maxConcurrent),
-      },
-      {
-        key: "views",
-        header: "播放",
-        align: "right",
-        sortable: true,
-        width: "5.5rem",
-        render: row => numberCell(row.vstatsViews ?? row.snapshotViews),
-      },
-      {
-        key: "chat",
-        header: "弹幕",
-        align: "right",
-        sortable: true,
-        width: "5.5rem",
-        render: row => numberCell(row.chatTotal),
-      },
-      {
-        key: "authors",
-        header: "人数",
-        align: "right",
-        sortable: true,
-        width: "5rem",
-        render: row => numberCell(row.uniqueAuthors),
-      },
-      {
-        key: "sc",
-        header: "SC",
-        align: "right",
-        sortable: true,
-        width: "3.5rem",
-        render: row => numberCell(row.superchats),
-      },
-      {
-        key: "comments",
-        header: "评论",
-        align: "right",
-        sortable: true,
-        width: "4.5rem",
-        render: row => numberCell(row.commentsCaptured),
-      },
-      {
-        key: "likeRate",
-        header: "点赞率",
-        align: "right",
-        width: "4.5rem",
-        render: row => likeRateCell(row.likesPer1000Views),
-      },
-    ],
-    [],
-  );
+    },
+    ...(extra.has("avg")
+      ? [
+          {
+            key: "avg",
+            header: "平均同接",
+            align: "right" as const,
+            sortable: true,
+            width: "6rem",
+            render: (row: StreamSummary) => numberCell(row.avgConcurrent),
+          } satisfies DataColumn<StreamSummary>,
+        ]
+      : []),
+    {
+      key: "max",
+      header: "峰值",
+      align: "right",
+      sortable: true,
+      width: "5rem",
+      render: row => numberCell(row.maxConcurrent, true),
+    },
+    {
+      key: "views",
+      header: "播放",
+      align: "right",
+      sortable: true,
+      width: "5.5rem",
+      render: row => numberCell(row.vstatsViews ?? row.snapshotViews),
+    },
+    {
+      key: "chat",
+      header: "弹幕",
+      align: "right",
+      sortable: true,
+      width: "5.5rem",
+      render: row => numberCell(row.chatTotal),
+    },
+    ...(extra.has("authors")
+      ? [
+          {
+            key: "authors",
+            header: "人数",
+            align: "right" as const,
+            sortable: true,
+            width: "5rem",
+            render: (row: StreamSummary) => numberCell(row.uniqueAuthors),
+          } satisfies DataColumn<StreamSummary>,
+        ]
+      : []),
+    ...(extra.has("sc")
+      ? [
+          {
+            key: "sc",
+            header: "SC",
+            align: "right" as const,
+            sortable: true,
+            width: "3.5rem",
+            render: (row: StreamSummary) => numberCell(row.superchats),
+          } satisfies DataColumn<StreamSummary>,
+        ]
+      : []),
+    ...(extra.has("comments")
+      ? [
+          {
+            key: "comments",
+            header: "评论",
+            align: "right" as const,
+            sortable: true,
+            width: "4.5rem",
+            render: (row: StreamSummary) => numberCell(row.commentsCaptured),
+          } satisfies DataColumn<StreamSummary>,
+        ]
+      : []),
+    ...(extra.has("likeRate")
+      ? [
+          {
+            key: "likeRate",
+            header: "点赞率",
+            align: "right" as const,
+            width: "4.5rem",
+            render: (row: StreamSummary) => likeRateCell(row.likesPer1000Views),
+          } satisfies DataColumn<StreamSummary>,
+        ]
+      : []),
+  ];
 
   function handleSort(key: string): void {
     if (!isTableSortKey(key)) return;
@@ -325,7 +358,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
 
             <div
               className={cn(
-                "hidden rounded-panel bg-card shadow-surface md:block",
+                "hidden rounded-panel bg-card md:block",
                 // coss Table 把 <table> 包在 overflow-x-auto 的容器里且没有高度上限，
                 // 直接 sticky 无效。这里把该容器变成有界滚动视口（桌面），
                 // 并把吸顶偏移从 top-14 归零，让表头真正贴住滚动区域顶部。
@@ -336,7 +369,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
             >
               <DataTable
                 ariaLabel="场次列表"
-                className="min-w-[67.5rem]"
+                className="min-w-[48rem]"
                 columns={columns}
                 onSort={handleSort}
                 rowHref={row => streamPath(datasetId, row.videoId)}
@@ -355,7 +388,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
           <p className="tabular-nums">
             共 {formatInteger(rows.length)} 场 · 筛选后 {formatInteger(visible.length)} 场
           </p>
-          <p>排序与筛选会写进 URL</p>
+          <p>排序、筛选与列设置会写进 URL</p>
         </footer>
       </section>
     </div>

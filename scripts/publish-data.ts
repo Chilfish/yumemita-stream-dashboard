@@ -10,8 +10,13 @@
  * 本地 `data/<id>/*.datapack.json` 是**唯一真源**：
  * 1. 由 pack 派生 manifest（摘要索引）与 insights（预聚合）；
  * 2. 写回本地 `data/<id>/`（gitignore，本地 dev 直接复用）；
- * 3. pack → manifest → insights → dataset index 的顺序上传，索引永远指向已存在的文件；
- * 4. 增量上传：内容摘要记在 `data/.publish-state.json`，未变化且远端对得上的 pack 跳过。
+ * 3. thumbs → pack → manifest → insights → dataset index 的顺序上传，索引永远指向已存在的文件；
+ * 4. 增量上传：内容摘要记在 `data/.publish-state.json`，未变化且远端对得上的对象跳过。
+ *
+ * 封面图（`data/<id>/thumbs/<videoId>.jpg`）与 480 / 960 / 1280w 的 WebP 变体
+ * （`<videoId>.<width>.webp`）由 `bun run fetch:thumbs` 生成，一起上传到
+ * `<base>/<id>/thumbs/`；先传图再传 pack / manifest，页面上的 `thumbnail`
+ * 一旦出现就一定有对应文件与全部 `srcset` 候选。
  *
  * `index.json` 是页面的入口：浏览器启动时直接向对象存储读它，再按 dataset 拉
  * manifest / insights / datapack。发布后刷新即可，不需要重新构建前端。
@@ -23,6 +28,7 @@ import { parseArgs } from 'node:util'
 import { aggregateDataset, buildStreamRows } from '../src/lib/aggregate.ts'
 import type { StreamDatapack } from '../src/types/datapack.ts'
 import type { BatchManifest } from '../src/types/dataset.ts'
+import { THUMB_VARIANTS } from '../src/lib/thumb-variants.ts'
 import { INDEX_KEY, buildDatasetIndex } from './lib/dataset-index.ts'
 import type { DatasetIndex, DatasetIndexSource } from './lib/dataset-index.ts'
 import { buildStreamSummary, isoJst } from './lib/dataset-manifest.ts'
@@ -36,8 +42,10 @@ import {
   readCredentials,
   remoteBase,
   runPool,
+  thumbVariantKey,
+  thumbsKey,
 } from './lib/object-storage.ts'
-import { digestBody, isUnchanged, readPublishState, writePublishState } from './lib/publish-state.ts'
+import { digestBody, digestBytes, isUnchanged, readPublishState, writePublishState } from './lib/publish-state.ts'
 
 interface DatasetSource {
   id: string
@@ -122,6 +130,67 @@ function readPacks(source: DatasetSource): StreamDatapack[] | null {
   })
 }
 
+const THUMB_SUFFIX = '.jpg'
+const VARIANT_PATTERN = /^(.+)\.(\d+)\.webp$/
+
+interface ThumbUpload {
+  key: string
+  body: Uint8Array
+  contentType: string
+}
+
+interface ThumbCollection {
+  uploads: ThumbUpload[]
+  /** 本地已有的 videoId，用来核对 manifest 的 thumbnail 有没有落空。 */
+  present: Set<string>
+  /** 缺 WebP 变体的 videoId：页面 `srcset` 会退回原图，提示重跑 fetch:thumbs。 */
+  missingVariants: string[]
+}
+
+/**
+ * 本地 `data/<id>/thumbs/<videoId>.jpg` 与 `<videoId>.<width>.webp` → 上传项。
+ * 文件是谁生成的不要紧，key 由 dataset + videoId（+ 变体宽度）决定。
+ */
+function collectThumbs(source: DatasetSource): ThumbCollection {
+  const dir = join(resolve(APP_ROOT, source.datapackDir), 'thumbs')
+  const uploads: ThumbUpload[] = []
+  const present = new Set<string>()
+  const variantCounts = new Map<string, number>()
+  if (!existsSync(dir))
+    return { uploads, present, missingVariants: [] }
+
+  for (const name of readdirSync(dir)) {
+    if (name.endsWith(THUMB_SUFFIX)) {
+      const videoId = name.slice(0, -THUMB_SUFFIX.length)
+      present.add(videoId)
+      uploads.push({
+        key: thumbsKey(source.id, videoId),
+        body: readFileSync(join(dir, name)),
+        contentType: 'image/jpeg',
+      })
+      continue
+    }
+
+    const match = VARIANT_PATTERN.exec(name)
+    if (!match)
+      continue
+    const [, videoId, rawWidth] = match
+    const width = Number(rawWidth)
+    if (!videoId || !(THUMB_VARIANTS as readonly number[]).includes(width))
+      continue
+    uploads.push({
+      key: thumbVariantKey(source.id, videoId, width),
+      body: readFileSync(join(dir, name)),
+      contentType: 'image/webp',
+    })
+    variantCounts.set(videoId, (variantCounts.get(videoId) ?? 0) + 1)
+  }
+
+  const missingVariants = [...present]
+    .filter(videoId => (variantCounts.get(videoId) ?? 0) < THUMB_VARIANTS.length)
+  return { uploads, present, missingVariants }
+}
+
 const config = readJson<{ datasets: DatasetSource[] }>(CONFIG_PATH)
 if (!Array.isArray(config.datasets) || config.datasets.length === 0)
   fail('data-sources.json 里没有 datasets')
@@ -138,6 +207,7 @@ if (!values['no-upload'] && !credentials)
 
 const store = credentials && !values['no-upload'] ? createObjectStore(credentials) : null
 const publishStartedAt = isoJst(new Date())
+const thumbUploads: ThumbUpload[] = []
 const packUploads: { key: string, body: string }[] = []
 const indexUploads: { key: string, body: string }[] = []
 const indexSources = new Map<string, DatasetIndexSource>()
@@ -169,7 +239,24 @@ for (const source of selected) {
   writeJson(join(dir, 'manifest.json'), manifest)
   writeJson(join(dir, 'insights.json'), insights)
 
-  console.log(`[publish-data] ${source.label} (${source.id})：${streams.length} 场，本地已生成 manifest + insights`)
+  const thumbs = collectThumbs(source)
+  thumbUploads.push(...thumbs.uploads)
+  // manifest 说“有封面”但本地没文件时只警告：缺图的场次页面走兜底，不该挡住发布。
+  const missingThumbs = streams.filter(stream => stream.thumbnail && !thumbs.present.has(stream.videoId))
+  if (missingThumbs.length > 0) {
+    const preview = missingThumbs.slice(0, 3).map(stream => stream.videoId).join(', ')
+    const rest = missingThumbs.length > 3 ? ` 等 ${missingThumbs.length} 场` : ''
+    console.warn(`[publish-data]   ! ${source.id} manifest 里有 ${missingThumbs.length} 场标了封面但本地没有图片（${preview}${rest}），先运行 bun run fetch:thumbs --dataset ${source.id}`)
+  }
+  // 缺变体时页面会退回原图（更慢但不会破图），同样只警告。
+  if (thumbs.missingVariants.length > 0) {
+    const preview = thumbs.missingVariants.slice(0, 3).join(', ')
+    const rest = thumbs.missingVariants.length > 3 ? ` 等 ${thumbs.missingVariants.length} 张` : ''
+    console.warn(`[publish-data]   ! ${source.id} 有 ${thumbs.missingVariants.length} 张封面缺 WebP 变体（${preview}${rest}），先运行 bun run fetch:thumbs --dataset ${source.id} 补齐`)
+  }
+
+  const variantCount = thumbs.uploads.filter(item => item.contentType === 'image/webp').length
+  console.log(`[publish-data] ${source.label} (${source.id})：${streams.length} 场，本地已生成 manifest + insights，封面 ${thumbs.uploads.length - variantCount} 张 + 变体 ${variantCount} 个`)
 
   for (const pack of packs)
     packUploads.push({ key: datapackKey(source.id, pack.video.id as string), body: JSON.stringify(pack) })
@@ -252,6 +339,43 @@ if (!values.force) {
     const detail = error instanceof Error ? error.message : String(error)
     console.warn(`[publish-data]   ! 列远端对象失败（${detail}），只按本地进度判断；要全量重传加 --force`)
   }
+}
+
+// 封面先传：manifest 的 `thumbnail` 指向这些 key，先有图再更新摘要才不会出现破图。
+const plannedThumbs = thumbUploads.map((item) => {
+  const digest = digestBytes(item.body)
+  const unchanged = isUnchanged(state.objects[item.key], digest, remote, item.key)
+  return { ...item, digest, skip: !values.force && unchanged }
+})
+const pendingThumbs = plannedThumbs.filter(item => !item.skip)
+const skippedThumbs = plannedThumbs.length - pendingThumbs.length
+
+if (plannedThumbs.length === 0) {
+  console.log('[publish-data] 本地没有封面图，跳过（先运行 bun run fetch:thumbs）')
+}
+else if (values.force) {
+  console.log(`[publish-data] --force：忽略本地进度，全量上传 ${pendingThumbs.length} 个封面 / 变体...`)
+}
+else if (skippedThumbs > 0) {
+  console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体（跳过 ${skippedThumbs} 个未变化）...`)
+}
+else {
+  console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体...`)
+}
+
+let thumbsUploaded = 0
+try {
+  await runPool(pendingThumbs, 4, async (item) => {
+    await store.putObject(item.key, item.body, item.contentType)
+    state.objects[item.key] = { ...item.digest, uploadedAt: new Date().toISOString() }
+    thumbsUploaded += 1
+    if (thumbsUploaded % 20 === 0)
+      writePublishState(statePath, state)
+  })
+}
+finally {
+  if (thumbsUploaded > 0)
+    writePublishState(statePath, state)
 }
 
 const planned = packUploads.map((item) => {

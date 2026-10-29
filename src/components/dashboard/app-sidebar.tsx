@@ -1,6 +1,8 @@
 import {
+  FileText,
   GitCompare,
   Guitar,
+  Images,
   Info,
   LayoutDashboard,
   Moon,
@@ -43,6 +45,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: "streams", label: "场次", icon: Table2 },
   { key: "trends", label: "趋势", icon: TrendingUp },
   { key: "compare", label: "对比", icon: GitCompare },
+  { key: "gallery", label: "相册", icon: Images },
+  { key: "transcripts", label: "逐字稿", icon: FileText },
   { key: "about", label: "说明", icon: Info },
 ];
 

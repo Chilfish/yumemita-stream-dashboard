@@ -5,6 +5,7 @@
  * manifest / insights，与 pack 一起上传到同一个桶，避免两份数据漂移。
  */
 import { S3Client } from 'bun'
+import { thumbVariantName } from '../../src/lib/thumb-variants.ts'
 
 export const MANIFEST_SCHEMA = 'yumemita.stream-datapack.batch/v1'
 export const INSIGHTS_SCHEMA = 'yumemita.dashboard.insights/v1'
@@ -24,6 +25,19 @@ export function manifestKey(datasetId: string): string {
 
 export function insightsKey(datasetId: string): string {
   return `${datasetId}/insights.json`
+}
+
+/**
+ * 封面图的 key 只由 dataset + videoId 决定，不读 manifest：
+ * 离线也能拼出 URL，删掉本地文件重发即可下架。
+ */
+export function thumbsKey(datasetId: string, videoId: string): string {
+  return `${datasetId}/thumbs/${videoId}.jpg`
+}
+
+/** WebP 变体：`<dataset>/thumbs/<videoId>.<width>.webp`，宽度见 `src/lib/thumb-variants.ts`。 */
+export function thumbVariantKey(datasetId: string, videoId: string, width: number): string {
+  return `${datasetId}/thumbs/${thumbVariantName(videoId, width)}`
 }
 
 interface Credentials {
@@ -48,6 +62,11 @@ export function readCredentials(): Credentials | null {
 
 export interface ObjectStore {
   put: (key: string, body: string) => Promise<void>
+  /**
+   * 二进制上传（封面图等）。Bun 的 S3 写入只能在 `type` 里给 Content-Type，
+   * 没有自定义 `Cache-Control` 的入口；长缓存靠桶侧规则，不在这里假装设置。
+   */
+  putObject: (key: string, body: Uint8Array, contentType: string) => Promise<void>
   /** 读取对象；不存在时返回 null。 */
   get: (key: string) => Promise<string | null>
   /** 桶内对象相对 `R2_PREFIX` 的 key → 字节数；用于增量发布时核对远端。 */
@@ -68,6 +87,17 @@ export function createObjectStore(credentials: Credentials): ObjectStore {
     const objectKey = `${prefix}${key}`
     try {
       await client.file(objectKey).write(body, { type: 'application/json' })
+    }
+    catch (error) {
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      throw new Error(`上传 ${objectKey} 失败：${detail}`, { cause: error })
+    }
+  }
+
+  async function putObject(key: string, body: Uint8Array, contentType: string): Promise<void> {
+    const objectKey = `${prefix}${key}`
+    try {
+      await client.file(objectKey).write(body, { type: contentType })
     }
     catch (error) {
       const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -111,7 +141,7 @@ export function createObjectStore(credentials: Credentials): ObjectStore {
     return sizes
   }
 
-  return { put, get, list }
+  return { put, putObject, get, list }
 }
 
 /** 有限并发地跑完一批任务，避免把 200+ 个 PUT 同时打出去。 */

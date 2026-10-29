@@ -61,10 +61,18 @@ bun run preview
 <bucket>/
 └─ stream-dashboard/        # R2_PREFIX：桶内前缀，留空则直接写桶根
    ├─ index.json            # dataset 索引（页面入口）
+   ├─ transcripts/
+   │  └─ index.json         # 逐字稿索引
    └─ nonoka/
       ├─ manifest.json
       ├─ insights.json
-      └─ <videoId>.datapack.json
+      ├─ <videoId>.datapack.json
+      ├─ thumbs/
+      │  ├─ <videoId>.jpg          # 原图 1280×720（srcset 的兜底 src）
+      │  ├─ <videoId>.480.webp     # 列表 / 相册
+      │  ├─ <videoId>.960.webp     # 首屏主图
+      │  └─ <videoId>.1280.webp    # 高 DPI 主图
+      └─ transcripts/<videoId>.json
 ```
 
 ### 发布
@@ -78,9 +86,19 @@ bun run publish:data --no-upload
 
 # 忽略本地进度，全量重传
 bun run publish:data --force
+
+# 封面：先镜像到本地，再由 publish:data 上传（已存在的跳过）
+bun run fetch:thumbs --dataset nonoka
+bun run publish:data --dataset nonoka
+
+# 逐字稿：校验 / 增量上传
+bun run publish:transcripts --no-upload
+bun run publish:transcripts
 ```
 
-`publish:data` 以本地 `data/<id>/*.datapack.json` 为唯一真源：先上传变化的 pack，再上传 manifest 与 insights，最后写根目录的 `index.json`。中途失败只会多出一个未被引用的 pack，不会出现指向不存在文件的索引。发布完成后页面刷新即生效，不需要重新构建。
+`publish:data` 以本地 `data/<id>/*.datapack.json` 为唯一真源：先上传变化的封面与 pack，再上传 manifest 与 insights，最后写根目录的 `index.json`。中途失败只会多出一个未被引用的对象，不会出现指向不存在文件的索引。发布完成后页面刷新即生效，不需要重新构建。
+
+逐字稿单独发布：`content/transcripts/` 是源文件，`publish:transcripts` 先传正文、最后写 `<base>/transcripts/index.json`，同样失败不阻塞。
 
 增量上传的进度记在本地 `data/.publish-state.json`（不进 git）：
 
@@ -114,8 +132,31 @@ bun run publish:data --force
 ### 缓存
 
 - datapack 内容随 videoId 固定，可以长缓存：`Cache-Control: public, max-age=31536000, immutable`。
+- 逐字稿正文 key 带 videoId，但同一场会改稿，建议短缓存或发布时带 `updatedAt` 查询参数；索引本身同样是短缓存。
 - `index.json` 每次启动带时间戳请求，CDN 缓存不影响新鲜度；manifest / insights 用索引的 `generatedAt` 作查询参数，发布后自动换 URL，可以放心短缓存或长缓存。
 - 发布后跑 `bun run validate:data -- --remote` 逐条 HEAD（含根目录 `index.json`），确认地址可达。
+
+#### 封面与变体
+
+封面 key 只由 dataset + videoId（+ 宽度）决定，内容不可变，是最值得长缓存的一类对象。
+注意：Bun 的 S3 写入只支持 `Content-Type`，**脚本无法给对象写 `Cache-Control`**（见
+`scripts/lib/object-storage.ts` 的注释），所以缓存必须配在存储侧，而不是代码里。
+
+推荐做法（Cloudflare R2）：
+
+1. 给桶绑定**自定义域名**（如 `s3.example.com`），不要长期用 `pub-xxxx.r2.dev`：后者没有可配的缓存规则。
+2. 该域名在 Cloudflare 上**开启代理**（橙色云），并用 **Cache Rule** 统一设置：
+   - 表达式：`(http.request.uri.path contains "/thumbs/")`
+   - Cache eligibility：`Eligible for cache`
+   - Edge TTL：`Override origin` → `1 year`
+   - Browser TTL：`Override origin` → `1 year`
+3. 同一思路可选加到 datapack：`(http.request.uri.path ends_with ".datapack.json")`，同样 1 年。
+4. `index.json` / `manifest.json` / `insights.json` 不要套长缓存：页面用时间戳 / `generatedAt` 参数保证新鲜度，
+   让它们走默认（不缓存）最省心。
+5. CORS 见上一节，需要允许 `GET` / `HEAD`。
+
+换图注意：key 不变时会命中一年缓存。重新抓取或调整编码参数（宽度、quality）后，要么在 Cloudflare 上 purge
+该前缀，要么改 key（例如把变体后缀升级成 `.v2.webp` 并同步 `src/lib/thumb-variants.ts`）。
 
 ## 缓存策略
 

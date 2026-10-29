@@ -1,8 +1,24 @@
-export const VIEWS = ["home", "streams", "stream", "compare", "about", "trends"] as const;
+export const VIEWS = [
+  "home",
+  "streams",
+  "stream",
+  "compare",
+  "about",
+  "trends",
+  "gallery",
+  "transcripts",
+] as const;
 
 export type ViewKey = (typeof VIEWS)[number];
 
-export const STREAM_SUBVIEWS = ["overview", "timeline", "words", "paid", "comments"] as const;
+export const STREAM_SUBVIEWS = [
+  "overview",
+  "timeline",
+  "words",
+  "paid",
+  "comments",
+  "transcript",
+] as const;
 
 export type StreamSubView = (typeof STREAM_SUBVIEWS)[number];
 
@@ -43,6 +59,14 @@ export function trendsPath(datasetId: string): string {
   return `${datasetPath(datasetId)}/trends`;
 }
 
+export function galleryPath(datasetId: string): string {
+  return `${datasetPath(datasetId)}/gallery`;
+}
+
+export function transcriptsPath(datasetId: string): string {
+  return `${datasetPath(datasetId)}/transcripts`;
+}
+
 export function comparePath(datasetId: string): string {
   return `${datasetPath(datasetId)}/compare`;
 }
@@ -61,6 +85,10 @@ export function viewPath(datasetId: string, view: ViewKey): string {
       return `${datasetPath(datasetId)}/stream`;
     case "trends":
       return trendsPath(datasetId);
+    case "gallery":
+      return galleryPath(datasetId);
+    case "transcripts":
+      return transcriptsPath(datasetId);
     case "compare":
       return comparePath(datasetId);
     case "about":
@@ -74,6 +102,8 @@ export function sectionFromPathname(pathname: string): ViewKey {
   if (segment === "streams" || segment === "table") return "streams";
   if (segment === "stream") return "stream";
   if (segment === "trends") return "trends";
+  if (segment === "gallery") return "gallery";
+  if (segment === "transcripts") return "transcripts";
   if (segment === "compare") return "compare";
   if (segment === "about") return "about";
   return "home";

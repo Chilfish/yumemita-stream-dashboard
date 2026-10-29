@@ -48,6 +48,18 @@
 | 更新日历默认定位最近 | 已完成 | `charts/calendar-heatmap.tsx` 渲染后滚到右端 |
 | 指标字阶 | 已完成 | `index.css` 新增 `--text-stat`（24/30，600），用于规模指标与最近一场主指标 |
 
+## P8 封面、相册与逐字稿
+
+| 项 | 状态 | 落点 |
+| --- | --- | --- |
+| 封面抓取与发布 | 已完成 | `scripts/fetch-thumbnails.ts`、`scripts/publish-data.ts`（thumbs → pack → index）、`scripts/lib/object-storage.ts` |
+| 首页与最近场次封面 | 已完成 | `dashboard/stream-cover.tsx`、`home-latest-stream.tsx`、`home-recent-streams.tsx` |
+| 单场页封面 | 已完成 | `stream-detail-view.tsx` 页头改为「标题 + 右侧 16:9 封面」网格 |
+| 相册页 | 已完成 | `dashboard/gallery-view.tsx`、`pages/gallery-page.tsx`；侧栏与移动端标签栏入口 |
+| 逐字稿 | 已完成 | `content/transcripts/`、`scripts/transcript-*.ts`、`scripts/publish-transcripts.ts`、`hooks/use-transcript.ts`、`dashboard/transcript-view.tsx`、`transcripts-view.tsx` |
+| 单场「逐字稿」分段 | 已完成 | 只在索引里有当前 `videoId` 时出现；移动端分段控件改为容器内横向滚动，避免页面溢出 |
+| 验证 | 已完成 | 1440 / 390 / 320 复核；相册 287 张图 0 破图；页面横向溢出 0；`typecheck` / 101 个单测 / lint 通过 |
+
 ## 文件归属（同一时刻只允许一个工作流修改）
 
 | 工作流 | 独占文件 |
@@ -62,6 +74,7 @@
 | P5-b 搜索 | `dashboard/command-palette.tsx`、`lib/keyboard.ts`、`lib/keyboard.test.ts`、`hooks/use-keyboard-shortcuts.ts` |
 | P5-c 表格 | `dashboard/data-table.tsx`、`dashboard/streams-view.tsx`、`dashboard/streams-toolbar.tsx` |
 | P6 日历与趋势 | `charts/calendar-heatmap.tsx`、`dashboard/home-calendar.tsx`、`charts/trend-line.tsx`、`dashboard/trends-view.tsx`、`pages/trends-page.tsx`、`lib/aggregate.ts`、`lib/aggregate.test.ts` |
+| P8 封面与逐字稿 | `dashboard/stream-cover.tsx`、`dashboard/gallery-view.tsx`、`dashboard/transcript-view.tsx`、`dashboard/transcripts-view.tsx`、`pages/gallery-page.tsx`、`pages/transcripts-page.tsx`、`hooks/use-transcript.ts`、`lib/transcripts.ts`、`content/transcripts/`、`scripts/fetch-thumbnails.ts`、`scripts/transcript-*.ts`、`scripts/publish-transcripts.ts` |
 
 > P5 完成后，`data-table.tsx` 回到 F1，`streams-view.tsx` / `streams-toolbar.tsx` 回到 L2。
 
@@ -79,6 +92,13 @@
 | 数值 | `tabular-nums`，右对齐，单位降一级 |
 
 ### 业务组件
+
+```tsx
+<StreamCover datasetId videoId title thumbnail? eager? sizes? className? />
+<GalleryView datasetId rows />
+<TranscriptView datasetId videoId />
+<TranscriptsView datasetId datasetLabel? />
+```
 
 ```tsx
 <Panel>

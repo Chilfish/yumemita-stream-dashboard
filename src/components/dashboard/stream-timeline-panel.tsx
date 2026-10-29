@@ -59,9 +59,6 @@ export function StreamTimelinePanel({ row }: StreamTimelinePanelProps) {
 
       <section className="border-t border-hairline pt-5">
         <h2 className="text-headline text-foreground">高光</h2>
-        <p className="mt-0.5 text-caption text-muted-foreground">
-          全部由本场数据包直接读出，不做区间猜测。
-        </p>
 
         <div className="mt-2 divide-y divide-hairline">
           {density.peakMinute ? (

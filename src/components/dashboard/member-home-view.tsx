@@ -16,7 +16,7 @@ import {
   formatPercent,
   formatTime,
 } from "@/lib/format";
-import { streamsPath, streamPath } from "@/lib/routes";
+import { galleryPath, streamsPath, streamPath } from "@/lib/routes";
 import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/dataset";
 
 interface MemberHomeViewProps {
@@ -104,6 +104,13 @@ export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeVi
                 variant="outline"
               >
                 全部场次
+              </Button>
+              <Button
+                render={<Link to={galleryPath(dataset.id)} />}
+                size="sm"
+                variant="outline"
+              >
+                相册
               </Button>
             </>
           }
