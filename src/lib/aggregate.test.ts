@@ -4,6 +4,7 @@ import type { StreamSummary } from "@/types/dataset";
 import {
   aggregateDataset,
   buildCalendarDays,
+  buildContentTypeStats,
   buildMonthlySeries,
   buildStreamRows,
   buildStreamShape,
@@ -444,6 +445,90 @@ describe("buildCalendarDays", () => {
   it("skips rows without a usable date", () => {
     const rows = [makeSummary({ startedAt: null, videoId: "a", durationSec: 60, date: "" })];
     expect(buildCalendarDays(rows)).toEqual([]);
+  });
+});
+
+describe("buildContentTypeStats", () => {
+  it("aggregates duration, chat, SC and concurrent by title type", () => {
+    const rows = [
+      makeSummary({
+        videoId: "a",
+        startedAt: "2026-10-01T20:00:00+09:00",
+        durationSec: 3600,
+        chatTotal: 120,
+        superchats: 2,
+        commentsCaptured: 10,
+        avgConcurrent: 100,
+        title: "【弾き語り】アコギ練習",
+      }),
+      makeSummary({
+        videoId: "b",
+        startedAt: "2026-10-02T20:00:00+09:00",
+        durationSec: 1800,
+        chatTotal: 60,
+        superchats: 1,
+        commentsCaptured: 4,
+        avgConcurrent: null,
+        title: "【弾き語り】夜の歌枠",
+      }),
+      makeSummary({
+        videoId: "c",
+        startedAt: "2026-10-03T20:00:00+09:00",
+        durationSec: 7200,
+        chatTotal: 240,
+        superchats: 3,
+        commentsCaptured: null,
+        avgConcurrent: 200,
+        title: "【ゲーム】魔女裁判",
+      }),
+      makeSummary({
+        videoId: "d",
+        startedAt: "2026-10-04T20:00:00+09:00",
+        durationSec: 1800,
+        chatTotal: 30,
+        superchats: 0,
+        commentsCaptured: 2,
+        avgConcurrent: null,
+        title: "【おしゃべり】ふつおた",
+      }),
+      makeSummary({
+        videoId: "e",
+        startedAt: "2026-10-05T20:00:00+09:00",
+        durationSec: 600,
+        chatTotal: 10,
+        title: "未分类标题",
+      }),
+    ];
+
+    const stats = buildContentTypeStats(rows);
+    const sing = stats.find(stat => stat.key === "sing");
+    const game = stats.find(stat => stat.key === "game");
+    const talk = stats.find(stat => stat.key === "talk");
+
+    expect(sing).toMatchObject({
+      streams: 2,
+      share: 0.4,
+      durationSec: 5400,
+      avgDurationSec: 2700,
+      chatTotal: 180,
+      superchats: 3,
+      commentsCaptured: 14,
+      commentsPerStream: 7,
+      chatPerMinute: 2,
+      scPerHour: 2,
+      avgConcurrent: 100,
+      concurrentStreams: 1,
+    });
+    expect(game).toMatchObject({ streams: 1, chatPerMinute: 2, scPerHour: 1.5 });
+    expect(talk).toMatchObject({ streams: 2, chatTotal: 40, commentsPerStream: 1 });
+    expect(stats.map(stat => stat.label)).toEqual(["弹唱", "活动", "杂谈", "游戏"]);
+  });
+
+  it("returns zeroed rows for an empty dataset", () => {
+    const stats = buildContentTypeStats([]);
+    expect(stats).toHaveLength(4);
+    expect(stats.every(stat => stat.streams === 0 && stat.share === 0)).toBe(true);
+    expect(stats.every(stat => stat.chatPerMinute === null)).toBe(true);
   });
 });
 

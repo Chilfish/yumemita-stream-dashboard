@@ -27,6 +27,7 @@ const METRICS_NOTE: [string, string][] = [
 const ROUTES: [string, string][] = [
   ["#/:member", "首页：最近一场、本月变化、最近场次"],
   ["#/:member/streams", "场次：完整表格，搜索 / 筛选 / 排序写入 URL"],
+  ["#/:member/trends", "趋势：月度趋势、月度明细、内容类型对比"],
   ["#/:member/stream/:videoId?view=", "单场：概览 / 时间轴 / 弹幕与词 / 付费 / 评论"],
   ["#/:member/compare", "对比：最多 4 场叠加与指标横表"],
   ["#/:member/about", "说明：本页"],

@@ -14,6 +14,7 @@ import {
   StreamIndexPage,
   StreamPage,
   StreamsPage,
+  TrendsPage,
 } from "@/pages/lazy-pages";
 
 export const router = createHashRouter([
@@ -32,6 +33,7 @@ export const router = createHashRouter([
           { path: "streams", element: <StreamsPage /> },
           { path: "stream", element: <StreamIndexPage /> },
           { path: "stream/:videoId", element: <StreamPage /> },
+          { path: "trends", element: <TrendsPage /> },
           { path: "compare", element: <ComparePage /> },
           { path: "about", element: <AboutPage /> },
           { path: "overview", element: <LegacyOverviewRedirect /> },

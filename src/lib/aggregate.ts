@@ -1,3 +1,9 @@
+import {
+  CONTENT_TYPES,
+  CONTENT_TYPE_LABELS,
+  classifyTitle,
+  type ContentTypeKey,
+} from "@/lib/classify";
 import type {
   ChatByKind,
   CurrencyTotal,
@@ -540,6 +546,100 @@ export function calendarMetricValue(day: CalendarDay, metric: CalendarMetric): n
     case "superchats":
       return day.superchats;
   }
+}
+
+export interface ContentTypeStat {
+  key: ContentTypeKey;
+  label: string;
+  streams: number;
+  share: number;
+  durationSec: number;
+  avgDurationSec: number | null;
+  chatTotal: number;
+  superchats: number;
+  commentsCaptured: number;
+  commentsPerStream: number | null;
+  chatPerMinute: number | null;
+  scPerHour: number | null;
+  avgConcurrent: number | null;
+  concurrentStreams: number;
+}
+
+/** 按标题类型聚合；未命中规则的行归入「杂谈」，与 `classifyTitles` 口径一致。 */
+export function buildContentTypeStats(rows: StreamSummary[]): ContentTypeStat[] {
+  const buckets = new Map<
+    ContentTypeKey,
+    {
+      streams: number;
+      durationSec: number;
+      chatTotal: number;
+      superchats: number;
+      commentsCaptured: number;
+      concurrentSum: number;
+      concurrentStreams: number;
+    }
+  >(
+    CONTENT_TYPES.map(key => [
+      key,
+      {
+        streams: 0,
+        durationSec: 0,
+        chatTotal: 0,
+        superchats: 0,
+        commentsCaptured: 0,
+        concurrentSum: 0,
+        concurrentStreams: 0,
+      },
+    ]),
+  );
+
+  for (const row of rows) {
+    const { key } = classifyTitle(row.title);
+    const bucket = buckets.get(key);
+    if (!bucket) continue;
+
+    bucket.streams += 1;
+    bucket.durationSec += row.durationSec ?? 0;
+    bucket.chatTotal += row.chatTotal ?? 0;
+    bucket.superchats += row.superchats ?? 0;
+    bucket.commentsCaptured += row.commentsCaptured ?? 0;
+    if (row.avgConcurrent != null) {
+      bucket.concurrentSum += row.avgConcurrent;
+      bucket.concurrentStreams += 1;
+    }
+  }
+
+  return CONTENT_TYPES.map(key => {
+    const bucket = buckets.get(key) ?? {
+      streams: 0,
+      durationSec: 0,
+      chatTotal: 0,
+      superchats: 0,
+      commentsCaptured: 0,
+      concurrentSum: 0,
+      concurrentStreams: 0,
+    };
+    return {
+      key,
+      label: CONTENT_TYPE_LABELS[key],
+      streams: bucket.streams,
+      share: rows.length > 0 ? bucket.streams / rows.length : 0,
+      durationSec: bucket.durationSec,
+      avgDurationSec: bucket.streams > 0 ? bucket.durationSec / bucket.streams : null,
+      chatTotal: bucket.chatTotal,
+      superchats: bucket.superchats,
+      commentsCaptured: bucket.commentsCaptured,
+      commentsPerStream:
+        bucket.streams > 0 ? bucket.commentsCaptured / bucket.streams : null,
+      chatPerMinute:
+        bucket.durationSec > 0 ? bucket.chatTotal / (bucket.durationSec / 60) : null,
+      scPerHour:
+        bucket.durationSec > 0 ? bucket.superchats / (bucket.durationSec / 3600) : null,
+      avgConcurrent:
+        bucket.concurrentStreams > 0 ? bucket.concurrentSum / bucket.concurrentStreams : null,
+      concurrentStreams: bucket.concurrentStreams,
+    };
+  });
 }
 
 /** 环比变化（%）；任一值为空或分母为 0 时返回 null。 */

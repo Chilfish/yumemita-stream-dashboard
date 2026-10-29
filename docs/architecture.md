@@ -88,6 +88,7 @@
 | `#/` | 重定向到上次访问的成员，否则第一个数据集 |
 | `#/:datasetId` | 成员首页（L1，glance） |
 | `#/:datasetId/streams?q=&type=&sort=&dir=&vstats=` | 场次页（L2，browse）；筛选/排序状态可分享 |
+| `#/:datasetId/trends` | 趋势页；月度趋势、月度明细、内容类型对比 |
 | `#/:datasetId/stream` | 跳转到最新一场 |
 | `#/:datasetId/stream/:videoId?view=` | 单场详情（L3，inspect）；`view` 为 `overview`/`timeline`/`words`/`paid`/`comments` |
 | `#/:datasetId/compare?ids=a,b,c` | 对比，最多 4 场 |
@@ -149,6 +150,7 @@ src/components/dashboard/
   home-content-mix.tsx / home-meter-row.tsx / home-top-words.tsx / home-top-authors.tsx
   streams-view.tsx    L2 场次页（表格 + 工具条）
   streams-toolbar.tsx 搜索、类型筛选、仅有 VSTATS、导出 CSV、移动端筛选 Sheet
+  trends-view.tsx     趋势：月度趋势、月度明细、内容类型对比
   stream-detail-view.tsx  L3 单场详情 + 分段控件
   stream-overview-panel.tsx / stream-timeline-panel.tsx
   stream-words-panel.tsx / stream-paid-panel.tsx / stream-comments-panel.tsx
@@ -165,7 +167,7 @@ src/components/dashboard/
 src/pages/
   lazy-pages.tsx      路由级 lazy() 包装
   home-redirect.tsx   重定向到上次访问 / 首个 dataset
-  home-page.tsx / streams-page.tsx / stream-index-page.tsx
+  home-page.tsx / streams-page.tsx / stream-index-page.tsx / trends-page.tsx
   stream-page.tsx / compare-page.tsx / about-page.tsx
   legacy-redirects.tsx 旧 overview / table 地址重定向
 ```
@@ -178,6 +180,7 @@ src/components/charts/
   axis.tsx            网格线 / 刻度 / 轴标题
   sparkline.tsx       迷你曲线 / 面积，供首页与行内复用
   calendar-heatmap.tsx 按日热力图（场次 / 弹幕 / SC）
+  trend-line.tsx      月度趋势折线（单指标 + 空值断线）
   stream-bars.tsx     每场平均/最大同接
   chat-density.tsx    逐分钟弹幕 + SC 条 + hover
   ten-minute-bars.tsx 每 10 分钟分布

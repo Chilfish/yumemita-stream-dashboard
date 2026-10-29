@@ -95,7 +95,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 ## 路由
 
 - 使用 React Router v8 的 **hash 路由**（`createHashRouter`），静态托管/子路径不需要服务端回退。
-- URL 形态：`#/:id` 成员首页、`#/:id/streams?q=&type=&sort=&dir=&vstats=` 场次页、`#/:id/stream/:videoId?view=` 单场、`#/:id/compare?ids=a,b,c` 对比、`#/:id/about` 说明；旧地址 `#/:id/overview`、`#/:id/table` 自动重定向。
+- URL 形态：`#/:id` 成员首页、`#/:id/streams?q=&type=&sort=&dir=&vstats=` 场次页、`#/:id/trends` 趋势页、`#/:id/stream/:videoId?view=` 单场、`#/:id/compare?ids=a,b,c` 对比、`#/:id/about` 说明；旧地址 `#/:id/overview`、`#/:id/table` 自动重定向。
 - 表格参数用 `parseTableParams` / `writeTableParams`（`lib/table-params.ts`），默认值不写入 URL，更新用 `replace: true`。
 - 根路由与 `:datasetId` 有 `errorElement`（`route-error.tsx`）；新页面不需要单独加错误兜底。
 - `DatasetLayout` 只加载 manifest + `insights.json`；列表页不下载 datapack。单场和对比用 `useStreamPacks` 按需拉取，缓存由 `lib/data.ts` 负责。
@@ -151,6 +151,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 | `stream-timeline.tsx` | 单场双轨时间轴：弹幕面积 + SC 刻度 + 悬停读数 |
 | `chart-frame.tsx` | 无卡片图表容器：标题 + 口径 + 动作 |
 | `calendar-heatmap.tsx` | 按日热力图：场次 / 弹幕 / SC，横向滚动 + 原生 tooltip |
+| `trend-line.tsx` | 月度趋势折线：单指标、空值断线、原生 tooltip |
 
 ## 加一个路由页面
 

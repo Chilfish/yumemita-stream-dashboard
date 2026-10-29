@@ -19,6 +19,7 @@ const SECTION_LABELS: Record<ViewKey, string> = {
   home: "首页",
   streams: "场次",
   stream: "单场",
+  trends: "趋势",
   compare: "对比",
   about: "说明",
 };

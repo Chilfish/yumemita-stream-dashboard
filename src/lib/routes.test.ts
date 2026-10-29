@@ -9,6 +9,7 @@ import {
   streamPath,
   streamsPath,
   toggleCompareId,
+  trendsPath,
   viewPath,
 } from "./routes";
 
@@ -17,8 +18,10 @@ describe("route paths", () => {
     expect(datasetPath("nonoka")).toBe("/nonoka");
     expect(homePath("nonoka")).toBe("/nonoka");
     expect(streamsPath("nonoka")).toBe("/nonoka/streams");
+    expect(trendsPath("nonoka")).toBe("/nonoka/trends");
     expect(viewPath("nonoka", "home")).toBe("/nonoka");
     expect(viewPath("nonoka", "streams")).toBe("/nonoka/streams");
+    expect(viewPath("nonoka", "trends")).toBe("/nonoka/trends");
     expect(viewPath("nonoka", "stream")).toBe("/nonoka/stream");
     expect(viewPath("nonoka", "compare")).toBe("/nonoka/compare");
     expect(viewPath("nonoka", "about")).toBe("/nonoka/about");
@@ -41,6 +44,7 @@ describe("sectionFromPathname", () => {
   it("returns the section segment", () => {
     expect(sectionFromPathname("/nonoka/compare")).toBe("compare");
     expect(sectionFromPathname("/nonoka/streams")).toBe("streams");
+    expect(sectionFromPathname("/nonoka/trends")).toBe("trends");
     expect(sectionFromPathname("/nonoka/stream/abc")).toBe("stream");
   });
 

@@ -77,6 +77,7 @@ const { datasetId, videoId, streamTitle, compareIds, compareTitle } = loadFixtur
 const streamUrl = `${baseUrl}/#/${datasetId}/stream/${videoId}`;
 const invalidUrl = `${baseUrl}/#/${datasetId}/stream/not-a-real-id`;
 const compareUrl = `${baseUrl}/#/${datasetId}/compare?ids=${compareIds.join(",")}`;
+const trendsUrl = `${baseUrl}/#/${datasetId}/trends`;
 const homeHash = `#/${datasetId}`;
 const streamMarker = streamTitle || videoId;
 const NOT_FOUND_TEXT = "找不到这场直播";
@@ -266,6 +267,19 @@ const scenarios = [
 
       const text = await bodyText();
       assert(text.includes(compareTitle), "对比页面没有渲染所选场次");
+    },
+  },
+  {
+    name: `趋势深链 ${trendsUrl.replace(baseUrl, "")}`,
+    async run() {
+      await page.open(trendsUrl);
+      await page.waitLoad();
+      await page.waitText("内容类型对比");
+      const route = String((await page.eval("location.hash")) ?? "");
+      assert(route.endsWith("/trends"), `hash 没有落在 /trends：${route}`);
+      const text = await bodyText();
+      assert(text.includes("月度趋势"), "趋势页没有渲染月度趋势");
+      assert(text.includes("内容类型对比"), "趋势页没有渲染内容类型对比");
     },
   },
   {

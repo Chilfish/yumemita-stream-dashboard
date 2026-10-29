@@ -15,6 +15,9 @@ export const StreamPage = lazy(() =>
 export const ComparePage = lazy(() =>
   import("@/pages/compare-page").then(module => ({ default: module.ComparePage })),
 );
+export const TrendsPage = lazy(() =>
+  import("@/pages/trends-page").then(module => ({ default: module.TrendsPage })),
+);
 export const AboutPage = lazy(() =>
   import("@/pages/about-page").then(module => ({ default: module.AboutPage })),
 );

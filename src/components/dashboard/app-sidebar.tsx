@@ -1,4 +1,13 @@
-import { GitCompare, Guitar, Info, LayoutDashboard, Moon, Sun, Table2 } from "lucide-react";
+import {
+  GitCompare,
+  Guitar,
+  Info,
+  LayoutDashboard,
+  Moon,
+  Sun,
+  Table2,
+  TrendingUp,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import {
@@ -31,6 +40,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "首页", icon: LayoutDashboard },
   { key: "streams", label: "场次", icon: Table2 },
+  { key: "trends", label: "趋势", icon: TrendingUp },
   { key: "compare", label: "对比", icon: GitCompare },
   { key: "about", label: "说明", icon: Info },
 ];
