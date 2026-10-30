@@ -84,7 +84,7 @@ export function StreamCover({
       ) : (
         <div
           aria-hidden="true"
-          className="relative flex size-full items-center justify-center bg-linear-to-br from-member/20 via-member/10 to-member/5"
+          className="cover-fallback relative flex size-full items-center justify-center"
         >
           <Play
             className="size-4 text-member-ink opacity-60 @[6rem]:size-6"

@@ -226,27 +226,43 @@
     --warning-foreground: var(--color-amber-700);
     --accent: --alpha(var(--color-black) / 4%);
     --accent-foreground: var(--color-neutral-800);
-    --background: #f7f3f5;
+    /* ── HIG 语义色（浅色）──────────────────────────────────────────
+     * 层级靠亮度：grouped 页面底 < 卡片 < 浮层，页面底在 HIG 的 grouped
+     * 背景上带一点品牌暖调，免得中性灰发冷；其余一律取 HIG 的标签与分隔线。
+     */
+    --system-grouped-background: #f5f2f4;
+    --secondary-grouped-background: #ffffff;
+    --tertiary-grouped-background: #f3eef1;
+    --label: #000000;
+    /* HIG 的 secondaryLabel（60%）在 12px 中文上只有 3.4:1，按可达性压深。 */
+    --secondary-label: #5f5f66;
+    --tertiary-label: #8a8a92;
+    --separator: rgb(60 60 67 / 0.29);
+    --separator-soft: rgb(60 60 67 / 0.12);
+    --fill-secondary: rgb(120 120 128 / 0.16);
+    --background: var(--system-grouped-background);
     --border: var(--hairline);
-    --card: #ffffff;
-    --card-foreground: var(--color-neutral-800);
+    --card: var(--secondary-grouped-background);
+    --card-foreground: var(--label);
     --destructive: var(--color-red-500);
-    --foreground: #1b1b1d;
+    --foreground: var(--label);
     --input: --alpha(var(--color-black) / 10%);
     --muted: --alpha(var(--color-black) / 4%);
-    --muted-foreground: #62626a;
-    --ink-3: #8a8a92;
-    --hairline: rgb(0 0 0 / 0.08);
+    --muted-foreground: var(--secondary-label);
+    --ink-3: var(--tertiary-label);
+    --hairline: var(--separator-soft);
     --positive: #2c7365;
     --paid: #98721f;
     --member-color: #b8461f;
     --member-ink: #b8461f;
-    /* 团体二色：取自团标（UFO 是白，底色是蓝与粉）。只用于背景氛围，不进图表。 */
-    --team-blue: #2288dd;
+    /* 团体二色：取自团标（UFO 是白，底色是蓝与粉）。只用于品牌标识与氛围。 */
     --team-pink: #ff7788;
-    --ambient-wash: 16%;
-    /* 组页面没有成员色，用团体粉收边；成员页面由布局层覆盖。 */
+    /* 强调色只做「内容自带的颜色」：成员页是成员色，组页面是团体粉。 */
+    --ambient-wash: 10%;
     --ambient-accent: var(--team-pink);
+    /* 滚动指示器属于系统外框，保持中性，不跟着强调色走。 */
+    --scrollbar-thumb: rgb(0 0 0 / 0.2);
+    --scrollbar-thumb-hover: rgb(0 0 0 / 0.34);
     --popover: var(--color-white);
     --popover-foreground: var(--color-neutral-800);
     --primary: var(--color-neutral-800);
@@ -284,24 +300,39 @@
     --warning-foreground: var(--color-amber-400);
     --accent: --alpha(var(--color-white) / 4%);
     --accent-foreground: var(--color-neutral-100);
-    --background: #08080b;
+    /* ── HIG 语义色（深色）──────────────────────────────────────────
+     * 深色靠「越亮越高」分层：侧栏 #000 → 内容面 #0b0b0c → 卡片 #1c1c1e
+     * → 浮层 #2c2c2e（后两级即 HIG 的 secondary / tertiary system background）。
+     */
+    --system-grouped-background: #0b0b0c;
+    --secondary-grouped-background: #1c1c1e;
+    --tertiary-grouped-background: #2c2c2e;
+    --label: #ffffff;
+    --secondary-label: #a1a1a6;
+    --tertiary-label: #8e8e93;
+    --separator: rgb(84 84 88 / 0.6);
+    --separator-soft: rgb(255 255 255 / 0.1);
+    --fill-secondary: rgb(120 120 128 / 0.32);
+    --background: var(--system-grouped-background);
     --border: var(--hairline);
-    --card: #141419;
-    --card-foreground: var(--color-neutral-100);
+    --card: var(--secondary-grouped-background);
+    --card-foreground: var(--label);
     --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-    --foreground: #f5f5f7;
+    --foreground: var(--label);
     --input: --alpha(var(--color-white) / 8%);
     --muted: --alpha(var(--color-white) / 4%);
-    --muted-foreground: #a1a1a6;
-    --ink-3: #8e8e93;
-    --hairline: rgb(255 255 255 / 0.09);
+    --muted-foreground: var(--secondary-label);
+    --ink-3: var(--tertiary-label);
+    --hairline: var(--separator-soft);
     --positive: #5fc2ad;
     --paid: #e0b25c;
     --member-color: #ff8a5c;
     --member-ink: #ff8a5c;
     /* 深色底吸光，同样的色量看着偏淡，提一档补回来。 */
-    --ambient-wash: 22%;
-    --popover: color-mix(in srgb, var(--background) 98%, var(--color-white));
+    --ambient-wash: 18%;
+    --scrollbar-thumb: rgb(255 255 255 / 0.18);
+    --scrollbar-thumb-hover: rgb(255 255 255 / 0.32);
+    --popover: var(--tertiary-grouped-background);
     --popover-foreground: var(--color-neutral-100);
     --primary: var(--color-neutral-100);
     --primary-foreground: var(--color-neutral-800);
@@ -319,7 +350,7 @@
     /* 深色无阴影，靠表面色差分层；用透明零阴影而不是 none，保证 box-shadow 列表始终合法。 */
     --shadow-surface: none;
     --surface-shadow: 0 0 #0000;
-    --sidebar: #0f0f13;
+    --sidebar: #000000;
     --sidebar-accent: --alpha(var(--color-white) / 4%);
     --sidebar-accent-foreground: var(--color-neutral-100);
     --sidebar-border: var(--hairline);
@@ -332,6 +363,27 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* 滚动条：细轨、透明底、悬停加深。成员页里由布局层把拇指换成成员色。 */
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+    }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+    }
+  ::-webkit-scrollbar-thumb {
+    border: 2.5px solid transparent;
+    border-radius: 999px;
+    background-color: var(--scrollbar-thumb);
+    background-clip: content-box;
+    }
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--scrollbar-thumb-hover);
     }
   body {
     @apply bg-background text-foreground;
@@ -354,8 +406,9 @@
 
 /*
  * ── 背景氛围 ────────────────────────────────────────────────────────
- * 团标的底就是「斜条纹 + 蓝粉」：与其铺一层谁都能用的渐变，不如把这道条纹
- * 本身放到页面顶端，用团体蓝压到极低，10rem 内落到纸面。数据区永远是干净的纸。
+ * 颜色只做「内容自带的颜色」：这一层取当前成员（组页面取团体粉），
+ * 像 Apple Music 把封面色渗到页头那样，只在 9rem 内落到 grouped 背景上。
+ * 不用装饰性的彩色光斑，也不进数据区。
  */
 .ambient-field {
   isolation: isolate;
@@ -368,15 +421,13 @@
   border-radius: inherit;
   pointer-events: none;
   content: "";
-  background-image: repeating-linear-gradient(
-    115deg,
-    color-mix(in oklab, var(--team-blue) 4%, transparent) 0 14px,
-    transparent 14px 40px
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--ambient-accent) var(--ambient-wash), transparent),
+    transparent
   );
   background-repeat: no-repeat;
-  background-size: 100% 5rem;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0 1.25rem, transparent 5rem);
-  mask-image: linear-gradient(to bottom, #000 0 1.25rem, transparent 5rem);
+  background-size: 100% 9rem;
 }
 
 /*
@@ -384,10 +435,10 @@
  * 16:9 的大封面没有图时不再是一整块死色，但也不会比真封面更抢眼。
  */
 .cover-fallback {
-  background-color: color-mix(in oklab, var(--member-color) 9%, var(--card));
+  background-color: color-mix(in oklab, var(--member-color) 8%, var(--card));
   background-image: repeating-linear-gradient(
     115deg,
-    color-mix(in oklab, var(--member-color) 10%, transparent) 0 9px,
+    color-mix(in oklab, var(--member-color) 8%, transparent) 0 9px,
     transparent 9px 26px
   );
 }
