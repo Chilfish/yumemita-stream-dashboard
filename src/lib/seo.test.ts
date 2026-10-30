@@ -132,7 +132,28 @@ describe("单场页", () => {
     expect(meta.ogType).toBe("article");
     expect(meta.publishedTime).toBe(stream.startedAt);
     expect(meta.image).toBe("https://cdn.example.com/nonoka/thumbs/abc123.jpg");
-    expect(meta.jsonLd.map(item => item["@type"])).toEqual(["BreadcrumbList", "WebPage"]);
+    expect(meta.imageAlt).toContain("宮永ののか");
+    expect(meta.jsonLd.map(item => item["@type"])).toEqual([
+      "BreadcrumbList",
+      "VideoObject",
+      "WebPage",
+    ]);
+
+    const video = meta.jsonLd.find(item => item["@type"] === "VideoObject");
+    expect(video?.duration).toBe("PT2H");
+    expect(video?.embedUrl).toContain("/embed/abc123");
+    expect(video?.thumbnailUrl).toEqual(["https://cdn.example.com/nonoka/thumbs/abc123.jpg"]);
+  });
+
+  it("没有分享图时不写 imageAlt", () => {
+    const meta = build({
+      dataset,
+      pathname: "/nonoka/stream/abc123",
+      section: "stream",
+      stream,
+    });
+    expect(meta.image).toBeNull();
+    expect(meta.imageAlt).toBeNull();
   });
 
   it("长标题在 title 里截断", () => {

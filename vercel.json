@@ -1,8 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install --frozen-lockfile",
+  "outputDirectory": "dist",
+  "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/((?!assets/|data/|avatars/).*)",
+      "source": "/((?!assets/|data/|avatars/|.*\\.(?:png|jpg|jpeg|webp|svg|ico|xml|txt|webmanifest|json)$).*)",
       "destination": "/index.html"
     }
   ],

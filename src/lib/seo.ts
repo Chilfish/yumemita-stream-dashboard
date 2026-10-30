@@ -1,4 +1,7 @@
 import type { GroupViewKey, ViewKey } from "@/lib/routes";
+import { DEFAULT_SITE_URL, TWITTER_SITE } from "./site-defaults.ts";
+
+export { DEFAULT_SITE_URL, TWITTER_SITE };
 
 /**
  * 每页的 title / description / canonical / OG 由这里统一生成。
@@ -7,11 +10,11 @@ import type { GroupViewKey, ViewKey } from "@/lib/routes";
 
 export const SITE_NAME = "ゆめみた 配信数据台";
 export const SITE_DESCRIPTION =
-  "夢限大みゅーたいぷ 成员直播数据的可视化数据台：同接、弹幕、SC、评论与词频。";
+  "夢限大みゅーたいぷ 成员直播数据的可视化数据台：同接、弹幕、SC、评论与逐字稿，支持按成员、场次和趋势浏览。";
 
 const GROUP_NAME = "夢限大みゅーたいぷ";
 const MAX_TITLE_CHARS = 44;
-const MAX_DESCRIPTION_CHARS = 150;
+const MAX_DESCRIPTION_CHARS = 160;
 
 /** sitemap 收录的成员栏目（`compare` 是 noindex，不进去）。 */
 export const SITEMAP_SECTIONS = [
@@ -67,6 +70,7 @@ export type SeoMeta = {
   description: string;
   canonical: string;
   image: string | null;
+  imageAlt: string | null;
   robots: RobotsDirective;
   ogType: "website" | "article";
   publishedTime: string | null;
@@ -157,10 +161,23 @@ function streamDescription(stream: SeoStream, label: string, date: string | null
   if (stream.chatTotal != null) stats.push(`弹幕 ${formatNumber(stream.chatTotal)} 条`);
   if (stream.superchats != null) stats.push(`SC ${formatNumber(stream.superchats)} 笔`);
 
-  const title = truncateText(stream.title, 30);
+  const title = stream.title.trim();
   const when = [label, date].filter(Boolean).join(" ");
   const detail = stats.length > 0 ? stats.join(" · ") : "同接、弹幕密度、SC 与逐分钟节奏";
-  return clampDescription(`${when}「${title}」：${detail}。`);
+  return clampDescription(
+    `${when}「${title}」：${detail}。含逐分钟弹幕密度、高频词、SC 明细与评论。`,
+  );
+}
+
+function isoDuration(totalSeconds: number | null | undefined): string | null {
+  if (totalSeconds == null || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return null;
+  const seconds = Math.round(totalSeconds);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  return `PT${hours > 0 ? `${hours}H` : ""}${minutes > 0 ? `${minutes}M` : ""}${
+    rest > 0 || (hours === 0 && minutes === 0) ? `${rest}S` : ""
+  }`;
 }
 
 function sectionCopy(
@@ -177,48 +194,56 @@ function sectionCopy(
       return {
         title: `${label} 场次列表 | ${SITE_NAME}`,
         description: clampDescription(
-          `${label} 的直播场次${suffix}：按日期、内容类型与同接筛选，支持排序与 CSV 导出。`,
+          `${label} 的直播场次${suffix}：按日期、内容类型与同接筛选，支持排序与 CSV 导出，可快速定位单场并查看同接、弹幕与 SC。`,
         ),
       };
     case "trends":
       return {
         title: `${label} 趋势与月度变化 | ${SITE_NAME}`,
         description: clampDescription(
-          `${label} 的月度趋势与内容类型对比：场次频率、弹幕密度、SC 与平均同接。`,
+          `${label} 的月度趋势与内容类型对比：场次频率、弹幕密度、SC 与平均同接，可按月查看变化。`,
         ),
       };
     case "gallery":
       return {
         title: `${label} 相册 | ${SITE_NAME}`,
-        description: clampDescription(`${label} 的直播封面墙，按 JST 自然月分组。`),
+        description: clampDescription(
+          `${label} 的直播封面墙，按 JST 自然月分组，点击封面即可进入对应场次。`,
+        ),
       };
     case "transcripts":
       return {
         title: `${label} 逐字稿 | ${SITE_NAME}`,
         description: clampDescription(
-          `${label} 的直播逐字稿索引，支持目录与时间戳跳转 YouTube。`,
+          `${label} 的直播逐字稿索引，支持目录与时间戳跳转 YouTube 原片。`,
         ),
       };
     case "compare":
       return {
         title: `场次对比 | ${SITE_NAME}`,
-        description: "选择最多 4 场直播，叠加逐分钟弹幕并横向对比同接、弹幕与 SC。",
+        description: clampDescription(
+          "选择最多 4 场直播，叠加逐分钟弹幕并横向对比同接、弹幕与 SC，适合比较同标题系列或同期场次。",
+        ),
       };
     case "about":
       return {
         title: `数据说明 | ${SITE_NAME}`,
-        description: "数据来源、统计口径、已知限制与更新方式。",
+        description: clampDescription(
+          "数据来源、统计口径、已知限制与更新方式，了解同接、弹幕、SC 与评论分别如何统计。",
+        ),
       };
     case "stream":
       return {
         title: `单场数据 | ${label} | ${SITE_NAME}`,
-        description: clampDescription(`${label} 单场直播的同接、弹幕、SC 与评论数据。`),
+        description: clampDescription(
+          `${label} 单场直播的同接、弹幕、SC 与评论数据，含逐分钟弹幕曲线与高频词。`,
+        ),
       };
     default:
       return {
         title: `${label} 直播数据 | ${SITE_NAME}`,
         description: clampDescription(
-          `${label} 的直播数据${suffix}：平均/最大同接、弹幕密度、SC、评论与逐字稿。`,
+          `${label} 的直播数据${suffix}：平均/最大同接、弹幕密度、SC、评论与逐字稿，可按场次、趋势、相册与逐字稿浏览。`,
         ),
       };
   }
@@ -253,9 +278,20 @@ function websiteJsonLd(origin: string, basePath: string, description: string): R
   };
 }
 
+function imageAltFor(ctx: SeoContext): string | null {
+  if (!ctx.image) return null;
+  if (ctx.stream) {
+    return `${truncateText(ctx.stream.title, 40)} · ${ctx.dataset?.label ?? GROUP_NAME}`;
+  }
+  if (ctx.dataset) return `${ctx.dataset.label} 直播数据`;
+  if (ctx.section === "gallery") return `${GROUP_NAME} 直播封面墙`;
+  return `${GROUP_NAME} 直播数据`;
+}
+
 export function buildSeo(ctx: SeoContext): SeoMeta {
   const canonical = absoluteUrl(ctx.origin, ctx.basePath, ctx.pathname);
   const image = ctx.image ?? null;
+  const imageAlt = imageAltFor(ctx);
   const robots: RobotsDirective =
     ctx.notFound || ctx.error || ctx.section === "compare" ? "noindex,follow" : "index,follow";
 
@@ -265,6 +301,7 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
       description: "页面出了点问题，可以重试一次，或者回到首页继续浏览。",
       canonical,
       image: null,
+      imageAlt: null,
       robots: "noindex,follow",
       ogType: "website",
       publishedTime: null,
@@ -276,9 +313,10 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
     if (ctx.section === "gallery") {
       return {
         title: `全组封面墙 | ${SITE_NAME}`,
-        description: `夢限大みゅーたいぷ 五位成员的直播封面，按 JST 自然月排列，可按成员与内容类型筛选。`,
+        description: `夢限大みゅーたいぷ 五位成员的直播封面，按 JST 自然月排列，可按成员与内容类型筛选，点击封面进入对应场次。`,
         canonical,
         image,
+        imageAlt,
         robots,
         ogType: "website",
         publishedTime: null,
@@ -294,10 +332,9 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
     const members = countLabel(ctx.memberCount);
     const streams = countLabel(ctx.streamCount);
     const description = clampDescription(
-      [
-        `${GROUP_NAME}${members ? ` ${members} 位成员` : ""}${streams ? `、${streams} 场直播` : ""}的数据台`,
-        "同接、弹幕、SC、评论与逐字稿。",
-      ].join("："),
+      `${GROUP_NAME}${members ? ` ${members} 位成员` : ""}${
+        streams ? `、${streams} 场直播` : ""
+      }的数据台：同接、弹幕、SC、评论与逐字稿，支持按成员、场次与趋势浏览。`,
     );
 
     return {
@@ -305,6 +342,7 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
       description,
       canonical,
       image,
+      imageAlt,
       robots,
       ogType: "website",
       publishedTime: null,
@@ -321,6 +359,7 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
         description: "这场直播不存在，可能已被删除，或从未被本站收录。",
         canonical,
         image,
+        imageAlt,
         robots: "noindex,follow",
         ogType: "website",
         publishedTime: null,
@@ -333,11 +372,19 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
     const description = streamDescription(stream, dataset.label, date);
     const title = `${truncateText(stream.title, 40)} · ${dataset.label} | ${SITE_NAME}`;
 
+    const duration = isoDuration(stream.durationSec);
+    const streamUrl = absoluteUrl(
+      ctx.origin,
+      ctx.basePath,
+      `/${dataset.id}/stream/${stream.videoId}`,
+    );
+
     return {
       title,
       description,
       canonical,
       image,
+      imageAlt,
       robots,
       ogType: "article",
       publishedTime: stream.startedAt,
@@ -348,6 +395,23 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
           { name: "场次", path: `/${dataset.id}/streams` },
           { name: truncateText(stream.title, 40), path: `/${dataset.id}/stream/${stream.videoId}` },
         ]),
+        {
+          "@context": "https://schema.org",
+          "@type": "VideoObject",
+          name: stream.title,
+          description,
+          url: streamUrl,
+          embedUrl: `https://www.youtube.com/embed/${encodeURIComponent(stream.videoId)}`,
+          ...(image ? { thumbnailUrl: [image] } : {}),
+          ...(stream.startedAt ? { uploadDate: stream.startedAt } : {}),
+          ...(duration ? { duration } : {}),
+          inLanguage: "ja-JP",
+          isPartOf: {
+            "@type": "WebSite",
+            name: SITE_NAME,
+            url: absoluteUrl(ctx.origin, ctx.basePath, "/"),
+          },
+        },
         {
           "@context": "https://schema.org",
           "@type": "WebPage",
@@ -391,6 +455,7 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
     description: clampDescription(description),
     canonical,
     image,
+    imageAlt,
     robots,
     ogType: "website",
     publishedTime: null,

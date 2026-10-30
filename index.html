@@ -10,7 +10,11 @@
         window.location.replace("__SITE_BASE__" + hash.slice(1));
       })();
     </script>
-    <link rel="icon" type="image/jpeg" href="/favicon.jpg" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%favicon-32x32.png" />
+    <link rel="icon" type="image/jpeg" href="%BASE_URL%favicon.jpg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%apple-touch-icon.png" />
+    <link rel="manifest" href="%BASE_URL%site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f5f2f4" media="(prefers-color-scheme: light)" />
@@ -19,19 +23,56 @@
     <!--seo:start-->
     <meta
       name="description"
-      content="夢限大みゅーたいぷ 成员直播数据的可视化数据台：同接、弹幕、SC、评论与词频。"
+      content="夢限大みゅーたいぷ 成员直播数据的可视化数据台：同接、弹幕、SC、评论与逐字稿，支持按成员、场次和趋势浏览。"
     />
     <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="__SITE_URL__/" />
     <meta property="og:site_name" content="ゆめみた 配信数据台" />
     <meta property="og:locale" content="zh_CN" />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <title>ゆめみた 配信数据台</title>
+    <meta property="og:title" content="夢限大みゅーたいぷ 直播数据 | ゆめみた 配信数据台" />
+    <meta
+      property="og:description"
+      content="夢限大みゅーたいぷ 成员直播数据的可视化数据台：同接、弹幕、SC、评论与逐字稿，支持按成员、场次和趋势浏览。"
+    />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <meta property="og:image" content="__SITE_URL__/favicon.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="400" />
+    <meta property="og:image:height" content="400" />
+    <meta property="og:image:alt" content="ゆめみた 配信数据台" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:site" content="@Chilfish" />
+    <meta name="twitter:title" content="夢限大みゅーたいぷ 直播数据 | ゆめみた 配信数据台" />
+    <meta
+      name="twitter:description"
+      content="夢限大みゅーたいぷ 成员直播数据的可视化数据台：同接、弹幕、SC、评论与逐字稿，支持按成员、场次和趋势浏览。"
+    />
+    <meta name="twitter:image" content="__SITE_URL__/favicon.jpg" />
+    <meta name="twitter:image:alt" content="ゆめみた 配信数据台" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "ゆめみた 配信数据台",
+        "alternateName": "夢限大みゅーたいぷ",
+        "url": "__SITE_URL__/",
+        "inLanguage": "zh-CN",
+        "description": "夢限大みゅーたいぷ 成员直播数据的可视化数据台：同接、弹幕、SC、评论与逐字稿，支持按成员、场次和趋势浏览。"
+      }
+    </script>
+    <title>夢限大みゅーたいぷ 直播数据 | ゆめみた 配信数据台</title>
     <!--seo:end-->
   </head>
   <body>
     <!--seo:body-->
-    <div id="root"></div>
+    <div id="root">
+      <!--seo:h1:start-->
+      <h1 style="max-width: 48rem; margin: 2rem auto; padding: 0 1rem; font: 600 1.5rem/1.4 system-ui, sans-serif">
+        夢限大みゅーたいぷ 直播数据 | ゆめみた 配信数据台
+      </h1>
+      <!--seo:h1:end-->
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

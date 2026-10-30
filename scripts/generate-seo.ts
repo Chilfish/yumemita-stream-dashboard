@@ -13,10 +13,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadEnv } from "vite";
 import {
   buildSeo,
   buildSitemap,
+  DEFAULT_SITE_URL,
   SITE_NAME,
+  TWITTER_SITE,
   type SeoDataset,
   type SeoMeta,
   type SeoStream,
@@ -28,10 +31,16 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const distRoot = join(appRoot, "dist");
 const publicRoot = join(appRoot, "public");
 const templatePath = join(distRoot, "index.html");
+/** 第一次生成时把 vite build 的原始模板留一份，standalone `bun run seo` 可以重复跑。 */
+const templateCachePath = join(appRoot, "node_modules", ".cache", "stream-dashboard", "seo-template.html");
 
 const SEO_START = "<!--seo:start-->";
 const SEO_END = "<!--seo:end-->";
 const SEO_BODY = "<!--seo:body-->";
+const SEO_H1_START = "<!--seo:h1:start-->";
+const SEO_H1_END = "<!--seo:h1:end-->";
+const H1_STYLE =
+  "max-width: 48rem; margin: 2rem auto; padding: 0 1rem; font: 600 1.5rem/1.4 system-ui, sans-serif";
 
 function fail(message: string): never {
   console.error(`[seo] ${message}`);
@@ -64,19 +73,27 @@ function parseMaxStreams(argv: string[]): number {
 }
 
 const maxStreams = parseMaxStreams(process.argv.slice(2));
-const isCi = Boolean(process.env.CI);
 
-const rawSite = (process.env.SITE_URL ?? process.env.VITE_SITE_URL ?? "").replace(/\/+$/, "");
-const vercelHost = (process.env.VERCEL_PROJECT_PRODUCTION_URL ?? "").replace(/^https?:\/\//, "");
-const site = rawSite || (vercelHost ? `https://${vercelHost}` : "");
-const basePath = (process.env.VITE_BASE ?? "/").replace(/\/+$/, "");
+// `bun run build` 的后续步骤不会自动读取 .env；这里复用 Vite 的加载规则，
+// 保证本地构建与 Vercel（环境变量由平台注入）得到同一份配置。
+const env = { ...loadEnv("production", appRoot, ""), ...process.env } as Record<
+  string,
+  string | undefined
+>;
 
-if (!site) {
-  if (isCi) fail("缺少 SITE_URL / VITE_SITE_URL：CI 里必须给出站点根地址。");
-  warn("缺少 SITE_URL / VITE_SITE_URL，canonical 与 sitemap 会使用相对地址。");
+const rawSite = (env.SITE_URL ?? env.VITE_SITE_URL ?? "").replace(/\/+$/, "");
+const site = rawSite || DEFAULT_SITE_URL;
+const basePath = (env.VITE_BASE ?? "/").replace(/\/+$/, "");
+
+if (!rawSite) {
+  warn(`未配置 SITE_URL / VITE_SITE_URL，canonical 与 sitemap 使用 ${DEFAULT_SITE_URL}`);
 }
 
-const dataBase = (process.env.VITE_DATAPACK_BASE ?? "").replace(/\/+$/, "");
+const dataBase = (env.VITE_DATAPACK_BASE ?? "").replace(/\/+$/, "");
+
+if (!dataBase) {
+  warn("未配置 VITE_DATAPACK_BASE，og:image 回退到站点同源的 /data/...（可能没有封面）");
+}
 
 function thumbUrl(datasetId: string, videoId: string): string {
   const path = `${datasetId}/thumbs/${encodeURIComponent(videoId)}.jpg`;
@@ -109,6 +126,9 @@ function renderHead(meta: SeoMeta): string {
     `<meta property="og:description" content="${escapeHtml(meta.description)}" />`,
     `<meta property="og:url" content="${escapeHtml(meta.canonical)}" />`,
     `<meta name="twitter:card" content="${meta.image ? "summary_large_image" : "summary"}" />`,
+    ...(TWITTER_SITE
+      ? [`<meta name="twitter:site" content="${escapeHtml(TWITTER_SITE)}" />`]
+      : []),
     `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`,
   ];
@@ -116,9 +136,19 @@ function renderHead(meta: SeoMeta): string {
   if (meta.image) {
     tags.push(
       `<meta property="og:image" content="${escapeHtml(meta.image)}" />`,
+      ...(meta.image.startsWith("https://")
+        ? [`<meta property="og:image:secure_url" content="${escapeHtml(meta.image)}" />`]
+        : []),
+      `<meta property="og:image:type" content="image/jpeg" />`,
       `<meta property="og:image:width" content="1280" />`,
       `<meta property="og:image:height" content="720" />`,
+      ...(meta.imageAlt
+        ? [`<meta property="og:image:alt" content="${escapeHtml(meta.imageAlt)}" />`]
+        : []),
       `<meta name="twitter:image" content="${escapeHtml(meta.image)}" />`,
+      ...(meta.imageAlt
+        ? [`<meta name="twitter:image:alt" content="${escapeHtml(meta.imageAlt)}" />`]
+        : []),
     );
   }
 
@@ -154,7 +184,7 @@ function streamList(streams: StreamSummary[], datasetId: string, limit = 10): st
 function noscriptBlock(title: string, body: string): string {
   return `<noscript>
       <div style="max-width:48rem;margin:2rem auto;padding:0 1rem;font-family:system-ui,sans-serif;line-height:1.6">
-        <h1>${escapeHtml(title)}</h1>
+        <h2>${escapeHtml(title)}</h2>
         ${body}
         <p style="color:#666">启用 JavaScript 以查看交互图表。</p>
       </div>
@@ -207,6 +237,8 @@ type PageRoute = {
   streamCount: number | null;
   updatedAt: string | null;
   image: string | null;
+  /** 服务端渲染的 H1；React 挂载后会替换掉 #root 里的兜底内容。 */
+  heading: string;
   noscript: string;
 };
 
@@ -243,6 +275,7 @@ function buildRoutes(bundles: DatasetBundle[]): PageRoute[] {
     streamCount: totalStreams,
     updatedAt: latest?.startedAt ?? null,
     image: groupImage,
+    heading: `${SITE_NAME} · 全组`,
     noscript: noscriptBlock(
       `${SITE_NAME} · 全组`,
       `<p>夢限大みゅーたいぷ 五位成员的直播数据台，共 ${bundles.length} 位成员。</p>
@@ -265,6 +298,7 @@ function buildRoutes(bundles: DatasetBundle[]): PageRoute[] {
     streamCount: totalStreams,
     updatedAt: latest?.startedAt ?? null,
     image: groupImage,
+    heading: "全组封面墙",
     noscript: noscriptBlock(
       "全组封面墙",
       `<p>跨成员的直播封面，按 JST 自然月分组。</p><p>${link("/", "回到全组首页")}</p>`,
@@ -299,6 +333,7 @@ function buildRoutes(bundles: DatasetBundle[]): PageRoute[] {
 
     for (const page of pages) {
       const isHome = page.section === "home";
+      const heading = `${entry.label} · ${page.title}`;
       const noscriptBody = isHome
         ? `<p>${escapeHtml(page.summary)}</p>
       ${streamList(streams, entry.id)}
@@ -314,7 +349,8 @@ function buildRoutes(bundles: DatasetBundle[]): PageRoute[] {
         streamCount: streams.length,
         updatedAt,
         image,
-        noscript: noscriptBlock(`${entry.label} · ${page.title}`, noscriptBody),
+        heading,
+        noscript: noscriptBlock(heading, noscriptBody),
       });
     }
 
@@ -326,6 +362,8 @@ function buildRoutes(bundles: DatasetBundle[]): PageRoute[] {
         `SC ${stream.superchats ?? 0} 笔`,
       ].filter(Boolean);
 
+      const heading = `${stream.title} · ${entry.label}`;
+
       routes.push({
         path: `/${entry.id}/stream/${stream.videoId}`,
         section: "stream",
@@ -334,8 +372,9 @@ function buildRoutes(bundles: DatasetBundle[]): PageRoute[] {
         streamCount: streams.length,
         updatedAt,
         image: thumbUrl(entry.id, stream.videoId),
+        heading,
         noscript: noscriptBlock(
-          `${stream.title} · ${entry.label}`,
+          heading,
           `<p>${escapeHtml(metrics.join(" · "))}</p>
       <p>${link(`/${entry.id}/streams`, `回到 ${entry.label} 的场次列表`)} · <a href="${escapeHtml(stream.url)}">在 YouTube 打开</a></p>`,
         ),
@@ -346,12 +385,32 @@ function buildRoutes(bundles: DatasetBundle[]): PageRoute[] {
   return routes;
 }
 
-function main(): void {
+/** 供 Vite build 的 closeBundle 钩子与独立 CLI 共用。 */
+export function generateSeo(): void {
   if (!existsSync(templatePath)) fail("dist/index.html 不存在，先运行 vite build");
-  const template = readFileSync(templatePath, "utf8");
 
-  if (!template.includes(SEO_START) || !template.includes(SEO_END) || !template.includes(SEO_BODY)) {
-    fail("index.html 缺少 <!--seo:start--> / <!--seo:end--> / <!--seo:body--> 标记");
+  const sourceHtml = readFileSync(templatePath, "utf8");
+  let template: string;
+
+  if (sourceHtml.includes(SEO_BODY)) {
+    template = sourceHtml;
+    mkdirSync(dirname(templateCachePath), { recursive: true });
+    writeFileSync(templateCachePath, template);
+  } else if (existsSync(templateCachePath)) {
+    // 已经生成过：复用上一次 vite build 的原始模板，避免在生成产物上二次处理。
+    template = readFileSync(templateCachePath, "utf8");
+  } else {
+    fail("dist/index.html 已是生成后的页面，且没有模板缓存；先运行 vite build");
+  }
+
+  if (
+    !template.includes(SEO_START) ||
+    !template.includes(SEO_END) ||
+    !template.includes(SEO_BODY) ||
+    !template.includes(SEO_H1_START) ||
+    !template.includes(SEO_H1_END)
+  ) {
+    fail("index.html 缺少 seo 的 head / body / h1 标记");
   }
 
   const bundles = loadDatasets();
@@ -374,9 +433,15 @@ function main(): void {
 
     const headStart = template.indexOf(SEO_START);
     const headEnd = template.indexOf(SEO_END);
-    const html = `${template.slice(0, headStart + SEO_START.length)}
+    const withHead = `${template.slice(0, headStart + SEO_START.length)}
     ${renderHead(meta)}
     ${template.slice(headEnd)}`.replace(SEO_BODY, route.noscript);
+
+    const h1Start = withHead.indexOf(SEO_H1_START);
+    const h1End = withHead.indexOf(SEO_H1_END);
+    const html = `${withHead.slice(0, h1Start + SEO_H1_START.length)}
+      <h1 style="${H1_STYLE}">${escapeHtml(route.heading)}</h1>
+      ${withHead.slice(h1End)}`;
 
     if (route.path === "/") {
       writeFileSync(templatePath, html);
@@ -412,4 +477,7 @@ function main(): void {
   );
 }
 
-main();
+const isDirectRun =
+  process.argv[1] != null && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) generateSeo();

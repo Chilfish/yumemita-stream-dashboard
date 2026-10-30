@@ -10,10 +10,11 @@
     "node": ">=22.22"
   },
   "scripts": {
-    "dev": "bun run sync:data && vite",
-    "build": "bun run sync:data && tsc -b && vite build && bun scripts/generate-seo.ts",
+    "dev": "bun run sync:data && bun run icons && vite",
+    "build": "bun run sync:data && bun run icons && tsc -b && vite build",
     "preview": "vite preview",
     "sync:data": "bun scripts/sync-data.mjs",
+    "icons": "bun scripts/generate-icons.ts",
     "seo": "bun scripts/generate-seo.ts",
     "verify:seo": "bun scripts/verify-seo.ts",
     "publish:data": "bun scripts/publish-data.ts",

@@ -6,18 +6,21 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SITEMAP_SECTIONS } from "../src/lib/seo.ts";
+import { loadEnv } from "vite";
+import { DEFAULT_SITE_URL, SITEMAP_SECTIONS } from "../src/lib/seo.ts";
 import type { BatchManifest, DatasetIndex } from "../src/types/dataset.ts";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const distRoot = join(appRoot, "dist");
 const publicRoot = join(appRoot, "public");
-const isCi = Boolean(process.env.CI);
 
-const rawSite = (process.env.SITE_URL ?? process.env.VITE_SITE_URL ?? "").replace(/\/+$/, "");
-const vercelHost = (process.env.VERCEL_PROJECT_PRODUCTION_URL ?? "").replace(/^https?:\/\//, "");
-const site = rawSite || (vercelHost ? `https://${vercelHost}` : "");
-const basePath = (process.env.VITE_BASE ?? "/").replace(/\/+$/, "");
+const env = { ...loadEnv("production", appRoot, ""), ...process.env } as Record<
+  string,
+  string | undefined
+>;
+const site = (env.SITE_URL ?? env.VITE_SITE_URL ?? "").replace(/\/+$/, "") || DEFAULT_SITE_URL;
+const basePath = (env.VITE_BASE ?? "/").replace(/\/+$/, "");
+const dataBase = (env.VITE_DATAPACK_BASE ?? "").replace(/\/+$/, "");
 
 const failures: string[] = [];
 
@@ -29,12 +32,9 @@ function read(path: string): string {
   return readFileSync(path, "utf8");
 }
 
-if (!site) {
-  if (isCi) {
-    console.error("[verify-seo] 缺少 SITE_URL / VITE_SITE_URL");
-    process.exit(1);
-  }
-  console.warn("[verify-seo] 缺少 SITE_URL / VITE_SITE_URL，跳过绝对地址相关检查");
+function metaContent(html: string, attr: "name" | "property", key: string): string {
+  const match = html.match(new RegExp(`<meta ${attr}="${key}" content="([^"]*)"`));
+  return match?.[1] ?? "";
 }
 
 const indexPath = join(publicRoot, "data", "index.json");
@@ -92,6 +92,15 @@ if (existsSync(robotsPath) && site) {
   );
 }
 
+for (const asset of [
+  "apple-touch-icon.png",
+  "favicon-32x32.png",
+  "site.webmanifest",
+  "favicon.svg",
+]) {
+  check(existsSync(join(distRoot, asset)), `dist/${asset} 不存在`);
+}
+
 const rootHtml = join(distRoot, "index.html");
 if (!existsSync(rootHtml)) {
   failures.push("dist/index.html 不存在");
@@ -100,6 +109,21 @@ if (!existsSync(rootHtml)) {
   check(html.includes('type="module"'), "dist/index.html 缺少 app 的 module script");
   check(html.includes('rel="canonical"'), "dist/index.html 缺少 canonical");
   check(html.includes("<noscript>"), "dist/index.html 缺少 noscript 兜底内容");
+  const h1Count = (html.match(/<h1\b/g) ?? []).length;
+  check(h1Count === 1, `dist/index.html 应有 1 个 H1（实际 ${h1Count}）`);
+  check(!html.includes("<!--seo:body-->"), "dist/index.html 仍是未生成 SEO 的模板");
+  check(!html.includes("__SITE_URL__"), "dist/index.html 没有替换 __SITE_URL__");
+
+  for (const [attr, key] of [
+    ["property", "og:image"],
+    ["property", "og:url"],
+    ["property", "og:title"],
+    ["name", "twitter:image"],
+    ["name", "twitter:site"],
+  ] as const) {
+    check(metaContent(html, attr, key) !== "", `dist/index.html 缺少 ${key}`);
+  }
+  check(html.includes('type="application/ld+json"'), "dist/index.html 缺少 JSON-LD");
 }
 
 function streamPagePath(datasetId: string, videoId: string): string {
@@ -124,18 +148,46 @@ for (const bundle of bundles) {
   if (!existsSync(pagePath)) continue;
 
   const html = read(pagePath);
-  check(html.includes("<title>"), `${entry.id} 单场页缺少 <title>`);
-  check(html.includes('rel="canonical"'), `${entry.id} 单场页缺少 canonical`);
-  check(html.includes('property="og:image"'), `${entry.id} 单场页缺少 og:image`);
-  check(html.includes('property="og:title"'), `${entry.id} 单场页缺少 og:title`);
+  const label = `${entry.id}/stream/${sample.videoId}`;
+  check(html.includes("<title>"), `${label} 缺少 <title>`);
+  check(html.includes('rel="canonical"'), `${label} 缺少 canonical`);
+  const h1Count = (html.match(/<h1\b/g) ?? []).length;
+  check(h1Count === 1, `${label} 应有 1 个 H1（实际 ${h1Count}）`);
+  check(!html.includes("<!--seo:body-->"), `${label} 仍是未生成 SEO 的模板`);
+  check(html.includes('type="application/ld+json"'), `${label} 缺少 JSON-LD`);
+  check(html.includes('"@type":"VideoObject"'), `${label} 缺少 VideoObject`);
 
-  if (site) {
-    const canonical = `${site}${basePath}/${entry.id}/stream/${sample.videoId}`;
-    check(
-      html.includes(`href="${canonical}"`),
-      `${entry.id} 单场页 canonical 不是 ${canonical}`,
-    );
+  for (const [attr, key] of [
+    ["property", "og:title"],
+    ["property", "og:description"],
+    ["property", "og:url"],
+    ["property", "og:image"],
+    ["property", "og:image:alt"],
+    ["name", "twitter:card"],
+    ["name", "twitter:image"],
+    ["name", "twitter:image:alt"],
+  ] as const) {
+    check(metaContent(html, attr, key) !== "", `${label} 缺少 ${key}`);
   }
+
+  const canonical = `${site}${basePath}/${entry.id}/stream/${sample.videoId}`;
+  check(
+    html.includes(`href="${canonical}"`),
+    `${label} canonical 不是 ${canonical}`,
+  );
+  check(
+    metaContent(html, "property", "og:url") === canonical,
+    `${label} og:url 不是 ${canonical}`,
+  );
+
+  const image = metaContent(html, "property", "og:image");
+  check(/^https?:\/\//.test(image), `${label} og:image 不是绝对地址`);
+  if (dataBase) {
+    check(image.startsWith(`${dataBase}/`), `${label} og:image 不在数据源上：${image}`);
+  }
+
+  const description = metaContent(html, "property", "og:description");
+  check(Array.from(description).length >= 50, `${label} 的 description 太短`);
 }
 
 if (failures.length > 0) {
