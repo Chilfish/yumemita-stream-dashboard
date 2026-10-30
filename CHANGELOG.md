@@ -18,10 +18,10 @@
 ### 界面
 
 - **封面层**：`fetch:thumbs` 把 YouTube 封面镜像到本地并随 `publish:data` 上传；首页最近一场、最近场次、单场页与相册统一 16:9 渲染，缺图走成员色兜底。
-- **相册页**：`#/:datasetId/gallery`，按 JST 自然月分组的封面墙，懒加载、`?order=` 可分享；侧栏与移动端标签栏新增入口。
-- **组首页**：`#/` 跨成员首屏——近 7 天 / 本月脉冲、最近一场焦点、跨成员最近更新与按成员进入；单个成员 manifest 加载失败时跳过并提示，不阻塞其余成员。
-- **全组相册**：`#/gallery` 把相册扩展为跨成员时间线，`?member=` / `?type=` / `?order=` 写进 URL，成员与内容类型筛选带实时计数。
-- **逐字稿**：`content/transcripts/<datasetId>/<videoId>.md` 手写 Markdown，`publish:transcripts` 上传后运行时渲染；单场页按需出现「逐字稿」分段，带目录、时间戳跳 YouTube，索引页 `#/:datasetId/transcripts`。
+- **相册页**：`/:datasetId/gallery`，按 JST 自然月分组的封面墙，懒加载、`?order=` 可分享；侧栏与移动端标签栏新增入口。
+- **组首页**：`/` 跨成员首屏：近 7 天 / 本月脉冲、最近一场焦点、跨成员最近更新与按成员进入；单个成员 manifest 加载失败时跳过并提示，不阻塞其余成员。
+- **全组相册**：`/gallery` 把相册扩展为跨成员时间线，`?member=` / `?type=` / `?order=` 写进 URL，成员与内容类型筛选带实时计数。
+- **逐字稿**：`content/transcripts/<datasetId>/<videoId>.md` 手写 Markdown，`publish:transcripts` 上传后运行时渲染；单场页按需出现「逐字稿」分段，带目录、时间戳跳 YouTube，索引页 `/:datasetId/transcripts`。
 - 单场页页头改为「标题 + 右侧 16:9 封面」网格；移动端分段控件改为容器内横向滚动，避免页面横向溢出。
 - 成员色拆成两个 token：`--member-color` 保留 `data-sources.json` 里的品牌原色（图表、色点、色条），
   `--member-ink` 用对比度达标的加深色（小号文字、焦点环）。浅色主题下 `#ffcb5b` 不再被压成棕色。
@@ -51,6 +51,7 @@
 
 ### 工程
 
+- **SEO**：路由从 hash 改为真实路径（`createBrowserRouter` + `basename`），旧 `#/...` 链接由 `index.html` 内联脚本改写；`vercel.json` 增加 SPA rewrite。新增 `src/lib/seo.ts`（`buildSeo` / `buildSitemap` 纯函数）与 `useSeo`，统一每页 title / description / canonical / OG / JSON-LD；`scripts/generate-seo.ts` 在构建时为组首页、全组相册、每位成员的 6 个栏目页与 1891 个单场页生成静态 head 和 `<noscript>` 摘要，并输出 `sitemap.xml` / `robots.txt`；`verify:seo` 进 CI。对比页与未知路径 noindex，canonical 丢弃 query。
 - **封面管线**：新增 `fetch:thumbs`（`maxresdefault` → `mqdefault`、并发、重试、单张失败跳过），`publish:data` 按 thumbs → pack → manifest/insights → index 上传，沿用增量发布进度。
 - **封面变体**：`fetch:thumbs` 用 `Bun.Image` 额外编码 480 / 960 / 1280w 的 WebP（480w 约 24 KB，原图约 144 KB），已有原图时自动补齐；`StreamCover` 用 `srcset` + `sizes` 由浏览器选档，变体缺失时退回原图。发布脚本把变体与 `Content-Type: image/webp` 一起上传，缺变体只警告。对象存储侧的长缓存规则见 [docs/deployment.md](docs/deployment.md) 的「封面与变体」。
 - **逐字稿管线**：新增 `transcript:new` / `transcript:import` / `publish:transcripts`；正文先传、索引最后写，单篇失败不阻塞；离线回退到构建期 Markdown 快照。
@@ -75,6 +76,14 @@
 - `scripts/stream-datapack.ts` 接入 `data-sources.json`：按 `channel_id` 匹配 dataset，直接写
   `data/<id>/<videoId>.datapack.json` 并 upsert manifest；支持一次传入多个会话目录。
 - manifest 摘要抽到 `scripts/lib/dataset-manifest.ts`，与 `add-datapack.mjs` 共用。
+
+### 文档
+
+- 重写 README：补线上地址、成员场次表，功能按页面重组，截图换成线上版本。
+- 新增 [docs/writing-style.md](docs/writing-style.md)：语气、用词、术语表与提交前检查表；`docs/README.md`、`CONTRIBUTING.md` 同步引用。
+- 按规范清理文档与界面文案里的口号式对偶、英文标语和设计黑话。
+- 文档里的路由写法统一为真实路径，删掉已失效的设计截图引用；`docs/README.md` 增加「文档即为事实」约定。
+- 补 MIT [LICENSE](LICENSE)、[SECURITY.md](SECURITY.md)、[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)；[NOTICE.md](NOTICE.md) 更新代码许可说明，`package.json` 增加 `license` 字段。
 
 ## 0.1.0 — 2026-10-28
 

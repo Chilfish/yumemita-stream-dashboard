@@ -48,7 +48,7 @@ src/
 │  ├─ charts/       D3 + SVG 图表
 │  ├─ dashboard/    视图、Sidebar、Header、布局与 context
 │  └─ ui/           coss ui primitives（生成物）
-├─ router.tsx       createHashRouter 路由表
+├─ router.tsx       createBrowserRouter 路由表
 ├─ App.tsx          RouterProvider
 └─ index.css        Tailwind v4 + coss token
 ```
@@ -94,8 +94,9 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 ## 路由
 
-- 使用 React Router v8 的 **hash 路由**（`createHashRouter`），静态托管/子路径不需要服务端回退。
-- URL 形态：`#/:id` 成员首页、`#/:id/streams?q=&type=&sort=&dir=&vstats=` 场次页、`#/:id/trends` 趋势页、`#/:id/stream/:videoId?view=` 单场、`#/:id/compare?ids=a,b,c` 对比、`#/:id/about` 说明；旧地址 `#/:id/overview`、`#/:id/table` 自动重定向。
+- 使用 React Router v8 的 **path 路由**（`createBrowserRouter`），`basename` 来自 `import.meta.env.BASE_URL`；静态托管需要 SPA 回退（`vercel.json` 已配置），旧 `#/...` 链接由 `index.html` 的内联脚本改写成真实路径。
+- URL 形态：`/:id` 成员首页、`/:id/streams?q=&type=&sort=&dir=&vstats=` 场次页、`/:id/trends` 趋势页、`/:id/stream/:videoId?view=` 单场、`/:id/compare?ids=a,b,c` 对比、`/:id/about` 说明；旧地址 `/:id/overview`、`/:id/table` 自动重定向。
+- 每个页面的 title / description / canonical / OG 由 `src/lib/seo.ts` 生成、`useSeo` 写入；构建期的静态 head 由 `scripts/generate-seo.ts` 生成。新增路由时记得在 `buildSeo` 的 `sectionCopy` 与 `scripts/generate-seo.ts` 的路由清单里各加一条。
 - 表格参数用 `parseTableParams` / `writeTableParams`（`lib/table-params.ts`），默认值不写入 URL，更新用 `replace: true`。
 - 根路由与 `:datasetId` 有 `errorElement`（`route-error.tsx`）；新页面不需要单独加错误兜底。
 - `DatasetLayout` 只加载 manifest + `insights.json`；列表页不下载 datapack。单场和对比用 `useStreamPacks` 按需拉取，缓存由 `lib/data.ts` 负责。

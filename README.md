@@ -1,200 +1,212 @@
 # ゆめみた 配信数据台
 
-把 **夢限大みゅーたいぷ** 成员直播的归一化 JSON 做成可交互的数据可视化页面：同接、弹幕密度、SC、评论、词频与跨场对比。
+夢限大みゅーたいぷ 成员直播数据的可视化页面，按成员、场次和趋势浏览同接、弹幕、SC 与评论，支持跨场对比和逐字稿。
 
-当前接入 **5 位成员**：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1891 场**不重复直播（2023-11 – 2026-10）。
+线上实例：<https://ymmt.chilfish.top>
 
-> **数据全部放在对象存储**（Cloudflare R2 等）：`index.json`、`manifest.json`、`insights.json` 与逐场 datapack。
-> git 里只有代码和 `data-sources.json` 配置，`bun run publish:data` 是唯一的写入入口。
-> 页面启动时直接读远端索引与预聚合，发布后刷新即可，不需要重新构建前端。
+![组首页](docs/assets/overview.png)
 
-## 界面
+## 收录
 
-![总览](docs/assets/overview.png)
+只收已结束的直播，按标题去重、保留正片；会员限定场也在内，但同接等统计通常缺失，页面上会标注。
 
-![单场](docs/assets/stream.png)
+| 成员 | 场次 |
+| --- | ---: |
+| 宮永ののか | 287 |
+| 仲町あられ | 505 |
+| 峰月律 | 339 |
+| 藤都子 | 321 |
+| 千石ユノ | 439 |
 
-> 截图为早期 48 场快照；当前 nonoka 287 场、全组 1891 场。右上角可切换深浅色主题。
+合计 1,891 场、691 万条弹幕，时间跨度 2023 年 11 月至 2026 年 10 月。
 
 ## 功能
 
-- **组首页**：近 7 天 / 本月脉冲、最近一场焦点、跨成员最近更新、按成员进入；单个成员加载失败不影响其余成员。
-- **成员首页**：规模指标条、最近一场、本月变化、全期记录、最近场次、更新日历（按日看场次 / 弹幕 / SC 热度）。
-- **场次页**：完整表格、搜索、内容类型筛选、仅有 VSTATS、排序、导出 CSV；筛选与排序写进 URL。
-- **趋势页**：月度趋势（场次 / 弹幕每分 / SC / 平均同接）、月度明细、内容类型对比、典型节奏曲线、全期高频词与发言者（v2 数据为全量精确聚合，v1 仍按榜单相加并明确标注）。
-- **单场详情**：概览 / 时间轴 / 弹幕与词 / 付费 / 评论五个子视图；有逐字稿时多一个「逐字稿」分段，支持目录与时间戳跳转。
-- **相册**：成员相册与全组相册（`#/gallery`），按 JST 自然月分组的封面墙；全组可按成员 / 内容类型筛选并分享 URL，懒加载、可切最新/最早在前。
-- **逐字稿**：作者手写 Markdown（`content/transcripts/`），发布后在站内渲染，不在站内编辑。
-- **对比**：最多选 4 场，逐分钟弹幕叠加对比 + 指标横表（最高值加粗）。
-- **说明**：数据口径、已知限制、更新方式。
-- **导航**：侧边栏 + 移动端底部标签栏；组首页 / 全组相册 / 成员 / 单场 / 对比 / 子视图都有独立 URL，可刷新、分享、前进后退。
-- **效率**：`j` / `k` 翻场、`1`–`5` 切页、`/` 搜索、`⌘K` 全局搜索场次与成员。
-- 深色/浅色主题、响应式布局、多成员数据结构（当前接入 5 位）。
+**组首页**
 
-## 快速开始
+- 近 7 天与本月脉冲、全组最新一场、跨成员最近更新
+- 按成员进入；单个成员加载失败不影响其他人
 
-需要 **Bun ≥ 1.4**（推荐）和 Node.js ≥ 22.22。
+**成员页**
 
-```bash
-bun install
-bun run dev
-# http://localhost:5173
-```
+- 规模指标、最近一场、本月变化、全期记录、更新日历
+- 场次表：搜索、内容类型筛选、排序、导出 CSV，筛选条件写进 URL
+- 日历按天看场次、弹幕、SC 热度
 
-页面启动时按 `VITE_DATAPACK_BASE` 直接向对象存储请求 `index.json`、manifest、insights 与单场 datapack；`dev` / `build` 前置的 `sync:data` 只生成一份同源兜底快照（配了远端时也从对象存储拉，没配时用本地 `data/` 暂存区），远端不可达或还没发布过索引时页面会回退到它。
+**单场**
 
-需要连对象存储时，复制 `.env.example` 为 `.env` 并填写 `VITE_DATAPACK_BASE`（构建时注入）；留空则完全走本地 `data/`，离线开发不受影响。上传侧另需 `R2_*` 凭据，可选 `R2_PREFIX` 指定桶内前缀。
+- 概览、时间轴、弹幕与词、付费、评论；有逐字稿时多一栏
+- 逐分钟弹幕曲线、每 10 分钟分布、高频词、发言者、SC 一览、评论区
 
-### 常用命令
+**趋势**
 
-| 命令 | 说明 |
-| --- | --- |
-| `bun run dev` | 同步数据 + 启动开发服务器 |
-| `bun run build` | 同步数据 + 类型检查 + 生产构建（`dist/`） |
-| `bun run preview` | 预览生产构建 |
-| `bun run sync:data` | 生成 `public/data/` 兜底快照（远端优先，失败回退本地暂存区） |
-| `bun run publish:data` | 由 pack 重建 manifest + insights + dataset 索引并上传对象存储 |
-| `bun run validate:data` | 校验 index → manifest → insights；加 `--remote` 检查对象存储 |
-| `bun run verify:data` | 校验 v2 不变量（authors/top/coverage/authors.json）；加 `--remote` 对比远端实际内容 |
-| `bun run add:datapack` | 加一份 datapack，自动更新 manifest |
-| `bun run fetch:thumbs` | 从 YouTube 镜像封面到 `data/<id>/thumbs/`；发布后进对象存储 |
-| `bun run transcript:new` | 从模板建一篇逐字稿，日期 / 标题取自 manifest |
-| `bun run transcript:import` | 把已有 Markdown 复制进 `content/transcripts/` |
-| `bun run publish:transcripts` | 校验并增量上传逐字稿正文与索引 |
-| `bun run typecheck` | TypeScript 类型检查 |
-| `bun run test` | Vitest 单元测试 |
-| `bun run lint` | oxlint |
-| `bun run check` | typecheck + test + lint |
-| `bun run ci` | sync + validate + check + build（CI 同款） |
+- 月度趋势与明细、内容类型对比、典型节奏曲线、全期高频词与发言者
 
-> 补缺失弹幕、回填 `authorId` 等一次性数据修复脚本不注册到 `package.json`，用法见 [scripts/README.md](scripts/README.md)。
+**相册**
 
-## 数据流
+- 按日本自然月分组的封面墙，全组相册可按成员和类型筛选
 
-```text
-data/<dataset>/*.datapack.json          # 本地暂存（gitignore，唯一真源）
-        │
-        │  scripts/publish-data.ts
-        ▼
-index.json + manifest.json + insights.json   # 由 pack 派生
-        │
-        │  上传（index 最后写）
-        ▼
-对象存储（R2）: <base>/index.json
-               <base>/<dataset>/manifest.json · insights.json · <videoId>.datapack.json
-               <base>/<dataset>/thumbs/<videoId>.jpg · <videoId>.<width>.webp
-               <base>/<dataset>/transcripts/<videoId>.json
-               <base>/transcripts/index.json
-        │
-        │  fetch（浏览器启动时；远端不可达时回退 public/data/ 与构建期 Markdown 快照）
-        ▼
-useDatasetIndex → useDataset → StreamSummary[] + DatasetTotals
-        │
-        ▼
-buildStreamRows / aggregateDataset（纯函数）
-        │
-        ▼
-总览 / 单场 / 对比 / 数据表 / 相册
+**对比**
 
-单场 / 对比：useStreamPacks 直接向对象存储请求 datapack
-封面：fetch:thumbs → publish:data（thumbs 先于 manifest / index）
-逐字稿：content/transcripts/ → publish:transcripts
-```
+- 最多选 4 场，逐分钟弹幕叠加，附指标横表
 
-- `data/<id>/*.datapack.json` 是**唯一真源**（本地暂存，不提交）。
-- 封面原图是 `data/<id>/thumbs/<videoId>.jpg`（本地暂存），另有 480 / 960 / 1280w 的 WebP 变体；key 由 dataset + videoId（+ 宽度）推导，不热链 YouTube。
-- 逐字稿源文件在 `content/transcripts/<datasetId>/<videoId>.md`（入库），发布后运行时读取。
-- `index.json` / `manifest.json` / `insights.json` 由 `publish:data` 从 pack 派生，与 pack 一起上传，保证索引不会指向不存在的 pack。
-- 页面运行时直接读对象存储，发布后刷新即可；`sync:data` 只生成 `public/data/` 兜底快照。
-- `public/data/` 是**构建中间产物**，不提交；`data-sources.json` 是唯一入库的数据配置。
+**其他**
 
-## 目录结构
-
-```text
-stream-dashboard/
-├─ content/transcripts/       # 作者手写逐字稿（入库）
-├─ data/                     # 本地暂存区（gitignore，仅 README 入库）
-│  ├─ README.md
-│  └─ <id>/*.datapack.json
-├─ docs/                     # 架构 / 数据模型 / 开发 / 部署文档
-├─ public/data/              # 生成物（gitignore）
-├─ scripts/
-│  ├─ sync-data.mjs
-│  └─ validate-data.mjs
-├─ src/
-│  ├─ components/
-│  │  ├─ charts/             # D3 图表（React 持有 DOM，D3 只算比例尺/路径）
-│  │  ├─ dashboard/          # 页面级组件与视图
-│  │  └─ ui/                 # coss ui primitives（生成物，避免手改）
-│  ├─ hooks/                 # 数据加载、主题、尺寸测量
-│  ├─ lib/                   # 纯函数：data / aggregate / format / routes
-│  ├─ pages/                 # 路由页面（数据 ↔ 视图 ↔ navigate）
-│  ├─ types/                 # datapack / dataset schema 的 TS 镜像
-│  ├─ router.tsx             # hash 路由表（createHashRouter）
-│  ├─ App.tsx                # RouterProvider
-│  └─ index.css              # Tailwind v4 + coss 主题 token
-├─ data-sources.json         # dataset 注册表
-├─ components.json           # shadcn/coss 配置
-└─ vite.config.ts
-```
+- 深浅色主题，移动端底部标签栏，每个视图都有独立 URL
+- 快捷键 `j` / `k` 翻场、`1`–`5` 切页、`/` 聚焦搜索、`⌘K` 全局搜索、`⌘B` 收起侧栏
+- SEO：真实路径、每页 title / description / canonical / OG，构建期生成单场页静态 head、`sitemap.xml` 与 `robots.txt`；旧 `#/...` 链接自动跳转
 
 ## 技术栈
 
-- **React 19 + Vite + TypeScript**
-- **React Router v8**：hash 路由 + 路由级懒加载
-- **Tailwind CSS v4** + **coss ui**（Base UI + shadcn 风格组件）
-- **D3**：`scale` / `shape` / `pie` / `arc`，只负责数学与路径，不接管 DOM
-- **Vitest**：数据聚合与格式化单元测试
-- **oxlint**：静态检查
+- **前端**：React 19、Vite、TypeScript
+- **路由**：React Router v8，path 路由（兼容子路径），路由级懒加载
+- **UI**：Tailwind CSS v4、coss ui（Base UI + shadcn 风格组件）
+- **图表**：D3，只算比例尺与路径，DOM 交给 React
+- **测试**：Vitest、oxlint
+- **数据**：Cloudflare R2（S3 兼容），与前端分开发布
 
-## 增加数据 / 成员
+## 快速开始
 
-### 加一场直播
+环境要求：Bun 1.4 以上（仓库的 `packageManager` 为 `bun@1.4.4`），Node.js 22.22 以上。
 
-1. `bun run add:datapack nonoka /path/to/<videoId>.datapack.json`：写入本地暂存区并 upsert manifest。
-2. `bun run fetch:thumbs --dataset nonoka`：镜像这一场的封面（已存在的会跳过）。
-3. `bun run publish:data`：由 pack 重建 manifest + insights + dataset 索引，并上传对象存储（先传封面）。生产页面刷新即生效。
-4. `bun run sync:data && bun run validate:data`：本地校验。
+```bash
+git clone https://github.com/Chilfish/yumemita-stream-dashboard.git
+cd yumemita-stream-dashboard
+bun install
+bun run dev
+```
 
-### 加一篇逐字稿
+打开 <http://localhost:5173>。
 
-1. `bun run transcript:new <videoId> --dataset nonoka`（或 `transcript:import <path>`）。
-2. 编辑 `content/transcripts/nonoka/<videoId>.md`。
-3. `bun run publish:transcripts`；单场页会出现「逐字稿」分段，索引页在 `#/nonoka/transcripts`。
+### 配置
 
-### 加一位成员
+把 `.env.example` 复制成 `.env`。
 
-1. 新建 `data/<id>/`，放入该成员的 `<videoId>.datapack.json`。
-2. 在 `data-sources.json` 增加一条 dataset。
-3. `bun run publish:data --dataset <id>` 生成该成员的 manifest/insights，并刷新 `index.json` 后上传。
-4. 页面会自动出现成员入口，不需要改组件。
+```env
+# 数据根地址，构建时注入；留空则只读本地 data/ 的兜底快照
+VITE_DATAPACK_BASE=https://s3.example.com/stream-dashboard
 
-详细步骤与字段说明见 [docs/adding-data.md](docs/adding-data.md)。
+# 站点根地址，canonical / OG / sitemap 用；CI 里必填
+VITE_SITE_URL=https://ymmt.example.com
+
+# 以下只有发布数据时需要
+R2_ACCOUNT_ID=""
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+R2_BUCKET=""
+R2_PREFIX="stream-dashboard"
+```
+
+页面启动后直接向 `VITE_DATAPACK_BASE` 请求索引和单场数据，所以发布数据不用重新构建前端。远端不可达或还没发布过索引时，会回退到 `public/data/` 里的构建期快照。
+
+## 数据
+
+`data/<成员>/*.datapack.json` 是本地暂存区，不入库。`bun run publish:data` 从这些 pack 派生出 `index.json`、`manifest.json`、`insights.json`，连同封面、逐字稿一起上传对象存储。git 里只有代码、`data-sources.json` 和手写的逐字稿。
+
+```text
+data/<id>/*.datapack.json            本地暂存
+        │  bun run publish:data
+        ▼
+对象存储  index.json
+          <id>/manifest.json
+          <id>/insights.json
+          <id>/<videoId>.datapack.json
+          <id>/thumbs/<videoId>.webp
+          <id>/transcripts/<videoId>.json
+        │  页面启动时读取
+        ▼
+组首页 / 成员页 / 场次 / 单场 / 趋势 / 相册 / 对比
+```
+
+索引和 pack 一起上传，索引最后写，保证不会指向还不存在的文件。封面同样是本地镜像后再传，不热链 YouTube。
+
+## 常用命令
+
+```bash
+bun run dev                  # 同步数据 + 开发服务器
+bun run build                # 同步数据 + 类型检查 + 生产构建
+bun run check                # typecheck + test + lint
+bun run ci                   # CI 同款：sync + validate + check + build + verify:seo
+bun run verify:seo           # 校验静态 head、canonical、sitemap 与 robots
+
+bun run publish:data         # 重建索引并上传对象存储
+bun run publish:transcripts  # 增量上传逐字稿
+bun run add:datapack         # 加一份 datapack，自动更新 manifest
+bun run fetch:thumbs         # 镜像封面到本地
+bun run validate:data        # 校验 index → manifest → insights
+```
+
+补缺失弹幕、回填 `authorId` 这类一次性修复脚本没有注册到 `package.json`，用法见 [scripts/README.md](scripts/README.md)。
+
+## 加数据
+
+加一场直播：
+
+```bash
+bun run add:datapack nonoka /path/to/<videoId>.datapack.json
+bun run fetch:thumbs --dataset nonoka
+bun run publish:data
+```
+
+加一位成员：新建 `data/<id>/` 放入 pack，在 `data-sources.json` 里加一条 dataset，再 `bun run publish:data --dataset <id>`。成员入口和页面都是按配置生成的，不用改组件。
+
+逐字稿：`bun run transcript:new <videoId> --dataset nonoka` 建模板，写完执行 `bun run publish:transcripts`。
+
+字段和步骤的细节见 [docs/adding-data.md](docs/adding-data.md)。
 
 ## 部署
 
+构建产物在 `dist/`，交给任意静态托管即可，`vercel.json` 里已经配好 SPA 重写和缓存头。
+
 ```bash
-bun run build
-# 产物在 dist/，包含 dist/data/（远端不可达时的兜底快照）
+VITE_DATAPACK_BASE=https://s3.example.com/stream-dashboard \
+VITE_SITE_URL=https://ymmt.example.com bun run build
 ```
 
-部署在 Vercel（构建 `bun run build`，输出 `dist/`）；`vercel.json` 已配好缓存头。构建前设置 `VITE_DATAPACK_BASE` 指向对象存储；数据更新只需 `bun run publish:data`，逐字稿更新 `bun run publish:transcripts`，都不用重新构建。子路径部署用 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
+构建会为每个路由生成带 head 的静态 HTML，并输出 `sitemap.xml` / `robots.txt`。数据更新只需要 `bun run publish:data`，逐字稿更新 `bun run publish:transcripts`，都不用重新构建；新场次的静态分享卡片要等下次构建，客户端 meta 立即生效。部署在子路径时设 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
+
+## 项目结构
+
+```text
+src/
+├─ pages/          # 路由页面：数据 ↔ 视图 ↔ 导航
+├─ components/
+│  ├─ dashboard/   # 页面级组件
+│  ├─ charts/      # D3 图表
+│  └─ ui/          # coss ui 生成物，不手写业务逻辑
+├─ hooks/          # 数据加载、主题、尺寸测量
+├─ lib/            # 纯函数：聚合、格式化、路由、SEO
+├─ types/          # datapack / dataset 的 TS 镜像
+└─ router.tsx
+scripts/           # 同步、发布、校验、封面、逐字稿
+content/transcripts/  # 手写逐字稿
+docs/              # 架构、数据模型、开发、部署
+data-sources.json  # 成员注册表
+```
 
 ## 文档
 
-- [docs/README.md](docs/README.md) — 文档索引
-- [docs/architecture.md](docs/architecture.md) — 架构与数据流
-- [docs/data-model.md](docs/data-model.md) — manifest / datapack 字段与口径
-- [docs/adding-data.md](docs/adding-data.md) — 新增场次、成员、数据集
-- [docs/data-progress.md](docs/data-progress.md) — 频道历史抓取进度与下一批候选
-- [docs/development.md](docs/development.md) — 本地开发、代码规范、图表写法
-- [docs/deployment.md](docs/deployment.md) — 构建与静态托管
-- [docs/troubleshooting.md](docs/troubleshooting.md) — 常见问题
-- [docs/product-direction.md](docs/product-direction.md) — 封面、相册、逐字稿、组级页面的方向与阶段计划
-- [docs/roadmap.md](docs/roadmap.md) — 后续计划
+- [docs/README.md](docs/README.md) 文档索引
+- [docs/architecture.md](docs/architecture.md) 分层、数据流、路由
+- [docs/data-model.md](docs/data-model.md) manifest / datapack 字段与口径
+- [docs/adding-data.md](docs/adding-data.md) 加场次、成员、数据集
+- [docs/development.md](docs/development.md) 本地开发、代码规范、图表写法
+- [docs/deployment.md](docs/deployment.md) 构建与静态托管
+- [docs/troubleshooting.md](docs/troubleshooting.md) 常见问题
+- [docs/roadmap.md](docs/roadmap.md) 后续计划
 
-## 数据与内容说明
+## 说明
 
-- 数据来自 YouTube 直播回放、弹幕、评论区与 VSTATS 快照，经 `stream-datapack` 归一化。
-- 会员限定内容可能包含不适合公开传播的信息；部署前请自行确认范围与权限。
-- 原始内容版权归各自权利人所有，本仓库只做个人研究与分析用途。详见 [NOTICE.md](NOTICE.md)。
+- 同接、视聴时间、播放、点赞来自 VSTATS；弹幕、SC、评论从 YouTube 公开数据抓取。时间一律按日本时间。
+- 不同币种的 SC 分开累计，不做汇率换算。
+- 非官方项目，与 夢限大みゅーたいぷ、所属事务所、Bushiroad、YouTube、VSTATS 均无隶属或合作关系。
+- 会员限定场可能包含不宜公开传播的信息，部署前请自行确认范围。
+- 原始内容版权归各自权利人所有，本仓库只做个人研究与分析用途，详见 [NOTICE.md](NOTICE.md)。
+
+## 贡献
+
+欢迎数据修正、可访问性改进、图表和文档，细节见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交前确保 `bun run check` 和 `bun run build` 通过。参与讨论请遵守 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)，安全问题按 [SECURITY.md](SECURITY.md) 私下报告。
+
+## License
+
+代码以 [MIT](LICENSE) 发布。直播数据与内容不在 MIT 范围内，见 [NOTICE.md](NOTICE.md)。

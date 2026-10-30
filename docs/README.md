@@ -9,6 +9,7 @@
 | [adding-data.md](adding-data.md) | 加场次、加成员、加数据集、数据校验 | 数据有更新 |
 | [data-progress.md](data-progress.md) | 频道历史抓取进度、跳过判定、下一批候选 | 继续补历史场次 |
 | [development.md](development.md) | 本地开发、代码规范、coss ui、D3 图表写法、测试 | 日常开发 |
+| [writing-style.md](writing-style.md) | 文档与界面文案的语气、用词、术语、正反例 | 写 README / docs / 界面文案前 |
 | [deployment.md](deployment.md) | 构建、静态托管、子路径、缓存、CI | 上线 |
 | [troubleshooting.md](troubleshooting.md) | 常见报错与数据异常 | 页面空白 / 图表为空 |
 | [ui-refactor.md](ui-refactor.md) | 信息架构、设计系统、coss ui 落地映射、迁移计划 | 规划界面重构 |
@@ -18,6 +19,8 @@
 ## 约定
 
 - 文档用简体中文；字段名、命令、代码保持原文。
+- 文档即为事实：路由、路径、命令、字段名必须与当前代码一致，能打开、能执行；删文件或改路由时同步清理引用。
+- 文案按 [writing-style.md](writing-style.md)：不堆形容词和黑话，不写口号式对偶。
 - 时间一律 **JST（UTC+9）**。
 - 数据（manifest / insights / datapack）在对象存储；git 里只有 `data-sources.json`。`data/` 与 `public/data/` 分别是本地暂存与构建生成物。
 - 改数据结构时，同时更新 `src/types/`、`docs/data-model.md`、`docs/adding-data.md`。

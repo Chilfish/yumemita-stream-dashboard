@@ -5,11 +5,11 @@
 方向与验收标准见 [product-direction.md](product-direction.md)。
 
 1. [x] **封面图**：`fetch:thumbs` 镜像 `video.thumbnail`，发布到对象存储，单场页、首页与相册展示；缺图走成员色兜底。
-2. [x] **相册页（成员）**：`#/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
+2. [x] **相册页（成员）**：`/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
 3. [x] **逐字稿**：`content/transcripts/` 手动维护，`publish:transcripts` 发布后运行时渲染；时间戳跳 YouTube。
-4. [x] **全组相册**：`#/gallery` 跨成员封面墙，`?member=` / `?type=` 筛选写进 URL。
-5. [x] **组首页**：`#/` 首屏回答「最近谁播了」，含近 7 天 / 本月脉冲、全组焦点场、最近更新与成员入口。
-6. [ ] **跨成员对比**：对比仍只在 `#/:datasetId/compare` 内选场次，尚未支持跨成员。
+4. [x] **全组相册**：`/gallery` 跨成员封面墙，`?member=` / `?type=` 筛选写进 URL。
+5. [x] **组首页**：`/` 首屏回答「最近谁播了」，含近 7 天 / 本月脉冲、全组焦点场、最近更新与成员入口。
+6. [ ] **跨成员对比**：对比仍只在 `/:datasetId/compare` 内选场次，尚未支持跨成员。
 7. [x] **精确词频 / 发言者**：datapack v2 追加全量 `wordCounts` / `authors`，发布时精确聚合并标注口径；v1 场次逐场回退。已支持 `full` / `partial` 覆盖率。
 
 ## 数据
@@ -32,9 +32,9 @@
 
 ## 体验
 
-- [x] URL 状态：`#/:datasetId/stream/:videoId?view=`，单场、子视图与对比选择可分享、可前进后退。
+- [x] URL 状态：`/:datasetId/stream/:videoId?view=`，单场、子视图与对比选择可分享、可前进后退。
 - [x] 侧边栏导航（可折叠）+ 移动端底部标签栏与成员 Sheet。
-- [x] 数据表筛选写 URL：`q` / `type` / `sort` / `dir` / `vstats` 随 hash 路由保存。
+- [x] 数据表筛选写 URL：`q` / `type` / `sort` / `dir` / `vstats` 随路由保存。
 - [x] 复制深链：单场与对比页的「复制链接」按钮。
 - [x] 图表导出 PNG/SVG：ChartCard 右上角导出当前 SVG，PNG 为 2× 画布。
 - [x] 更新日历：按 JST 自然日查看场次 / 弹幕 / SC 热度，支持指标切换。
@@ -44,7 +44,7 @@
 - [x] 键盘快捷键：`j` / `k` 翻场、`1`–`5` 切页、`/` 搜索、`⌘K` 全局搜索、`⌘B` 侧栏。
 - [x] 移动端优化：390 / 320px 无横向溢出，表格自身横向滚动，首列吸附。
 - [x] 封面图：镜像 `video.thumbnail` 到对象存储，单场页 / 首页 / 相册展示，含成员色兜底。
-- [x] 相册页（成员）：`#/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
+- [x] 相册页（成员）：`/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
 - [x] 逐字稿：`content/transcripts/` 手动维护，发布后运行时渲染，支持时间戳跳转与目录。
 - [x] 全组相册与组首页：跨成员封面墙、全组脉搏。
 - [ ] 跨成员对比：同一时间段 / 内容类型的横向对比。
@@ -67,6 +67,7 @@
 - [x] `ObjectStore` 支持二进制上传与 `Content-Type`；缓存头交给桶侧规则（Bun S3 写接口不支持自定义 Cache-Control）。
 - [x] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。
 - [x] 逐字稿脚本：`transcript:new` / `transcript:import` 从模板或已有 Markdown 生成。
+- [x] SEO：path 路由 + 每页 metadata + 构建期静态 head（含 `<noscript>` 摘要）+ sitemap / robots；`verify:seo` 进 CI。
 - [ ] 200% 缩放复核（320px 已通过）。
 
 ## 非目标

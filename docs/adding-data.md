@@ -136,7 +136,7 @@ bun run publish:transcripts --force       # 忽略 data/.publish-state.json，�
 
 - 先传正文、最后写索引：中途失败只会「索引少一篇」，不会指向不存在的文件。
 - 单篇失败只记日志，不阻塞其余稿件；退出码仍为 1，CI 会拦住。
-- 单场页的「逐字稿」分段只在索引里有当前 `videoId` 时出现；索引页在 `#/:datasetId/transcripts`。
+- 单场页的「逐字稿」分段只在索引里有当前 `videoId` 时出现；索引页在 `/:datasetId/transcripts`。
 - 发布后刷新页面即可，不需要重新构建前端。
 
 ## manifest 从哪来

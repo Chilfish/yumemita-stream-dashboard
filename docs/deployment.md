@@ -11,10 +11,16 @@ bun run build
 
 ```text
 dist/
-├─ index.html
-├─ assets/        # JS/CSS/字体（带 hash）
-└─ data/          # 兜底快照：index.json + <dataset>/manifest.json + insights.json
+├─ index.html              # 组首页（带静态 head）
+├─ robots.txt
+├─ sitemap.xml
+├─ <datasetId>/index.html  # 成员首页与栏目页
+├─ <datasetId>/stream/<videoId>/index.html   # 每个单场一份静态 head + noscript 摘要
+├─ assets/                 # JS/CSS/字体（带 hash）
+└─ data/                   # 兜底快照：index.json + <dataset>/manifest.json + insights.json
 ```
+
+`generate-seo` 会为每个路由写一份 `dist/<path>/index.html`（约 1900 个），并生成 `sitemap.xml` / `robots.txt`。
 
 `dist/` 是纯静态文件，不需要 Node 运行时。页面启动时直接向对象存储请求数据；`dist/data/` 只在远端不可达时兜底（例如离线预览）。逐场 datapack 不在 `dist/` 里。
 
@@ -41,6 +47,7 @@ bun run preview
 | Install command | `bun install --frozen-lockfile` |
 | Node version | 22.22+ |
 | 环境变量 | `VITE_DATAPACK_BASE` — 数据根地址（index / manifest / insights / datapack） |
+| 环境变量 | `VITE_SITE_URL` — 站点根地址，用于 canonical / OG / sitemap；CI 里必须设置 |
 
 `VITE_DATAPACK_BASE` 在构建时被 Vite 内联进产物，地址本身改动后需要重新构建；**数据更新不需要**，`bun run publish:data` 后刷新即可。留空则回退到本地 `data/` 暂存区。
 
@@ -48,10 +55,20 @@ bun run preview
 
 ### 单页应用回退
 
-不需要。项目使用 **hash 路由**（`#/:datasetId/...`），所有页面都由 `index.html` 加载，路径不会出现在 HTTP 请求里。
+项目使用 **path 路由**，直接访问 `/nonoka/stream/<videoId>` 需要服务端在找不到文件时返回 `index.html`。仓库自带 `vercel.json`：
 
-- 不需要配置 `/* -> /index.html` 的 rewrite。
-- 子路径部署（`https://example.com/dashboard/`）也直接可用，hash 不参与 base 解析。
+```json
+"rewrites": [
+  { "source": "/((?!assets/|data/|avatars/).*)", "destination": "/index.html" }
+]
+```
+
+- Vercel 先查文件系统：`generate-seo` 生成的 `dist/<path>/index.html` 会优先命中，静态 head 生效。
+- 排除 `assets/` / `data/` / `avatars/`，缺失的静态资源仍然返回 404，而不是伪装成 HTML。
+- 其他静态托管需要等价配置：Netlify `_redirects` 里的 `/* /index.html 200`、Cloudflare Pages 的 SPA 规则。
+- 子路径部署（`https://example.com/dashboard/`）用 `VITE_BASE=/dashboard/`；`basename` 与数据地址会自动带前缀，rewrite 也需要指向该子路径。
+
+> 部署后确认一次：直接打开 `/nonoka`，查看源代码里的 `<title>` 是否为该成员页，而不是首页。若命中的是 SPA 回退，说明托管商没有把目录索引当成文件。
 
 ## 数据发布与对象存储
 
@@ -162,7 +179,7 @@ bun run publish:transcripts
 
 - `assets/*` 带 content hash，可以长缓存（`Cache-Control: public, max-age=31536000, immutable`）。
 - `data/*.json`（构建兜底快照）用短缓存：`public, max-age=300, must-revalidate`。
-- `index.html` 用 `no-cache`。
+- `index.html` 用 `no-cache`；`generate-seo` 生成的嵌套 HTML 走托管商的 HTML 默认策略（`must-revalidate`），不需要额外规则。
 - 运行时数据主要来自对象存储，其缓存由存储侧控制；仓库自带 `vercel.json` 只影响兜底快照。
 
 ## CI
@@ -193,6 +210,7 @@ bun run ci
 - `dist/data/` 只含兜底快照，datapack 不在构建产物里。
 - datapack 放在对象存储；单场页只取 1 份，对比页最多 4 份。
 - JS 主包约 349 KB（gzip ~112 KB），CSS 约 240 KB（gzip ~32 KB）。
+- 静态 SEO 页面约 1900 份（每份 4–8 KB，含 noscript 摘要），合计约 15 MB；不进入首屏 JS，也不影响运行时请求。
 - 视图已按路由 `React.lazy()` 拆包，总览/单场/对比/数据表/说明各自是独立 chunk。
 
 ## 回滚

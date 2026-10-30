@@ -38,7 +38,7 @@
 | 对象存储数据链路 | 已完成 | `publish:data` / `sync:data` / `validate:data`；datapack 不进 git |
 | 文档同步 | 已完成 | README、roadmap、architecture、development |
 
-## P7 首页降噪与溢出修复
+## P7 首页排版与溢出修复
 
 | 项 | 状态 | 落点 |
 | --- | --- | --- |
@@ -189,7 +189,7 @@ bun run test:smoke   # 需先启动 dev/preview
 
 ## 已知取舍
 
-- 路由从 `#/:id/overview|table` 改为 `#/:id`（成员首页）与 `#/:id/streams`（场次页）；旧地址保留重定向。
+- 路由从 `#/:id/overview|table` 改为真实路径 `/:id`（成员首页）与 `/:id/streams`（场次页）；旧 hash 链接由 `index.html` 改写，旧 overview / table 地址保留重定向。
 - 成员色写入 `data-sources.json` 的 `color`，由 `publish:data` 写进 `index.json`；页面注入 `--member-color`（品牌原色，图表/色点）与 `--member-ink`（对比度达标的前景色，文字/焦点环）。
 - 原型 `.commandcode/design/prototype-v2.html` 仅作视觉校验，不进入生产代码。
 - 移动端使用底部标签栏 + 成员 Sheet；侧栏在移动端仍可通过顶栏按钮以抽屉打开。

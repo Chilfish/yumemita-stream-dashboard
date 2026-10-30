@@ -322,6 +322,6 @@ bun run validate:data
 - 加 `--remote` 时逐条 HEAD `<base>` 上的 `index.json`、manifest / insights / datapack。
 
 datapack 的字段级校验（`schema`、`video.id === videoId`、`chat.total`、`density.perMinute` 等）
-在 `publish:data` 读取 pack 时完成——`video.id` 与文件名不一致会直接中止发布。
+在 `publish:data` 读取 pack 时完成：`video.id` 与文件名不一致会直接中止发布。
 
 更严格的数据质量检查（时长、币种、JST 等）建议在生成 datapack 的 pipeline 侧完成。
