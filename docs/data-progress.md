@@ -96,6 +96,21 @@ yt-dlp --flat-playlist --print "%(id)s" `
 
 ## 更新流程
 
+日常更新用 `bun scripts/daily-update.ts`（仓库里的定时工作流也调用它）：先和远端 manifest
+求差集，只处理有新场次或缺 VSTATS / 弹幕的成员，再定点发布。没有变化时不会恢复 datapack，
+也不会重新上传。
+
+```powershell
+bun scripts/daily-update.ts                 # 增量（本地用 Firefox cookie）
+bun scripts/daily-update.ts --force         # 额外重抓最近 24 小时
+bun scripts/daily-update.ts --dry-run       # 只列候选
+```
+
+定时任务在 `.github/workflows/data.yml`，每天 14:17 JST 跑一次；配置与 cookie 导出见
+[deployment.md](deployment.md) 的「定时增量更新」。
+
+下面的 `fetch-streams` 是底层命令，用于首次建档、强制返工或需要手动控制批次的场景：
+
 ```powershell
 # 一次跑完：频道列表 → meta/弹幕/评论/VSTATS → 每 5 场自动生成 datapack
 bun scripts/fetch-streams.ts --dataset <id> `

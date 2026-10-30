@@ -103,6 +103,8 @@ R2_PREFIX="stream-dashboard"
 
 `data/<成员>/*.datapack.json` 是本地暂存区，不入库。`bun run publish:data` 从这些 pack 派生出 `index.json`、`manifest.json`、`insights.json`，连同封面、逐字稿一起上传对象存储。git 里只有代码、`data-sources.json` 和手写的逐字稿。
 
+日常增量用 `bun scripts/daily-update.ts`（仓库每天 14:17 JST 也会跑一次）：先做频道差集，只处理有新场次或缺 VSTATS / 弹幕的成员，再定点发布。`publish:data` 保留给手动发布、返工和首次建档。
+
 ```text
 data/<id>/*.datapack.json            本地暂存
         │  bun run publish:data
@@ -130,6 +132,7 @@ bun run ci                   # CI 同款：sync + validate + check + build + ver
 bun run verify:seo           # 校验静态 head、canonical、sitemap 与 robots
 
 bun run publish:data         # 重建索引并上传对象存储
+bun scripts/daily-update.ts  # 每日增量：频道差集 → 抓取 → 补封面 → 定点发布
 bun run publish:transcripts  # 增量上传逐字稿
 bun run add:datapack         # 加一份 datapack，自动更新 manifest
 bun run fetch:thumbs         # 镜像封面到本地

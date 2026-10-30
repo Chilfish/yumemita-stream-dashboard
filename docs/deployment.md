@@ -14,6 +14,8 @@ dist/
 ├─ index.html              # 组首页（带静态 head）
 ├─ robots.txt
 ├─ sitemap.xml
+├─ site.webmanifest        # PWA manifest
+├─ favicon.svg / favicon-32x32.png / apple-touch-icon.png
 ├─ <datasetId>/index.html  # 成员首页与栏目页
 ├─ <datasetId>/stream/<videoId>/index.html   # 每个单场一份静态 head + noscript 摘要
 ├─ assets/                 # JS/CSS/字体（带 hash）
@@ -21,6 +23,11 @@ dist/
 ```
 
 `generate-seo` 会为每个路由写一份 `dist/<path>/index.html`（约 1900 个），并生成 `sitemap.xml` / `robots.txt`。
+`build` 里的 `bun run icons` 会先从 `public/favicon.jpg` 生成 32×32 / 180×180 / 192×192 / 512×512 的不透明 PNG。
+
+> `generate-seo` 挂在 Vite build 的 `closeBundle` 上，所以 `vite build` 也会生成逐路由 HTML；
+> 但它不会自动跑 `sync:data` / 生成图标，完整构建仍然用 `bun run build`（或 `bun run ci`）。
+> `vercel.json` 已经用 `buildCommand` 固定了这条命令，部署平台的项目设置不要覆盖它。
 
 `dist/` 是纯静态文件，不需要 Node 运行时。页面启动时直接向对象存储请求数据；`dist/data/` 只在远端不可达时兜底（例如离线预览）。逐场 datapack 不在 `dist/` 里。
 
@@ -59,12 +66,16 @@ bun run preview
 
 ```json
 "rewrites": [
-  { "source": "/((?!assets/|data/|avatars/).*)", "destination": "/index.html" }
+  {
+    "source": "/((?!assets/|data/|avatars/|.*\\.(?:png|jpg|jpeg|webp|svg|ico|xml|txt|webmanifest|json)$).*)",
+    "destination": "/index.html"
+  }
 ]
 ```
 
 - Vercel 先查文件系统：`generate-seo` 生成的 `dist/<path>/index.html` 会优先命中，静态 head 生效。
-- 排除 `assets/` / `data/` / `avatars/`，缺失的静态资源仍然返回 404，而不是伪装成 HTML。
+- 排除 `assets/` / `data/` / `avatars/` 和常见静态扩展名（`sitemap.xml`、`robots.txt`、`site.webmanifest`、图标等），缺失的资源返回 404，而不是伪装成 HTML。
+- `buildCommand` / `outputDirectory` / `trailingSlash` 也写在 `vercel.json` 里，避免项目设置里的旧命令覆盖仓库的构建流程。
 - 其他静态托管需要等价配置：Netlify `_redirects` 里的 `/* /index.html 200`、Cloudflare Pages 的 SPA 规则。
 - 子路径部署（`https://example.com/dashboard/`）用 `VITE_BASE=/dashboard/`；`basename` 与数据地址会自动带前缀，rewrite 也需要指向该子路径。
 
@@ -181,6 +192,51 @@ bun run publish:transcripts
 - `data/*.json`（构建兜底快照）用短缓存：`public, max-age=300, must-revalidate`。
 - `index.html` 用 `no-cache`；`generate-seo` 生成的嵌套 HTML 走托管商的 HTML 默认策略（`must-revalidate`），不需要额外规则。
 - 运行时数据主要来自对象存储，其缓存由存储侧控制；仓库自带 `vercel.json` 只影响兜底快照。
+
+## 定时增量更新
+
+`.github/workflows/data.yml` 每天 **05:17 UTC（14:17 JST）** 跑一次增量，也可以在 Actions 页面手动触发。
+
+```text
+checkout → setup Bun / Node / Deno → 安装 yt-dlp
+        → 恢复 data/ 缓存 → 写入 YT_COOKIES → bun scripts/daily-update.ts
+        → 删除 cookie → 保存 data/ 缓存
+```
+
+- **不会重新部署**：数据在对象存储上，页面运行时直接读；发布完成后刷新即可。这个工作流不 push、不触发前端构建。
+- **安静日几乎零成本**：先拉 5 个频道的 `/streams`（flat-playlist），和远端 manifest 求差集。没有新场次、也没有待补数据的成员直接跳过，不恢复 pack、不上传。
+- **有变化才定点处理**：只恢复该成员的 datapack（单人 20–45 MB），抓新场次、补封面，再 `publish:data --dataset <id>`；其余成员不下载、不上传。
+- **自动补数据**：近期缺 VSTATS（公开场次，14 天内）或弹幕为空（7 天内）的场次会被重抓一次；刚结束的场次不会因为回放/页面还没生成就被永久标记为不可用。
+- **补发布**：如果上次抓取成功但发布失败（或本地跑过 `--no-publish`），本地 manifest 会比远端新；这种没有新场次的日子也会补一次发布，不会把改动一直卡在本地。
+- `data/` 在两次运行之间通过 Actions Cache 保留，首次运行会从对象存储恢复约 150 MB 的 pack，之后只增量变化。
+- 手动触发时勾选 `force` 会重抓最近 24 小时结束的场次（用于刷新播放量、点赞、评论快照）。
+
+需要配置：
+
+| 类型 | 名称 | 用途 |
+| --- | --- | --- |
+| Variable | `VITE_DATAPACK_BASE` | 公开数据根地址 |
+| Secret | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` / `R2_PREFIX` | 发布与恢复 |
+| Secret | `YT_COOKIES` | YouTube 登录态（会员限定场次与 bot 检查） |
+
+cookie 从本机浏览器导出并直接推到仓库：
+
+```bash
+bun scripts/export-yt-cookies.ts --push
+```
+
+导出文件默认落在 `node_modules/.cache/stream-dashboard/yt-cookies.txt`（已 gitignore）。它是登录态凭据，不要提交、不要贴到聊天里；换账号或 cookie 失效后重新导出即可。
+
+本地想手动跑同一套流程：
+
+```bash
+bun scripts/daily-update.ts                 # 增量，本地用 Firefox cookie
+bun scripts/daily-update.ts --force         # 额外重抓最近 24 小时
+bun scripts/daily-update.ts --dry-run       # 只列这次会动哪些场次
+bun scripts/daily-update.ts --no-publish    # 只写本地，不传对象存储
+```
+
+注意：GitHub 托管 runner 是云厂商 IP，YouTube 的 bot 检查比住宅 IP 更严格。工作流每次安装最新 yt-dlp；如果失败，先看日志里是不是 `Sign in to confirm you're not a bot`，必要时重新导出 cookie 再手动触发一次。
 
 ## CI
 

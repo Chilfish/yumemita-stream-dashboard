@@ -111,6 +111,56 @@ manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` �
 恢复后再按正常的「已入库 + 已有素材」逻辑跳过。公开地址要带桶内前缀，例如
 `https://s3.example.com/stream-dashboard`。
 
+## 每日增量更新
+
+`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面 → 定点发布」串成一条命令，本地和 GitHub Actions 共用。
+定时任务见 [docs/deployment.md](../docs/deployment.md) 的「定时增量更新」。
+
+```powershell
+bun scripts/daily-update.ts                 # 增量；本地默认用 Firefox cookie
+bun scripts/daily-update.ts --force         # 额外重抓最近 24 小时
+bun scripts/daily-update.ts --dataset nonoka
+bun scripts/daily-update.ts --dry-run       # 只列这次会动哪些场次
+bun scripts/daily-update.ts --no-publish    # 只写本地，不上传对象存储
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dataset <id>` | 只处理一个成员；默认全部 |
+| `--root <目录>` | 原始会话目录，默认 `$STREAM_SESSION_ROOT` 或 `./temp/youtube-live` |
+| `--state-dir <目录>` | 频道缓存，默认 `<root>/.fetch-state` |
+| `--concurrency <n>` | 抓取并发，默认 3 |
+| `--cookies <文件>` | Netscape cookie jar；CI 用这个 |
+| `--cookies-from-browser <b>` | 本地默认 firefox |
+| `--force` | 重抓最近 24 小时结束的场次（刷新播放量 / 点赞 / 评论快照） |
+| `--dry-run` | 只列候选，不抓取、不发布 |
+| `--no-publish` | 只写本地 |
+| `--bootstrap` | 远端清单读不到时也允许按全量新场次处理 |
+
+行为：
+
+- 先拉频道 `/streams`（`-J`，带 `live_status` / 标题 / 时长），和**远端 manifest**求差集。
+- 未来场（`is_upcoming`）、正在直播（`is_live`）、同标题但短于正片 60% 的摘要不进入候选；
+  它们会记在「暂缓」里，不会每天重新拉元信息。
+- 没有新场次、也没有待补数据的成员直接跳过，不恢复 datapack、不发布。
+- 有变化时只对该成员 `--restore`（补齐远端 pack，保证 insights 精确）并 `publish:data --dataset <id>`。
+- 平时会重试近期缺 VSTATS（公开场次，14 天内）或缺弹幕（7 天内）的场次；刚结束的场次不会被写成「不可用」。
+- 本地 manifest 比远端新（上次发布失败，或本地跑过 `--no-publish`）时，即使没有新场次也会补一次发布。
+- 发布前 `publish:data` 会核对远端 manifest 场次数；本地 pack 更少时拒绝覆盖（防止不完整的恢复把线上数据缩水）。
+
+### 导出 YouTube cookie
+
+CI 没有浏览器 profile，需要把登录态 cookie 作为 Secret 传入。
+
+```powershell
+bun scripts/export-yt-cookies.ts            # 导出到 node_modules/.cache/stream-dashboard/yt-cookies.txt
+bun scripts/export-yt-cookies.ts --push     # 导出并 gh secret set YT_COOKIES
+bun scripts/export-yt-cookies.ts --browser edge --push
+```
+
+文件是 Netscape 格式，等同账号凭据：默认路径在 gitignore 内，不要提交、不要贴到聊天里。
+导出时会检查是否存在 `SID` / `__Secure-3PSID`，没有登录态会直接报错。
+
 ## 封面图
 
 `fetch-thumbnails.ts` 把每场直播的 YouTube 封面镜像到本地暂存区；页面运行时只读对象存储上的图，
