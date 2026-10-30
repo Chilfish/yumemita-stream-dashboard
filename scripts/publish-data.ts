@@ -72,6 +72,7 @@ const { values } = parseArgs({
     dataset: { type: 'string' },
     'no-upload': { type: 'boolean' },
     force: { type: 'boolean' },
+    'allow-shrink': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
   allowPositionals: false,
@@ -85,6 +86,7 @@ const USAGE = `用法：bun scripts/publish-data.ts [选项]
   --dataset <id>   只发布指定 dataset
   --no-upload      只生成本地文件，不上传
   --force          忽略 data/.publish-state.json 的进度，全量重传
+  --allow-shrink   允许本地场次少于远端（确实要下架场次时才用）
   -h, --help       显示本帮助
 
 上传需要环境变量：R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET`
@@ -236,6 +238,24 @@ for (const source of selected) {
     count: streams.length,
     note: source.note ?? '',
     streams,
+  }
+
+  // 完整性校验：本地 pack 少于远端清单时拒绝覆盖，避免一次不完整的恢复把线上数据缩水。
+  if (store) {
+    let remoteCount: number | null = null
+    try {
+      const remoteText = await store.get(manifestKey(source.id))
+      if (remoteText) {
+        const remote = JSON.parse(remoteText) as { count?: number, streams?: unknown[] }
+        remoteCount = remote.count ?? (Array.isArray(remote.streams) ? remote.streams.length : null)
+      }
+    }
+    catch (error) {
+      console.warn(`[publish-data]   ! ${source.id} 读取远端 manifest 失败，跳过完整性校验：${error instanceof Error ? error.message : String(error)}`)
+    }
+    if (remoteCount != null && streams.length < remoteCount && !values['allow-shrink']) {
+      fail(`${source.id} 本地只有 ${streams.length} 场，远端已有 ${remoteCount} 场；拒绝用不完整的本地镜像覆盖。先恢复 datapack，或确认要下架场次时加 --allow-shrink`)
+    }
   }
   const totals = aggregateDataset(buildStreamRows(manifest, packsById))
   const insights = { schema: INSIGHTS_SCHEMA, generatedAt: publishStartedAt, totals }

@@ -64,6 +64,7 @@ interface Counts {
 
 const OPTIONS = {
   dataset: { type: 'string' },
+  ids: { type: 'string' },
   limit: { type: 'string' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
@@ -80,6 +81,7 @@ const USAGE = `用法：bun scripts/fetch-thumbnails.ts [选项]
 
 选项：
   --dataset <id>     只处理指定 dataset；不传则处理 data-sources.json 里的全部
+  --ids <文件>       只处理文件里列出的 videoId（每行一个）；用于增量更新
   --limit <n>        本次最多抓 n 张（按 manifest 顺序，最新的优先）；0 = 全部
   --force            已存在的封面也重新下载
   --dry-run          只列出候选，不发请求、不写文件
@@ -216,11 +218,27 @@ function videoIdsFor(source: DatasetSource, dir: string): string[] {
     .sort()
 }
 
-async function fetchDataset(source: DatasetSource, limit: number, concurrency: number, force: boolean, dryRun: boolean): Promise<Counts> {
+async function fetchDataset(
+  source: DatasetSource,
+  limit: number,
+  concurrency: number,
+  force: boolean,
+  dryRun: boolean,
+  filter: Set<string> | null,
+): Promise<Counts> {
   const dir = resolve(APP_ROOT, source.datapackDir)
   const thumbsDir = join(dir, 'thumbs')
-  const ids = videoIdsFor(source, dir)
+  const allIds = videoIdsFor(source, dir)
+  // --ids：只处理点名场次；点名了但 manifest 里还没有（刚入库）也补进来。
+  // 空文件表示「本次没有要补的」，不能退化成处理全部。
+  const ids = filter
+    ? [...new Set([...allIds.filter(id => filter.has(id)), ...filter])]
+    : allIds
   if (ids.length === 0) {
+    if (filter) {
+      console.log(`[fetch-thumbs] ${source.id}：--ids 里的场次都不在清单中，跳过`)
+      return { ok: 0, skipped: 0, failed: 0, variants: 0 }
+    }
     console.error(`[fetch-thumbs] ${source.id} 没有可用场次：${source.datapackDir}/ 里既没有 manifest.json，也没有 *${PACK_SUFFIX}`)
     process.exitCode = 1
     return { ok: 0, skipped: 0, failed: 0, variants: 0 }
@@ -312,8 +330,11 @@ async function main(): Promise<void> {
   }
 
   const total: Counts = { ok: 0, skipped: 0, failed: 0, variants: 0 }
+  const filter = values.ids
+    ? new Set(readFileSync(resolve(values.ids), 'utf8').split(/\r?\n/).map(line => line.trim()).filter(Boolean))
+    : null
   for (const source of selected) {
-    const counts = await fetchDataset(source, limit, concurrency, Boolean(values.force), Boolean(values['dry-run']))
+    const counts = await fetchDataset(source, limit, concurrency, Boolean(values.force), Boolean(values['dry-run']), filter)
     total.ok += counts.ok
     total.skipped += counts.skipped
     total.failed += counts.failed

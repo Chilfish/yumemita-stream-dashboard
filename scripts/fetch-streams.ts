@@ -33,6 +33,11 @@ import { restoreDataset } from './lib/restore-datapacks.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
+
+/** 回放/评论/VSTATS 可能滞后：这段时间内抓不到不写「不可用」，留给下次重试。 */
+const CHAT_GRACE_HOURS = 24
+/** VSTATS 对新场次的收录更慢；这段时间内缺页面按「还没生成」处理。 */
+const VSTATS_GRACE_HOURS = 24 * 14
 const DATAPACK_SCRIPT = join(APP_ROOT, 'scripts', 'stream-datapack.ts')
 const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
 
@@ -143,6 +148,26 @@ function jstDate(seconds: number | undefined): string {
   if (!seconds)
     return '0000-00-00'
   return new Date((seconds + 540 * 60) * 1000).toISOString().slice(0, 10)
+}
+
+/** 直播结束时刻（毫秒）；没有时长时退回开播时刻。 */
+function endedAtMs(info: InfoJson | undefined): number | null {
+  const start = info?.release_timestamp ?? info?.timestamp
+  if (!start)
+    return null
+  return (start + (info?.duration ?? 0)) * 1000
+}
+
+/**
+ * 结束多久以内算「平台还没生成」：这类场次不写 `*-unavailable.txt`，
+ * 否则下一轮会被永久跳过（定时任务最容易踩的坑）。
+ */
+function withinGrace(info: InfoJson | undefined, hours: number): boolean {
+  const end = endedAtMs(info)
+  if (end == null)
+    return false
+  const age = Date.now() - end
+  return age >= 0 && age < hours * 3600_000
 }
 
 function run(command: string, args: string[], capture: boolean, retries = 2): Promise<string> {
@@ -582,6 +607,10 @@ async function main(): Promise<void> {
               throw error
             }
           }
+          else if (withinGrace(candidate.info, CHAT_GRACE_HOURS)) {
+            // 刚结束的场次回放通常还没生成：不写哨兵，下一轮会重新尝试。
+            logFile(logPath, `${id} chat 还没生成，保持待重试`)
+          }
           else {
             writeFileSync(chatUnavailable, 'no live_chat replay\n', 'utf8')
           }
@@ -621,6 +650,10 @@ async function main(): Promise<void> {
           if (html.length > 1000) {
             writeFileSync(vstatsPath, html, 'utf8')
             media.vstats += 1
+          }
+          else if (withinGrace(candidate.info, VSTATS_GRACE_HOURS)) {
+            // 新场次在 VSTATS 上可能还没建档：不写哨兵，下一轮还会再试。
+            logFile(logPath, `${id} vstats 还没有条目，保持待重试`)
           }
           else {
             writeFileSync(vstatsUnavailable, `empty ${html.length} bytes\n`, 'utf8')

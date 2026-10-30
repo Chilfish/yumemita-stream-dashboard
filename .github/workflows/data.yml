@@ -1,0 +1,121 @@
+name: Data update
+
+# 每天 05:17 UTC（14:17 JST）补一次增量：这个时间点前一天的直播基本都结束，
+# 回放 / 弹幕 / VSTATS 也已经开放；避开整点可以减少 GitHub 调度延迟。
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 重抓最近 24 小时的场次
+        type: boolean
+        default: false
+      dataset:
+        description: 只更新指定成员（留空 = 全部）
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+# 定时与手动可能撞车；不取消正在跑的那次，排队即可。
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      VITE_DATAPACK_BASE: ${{ vars.VITE_DATAPACK_BASE }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_PREFIX: ${{ secrets.R2_PREFIX }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # 安静日不会生成任何文件；先建目录，缓存保存步骤才有合法路径。
+      - name: Prepare data directory
+        run: mkdir -p data
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # yt-dlp 解 YouTube 的 JS challenge 需要一个 JS runtime；deno 与本地保持一致。
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Install yt-dlp
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o "$RUNNER_TEMP/bin/yt-dlp"
+          chmod +x "$RUNNER_TEMP/bin/yt-dlp"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/yt-dlp" --version
+
+      - name: Check configuration
+        run: |
+          if [ -z "$VITE_DATAPACK_BASE" ]; then
+            echo "::error::Set the repository variable VITE_DATAPACK_BASE to the public object storage root."
+            exit 1
+          fi
+          if [ -z "$R2_BUCKET" ] || [ -z "$R2_ACCOUNT_ID" ]; then
+            echo "::error::Set the R2_* repository secrets before running the data job."
+            exit 1
+          fi
+
+      # 本地暂存区跨运行保留：已有 150 MB 左右的 pack，不清空就不会每天重下。
+      - name: Restore data cache
+        uses: actions/cache/restore@v6
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+          restore-keys: |
+            data-
+
+      - name: Write cookies
+        env:
+          YT_COOKIES: ${{ secrets.YT_COOKIES }}
+        run: |
+          if [ -z "$YT_COOKIES" ]; then
+            echo "::error::Missing YT_COOKIES secret. Run: bun scripts/export-yt-cookies.ts --push"
+            exit 1
+          fi
+          printf '%s\n' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"
+          chmod 600 "$RUNNER_TEMP/cookies.txt"
+
+      - name: Update data
+        run: |
+          args=(--root "$RUNNER_TEMP/youtube-live" --cookies "$RUNNER_TEMP/cookies.txt" --concurrency 2)
+          if [ "${{ inputs.force }}" = "true" ]; then
+            args+=(--force)
+          fi
+          if [ -n "${{ inputs.dataset }}" ]; then
+            args+=(--dataset "${{ inputs.dataset }}")
+          fi
+          bun scripts/daily-update.ts "${args[@]}"
+
+      - name: Remove cookies
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cookies.txt"
+
+      - name: Save data cache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: data
+          key: data-${{ github.run_id }}
