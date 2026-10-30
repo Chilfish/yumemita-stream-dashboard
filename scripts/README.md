@@ -163,13 +163,13 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 
 ```bash
 # 1. 生成缺失清单（有弹幕、但本机没有 danmaku_<id>.jsonl）
-bun run missing:danmaku --root "D:/projects/claude-messages/temp/youtube-live"
+bun scripts/missing-danmaku.ts --root "D:/projects/claude-messages/temp/youtube-live"
 
 # 2. 只抓缺失弹幕；不带 --dataset 就是全部成员
-bun run fetch:danmaku --root "D:/projects/claude-messages/temp/youtube-live" --concurrency 3
+bun scripts/fetch-danmaku.ts --root "D:/projects/claude-messages/temp/youtube-live" --concurrency 3
 
 # 3. 用新弹幕把 v1 pack 升级成 v2
-bun run enrich:chat --root "D:/projects/claude-messages/temp/youtube-live"
+bun scripts/enrich-chat.ts --root "D:/projects/claude-messages/temp/youtube-live"
 
 # 4. 重建 insights（本地；确认后再去掉 --no-upload 发布）
 bun run publish:data --no-upload
@@ -178,17 +178,17 @@ bun run publish:data --no-upload
 多实例并行（互不重叠）：
 
 ```bash
-bun run fetch:danmaku --root "..." --shard 1/4 --concurrency 3
-bun run fetch:danmaku --root "..." --shard 2/4 --concurrency 3
-bun run fetch:danmaku --root "..." --shard 3/4 --concurrency 3
-bun run fetch:danmaku --root "..." --shard 4/4 --concurrency 3
+bun scripts/fetch-danmaku.ts --root "..." --shard 1/4 --concurrency 3
+bun scripts/fetch-danmaku.ts --root "..." --shard 2/4 --concurrency 3
+bun scripts/fetch-danmaku.ts --root "..." --shard 3/4 --concurrency 3
+bun scripts/fetch-danmaku.ts --root "..." --shard 4/4 --concurrency 3
 ```
 
 - `--shard i/n` 按全局任务顺序取模分片，多个实例不会抢同一场；中断后重跑会跳过已有 jsonl。
 - 建议总并发（实例数 × `--concurrency`）控制在 8–12，太高容易触发 YouTube 限流。
 - 会员限定场次需要 Firefox cookie；默认 `--cookies-from-browser firefox`，也可 `--cookies <jar>`。
 - 没有弹幕回放的场次会写 `work/chat-unavailable.txt`，下次跳过；失败写 `data/missing-danmaku/failed*.json`。
-- `enrich:chat` 只重算作者 / 词频 / 徽章 / 构成，保留 video / vstats / comments / density / paid。
+- `scripts/enrich-chat.ts` 只重算作者 / 词频 / 徽章 / 构成，保留 video / vstats / comments / density / paid。
 
 ## 校验 v2 数据
 

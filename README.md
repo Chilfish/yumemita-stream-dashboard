@@ -57,9 +57,6 @@ bun run dev
 | `bun run validate:data` | 校验 index → manifest → insights；加 `--remote` 检查对象存储 |
 | `bun run verify:data` | 校验 v2 不变量（authors/top/coverage/authors.json）；加 `--remote` 对比远端实际内容 |
 | `bun run add:datapack` | 加一份 datapack，自动更新 manifest |
-| `bun run missing:danmaku` | 列出缺原始弹幕的场次，写 `data/missing-danmaku/` |
-| `bun run fetch:danmaku` | 只抓缺失场次的 live_chat 回放，可 `--shard i/n` 多实例并行 |
-| `bun run enrich:chat` | 用新弹幕把 v1 pack 升级为 v2（不重抓素材） |
 | `bun run fetch:thumbs` | 从 YouTube 镜像封面到 `data/<id>/thumbs/`；发布后进对象存储 |
 | `bun run transcript:new` | 从模板建一篇逐字稿，日期 / 标题取自 manifest |
 | `bun run transcript:import` | 把已有 Markdown 复制进 `content/transcripts/` |
@@ -69,6 +66,8 @@ bun run dev
 | `bun run lint` | oxlint |
 | `bun run check` | typecheck + test + lint |
 | `bun run ci` | sync + validate + check + build（CI 同款） |
+
+> 补缺失弹幕、回填 `authorId` 等一次性数据修复脚本不注册到 `package.json`，用法见 [scripts/README.md](scripts/README.md)。
 
 ## 数据流
 

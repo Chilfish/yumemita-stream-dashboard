@@ -8,7 +8,7 @@
 - 三种模式并存：全量时显示“精确聚合”，部分重建时显示“精确覆盖 X/Y 场”，全 v1 时提示“榜单相加”。
 - `publish:data` 由 v2 pack 额外派生 `<dataset>/authors.json`（作者 → 场次索引），为观众重叠预留；任一场仍是 v1 时跳过并在日志里提示。
 - 归档侧弹幕归一化补 `authorId`（`authorExternalChannelId`），显示名改名/重名不再影响作者合并。
-- 新增 `missing:danmaku` / `fetch:danmaku` / `enrich:chat`：只补缺失场次的 `live_chat` 回放并升级为 v2，不重抓 meta / 评论 / VSTATS；支持 `--shard i/n` 多实例并行、断点续跑与无回放标记。
+- 新增 `scripts/missing-danmaku.ts` / `scripts/fetch-danmaku.ts` / `scripts/enrich-chat.ts`：只补缺失场次的 `live_chat` 回放并升级为 v2，不重抓 meta / 评论 / VSTATS；支持 `--shard i/n` 多实例并行、断点续跑与无回放标记。
 - 新增 `verify:data`：校验 v2 不变量（authors 求和 / uniqueAuthors / insights 重算 / coverage / authors.json），`--remote` 直接对比对象存储内容，能发现“只传了一部分 dataset”的发布问题。
 - 数据集扩展为 5 位成员：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1891 场**（2023-11-18 – 2026-10-29）：nonoka 287、arale 505、ritsu 339、miyako 321、yuno 439。
 - 五位成员都按频道顺序补齐历史场次（同名去重、保留正片）；当前 manifest 没有待抓场次。
