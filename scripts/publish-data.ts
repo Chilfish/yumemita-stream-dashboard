@@ -330,7 +330,8 @@ const groupSummary = buildGroupSummary(groupManifests, publishStartedAt)
 const groupGallery = buildGroupGallery(groupManifests, publishStartedAt)
 indexUploads.push({ key: groupSummaryKey(), body: JSON.stringify(groupSummary) })
 indexUploads.push({ key: groupGalleryKey(), body: JSON.stringify(groupGallery) })
-console.log(`[publish-data] 组级数据：${groupSummary.stats.length} 场（首页 ${Math.round(JSON.stringify(groupSummary).length / 1024)} KB，相册 ${Math.round(JSON.stringify(groupGallery).length / 1024)} KB）`)
+const groupStreamCount = groupSummary.members.reduce((sum, member) => sum + member.streamCount, 0)
+console.log(`[publish-data] 组级数据：${groupStreamCount} 场 / ${groupSummary.days.length} 个日期桶（首页 ${Math.round(JSON.stringify(groupSummary).length / 1024)} KB，相册 ${Math.round(JSON.stringify(groupGallery).length / 1024)} KB）`)
 
 if (!store || !credentials) {
   console.log('[publish-data] 已跳过上传（--no-upload）')
