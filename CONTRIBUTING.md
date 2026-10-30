@@ -40,6 +40,12 @@ bun run build
 - 新图表必须处理空数据与 `null`，并加 `aria-label` / `<title>`。
 - 改字段/口径时同步更新 `docs/data-model.md`。
 
+## 文案与文档
+
+- README、`docs/`、界面文案按 [docs/writing-style.md](docs/writing-style.md) 写，术语表也在那里。
+- 不写「不是 A，而是 B」这类口号，不堆「直观」「强大」「一站式」这类形容词。
+- 改了行为、命令或数据流程，同步更新对应文档；界面文案改动要顺带检查空状态和错误提示。
+
 ## PR 检查清单
 
 - [ ] `bun run check` 通过
@@ -48,6 +54,7 @@ bun run build
 - [ ] 新增/修改的交互在浅色与深色主题下都能看
 - [ ] 移动端窄屏不横向溢出（表格允许自身滚动）
 - [ ] 相关文档已更新
+- [ ] 新增或修改的文案符合 [docs/writing-style.md](docs/writing-style.md)
 
 ## 范围
 
