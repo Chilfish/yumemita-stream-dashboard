@@ -29,6 +29,25 @@ const LIMITATIONS = [
   "不同币种的金额不能直接相加，页面按币种分开显示。",
 ];
 
+const PROJECT_URL = "https://github.com/Chilfish/yumemita-stream-dashboard";
+const BILIBILI_URL = "https://space.bilibili.com/259486090";
+
+const LINK_CLASS =
+  "text-member-ink underline-offset-2 transition-colors duration-120 ease-out hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink";
+
+const PROJECT_LINKS: { term: string; href: string; label: string; note: string }[] = [
+  { term: "项目地址", href: PROJECT_URL, label: "Chilfish/yumemita-stream-dashboard", note: "GitHub" },
+  { term: "作者", href: BILIBILI_URL, label: "@Chilfish", note: "Bilibili" },
+  { term: "问题反馈", href: `${PROJECT_URL}/issues`, label: "Issues", note: "数据纠错与功能建议" },
+];
+
+const PROJECT_NOTE: [string, string][] = [
+  ["非官方项目", "与 夢限大みゅーたいぷ、所属事务所、Bushiroad、YouTube、VSTATS 均无隶属或合作关系。"],
+  ["数据来源", "直播标题、简介、弹幕、SC 与评论来自 YouTube 公开页面；同接等统计来自 VSTATS。"],
+  ["版权", "原始内容版权归各自权利人所有，本站只做个人研究与分析用途。"],
+  ["技术栈", "React 19 · Vite · Tailwind CSS · coss ui · D3"],
+];
+
 interface SectionProps {
   title: string;
   children: ReactNode;
@@ -46,7 +65,7 @@ function Section({ title, children }: SectionProps) {
   );
 }
 
-function KeyValueList({ items }: { items: [string, string][] }) {
+function KeyValueList({ items }: { items: [string, ReactNode][] }) {
   return (
     <dl className="flex flex-col divide-y divide-hairline">
       {items.map(([term, description]) => (
@@ -124,6 +143,27 @@ export function AboutView({ dataset, manifest }: AboutViewProps) {
               <li key={item}>{item}</li>
             ))}
           </ul>
+        </Section>
+
+        <Section title="项目与联系">
+          <dl className="flex flex-col divide-y divide-hairline">
+            {PROJECT_LINKS.map(link => (
+              <div
+                className="grid gap-1 py-2 first:pt-0 last:pb-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4"
+                key={link.term}
+              >
+                <dt className="text-footnote text-muted-foreground">{link.term}</dt>
+                <dd className="flex flex-wrap items-baseline gap-x-2 text-footnote">
+                  <a className={LINK_CLASS} href={link.href} rel="noreferrer" target="_blank">
+                    {link.label}
+                  </a>
+                  <span className="text-caption text-ink-3">{link.note}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <KeyValueList items={PROJECT_NOTE} />
+          <p className="text-caption text-ink-3">© 2026 Chilfish · 非官方粉丝项目</p>
         </Section>
       </div>
     </div>
