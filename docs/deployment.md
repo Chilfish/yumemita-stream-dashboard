@@ -199,8 +199,9 @@ bun run publish:transcripts
 
 ```text
 checkout → setup Bun / Node / Deno → 安装 yt-dlp
+        → 可选：拉订阅、起 mihomo、导出 YTDLP_PROXY
         → 恢复 data/ 缓存 → 写入 YT_COOKIES → bun scripts/daily-update.ts
-        → 删除 cookie → 保存 data/ 缓存
+        → 删除 cookie / 停 mihomo → 保存 data/ 缓存
 ```
 
 - **不会重新部署**：数据在对象存储上，页面运行时直接读；发布完成后刷新即可。这个工作流不 push、不触发前端构建。
@@ -208,6 +209,8 @@ checkout → setup Bun / Node / Deno → 安装 yt-dlp
 - **有变化才定点处理**：只恢复该成员的 datapack（单人 20–45 MB），抓新场次、补封面，再 `publish:data --dataset <id>`；其余成员不下载、不上传。
 - **自动补数据**：近期缺 VSTATS（公开场次，14 天内）或弹幕为空（7 天内）的场次会被重抓一次；刚结束的场次不会因为回放/页面还没生成就被永久标记为不可用。
 - **补发布**：如果上次抓取成功但发布失败（或本地跑过 `--no-publish`），本地 manifest 会比远端新；这种没有新场次的日子也会补一次发布，不会把改动一直卡在本地。
+- **代理兜底**：配了 `MIHOMO_SUB_URL` 时，每次从订阅生成 mihomo 配置并起本地 `127.0.0.1:7890`，只给 yt-dlp 加 `--proxy`（R2 上传与 VSTATS 仍直连）。订阅拉不到或代理起不来会告警并直连，不会挡住任务。
+- **失败通知**：任何一步失败都会开一个 `Data update failed` issue（`issues: write`），避免定时任务静默断更。
 - `data/` 在两次运行之间通过 Actions Cache 保留，首次运行会从对象存储恢复约 150 MB 的 pack，之后只增量变化。
 - 手动触发时勾选 `force` 会重抓最近 24 小时结束的场次（用于刷新播放量、点赞、评论快照）。
 
@@ -218,6 +221,7 @@ checkout → setup Bun / Node / Deno → 安装 yt-dlp
 | Variable | `VITE_DATAPACK_BASE` | 公开数据根地址 |
 | Secret | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` / `R2_PREFIX` | 发布与恢复 |
 | Secret | `YT_COOKIES` | YouTube 登录态（会员限定场次与 bot 检查） |
+| Secret（可选） | `MIHOMO_SUB_URL` | mihomo 订阅；配了才走代理兜底 |
 
 cookie 从本机浏览器导出并直接推到仓库：
 
@@ -236,7 +240,7 @@ bun scripts/daily-update.ts --dry-run       # 只列这次会动哪些场次
 bun scripts/daily-update.ts --no-publish    # 只写本地，不传对象存储
 ```
 
-注意：GitHub 托管 runner 是云厂商 IP，YouTube 的 bot 检查比住宅 IP 更严格。工作流每次安装最新 yt-dlp；如果失败，先看日志里是不是 `Sign in to confirm you're not a bot`，必要时重新导出 cookie 再手动触发一次。
+注意：GitHub 托管 runner 是云厂商 IP，YouTube 的 bot 检查比住宅 IP 更严格。工作流每次安装最新 yt-dlp；如果失败，先看日志里是不是 `Sign in to confirm you're not a bot`。优先配 `MIHOMO_SUB_URL` 让 yt-dlp 走代理出口；没有订阅时再重新导出 cookie 并手动触发一次。
 
 ## CI
 

@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 # 定时与手动可能撞车；不取消正在跑的那次，排队即可。
 concurrency:
@@ -35,6 +36,9 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
       R2_PREFIX: ${{ secrets.R2_PREFIX }}
+      # 有订阅就走 mihomo 代理；没配就直连（runner 的云厂商 IP 更容易被 bot 检查）。
+      MIHOMO_VERSION: v1.19.30
+      MIHOMO_SUB_URL: ${{ secrets.MIHOMO_SUB_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -66,6 +70,61 @@ jobs:
           chmod +x "$RUNNER_TEMP/bin/yt-dlp"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/yt-dlp" --version
+
+      # 代理是可选兜底：配了 MIHOMO_SUB_URL 才走，起不来就告警并直连。
+      - name: Cache mihomo
+        if: env.MIHOMO_SUB_URL != ''
+        uses: actions/cache@v6
+        with:
+          path: ~/mihomo
+          key: mihomo-${{ runner.os }}-${{ env.MIHOMO_VERSION }}
+
+      - name: Prepare mihomo config
+        id: mihomo
+        if: env.MIHOMO_SUB_URL != ''
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mihomo
+          # 订阅端是自签证书，只能跳过校验。
+          if ! curl -fsSL --retry 3 --retry-all-errors -k -A 'clash.meta' \
+            "$MIHOMO_SUB_URL" -o /tmp/mihomo/subscription.yaml; then
+            echo "::warning::MIHOMO_SUB_URL 拉取失败，本次直连"
+            exit 0
+          fi
+          if ! bun scripts/mihomo-config.ts /tmp/mihomo/subscription.yaml /tmp/mihomo/config.yaml; then
+            echo "::warning::订阅里没有可用节点，本次直连"
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Start mihomo
+        if: steps.mihomo.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -x "$HOME/mihomo/core" ]; then
+            curl -fsSL -o /tmp/core.gz \
+              "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VERSION}/mihomo-linux-amd64-${MIHOMO_VERSION}.gz"
+            gunzip -f /tmp/core.gz
+            mkdir -p "$HOME/mihomo"
+            mv /tmp/core "$HOME/mihomo/core"
+            chmod +x "$HOME/mihomo/core"
+          fi
+          nohup "$HOME/mihomo/core" -d /tmp/mihomo -f /tmp/mihomo/config.yaml > /tmp/mihomo/core.log 2>&1 &
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:9099/version > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != "1" ]; then
+            echo "::warning::mihomo 没有起来，本次直连（更容易被 YouTube bot 检查拦）"
+            tail -n 50 /tmp/mihomo/core.log || true
+            exit 0
+          fi
+          PROXY_NODE=$(cat /tmp/mihomo/config.yaml.proxy-node)
+          curl -sf -X PUT -H 'Content-Type: application/json' \
+            -d "{\"name\":\"${PROXY_NODE}\"}" http://127.0.0.1:9099/proxies/PICK
+          echo "YTDLP_PROXY=http://127.0.0.1:7890" >> "$GITHUB_ENV"
+          echo "mihomo ready, egress via ${PROXY_NODE}"
 
       - name: Check configuration
         run: |
@@ -112,6 +171,28 @@ jobs:
       - name: Remove cookies
         if: always()
         run: rm -f "$RUNNER_TEMP/cookies.txt"
+
+      - name: Dump mihomo log
+        if: failure() || cancelled()
+        run: tail -n 100 /tmp/mihomo/core.log || true
+
+      # cron 健康通知：失败时开 issue，避免静默断更。
+      - name: Notify on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "Data update failed" \
+            --assignee Chilfish \
+            --repo ${{ github.repository }} \
+            --body "定时数据更新失败：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          检查顺序：MIHOMO_SUB_URL / mihomo 是否可用、YT_COOKIES 是否过期、R2_* 凭据、yt-dlp 是否被 YouTube bot 检查拦。"
+
+      - name: Stop mihomo
+        if: always()
+        run: pkill -f "$HOME/mihomo/core" || true
 
       - name: Save data cache
         if: always()

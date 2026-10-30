@@ -221,6 +221,7 @@ async function readChannelEntries(source: DatasetSource, stateDir: string): Prom
   }
 
   try {
+    const proxy = process.env.YTDLP_PROXY
     const raw = await runCapture('yt-dlp', [
       '--flat-playlist',
       '--no-warnings',
@@ -229,6 +230,7 @@ async function readChannelEntries(source: DatasetSource, stateDir: string): Prom
       '--retries',
       '3',
       '-J',
+      ...(proxy ? ['--proxy', proxy] : []),
       `https://www.youtube.com/channel/${source.channelId}/streams`,
     ], { PYTHONIOENCODING: 'utf-8' })
     const playlist = JSON.parse(raw) as {

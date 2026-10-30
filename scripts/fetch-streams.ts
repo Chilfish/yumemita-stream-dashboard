@@ -323,7 +323,11 @@ async function main(): Promise<void> {
   const cookieArgs = values.cookies
     ? ['--cookies', resolve(values.cookies)]
     : ['--cookies-from-browser', values['cookies-from-browser'] ?? 'firefox']
-  const ytdlpBase = ['--no-warnings', '--socket-timeout', '30', '--retries', '3']
+  // CI 里 GitHub runner 的出口 IP 更容易被 YouTube 的 bot 检查拦；
+  // 配了 YTDLP_PROXY（mihomo）就让所有 yt-dlp 请求走代理，没配就直连。
+  const proxy = process.env.YTDLP_PROXY
+  const proxyArgs = proxy ? ['--proxy', proxy] : []
+  const ytdlpBase = ['--no-warnings', '--socket-timeout', '30', '--retries', '3', ...proxyArgs]
   const startedAt = new Date().toISOString()
 
   // 换设备 / 丢缓存时先拉回远端的 manifest 与 pack；本地已有 manifest 时不自动跑，
@@ -413,7 +417,7 @@ async function main(): Promise<void> {
     else {
       try {
         logFile(logPath, '拉取频道 /streams 列表…')
-        const raw = await run('yt-dlp', ['--flat-playlist', '--print', '%(id)s', `https://www.youtube.com/channel/${dataset.channelId}/streams`], true, 1)
+        const raw = await run('yt-dlp', ['--flat-playlist', '--print', '%(id)s', ...proxyArgs, `https://www.youtube.com/channel/${dataset.channelId}/streams`], true, 1)
         channelIds = [...new Set(raw.split('\n').map(line => line.trim()).filter(id => /^[A-Za-z0-9_-]{11}$/.test(id)))]
         writeFileSync(channelCache, `${channelIds.join('\n')}\n`, 'utf8')
       }

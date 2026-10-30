@@ -161,6 +161,20 @@ bun scripts/export-yt-cookies.ts --browser edge --push
 文件是 Netscape 格式，等同账号凭据：默认路径在 gitignore 内，不要提交、不要贴到聊天里。
 导出时会检查是否存在 `SID` / `__Secure-3PSID`，没有登录态会直接报错。
 
+### CI 代理（可选）
+
+GitHub runner 的出口 IP 更容易被 YouTube 的 bot 检查拦。配置 `MIHOMO_SUB_URL` 后，工作流会：
+
+1. `bun scripts/mihomo-config.ts <订阅> <config>`：只保留香港节点，开 `7890` 混合端口与 `9099` 控制端口，并写出默认节点名；
+2. 起 mihomo 并切到该节点；
+3. 导出 `YTDLP_PROXY=http://127.0.0.1:7890`。`fetch-streams` 与 `daily-update` 只把这个变量加给 yt-dlp（`--proxy`），R2 上传与 VSTATS 请求仍直连。
+
+订阅拉不到或代理起不来时只发警告，任务继续直连。本地想临时走代理也可以：
+
+```bash
+YTDLP_PROXY=http://127.0.0.1:7890 bun scripts/daily-update.ts
+```
+
 ## 封面图
 
 `fetch-thumbnails.ts` 把每场直播的 YouTube 封面镜像到本地暂存区；页面运行时只读对象存储上的图，
