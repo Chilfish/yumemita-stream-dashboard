@@ -2,16 +2,35 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // 旧的 hash 路由链接（/#/nonoka/...）在应用启动前改写成真实路径。
+      (function () {
+        var hash = window.location.hash;
+        if (hash.charCodeAt(1) !== 47) return;
+        window.location.replace("__SITE_BASE__" + hash.slice(1));
+      })();
+    </script>
+    <link rel="icon" type="image/jpeg" href="/favicon.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f3f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#08080b" media="(prefers-color-scheme: dark)" />
+    <meta name="application-name" content="ゆめみた 配信数据台" />
+    <!--seo:start-->
     <meta
       name="description"
       content="夢限大みゅーたいぷ 成员直播数据的可视化数据台：同接、弹幕、SC、评论与词频。"
     />
+    <meta name="robots" content="index,follow" />
+    <meta property="og:site_name" content="ゆめみた 配信数据台" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
     <title>ゆめみた 配信数据台</title>
+    <!--seo:end-->
   </head>
   <body>
+    <!--seo:body-->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

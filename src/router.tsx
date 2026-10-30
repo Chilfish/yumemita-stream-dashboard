@@ -1,8 +1,9 @@
-import { createHashRouter } from "react-router";
+import { createBrowserRouter } from "react-router";
 import { DatasetIndexGate } from "@/components/dashboard/dataset-index-gate";
 import { DatasetLayout } from "@/components/dashboard/dataset-layout";
 import { GroupLayout } from "@/components/dashboard/group-layout";
 import { RouteError } from "@/components/dashboard/route-error";
+import { siteBasePath } from "@/lib/site";
 import { HomeRedirect } from "@/pages/home-redirect";
 import {
   LegacyOverviewRedirect,
@@ -22,40 +23,44 @@ import {
   TrendsPage,
 } from "@/pages/lazy-pages";
 
-export const router = createHashRouter([
-  {
-    path: "/",
-    element: <DatasetIndexGate />,
-    errorElement: <RouteError />,
-    children: [
-      {
-        element: <GroupLayout />,
-        errorElement: <RouteError />,
-        children: [
-          { index: true, element: <GroupHomePage /> },
-          { path: "gallery", element: <GroupGalleryPage /> },
-          { path: "*", element: <GroupHomePage /> },
-        ],
-      },
-      {
-        path: ":datasetId",
-        element: <DatasetLayout />,
-        errorElement: <RouteError />,
-        children: [
-          { index: true, element: <HomePage /> },
-          { path: "streams", element: <StreamsPage /> },
-          { path: "stream", element: <StreamIndexPage /> },
-          { path: "stream/:videoId", element: <StreamPage /> },
-          { path: "trends", element: <TrendsPage /> },
-          { path: "gallery", element: <GalleryPage /> },
-          { path: "transcripts", element: <TranscriptsPage /> },
-          { path: "compare", element: <ComparePage /> },
-          { path: "about", element: <AboutPage /> },
-          { path: "overview", element: <LegacyOverviewRedirect /> },
-          { path: "table", element: <LegacyTableRedirect /> },
-          { path: "*", element: <HomeRedirect /> },
-        ],
-      },
-    ],
-  },
-]);
+export const router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      element: <DatasetIndexGate />,
+      errorElement: <RouteError />,
+      children: [
+        {
+          element: <GroupLayout />,
+          errorElement: <RouteError />,
+          children: [
+            { index: true, element: <GroupHomePage /> },
+            { path: "gallery", element: <GroupGalleryPage /> },
+            { path: "*", element: <GroupHomePage /> },
+          ],
+        },
+        {
+          path: ":datasetId",
+          element: <DatasetLayout />,
+          errorElement: <RouteError />,
+          children: [
+            { index: true, element: <HomePage /> },
+            { path: "streams", element: <StreamsPage /> },
+            { path: "stream", element: <StreamIndexPage /> },
+            { path: "stream/:videoId", element: <StreamPage /> },
+            { path: "trends", element: <TrendsPage /> },
+            { path: "gallery", element: <GalleryPage /> },
+            { path: "transcripts", element: <TranscriptsPage /> },
+            { path: "compare", element: <ComparePage /> },
+            { path: "about", element: <AboutPage /> },
+            { path: "overview", element: <LegacyOverviewRedirect /> },
+            { path: "table", element: <LegacyTableRedirect /> },
+            { path: "*", element: <HomeRedirect /> },
+          ],
+        },
+      ],
+    },
+  ],
+  // 子路径部署（VITE_BASE=/dashboard/）时，路由匹配与链接都基于同一 base。
+  { basename: siteBasePath() || "/" },
+);

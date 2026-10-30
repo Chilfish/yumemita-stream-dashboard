@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "夢限大みゅーたいぷ 成员直播数据的可视化数据台（React + coss ui + D3）",
+  "license": "MIT",
   "type": "module",
   "packageManager": "bun@1.4.4",
   "engines": {
@@ -10,9 +11,11 @@
   },
   "scripts": {
     "dev": "bun run sync:data && vite",
-    "build": "bun run sync:data && tsc -b && vite build",
+    "build": "bun run sync:data && tsc -b && vite build && bun scripts/generate-seo.ts",
     "preview": "vite preview",
     "sync:data": "bun scripts/sync-data.mjs",
+    "seo": "bun scripts/generate-seo.ts",
+    "verify:seo": "bun scripts/verify-seo.ts",
     "publish:data": "bun scripts/publish-data.ts",
     "validate:data": "bun scripts/validate-data.mjs",
     "verify:data": "bun scripts/verify-data.ts",
@@ -28,7 +31,7 @@
     "test:smoke": "bun scripts/smoke-routes.mjs",
     "lint": "oxlint src scripts",
     "check": "bun run typecheck && bun run test && bun run lint",
-    "ci": "bun run sync:data && bun run validate:data && bun run check && bun run build"
+    "ci": "bun run sync:data && bun run validate:data && bun run check && bun run build && bun run verify:seo"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

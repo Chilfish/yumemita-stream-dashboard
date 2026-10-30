@@ -74,12 +74,16 @@ function loadFixture() {
 
 const { datasetId, videoId, streamTitle, compareIds, compareTitle } = loadFixture();
 
-const streamUrl = `${baseUrl}/#/${datasetId}/stream/${videoId}`;
-const invalidUrl = `${baseUrl}/#/${datasetId}/stream/not-a-real-id`;
-const compareUrl = `${baseUrl}/#/${datasetId}/compare?ids=${compareIds.join(",")}`;
-const trendsUrl = `${baseUrl}/#/${datasetId}/trends`;
-const homeHash = `#/${datasetId}`;
-const streamMarker = streamTitle || videoId;
+const streamUrl = `${baseUrl}/${datasetId}/stream/${videoId}`;
+const invalidUrl = `${baseUrl}/${datasetId}/stream/not-a-real-id`;
+const compareUrl = `${baseUrl}/${datasetId}/compare?ids=${compareIds.join(",")}`;
+const trendsUrl = `${baseUrl}/${datasetId}/trends`;
+/** 页面文本会把连续空白折叠成一个空格，等待文本前先对齐。 */
+function normalizeText(value) {
+  return String(value).replace(/\s+/g, " ").trim();
+}
+
+const streamMarker = normalizeText(streamTitle || videoId);
 const NOT_FOUND_TEXT = "找不到这场直播";
 const STREAMS_LINK = "场次";
 
@@ -151,15 +155,21 @@ const page = {
   forward: () => ab(["forward"]),
   url: () => ab(["get", "url"]),
   waitLoad: () => ab(["wait", "--load", "networkidle"]),
-  waitText: text => ab(["wait", "--text", text]),
+  waitText: text => ab(["wait", "--text", normalizeText(text)]),
   text: (selector = "body") => ab(["get", "text", selector]),
   clickLink: name => ab(["find", "role", "link", "click", "--name", name]),
   eval: js => parseValue(ab(["eval", js])),
   close: () => ab(["close"], 30_000),
 };
 
-async function hash() {
-  return String((await page.eval("location.hash")) ?? "");
+async function pathname() {
+  return String((await page.eval("new URL(location.href).pathname")) ?? "");
+}
+
+async function metaContent(name) {
+  return String(
+    (await page.eval(`document.querySelector('meta[name="${name}"]')?.content ?? ''`)) ?? "",
+  );
 }
 
 async function bodyText() {
@@ -203,18 +213,15 @@ function probe(url, timeout = 5000) {
 
 const scenarios = [
   {
-    name: "首页重定向 / → 成员首页",
+    name: "组首页 /",
     async run() {
       await page.open(`${baseUrl}/`);
       await page.waitLoad();
-      await waitFor("等待重定向到成员首页", async () => {
-        const value = await hash();
-        return value === homeHash ? value : null;
-      });
-      const current = await hash();
-      assert(current === homeHash, `期望 ${homeHash}，实际 ${current || "(空)"}`);
-      const fullUrl = await page.url();
-      assert(fullUrl.includes(homeHash), `地址栏没有落地到 ${homeHash}：${fullUrl}`);
+      await page.waitText("全组");
+      const current = await pathname();
+      assert(current === "/", `期望 /，实际 ${current || "(空)"}`);
+      const title = String((await page.eval("document.title")) ?? "");
+      assert(title.includes("夢限大みゅーたいぷ"), `首页 title 不对：${title}`);
     },
   },
   {
@@ -224,18 +231,21 @@ const scenarios = [
       await page.waitLoad();
       await page.waitText(streamMarker);
 
-      const before = await hash();
-      assert(before.includes(videoId), `hash 里没有 ${videoId}：${before}`);
+      const before = await pathname();
+      assert(before.includes(videoId), `路径里没有 ${videoId}：${before}`);
 
       const text = await bodyText();
       assert(text.includes(streamMarker), "单场页面没有渲染标题文本");
+      assert((await metaContent("robots")) === "index,follow", "单场页 robots 不是 index,follow");
+      const canonical = String((await page.eval(`document.querySelector('link[rel="canonical"]')?.href ?? ''`)));
+      assert(canonical.endsWith(`/${datasetId}/stream/${videoId}`), `canonical 不对：${canonical}`);
 
       await page.reload();
       await page.waitLoad();
       await page.waitText(streamMarker);
 
-      const after = await hash();
-      assert(after === before, `刷新后 hash 变了：${before} → ${after}`);
+      const after = await pathname();
+      assert(after === before, `刷新后路径变了：${before} → ${after}`);
       const reloadedText = await bodyText();
       assert(reloadedText.includes(streamMarker), "刷新后单场内容消失");
     },
@@ -248,7 +258,7 @@ const scenarios = [
       await page.waitText(NOT_FOUND_TEXT);
       const text = await bodyText();
       assert(text.includes(NOT_FOUND_TEXT), `页面缺少「${NOT_FOUND_TEXT}」`);
-      assert(text.includes("not-a-real-id"), "兜底页面没有回显无效 id");
+      assert((await metaContent("robots")) === "noindex,follow", "无效单场页应 noindex");
     },
   },
   {
@@ -258,7 +268,7 @@ const scenarios = [
       await page.waitLoad();
       await page.waitText(compareTitle);
 
-      const route = String((await page.eval("new URL(location.href).hash")) ?? "");
+      const route = String((await page.eval("location.search")) ?? "");
       const decoded = decodeURIComponent(route);
       assert(decoded.includes("ids="), `URL 里没有 ids 参数：${route}`);
       for (const id of compareIds) {
@@ -266,7 +276,7 @@ const scenarios = [
       }
 
       const text = await bodyText();
-      assert(text.includes(compareTitle), "对比页面没有渲染所选场次");
+      assert(text.includes(normalizeText(compareTitle)), "对比页面没有渲染所选场次");
     },
   },
   {
@@ -275,8 +285,8 @@ const scenarios = [
       await page.open(trendsUrl);
       await page.waitLoad();
       await page.waitText("内容类型对比");
-      const route = String((await page.eval("location.hash")) ?? "");
-      assert(route.endsWith("/trends"), `hash 没有落在 /trends：${route}`);
+      const route = await pathname();
+      assert(route.endsWith("/trends"), `路径没有落在 /trends：${route}`);
       const text = await bodyText();
       assert(text.includes("月度趋势"), "趋势页没有渲染月度趋势");
       assert(text.includes("内容类型对比"), "趋势页没有渲染内容类型对比");
@@ -288,25 +298,39 @@ const scenarios = [
       await page.open(streamUrl);
       await page.waitLoad();
       await page.waitText(streamMarker);
-      const streamHash = await hash();
+      const streamPath = await pathname();
 
       await page.clickLink(STREAMS_LINK);
       await waitFor("等待进入场次页", async () => {
-        const value = await hash();
+        const value = await pathname();
         return value.endsWith("/streams") ? value : null;
       });
 
       await page.back();
       await waitFor("等待 back 回到单场", async () => {
-        const value = await hash();
-        return value === streamHash ? value : null;
+        const value = await pathname();
+        return value === streamPath ? value : null;
       });
 
       await page.forward();
       await waitFor("等待 forward 回到场次页", async () => {
-        const value = await hash();
+        const value = await pathname();
         return value.endsWith("/streams") ? value : null;
       });
+    },
+  },
+  {
+    name: "旧 hash 链接自动改写",
+    async run() {
+      await page.open(`${baseUrl}/#/${datasetId}/trends`);
+      await page.waitLoad();
+      await waitFor("等待 hash 改写为真实路径", async () => {
+        const value = await pathname();
+        return value.endsWith("/trends") ? value : null;
+      });
+      const current = await pathname();
+      assert(current === `/${datasetId}/trends`, `旧链接没有落地到 /${datasetId}/trends：${current}`);
+      assert(!(await page.url()).includes("#/"), "旧链接跳转后仍带 hash");
     },
   },
 ];

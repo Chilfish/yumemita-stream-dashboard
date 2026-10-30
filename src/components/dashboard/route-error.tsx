@@ -2,7 +2,10 @@ import { TriangleAlert } from "lucide-react";
 import { isRouteErrorResponse, Link, useParams, useRouteError } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
+import { useSeo } from "@/hooks/use-seo";
 import { viewPath } from "@/lib/routes";
+import { buildSeo } from "@/lib/seo";
+import { siteBasePath, siteOrigin } from "@/lib/site";
 
 const MAX_DETAIL_LENGTH = 400;
 
@@ -48,6 +51,17 @@ export function RouteError() {
   const { detail, stack } = describeError(error);
   const overviewPath = datasetId ? viewPath(datasetId, "home") : "/";
 
+  useSeo(
+    buildSeo({
+      origin: siteOrigin(),
+      basePath: siteBasePath(),
+      pathname: "/",
+      section: "home",
+      dataset: null,
+      error: true,
+    }),
+  );
+
   return (
     <div className="flex min-h-dvh items-center justify-center px-4 py-16">
       <Card className="w-full max-w-lg">
@@ -59,7 +73,7 @@ export function RouteError() {
           <div className="flex flex-col gap-1.5">
             <p className="font-heading font-semibold text-headline">页面出错了</p>
             <p className="text-body text-muted-foreground">
-              页面出了点问题，可以重试一次，或者回到总览继续浏览。
+              页面出了点问题，可以重试一次，或者回到首页继续浏览。
             </p>
           </div>
 
@@ -74,7 +88,7 @@ export function RouteError() {
               重试
             </Button>
             <Button render={<Link to={overviewPath} />} variant="outline">
-              回到总览
+              回到首页
             </Button>
           </div>
 

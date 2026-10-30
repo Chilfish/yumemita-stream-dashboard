@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_DATAPACK_BASE: ${{ vars.VITE_DATAPACK_BASE }}
+      VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -34,6 +35,13 @@ jobs:
         run: |
           if [ -z "$VITE_DATAPACK_BASE" ]; then
             echo "::error::Set the repository variable VITE_DATAPACK_BASE to the public object storage root."
+            exit 1
+          fi
+
+      - name: Check site url
+        run: |
+          if [ -z "$VITE_SITE_URL" ]; then
+            echo "::error::Set the repository variable VITE_SITE_URL to the production origin (used for canonical / OG / sitemap)."
             exit 1
           fi
 

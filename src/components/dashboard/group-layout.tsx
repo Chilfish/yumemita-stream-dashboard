@@ -1,5 +1,5 @@
 import { TriangleAlert } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { Outlet, ScrollRestoration, useLocation, useNavigate } from "react-router";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { useDatasetIndexContext } from "@/components/dashboard/dataset-index-context";
@@ -10,20 +10,48 @@ import { MobileTabBar } from "@/components/dashboard/mobile-tab-bar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useGroupData } from "@/hooks/use-group-data";
+import { useSeo } from "@/hooks/use-seo";
 import { useTheme } from "@/hooks/use-theme";
+import { thumbnailUrl } from "@/lib/data";
 import { groupSectionFromPathname, homePath } from "@/lib/routes";
+import { buildSeo } from "@/lib/seo";
+import { absoluteAssetUrl, siteBasePath, siteOrigin } from "@/lib/site";
 
 export function GroupLayout() {
   const index = useDatasetIndexContext();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
-  const { data, status, error, failedMembers } = useGroupData(index.datasets);
-
   const section = groupSectionFromPathname(pathname);
+  const { data, status, error, failedMembers } = useGroupData(
+    index.datasets,
+    section === "gallery" ? "full" : "summary",
+  );
   const chatTotal = data?.totals.chatTotal ?? 0;
   const streamCount =
     data?.totals.streamCount ?? index.datasets.reduce((sum, item) => sum + item.count, 0);
+  // 根路由的 `*` 也会渲染组首页；这类未知路径归一到 `/` 并且不收录。
+  const knownPath = pathname === "/" || pathname === "/gallery";
+  const latest = data?.rows[0] ?? null;
+
+  const seo = useMemo(
+    () =>
+      buildSeo({
+        origin: siteOrigin(),
+        basePath: siteBasePath(),
+        pathname: knownPath ? pathname : "/",
+        section,
+        dataset: null,
+        memberCount: index.datasets.length,
+        streamCount,
+        updatedAt: latest?.startedAt ?? null,
+        image: latest ? absoluteAssetUrl(thumbnailUrl(latest.datasetId, latest.videoId)) : null,
+        notFound: !knownPath,
+      }),
+    [index.datasets.length, knownPath, latest, pathname, section, streamCount],
+  );
+
+  useSeo(seo);
 
   return (
     <SidebarProvider>
@@ -46,7 +74,7 @@ export function GroupLayout() {
         theme={theme}
       />
 
-      <SidebarInset className="min-w-0" id="main-content" tabIndex={-1}>
+      <SidebarInset className="ambient-field min-w-0" id="main-content" tabIndex={-1}>
         <ScrollRestoration />
         <GroupHeader
           chatTotal={chatTotal}
