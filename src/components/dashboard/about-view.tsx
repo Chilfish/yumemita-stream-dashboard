@@ -117,7 +117,7 @@ export function AboutView({ dataset, manifest, totals }: AboutViewProps) {
       <div className="flex flex-col">
         <Section title="这个页面是什么">
           <p className="text-body text-muted-foreground">
-            收集成员已结束直播的公开数据，做成可浏览、可对比的图表。页面只读，不会修改原始数据。
+            把成员已结束直播的公开数据整理成图表，方便浏览和对比。页面只读，不改动原始数据。
           </p>
           <KeyValueList
             items={[
@@ -160,7 +160,7 @@ export function AboutView({ dataset, manifest, totals }: AboutViewProps) {
               <AlertDescription>
                 {partialAggregation
                   ? `已全量重扫的场次为精确值（${coverageText}），其余场次仍来自每场 Top 排行榜；补齐原始弹幕后会逐步转成全量。`
-                  : "高频词、发言者、徽章、表情都来自每场直播的排行榜，不是重新分析全部弹幕；全月榜适合看趋势，不适合做精确排名。"}
+                  : "高频词、发言者、徽章、表情都来自每场直播的排行榜，没有重新分析全部弹幕；全月榜适合看趋势，不适合做精确排名。"}
               </AlertDescription>
             </Alert>
           )}

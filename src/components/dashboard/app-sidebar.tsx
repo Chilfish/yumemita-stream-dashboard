@@ -1,7 +1,6 @@
 import {
   FileText,
   GitCompare,
-  Guitar,
   Images,
   Info,
   LayoutDashboard,
@@ -126,9 +125,12 @@ export function AppSidebar({
               tooltip="ゆめみた 配信数据台"
               render={<Link to={groupHomePath()} />}
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-card text-foreground shadow-surface">
-                <Guitar aria-hidden="true" className="size-4" />
-              </span>
+              <img
+                alt=""
+                aria-hidden="true"
+                className="size-8 shrink-0 rounded-control object-cover"
+                src={assetUrl("/brand-mark.webp")}
+              />
               <span className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-semibold text-body">ゆめみた 配信数据台</span>
                 <span className="truncate text-caption text-muted-foreground">

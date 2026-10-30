@@ -1,4 +1,5 @@
 import { Children, type ReactNode } from "react";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface PanelProps {
@@ -6,10 +7,12 @@ interface PanelProps {
   children: ReactNode;
 }
 
+/**
+ * 面板表面直接用组件库的 Card：圆角、描边、内描边高光都由 UI 层统一，
+ * 这里只负责去掉 Card 的纵向 padding，让内容自己贴边。
+ */
 export function Panel({ className, children }: PanelProps) {
-  return (
-    <div className={cn("relative rounded-panel bg-card shadow-surface", className)}>{children}</div>
-  );
+  return <Card className={cn("gap-0 py-0", className)}>{children}</Card>;
 }
 
 interface PanelHeadProps {

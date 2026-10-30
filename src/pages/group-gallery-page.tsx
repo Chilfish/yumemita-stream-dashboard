@@ -203,7 +203,7 @@ export function GroupGalleryPage() {
         </p>
         <p className="text-footnote text-muted-foreground">
           当前筛选：{activeLabels.join(" · ")}
-          。放宽条件或清除筛选，封面就会重新按 JST 自然月排上来。
+          。换个条件，或者清除筛选。
         </p>
       </div>
       <Button className="self-start" onClick={resetFilters} size="sm" variant="outline">
