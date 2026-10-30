@@ -379,6 +379,19 @@
   mask-image: linear-gradient(to bottom, #000 0 1.25rem, transparent 5rem);
 }
 
+/*
+ * 封面缺失时的兜底：成员色打底，压一层团标的斜条纹。
+ * 16:9 的大封面没有图时不再是一整块死色，但也不会比真封面更抢眼。
+ */
+.cover-fallback {
+  background-color: color-mix(in oklab, var(--member-color) 9%, var(--card));
+  background-image: repeating-linear-gradient(
+    115deg,
+    color-mix(in oklab, var(--member-color) 10%, transparent) 0 9px,
+    transparent 9px 26px
+  );
+}
+
 /* 动效 ────────────────────────────────────────────────────────────
  * 只动 opacity / translate / scale / stroke-dashoffset：全部落在合成层，
  * 不触发布局。元素插入时的首帧交给 @starting-style，不需要 JS 挂载动画。
