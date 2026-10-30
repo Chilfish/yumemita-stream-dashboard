@@ -27,6 +27,16 @@ export function insightsKey(datasetId: string): string {
   return `${datasetId}/insights.json`
 }
 
+/** 组首页的精简数据：stats + 每位成员最新一场 + 最近若干场。 */
+export function groupSummaryKey(): string {
+  return 'group-summary.json'
+}
+
+/** 全组相册的全部精简行；只在 /gallery 按需加载。 */
+export function groupGalleryKey(): string {
+  return 'group-gallery.json'
+}
+
 /** 作者 → 场次索引，只在观众重叠等分析页按需加载。 */
 export function authorsKey(datasetId: string): string {
   return `${datasetId}/authors.json`

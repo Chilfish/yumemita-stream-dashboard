@@ -176,6 +176,54 @@ export const InsightsSchema = v.object({
   }),
 });
 
+export const GroupMemberStatSchema = v.object({
+  datasetId: v.string(),
+  streamCount: v.number(),
+  chatTotal: v.number(),
+  superchats: v.number(),
+  durationSec: v.number(),
+  avgConcurrent: v.nullable(v.number()),
+});
+
+export const GroupDayStatSchema = v.object({
+  datasetId: v.string(),
+  date: v.string(),
+  streams: v.number(),
+  chat: v.number(),
+});
+
+export const GroupStreamSchema = v.object({
+  datasetId: v.string(),
+  date: v.string(),
+  videoId: v.string(),
+  title: v.string(),
+  startedAt: v.nullable(v.string()),
+  durationSec: v.nullable(v.number()),
+  availability: v.nullable(v.string()),
+  avgConcurrent: v.nullable(v.number()),
+  maxConcurrent: v.nullable(v.number()),
+  chatTotal: v.number(),
+  superchats: v.number(),
+  vstatsViews: v.nullable(v.number()),
+  snapshotViews: v.nullable(v.number()),
+  thumbnail: v.optional(v.nullable(v.string())),
+});
+
+export const GroupSummarySchema = v.object({
+  schema: v.string(),
+  generatedAt: v.string(),
+  members: v.array(GroupMemberStatSchema),
+  days: v.array(GroupDayStatSchema),
+  latest: v.array(GroupStreamSchema),
+  recent: v.array(GroupStreamSchema),
+});
+
+export const GroupGallerySchema = v.object({
+  schema: v.string(),
+  generatedAt: v.string(),
+  streams: v.array(GroupStreamSchema),
+});
+
 export function formatIssues(result: { readonly issues?: readonly v.GenericIssue[] }): string[] {
   return (result.issues ?? []).map((issue) => {
     const path = v.getDotPath(issue);

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGroupData,
+  buildGroupDataFromSummary,
   jstDateKey,
   shiftDateKey,
   sortMembersByLatest,
   weekStartKey,
+  type GroupData,
 } from "./group";
 import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/dataset";
+import type { GroupDayStat, GroupSummaryFile } from "@/types/group";
 
 function member(id: string, label: string): DatasetIndexEntry {
   return {
@@ -136,6 +139,83 @@ describe("buildGroupData", () => {
     expect(data.members).toHaveLength(1);
     expect(data.members[0]?.dataset.id).toBe("arale");
     expect(data.totals.streamCount).toBe(1);
+  });
+});
+
+function summaryOf(data: GroupData, recent = 8): GroupSummaryFile {
+  const days = new Map<string, GroupDayStat>();
+  for (const row of data.rows) {
+    const key = `${row.datasetId}|${row.date}`;
+    const day = days.get(key) ?? { datasetId: row.datasetId, date: row.date, streams: 0, chat: 0 };
+    day.streams += 1;
+    day.chat += row.chatTotal;
+    days.set(key, day);
+  }
+
+  return {
+    schema: "test",
+    generatedAt: "",
+    members: data.members.map(item => ({
+      datasetId: item.dataset.id,
+      streamCount: item.streamCount,
+      chatTotal: item.chatTotal,
+      superchats: item.superchats,
+      durationSec: item.durationSec,
+      avgConcurrent: item.avgConcurrent,
+    })),
+    days: [...days.values()],
+    latest: data.members.flatMap(item => (item.latest ? [item.latest] : [])),
+    recent: data.rows.slice(0, recent),
+  };
+}
+
+describe("buildGroupDataFromSummary", () => {
+  it("matches the manifest-derived totals while only carrying member totals, day buckets and latest/recent rows", () => {
+    const now = new Date("2026-10-29T03:00:00Z");
+    const datasets = [member("nonoka", "宮永ののか"), member("arale", "仲町あられ")];
+    const manifests = new Map<string, BatchManifest>([
+      [
+        "nonoka",
+        manifest([
+          stream({ videoId: "new", date: "2026-10-28", chatTotal: 500, avgConcurrent: 1000 }),
+          stream({ videoId: "old", date: "2026-09-30", chatTotal: 300, avgConcurrent: 500 }),
+        ]),
+      ],
+      [
+        "arale",
+        manifest([
+          stream({ videoId: "mid", date: "2026-10-20", chatTotal: 200, avgConcurrent: 2000 }),
+        ]),
+      ],
+    ]);
+
+    const full = buildGroupData(datasets, manifests, now);
+    const fromSummary = buildGroupDataFromSummary(datasets, summaryOf(full), now);
+
+    expect(fromSummary.totals).toEqual(full.totals);
+    expect(
+      fromSummary.members.map(item => [
+        item.dataset.id,
+        item.streamCount,
+        item.weekStreams,
+        item.monthStreams,
+        item.avgConcurrent,
+      ]),
+    ).toEqual(
+      full.members.map(item => [
+        item.dataset.id,
+        item.streamCount,
+        item.weekStreams,
+        item.monthStreams,
+        item.avgConcurrent,
+      ]),
+    );
+    expect(fromSummary.rows.map(row => row.videoId)).toEqual(
+      full.rows.slice(0, 8).map(row => row.videoId),
+    );
+    expect(fromSummary.members.find(item => item.dataset.id === "nonoka")?.latest?.videoId).toBe(
+      "new",
+    );
   });
 });
 

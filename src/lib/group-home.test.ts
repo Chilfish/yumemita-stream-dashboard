@@ -9,7 +9,7 @@ import {
   splitHeroMembers,
 } from "./group-home";
 import type { GroupMemberSummary, GroupStreamRow } from "./group";
-import type { DatasetIndexEntry, StreamSummary } from "@/types/dataset";
+import type { DatasetIndexEntry } from "@/types/dataset";
 
 function dataset(id: string, label: string, color?: string | null): DatasetIndexEntry {
   return {
@@ -23,42 +23,24 @@ function dataset(id: string, label: string, color?: string | null): DatasetIndex
   };
 }
 
-function stream(overrides: Partial<StreamSummary> = {}): StreamSummary {
+function stream(overrides: Partial<GroupStreamRow> = {}): GroupStreamRow {
   return {
-    rank: 0,
+    datasetId: "a",
+    memberLabel: "A",
+    memberColor: "#b8461f",
     date: "2026-10-29",
     videoId: "vid",
     title: "配信",
-    url: "",
-    durationHms: null,
-    durationSec: 3600,
     startedAt: "2026-10-29T12:00:00+09:00",
-    endedAt: null,
+    durationSec: 3600,
     availability: null,
     avgConcurrent: null,
     maxConcurrent: null,
-    maxConcurrentAt: null,
-    watchTimeHours: null,
-    vstatsViews: null,
-    vstatsLikes: null,
-    snapshotViews: null,
-    snapshotLikes: null,
-    snapshotComments: null,
     chatTotal: 100,
-    chatByKind: { text: 100, superchat: 0, sticker: 0, membership: 0 },
-    pureEmojiOnly: 0,
-    uniqueAuthors: 0,
     superchats: 0,
-    scTotalsByCurrency: {},
-    stickers: 0,
-    memberships: 0,
-    commentsCaptured: null,
-    chatPer1000AvgViewers: null,
-    likesPer1000Views: null,
-    scPerHour: null,
-    sessionDir: "",
-    datapack: "",
-    generatedAt: "",
+    vstatsViews: null,
+    snapshotViews: null,
+    thumbnail: null,
     ...overrides,
   };
 }

@@ -1,13 +1,25 @@
 import { TriangleAlert } from "lucide-react";
-import { Outlet } from "react-router";
+import { useEffect } from "react";
+import { Outlet, useMatches } from "react-router";
 import { DatasetIndexContext } from "@/components/dashboard/dataset-index-context";
 import { LoadingScreen } from "@/components/dashboard/loading-screen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useDatasetIndex } from "@/hooks/use-dataset-index";
+import { prefetchDataset } from "@/lib/data";
 
 export function DatasetIndexGate() {
   const { index, loading, error } = useDatasetIndex();
+  // 组级路由没有 `:datasetId`；`useMatches` 同时兼容子路由与 basename 部署。
+  const datasetId =
+    useMatches()
+      .map(match => match.params.datasetId)
+      .find(Boolean) ?? null;
+
+  // 索引还没回来就先发 manifest/insights：两者只依赖路由里的 datasetId。
+  useEffect(() => {
+    if (datasetId) prefetchDataset(datasetId);
+  }, [datasetId]);
 
   if (loading) {
     return <LoadingScreen label="正在加载成员列表…" />;

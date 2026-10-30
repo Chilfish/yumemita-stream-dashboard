@@ -21,6 +21,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildGroupGallery, buildGroupSummary } from "./lib/group-summary.ts";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = join(appRoot, "data-sources.json");
@@ -41,6 +42,11 @@ function readJson(path) {
 
 function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+/** 组级数据是纯读取的大文件：不缩进，减少传输与解析成本。 */
+function writeJsonCompact(path, value) {
+  writeFileSync(path, `${JSON.stringify(value)}\n`, "utf8");
 }
 
 function describe(error) {
@@ -80,6 +86,7 @@ const index = {
   generatedAt: new Date().toISOString(),
   datasets: [],
 };
+const groupManifests = [];
 
 for (const source of config.datasets) {
   const { id, label, color, avatar, channelId, datapackDir } = source;
@@ -155,6 +162,7 @@ for (const source of config.datasets) {
 
   writeJson(join(destDir, "manifest.json"), manifest);
   writeJson(join(destDir, "insights.json"), insights);
+  groupManifests.push({ id, streams: manifest.streams });
 
   index.datasets.push({
     id,
@@ -172,6 +180,18 @@ for (const source of config.datasets) {
     ? `manifest/insights 来自 ${remoteBase}`
     : `本地 datapack ${packCount} 份`;
   console.log(`[sync-data] ${label} (${id}) -> ${manifest.streams.length} 场，${sourceNote}`);
+}
+
+// 组级数据：首页只读 summary（聚合 + 最近若干行），相册才读完整精简行。
+if (groupManifests.length > 0) {
+  const groupSummary = buildGroupSummary(groupManifests, index.generatedAt);
+  const groupGallery = buildGroupGallery(groupManifests, index.generatedAt);
+  writeJsonCompact(join(outputRoot, "group-summary.json"), groupSummary);
+  writeJsonCompact(join(outputRoot, "group-gallery.json"), groupGallery);
+  console.log(`[sync-data] 组级数据：${groupSummary.stats.length} 场 -> public/data/group-summary.json + group-gallery.json`);
+} else {
+  rmSync(join(outputRoot, "group-summary.json"), { force: true });
+  rmSync(join(outputRoot, "group-gallery.json"), { force: true });
 }
 
 // 远端 index 由 publish:data 生成，是页面实际会读的那份；能用就用它，避免构建快照漂移。

@@ -8,13 +8,12 @@ import { formatDate, formatInteger } from "@/lib/format";
 import { type GalleryOrder, parseGalleryOrder, writeGalleryOrder } from "@/lib/gallery-params";
 import { DEFAULT_MEMBER_COLOR } from "@/lib/group";
 import { streamPath } from "@/lib/routes";
-import type { StreamSummary } from "@/types/dataset";
+import type { GroupStreamSummary } from "@/types/group";
 
 export type { GalleryOrder };
 
-/** 相册的一行：`StreamSummary` 自带归属成员，单成员与混合成员共用同一份渲染。 */
-export interface GalleryRow extends StreamSummary {
-  datasetId: string;
+/** 相册的一行：精简场次字段自带归属成员，单成员与混合成员共用同一份渲染。 */
+export interface GalleryRow extends GroupStreamSummary {
   memberLabel?: string;
   memberColor?: string;
 }
@@ -88,16 +87,16 @@ function monthLabel(key: string): string {
   return `${year} 年 ${Number(month)} 月`;
 }
 
-function monthKey(row: StreamSummary): string {
+function monthKey(row: GroupStreamSummary): string {
   return row.date && row.date.length >= 7 ? row.date.slice(0, 7) : UNKNOWN_MONTH;
 }
 
-function sortKey(row: StreamSummary): string {
+function sortKey(row: GroupStreamSummary): string {
   return row.startedAt ?? row.date ?? "";
 }
 
 /** 一个读数：优先峰值同接，没有 VSTATS 时退回弹幕。 */
-function cardMetric(row: StreamSummary): { label: string; value: string } {
+function cardMetric(row: GroupStreamSummary): { label: string; value: string } {
   if (row.maxConcurrent != null) {
     return { label: "峰值同接", value: formatInteger(row.maxConcurrent) };
   }

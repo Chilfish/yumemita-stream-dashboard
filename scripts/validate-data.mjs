@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url";
 import { safeParse } from "valibot";
 import {
   DatasetIndexSchema,
+  GroupGallerySchema,
+  GroupSummarySchema,
   InsightsSchema,
   ManifestSchema,
   formatIssues,
@@ -104,6 +106,77 @@ for (const dataset of indexResult.output.datasets) {
   }
 }
 
+const datasetIds = new Set(indexResult.output.datasets.map((dataset) => dataset.id));
+
+function readGroupFile(name, schema) {
+  const path = join(dataRoot, name);
+  if (!existsSync(path)) {
+    errors.push(`缺少 ${rel(path)}，请先运行 sync:data`);
+    return null;
+  }
+  const file = readJson(path);
+  if (file === null) return null;
+  const result = safeParse(schema, file);
+  if (!result.success) {
+    pushIssues(name, result);
+    return null;
+  }
+  return result.output;
+}
+
+const groupSummary = readGroupFile("group-summary.json", GroupSummarySchema);
+if (groupSummary) {
+  const streamTotal = groupSummary.members.reduce((sum, member) => sum + member.streamCount, 0);
+  if (streamTotal !== checked) {
+    errors.push(
+      `group-summary.json 成员场次合计 ${streamTotal} 场，与 manifest 合计 ${checked} 场不一致`,
+    );
+  }
+  const memberIds = new Set(groupSummary.members.map((member) => member.datasetId));
+  if (memberIds.size !== groupSummary.members.length) {
+    errors.push("group-summary.json members 含重复成员");
+  }
+  if (groupSummary.members.length !== indexResult.output.datasets.length) {
+    errors.push(
+      `group-summary.json 成员数 ${groupSummary.members.length}，与 index 的 ${indexResult.output.datasets.length} 不一致`,
+    );
+  }
+  const unknownMember = groupSummary.members.find((member) => !datasetIds.has(member.datasetId));
+  if (unknownMember) errors.push(`group-summary.json 含未知成员：${unknownMember.datasetId}`);
+
+  const dayKeys = new Set();
+  for (const day of groupSummary.days) {
+    if (!datasetIds.has(day.datasetId)) {
+      errors.push(`group-summary.json days 含未知成员：${day.datasetId}`);
+      break;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day.date)) {
+      errors.push(`group-summary.json days 日期非法：${day.date}`);
+      break;
+    }
+    const key = `${day.datasetId}/${day.date}`;
+    if (dayKeys.has(key)) {
+      errors.push(`group-summary.json days 重复：${key}`);
+      break;
+    }
+    dayKeys.add(key);
+  }
+
+  const latestIds = new Set(groupSummary.latest.map((row) => row.datasetId));
+  if (latestIds.size !== groupSummary.latest.length) {
+    errors.push("group-summary.json latest 含重复成员");
+  }
+  const unknownLatest = groupSummary.latest.find((row) => !datasetIds.has(row.datasetId));
+  if (unknownLatest) errors.push(`group-summary.json latest 含未知成员：${unknownLatest.datasetId}`);
+}
+
+const groupGallery = readGroupFile("group-gallery.json", GroupGallerySchema);
+if (groupGallery && groupGallery.streams.length !== checked) {
+  errors.push(
+    `group-gallery.json ${groupGallery.streams.length} 场，与 manifest 合计 ${checked} 场不一致`,
+  );
+}
+
 async function verifyRemote() {
   if (!remoteBase) {
     console.error(
@@ -114,6 +187,8 @@ async function verifyRemote() {
 
   const urls = [
     `${remoteBase}/index.json`,
+    `${remoteBase}/group-summary.json`,
+    `${remoteBase}/group-gallery.json`,
     ...indexResult.output.datasets.flatMap((dataset) => [
       `${remoteBase}/${dataset.id}/manifest.json`,
       `${remoteBase}/${dataset.id}/insights.json`,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { LOCAL_DATA_BASE, REMOTE_DATA_BASE, thumbnailSrcSet, thumbnailUrl } from "./data";
+import {
+  LOCAL_DATA_BASE,
+  REMOTE_DATA_BASE,
+  fetchManifest,
+  thumbnailSrcSet,
+  thumbnailUrl,
+} from "./data";
 import { THUMB_VARIANTS, thumbVariantName } from "./thumb-variants";
 
 /** 配置了对象存储时走远端，否则走构建快照——两种环境都要有确定的期望值。 */
@@ -32,5 +38,30 @@ describe("thumbnailSrcSet", () => {
 describe("thumbVariantName", () => {
   it("is the single naming rule shared by fetch:thumbs, publish:data and the page", () => {
     expect(thumbVariantName("abc", 480)).toBe("abc.480.webp");
+  });
+});
+
+describe("fetchManifest", () => {
+  it("shares one request between concurrent consumers", async () => {
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      return new Response(
+        JSON.stringify({ streams: [{ videoId: "concurrent-test" }] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    };
+
+    try {
+      const [first, second] = await Promise.all([
+        fetchManifest("concurrent-test"),
+        fetchManifest("concurrent-test"),
+      ]);
+      expect(calls).toBe(1);
+      expect(first).toBe(second);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

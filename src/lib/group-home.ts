@@ -5,7 +5,7 @@ import {
   type GroupMemberSummary,
   type GroupStreamRow,
 } from "@/lib/group";
-import type { StreamSummary } from "@/types/dataset";
+import type { GroupStreamSummary } from "@/types/group";
 
 /** 「最近更新」列表的固定长度：手机上一屏多看两场，桌面也不过长。 */
 export const RECENT_UPDATE_LIMIT = 8;
@@ -47,7 +47,7 @@ export interface Readout {
 }
 
 /** 一条场次的首选读数：有 VSTATS 的场次先给峰值同接，没有就退回弹幕。 */
-export function primaryReadout(row: StreamSummary): Readout {
+export function primaryReadout(row: GroupStreamSummary): Readout {
   if (row.maxConcurrent != null) {
     return { label: "峰值同接", unit: "人", value: row.maxConcurrent };
   }
@@ -58,7 +58,7 @@ export function primaryReadout(row: StreamSummary): Readout {
  * 次选读数：与首选互补，避免同一个数字出现两次。
  * 弹幕为 0 的场次多半是 datapack 还没抓，不拿 0 当结论。
  */
-export function secondaryReadout(row: StreamSummary): Readout {
+export function secondaryReadout(row: GroupStreamSummary): Readout {
   if (row.maxConcurrent != null) {
     return { label: "弹幕", unit: "条", value: row.chatTotal > 0 ? row.chatTotal : null };
   }

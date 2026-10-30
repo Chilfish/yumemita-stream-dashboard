@@ -33,12 +33,15 @@ import { THUMB_VARIANTS } from '../src/lib/thumb-variants.ts'
 import { INDEX_KEY, buildDatasetIndex } from './lib/dataset-index.ts'
 import type { DatasetIndex, DatasetIndexSource } from './lib/dataset-index.ts'
 import { buildStreamSummary, isoJst } from './lib/dataset-manifest.ts'
+import { buildGroupGallery, buildGroupSummary } from './lib/group-summary.ts'
 import {
   INSIGHTS_SCHEMA,
   MANIFEST_SCHEMA,
   authorsKey,
   createObjectStore,
   datapackKey,
+  groupGalleryKey,
+  groupSummaryKey,
   insightsKey,
   manifestKey,
   readCredentials,
@@ -294,6 +297,41 @@ for (const source of selected) {
   })
 }
 
+// 组级精简数据由全部成员的最新 manifest 派生；--dataset 只发布一部分时，
+// 其余成员优先读本地 manifest，本地没有再从对象存储读，避免组级文件少人。
+const groupManifests: { id: string, streams: BatchManifest['streams'] }[] = []
+for (const source of config.datasets) {
+  const manifestPath = join(resolve(APP_ROOT, source.datapackDir), 'manifest.json')
+  let manifest: BatchManifest | null = null
+
+  if (existsSync(manifestPath)) {
+    manifest = readJson<BatchManifest>(manifestPath)
+  }
+  else if (store) {
+    try {
+      const text = await store.get(manifestKey(source.id))
+      if (text)
+        manifest = JSON.parse(text) as BatchManifest
+    }
+    catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      console.warn(`[publish-data]   ! ${source.id} 读取远端 manifest 失败：${detail}`)
+    }
+  }
+
+  if (!manifest || !Array.isArray(manifest.streams) || manifest.streams.length === 0) {
+    console.warn(`[publish-data]   ! ${source.id} 没有可用 manifest，组级数据里跳过`)
+    continue
+  }
+  groupManifests.push({ id: source.id, streams: manifest.streams })
+}
+
+const groupSummary = buildGroupSummary(groupManifests, publishStartedAt)
+const groupGallery = buildGroupGallery(groupManifests, publishStartedAt)
+indexUploads.push({ key: groupSummaryKey(), body: JSON.stringify(groupSummary) })
+indexUploads.push({ key: groupGalleryKey(), body: JSON.stringify(groupGallery) })
+console.log(`[publish-data] 组级数据：${groupSummary.stats.length} 场（首页 ${Math.round(JSON.stringify(groupSummary).length / 1024)} KB，相册 ${Math.round(JSON.stringify(groupGallery).length / 1024)} KB）`)
+
 if (!store || !credentials) {
   console.log('[publish-data] 已跳过上传（--no-upload）')
   console.log(`[publish-data] 手动上传示例：rclone sync data/<id> r2:<bucket>/<id>`)
@@ -430,7 +468,7 @@ finally {
 }
 
 // 索引最后写：即使中途失败，也是“多一个 pack”而不是“指向不存在的 pack”。
-console.log(`[publish-data] 上传 ${indexUploads.length} 个 manifest / insights...`)
+console.log(`[publish-data] 上传 ${indexUploads.length} 个 manifest / insights / 组级数据...`)
 await runPool(indexUploads, 2, async (item) => {
   await store.put(item.key, item.body)
 })

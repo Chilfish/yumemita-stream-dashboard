@@ -18,7 +18,7 @@ import {
   secondaryReadout,
 } from "@/lib/group-home";
 import { homePath, streamPath } from "@/lib/routes";
-import type { StreamSummary } from "@/types/dataset";
+import type { GroupStreamSummary } from "@/types/group";
 
 const LINK_CLASS =
   "text-footnote text-muted-foreground underline-offset-4 transition-colors duration-120 ease-out hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink";
@@ -46,7 +46,7 @@ function Readout({ label, value, unit }: ReadoutProps) {
 
 interface GroupFocusStreamProps {
   member: GroupMemberSummary;
-  stream: StreamSummary;
+  stream: GroupStreamSummary;
 }
 
 /**
