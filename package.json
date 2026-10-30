@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "夢限大みゅーたいぷ 成员直播数据的可视化数据台（React + coss ui + D3）",
   "type": "module",
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "engines": {
     "node": ">=22.22"
   },
@@ -39,7 +39,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "d3": "^7.9.0",
-    "lucide-react": "^1.62.0",
+    "lucide-react": "^1.64.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0",
@@ -52,7 +52,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "^1.4.4",
     "@types/d3": "^7.4.3",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
