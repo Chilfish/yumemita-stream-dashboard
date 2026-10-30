@@ -15,7 +15,7 @@ dist/
 ├─ robots.txt
 ├─ sitemap.xml
 ├─ site.webmanifest        # PWA manifest
-├─ favicon.svg / favicon-32x32.png / apple-touch-icon.png
+├─ favicon-32x32.png / apple-touch-icon.png
 ├─ <datasetId>/index.html  # 成员首页与栏目页
 ├─ <datasetId>/stream/<videoId>/index.html   # 每个单场一份静态 head + noscript 摘要
 ├─ assets/                 # JS/CSS/字体（带 hash）

@@ -96,7 +96,7 @@ for (const asset of [
   "apple-touch-icon.png",
   "favicon-32x32.png",
   "site.webmanifest",
-  "favicon.svg",
+  "favicon.jpg",
 ]) {
   check(existsSync(join(distRoot, asset)), `dist/${asset} 不存在`);
 }
