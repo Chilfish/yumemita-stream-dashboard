@@ -13,7 +13,7 @@ import { TranscriptView } from "@/components/dashboard/transcript-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import { useTranscriptIndex } from "@/hooks/use-transcript";
+import { useTranscriptAvailability } from "@/hooks/use-transcript";
 import type { StreamRow } from "@/lib/aggregate";
 import {
   formatDuration,
@@ -75,7 +75,7 @@ export function StreamDetailView({
   const superchatCount = pack.chat.paid.superchats.length;
 
   // 逐字稿是可选内容：没有稿的场次不显示这个分段，避免出现永远为空的标签。
-  const { hasTranscript } = useTranscriptIndex(datasetId);
+  const { hasTranscript } = useTranscriptAvailability(datasetId);
   const showTranscript = hasTranscript(summary.videoId);
   const subviews = STREAM_SUBVIEWS.filter(subview => subview !== "transcript" || showTranscript);
 

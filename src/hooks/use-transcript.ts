@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { REMOTE_DATA_BASE } from "@/lib/data";
+import { LOCAL_DATA_BASE, REMOTE_DATA_BASE } from "@/lib/data";
 import {
   TRANSCRIPT_INDEX_SCHEMA,
   type TranscriptFile,
@@ -17,12 +17,14 @@ import {
 /**
  * 逐字稿运行时数据：远端索引优先，构建期把 `content/transcripts/` 的 Markdown
  * 当离线兜底快照（与 `import.meta.glob` 的语义一致：`/` 开头相对项目根目录）。
+ *
+ * 快照是懒加载的：glob 的 key 就是文件路径，datasetId / videoId 不读内容就能拿到；
+ * 只有真正要看某篇稿（或本地索引页）时才拉对应的 Markdown。
  */
 const LOCAL_TRANSCRIPT_FILES = import.meta.glob("/content/transcripts/**/*.md", {
   query: "?raw",
-  eager: true,
   import: "default",
-}) as Record<string, string>;
+}) as Record<string, () => Promise<string>>;
 
 export type TranscriptStatus = "idle" | "loading" | "ready" | "error";
 export type TranscriptFileStatus = "idle" | "loading" | "ready" | "empty" | "error";
@@ -73,32 +75,81 @@ function guard<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 // 构建期快照（glob）
 // ---------------------------------------------------------------------------
 
-let localFiles: Map<string, TranscriptFile> | null = null;
-
-function localTranscriptMap(): Map<string, TranscriptFile> {
-  if (localFiles) return localFiles;
-  const map = new Map<string, TranscriptFile>();
-  for (const [path, text] of Object.entries(LOCAL_TRANSCRIPT_FILES)) {
-    try {
-      const file = parseTranscriptFile(String(text ?? ""), path);
-      // 根目录下的 README / 模板没有 datasetId，不参与索引。
-      if (!file.datasetId) continue;
-      map.set(`${file.datasetId}/${file.videoId}`, file);
-    } catch {
-      // 坏文件由 publish:transcripts 在发布时拦下并报错，浏览器端跳过即可。
-    }
-  }
-  localFiles = map;
-  return map;
+interface LocalTranscript {
+  path: string;
+  load: () => Promise<string>;
 }
 
-function localIndexEntries(): TranscriptIndexEntry[] {
-  const entries = Array.from(localTranscriptMap().values(), file => toIndexEntry(file, ""));
-  return sortTranscriptEntries(entries);
+/** `/content/transcripts/<datasetId>/<videoId>.md` → `<datasetId>/<videoId>`。 */
+function transcriptKeyFromPath(path: string): string {
+  const match = /\/transcripts\/([^/]+)\/([^/]+)\.md$/.exec(path);
+  return match ? `${match[1]}/${match[2]}` : "";
+}
+
+const LOCAL_TRANSCRIPTS = new Map<string, LocalTranscript>();
+
+for (const [path, load] of Object.entries(LOCAL_TRANSCRIPT_FILES)) {
+  const key = transcriptKeyFromPath(path);
+  // 根目录下的 README / 模板没有 datasetId，不参与索引。
+  if (key) LOCAL_TRANSCRIPTS.set(key, { path, load });
+}
+
+const localFileCache = new Map<string, Promise<TranscriptFile>>();
+
+function loadLocalFile(key: string): Promise<TranscriptFile> | null {
+  const entry = LOCAL_TRANSCRIPTS.get(key);
+  if (!entry) return null;
+  const cached = localFileCache.get(key);
+  if (cached) return cached;
+
+  const promise = entry.load().then(text => parseTranscriptFile(String(text ?? ""), entry.path));
+  localFileCache.set(key, promise);
+  // 坏文件由 publish:transcripts 在发布时拦下并报错，浏览器端失败后允许重试。
+  promise.catch(() => localFileCache.delete(key));
+  return promise;
 }
 
 export function hasLocalTranscript(datasetId: string, videoId: string): boolean {
-  return localTranscriptMap().has(`${datasetId}/${videoId}`);
+  return LOCAL_TRANSCRIPTS.has(`${datasetId}/${videoId}`);
+}
+
+let localIndexPromise: Promise<TranscriptIndexEntry[]> | null = null;
+
+/**
+ * 本地索引：`sync:data` 把 `content/transcripts` 的 frontmatter 落成
+ * `public/data/transcripts/index.json`，列表页只读这一份，不碰正文。
+ * 快照缺失时（比如直接起 `vite` 而不是 `bun run dev`）才回退到逐篇解析 Markdown。
+ */
+function localIndexEntries(): Promise<TranscriptIndexEntry[]> {
+  if (!localIndexPromise) {
+    localIndexPromise = fetchLocalIndex().catch(() => parseLocalIndexEntries());
+  }
+  return localIndexPromise;
+}
+
+async function fetchLocalIndex(): Promise<TranscriptIndexEntry[]> {
+  const response = await fetch(`${LOCAL_DATA_BASE}/transcripts/index.json`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("加载逐字稿索引失败。");
+  const file = (await response.json()) as TranscriptIndexFile;
+  if (file?.schema !== TRANSCRIPT_INDEX_SCHEMA || !Array.isArray(file.entries)) {
+    throw new Error("逐字稿索引格式异常。");
+  }
+  return file.entries;
+}
+
+function parseLocalIndexEntries(): Promise<TranscriptIndexEntry[]> {
+  const tasks = Array.from(LOCAL_TRANSCRIPTS.keys(), key => {
+    const file = loadLocalFile(key);
+    return file ? file.then(entry => toIndexEntry(entry, "")).catch(() => null) : null;
+  });
+  return Promise.all(tasks).then(entries =>
+    sortTranscriptEntries(
+      entries.filter((entry): entry is TranscriptIndexEntry => entry !== null),
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -129,33 +180,37 @@ async function fetchRemoteIndex(): Promise<TranscriptIndexEntry[]> {
  * 两边都没有内容时保留远端错误，索引页才能显示失败原因而不是「还没有逐字稿」。
  */
 function loadIndex(force = false): Promise<TranscriptSource> {
-  if (force) indexPromise = null;
+  if (force) {
+    indexPromise = null;
+    localIndexPromise = null;
+  }
   if (indexPromise) return indexPromise;
 
-  const local = localIndexEntries();
-  if (!REMOTE_DATA_BASE) {
-    indexPromise = Promise.resolve({ entries: local, source: "local", error: null });
-    return indexPromise;
-  }
-
-  indexPromise = fetchRemoteIndex()
-    .then(
-      (entries): TranscriptSource =>
-        entries.length > 0
-          ? { entries: sortTranscriptEntries(entries), source: "remote", error: null }
-          : { entries: local, source: "local", error: null },
-    )
-    .catch((error: unknown): TranscriptSource => {
-      if (local.length === 0) throw error;
-      return { entries: local, source: "local", error: errorMessage(error) };
-    })
-    .catch((error: unknown) => {
-      // 远端和本地都没有内容：让调用方进入错误态，同时允许下一次重试。
-      indexPromise = null;
-      throw error;
-    });
+  indexPromise = loadIndexSource().catch((error: unknown) => {
+    // 远端和本地都没有内容：让调用方进入错误态，同时允许下一次重试。
+    indexPromise = null;
+    throw error;
+  });
 
   return indexPromise;
+}
+
+async function loadIndexSource(): Promise<TranscriptSource> {
+  if (!REMOTE_DATA_BASE) {
+    return { entries: await localIndexEntries(), source: "local", error: null };
+  }
+
+  try {
+    const entries = await fetchRemoteIndex();
+    if (entries.length > 0) {
+      return { entries: sortTranscriptEntries(entries), source: "remote", error: null };
+    }
+    return { entries: await localIndexEntries(), source: "local", error: null };
+  } catch (error) {
+    const local = await localIndexEntries();
+    if (local.length === 0) throw error;
+    return { entries: local, source: "local", error: errorMessage(error) };
+  }
 }
 
 function fileFromPayload(payload: TranscriptPayload, fallback: TranscriptFile | null): TranscriptFile {
@@ -176,15 +231,22 @@ const transcriptCache = new Map<string, Promise<TranscriptFile>>();
 
 function loadTranscript(datasetId: string, videoId: string, force = false): Promise<TranscriptFile> {
   const key = `${datasetId}/${videoId}`;
-  if (force) transcriptCache.delete(key);
+  if (force) {
+    transcriptCache.delete(key);
+    localFileCache.delete(key);
+  }
   const cached = transcriptCache.get(key);
   if (cached) return cached;
 
-  const local = localTranscriptMap().get(key) ?? null;
+  // 本地快照按需加载：远端能用就不读 Markdown，失败时才补读这一篇。
+  const loadLocal = (): Promise<TranscriptFile | null> =>
+    loadLocalFile(key)?.catch(() => null) ?? Promise.resolve(null);
+
   if (!REMOTE_DATA_BASE) {
-    const promise = local
-      ? Promise.resolve(local)
-      : Promise.reject(new TranscriptMissingError("这场还没有逐字稿"));
+    const promise = loadLocal().then(local => {
+      if (!local) throw new TranscriptMissingError("这场还没有逐字稿");
+      return local;
+    });
     transcriptCache.set(key, promise);
     // 没有远端时失败是确定性的，不必让缓存挡住重试。
     promise.catch(() => transcriptCache.delete(key));
@@ -201,11 +263,13 @@ function loadTranscript(datasetId: string, videoId: string, force = false): Prom
       if (!response.ok) {
         throw new Error("加载逐字稿失败。");
       }
-      return (await response.json()) as TranscriptPayload;
+      const payload = (await response.json()) as TranscriptPayload;
+      const markdown = typeof payload.markdown === "string" ? payload.markdown.trimEnd() : "";
+      return fileFromPayload(payload, markdown ? null : await loadLocal());
     })
-    .then(payload => fileFromPayload(payload, local))
-    .catch((error: unknown) => {
+    .catch(async (error: unknown) => {
       // 远端挂掉时构建快照还能读；远端明确说没有也不影响本地兜底。
+      const local = await loadLocal();
       if (local) return local;
       throw error;
     })
@@ -307,6 +371,78 @@ export function useTranscriptIndex(datasetId: string | null): TranscriptIndexRes
     hasTranscript,
     retry,
   };
+}
+
+const EMPTY_VIDEO_IDS: ReadonlySet<string> = new Set();
+
+interface AvailabilityState {
+  scope: string;
+  videoIds: ReadonlySet<string>;
+  status: TranscriptStatus;
+}
+
+export interface TranscriptAvailability {
+  /** 当前 dataset 是否已经有这一场的稿。 */
+  hasTranscript: (videoId: string) => boolean;
+  status: TranscriptStatus;
+}
+
+/**
+ * 只回答「要不要显示逐字稿入口」：本地模式下直接看 glob 的路径，一次 Markdown 都不读；
+ * 远端模式下只取索引（一个小 JSON），不会为了显示标签把本地快照全量载入。
+ */
+export function useTranscriptAvailability(datasetId: string | null): TranscriptAvailability {
+  const localOnly = REMOTE_DATA_BASE === "";
+  const [state, setState] = useState<AvailabilityState>({
+    scope: "",
+    videoIds: EMPTY_VIDEO_IDS,
+    status: "idle",
+  });
+
+  useEffect(() => {
+    if (!datasetId || localOnly) return;
+    const controller = new AbortController();
+    // oxlint-disable-next-line react/set-state-in-effect -- dataset 变化时必须重置加载状态
+    setState({ scope: datasetId, videoIds: EMPTY_VIDEO_IDS, status: "loading" });
+
+    guard(loadIndex(), controller.signal)
+      .then(result => {
+        if (controller.signal.aborted) return;
+        setState({
+          scope: datasetId,
+          videoIds: new Set(
+            result.entries
+              .filter(entry => entry.datasetId === datasetId)
+              .map(entry => entry.videoId),
+          ),
+          status: "ready",
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        if (error instanceof Error && error.name === "AbortError") return;
+        setState({ scope: datasetId, videoIds: EMPTY_VIDEO_IDS, status: "error" });
+      });
+
+    return () => controller.abort();
+  }, [datasetId, localOnly]);
+
+  const videoIds = !datasetId || state.scope !== datasetId ? EMPTY_VIDEO_IDS : state.videoIds;
+  const status: TranscriptStatus = !datasetId
+    ? "idle"
+    : localOnly
+      ? "ready"
+      : state.scope !== datasetId
+        ? "loading"
+        : state.status;
+
+  const hasTranscript = useCallback(
+    (videoId: string) =>
+      videoIds.has(videoId) || (datasetId ? hasLocalTranscript(datasetId, videoId) : false),
+    [datasetId, videoIds],
+  );
+
+  return { hasTranscript, status };
 }
 
 interface FileState {

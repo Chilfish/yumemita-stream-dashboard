@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTranscript, useTranscriptIndex } from "@/hooks/use-transcript";
+import { useTranscript, useTranscriptAvailability } from "@/hooks/use-transcript";
 import { transcriptsPath } from "@/lib/routes";
 import {
   type TranscriptFile,
@@ -318,7 +318,7 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
   const { file, status, error, retry } = useTranscript(datasetId, videoId);
   // 远端对象不存在时 R2 的 404 可能不带 CORS 头，fetch 会变成网络错误。
   // 索引说这场没有稿，就按「还没有逐字稿」处理，而不是报错。
-  const { hasTranscript, status: indexStatus } = useTranscriptIndex(datasetId);
+  const { hasTranscript, status: indexStatus } = useTranscriptAvailability(datasetId);
   const missing = indexStatus === "ready" && !hasTranscript(videoId);
 
 

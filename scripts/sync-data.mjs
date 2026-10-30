@@ -17,15 +17,23 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  TRANSCRIPT_INDEX_SCHEMA,
+  parseTranscriptFile,
+  sortTranscriptEntries,
+  toIndexEntry,
+} from "../src/lib/transcripts.ts";
 import { buildGroupGallery, buildGroupSummary } from "./lib/group-summary.ts";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = join(appRoot, "data-sources.json");
 const outputRoot = join(appRoot, "public", "data");
+const transcriptRoot = join(appRoot, "content", "transcripts");
 const cacheRoot = join(appRoot, "node_modules", ".cache", "stream-dashboard");
 const remoteBase = (process.env.DATAPACK_BASE ?? process.env.VITE_DATAPACK_BASE ?? "").replace(/\/+$/, "");
 
@@ -193,6 +201,42 @@ if (groupManifests.length > 0) {
 } else {
   rmSync(join(outputRoot, "group-summary.json"), { force: true });
   rmSync(join(outputRoot, "group-gallery.json"), { force: true });
+}
+
+// 逐字稿索引：列表页只需要 frontmatter（标题 / 日期 / 标签），正文仍由页面按需加载。
+function buildTranscriptIndex() {
+  if (!existsSync(transcriptRoot)) return null;
+  const entries = [];
+  for (const dirent of readdirSync(transcriptRoot, { withFileTypes: true })) {
+    if (!dirent.isDirectory() || dirent.name.startsWith("_") || dirent.name.startsWith(".")) continue;
+    const datasetId = dirent.name;
+    for (const name of readdirSync(join(transcriptRoot, datasetId)).sort()) {
+      // 以 `_` / `.` 开头的文件是草稿或模板，不参与索引（与 publish:transcripts 一致）。
+      if (!name.endsWith(".md") || name.startsWith("_") || name.startsWith(".")) continue;
+      const path = join(transcriptRoot, datasetId, name);
+      try {
+        const file = parseTranscriptFile(readFileSync(path, "utf8"), path);
+        entries.push(toIndexEntry({ ...file, datasetId }, statSync(path).mtime.toISOString()));
+      } catch (error) {
+        console.warn(`[sync-data]   ! ${relative(appRoot, path)} 解析失败，已跳过：${describe(error)}`);
+      }
+    }
+  }
+  return {
+    schema: TRANSCRIPT_INDEX_SCHEMA,
+    generatedAt: new Date().toISOString(),
+    entries: sortTranscriptEntries(entries),
+  };
+}
+
+const transcriptIndex = buildTranscriptIndex();
+if (transcriptIndex) {
+  const transcriptDir = join(outputRoot, "transcripts");
+  mkdirSync(transcriptDir, { recursive: true });
+  writeJsonCompact(join(transcriptDir, "index.json"), transcriptIndex);
+  console.log(`[sync-data] 逐字稿索引：${transcriptIndex.entries.length} 篇 -> public/data/transcripts/index.json`);
+} else {
+  rmSync(join(outputRoot, "transcripts"), { recursive: true, force: true });
 }
 
 // 远端 index 由 publish:data 生成，是页面实际会读的那份；能用就用它，避免构建快照漂移。
