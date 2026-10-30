@@ -10,6 +10,7 @@
 - 归档侧弹幕归一化补 `authorId`（`authorExternalChannelId`），显示名改名/重名不再影响作者合并。
 - 新增 `scripts/missing-danmaku.ts` / `scripts/fetch-danmaku.ts` / `scripts/enrich-chat.ts`：只补缺失场次的 `live_chat` 回放并升级为 v2，不重抓 meta / 评论 / VSTATS；支持 `--shard i/n` 多实例并行、断点续跑与无回放标记。
 - 新增 `verify:data`：校验 v2 不变量（authors 求和 / uniqueAuthors / insights 重算 / coverage / authors.json），`--remote` 直接对比对象存储内容，能发现“只传了一部分 dataset”的发布问题。
+- 新增 `scripts/backfill-author-id.ts` + `scripts/enrich-chat.ts --force`：用原始 `live_chat.json` 给 1242 份旧 jsonl 补 `authorId`，修复同一发言人被拆成 `id:` / `name:` 两行；修复后 4 个全量 dataset 的同名拆分从 410/639/635/1258 降到 0。
 - 数据集扩展为 5 位成员：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1891 场**（2023-11-18 – 2026-10-29）：nonoka 287、arale 505、ritsu 339、miyako 321、yuno 439。
 - 五位成员都按频道顺序补齐历史场次（同名去重、保留正片）；当前 manifest 没有待抓场次。
 - 新增 [docs/data-progress.md](docs/data-progress.md)：五位成员的抓取进度、nonoka 批次记录、跳过判定、下一批候选。

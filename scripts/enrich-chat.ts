@@ -23,6 +23,7 @@ const { values } = parseArgs({
     dataset: { type: 'string', multiple: true },
     root: { type: 'string' },
     limit: { type: 'string', default: '0' },
+    force: { type: 'boolean' },
     'dry-run': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
@@ -37,6 +38,7 @@ const USAGE = `用法：bun scripts/enrich-chat.ts [选项]
   --dataset <id>   只处理指定 dataset，可重复
   --root <目录>    原始会话根目录（默认 $STREAM_SESSION_ROOT）
   --limit <n>      本次最多处理 n 场，0 = 全部
+  --force          已是 v2 也用 jsonl 重新聚合（回填 authorId 后需要）
   --dry-run        只统计，不写文件
   -h, --help       显示本帮助`
 
@@ -284,7 +286,7 @@ for (const source of selected) {
       console.error(`[enrich] ${source.id}/${name} 读取失败：${error instanceof Error ? error.message : String(error)}`)
       continue
     }
-    if (pack.schema === V2) {
+    if (pack.schema === V2 && !values.force) {
       alreadyV2 += 1
       continue
     }

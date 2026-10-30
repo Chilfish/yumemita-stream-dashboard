@@ -190,6 +190,18 @@ bun scripts/fetch-danmaku.ts --root "..." --shard 4/4 --concurrency 3
 - 没有弹幕回放的场次会写 `work/chat-unavailable.txt`，下次跳过；失败写 `data/missing-danmaku/failed*.json`。
 - `scripts/enrich-chat.ts` 只重算作者 / 词频 / 徽章 / 构成，保留 video / vstats / comments / density / paid。
 
+早期 jsonl 缺 `authorId`（同一个人被拆成 `id:` / `name:` 两行）时，用原始回放补一次：
+
+```bash
+bun scripts/backfill-author-id.ts --root "D:/projects/claude-messages/temp/youtube-live"
+bun scripts/enrich-chat.ts --root "D:/projects/claude-messages/temp/youtube-live" --force
+bun run publish:data
+bun run verify:data --remote
+```
+
+- `scripts/backfill-author-id.ts` 只重写缺少 `authorId` 的 jsonl，已有 ID 的默认跳过；条数应与原文件一致。
+- `scripts/enrich-chat.ts --force` 会把已是 v2 的 pack 也用新 jsonl 重新聚合。
+
 ## 校验 v2 数据
 
 `validate:data` 只检查文件存在与场次数；`verify:data` 检查内容是否自洽、发布是否真的生效。
