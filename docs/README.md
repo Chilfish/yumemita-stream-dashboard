@@ -12,7 +12,7 @@
 | [deployment.md](deployment.md) | 构建、静态托管、子路径、缓存、CI | 上线 |
 | [troubleshooting.md](troubleshooting.md) | 常见报错与数据异常 | 页面空白 / 图表为空 |
 | [ui-refactor.md](ui-refactor.md) | 信息架构、设计系统、coss ui 落地映射、迁移计划 | 规划界面重构 |
-| [product-direction.md](product-direction.md) | 封面图管线、相册、逐字稿、推文联动与阶段计划 | 规划下一轮产品迭代 |
+| [product-direction.md](product-direction.md) | 封面图管线、相册、逐字稿、组级页面、推文联动与阶段计划 | 规划下一轮产品迭代 |
 | [roadmap.md](roadmap.md) | 后续数据与功能计划 | 规划迭代 |
 
 ## 约定

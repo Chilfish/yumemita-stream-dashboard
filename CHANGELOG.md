@@ -4,14 +4,16 @@
 
 ### 数据
 
-- 数据集扩展为 5 位成员：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1469 场**。
-- `nonoka` 分两批从最近 30 场向前续抓 18 场（2026-06-22 – 2026-08-09，以及 2024-12-13 的存档），共 **48 场**。
-- 新增 [docs/data-progress.md](docs/data-progress.md)：频道历史抓取进度、跳过判定、下一批候选。
+- 数据集扩展为 5 位成员：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1891 场**（2023-11-18 – 2026-10-29）：nonoka 287、arale 505、ritsu 339、miyako 321、yuno 439。
+- 五位成员都按频道顺序补齐历史场次（同名去重、保留正片）；当前 manifest 没有待抓场次。
+- 新增 [docs/data-progress.md](docs/data-progress.md)：五位成员的抓取进度、nonoka 批次记录、跳过判定、下一批候选。
 
 ### 界面
 
 - **封面层**：`fetch:thumbs` 把 YouTube 封面镜像到本地并随 `publish:data` 上传；首页最近一场、最近场次、单场页与相册统一 16:9 渲染，缺图走成员色兜底。
 - **相册页**：`#/:datasetId/gallery`，按 JST 自然月分组的封面墙，懒加载、`?order=` 可分享；侧栏与移动端标签栏新增入口。
+- **组首页**：`#/` 跨成员首屏——近 7 天 / 本月脉冲、最近一场焦点、跨成员最近更新与按成员进入；单个成员 manifest 加载失败时跳过并提示，不阻塞其余成员。
+- **全组相册**：`#/gallery` 把相册扩展为跨成员时间线，`?member=` / `?type=` / `?order=` 写进 URL，成员与内容类型筛选带实时计数。
 - **逐字稿**：`content/transcripts/<datasetId>/<videoId>.md` 手写 Markdown，`publish:transcripts` 上传后运行时渲染；单场页按需出现「逐字稿」分段，带目录、时间戳跳 YouTube，索引页 `#/:datasetId/transcripts`。
 - 单场页页头改为「标题 + 右侧 16:9 封面」网格；移动端分段控件改为容器内横向滚动，避免页面横向溢出。
 - 成员色拆成两个 token：`--member-color` 保留 `data-sources.json` 里的品牌原色（图表、色点、色条），
@@ -37,6 +39,7 @@
   工具栏补手机端「排序」菜单（类型 + 升降序），状态照常写回 URL。
 - 移动端交互：底部标签栏按 HIG 重做（图标 22px、标签 11px、仅用着色标记选中），面板头与图表头在窄屏改为纵向堆叠。
 - 清理写死的 px：内容最大宽、表格最小宽、滚动区高度、对比页侧栏、单场指标列宽改为 rem 或视口单位。
+- **动效**：路由切换只给内容区淡入、单场子视图互换、折线自绘与柱子生长、按钮按压反馈、封面解码后淡入、顶栏滚动阴影；主题切换用 View Transitions 交叉淡入。`prefers-reduced-motion` 下位移与缩放全部降级。
 
 ### 工程
 
@@ -57,6 +60,7 @@
 - 新增 `vercel.json`（缓存头）与 `.env.example`。
 - `publish:data` 支持 `R2_PREFIX`：对象写进桶内指定前缀，`VITE_DATAPACK_BASE` 指向同一前缀。
 - 上传改用 Bun 原生 `S3Client`，移除 `aws4fetch` 依赖。
+- 依赖升级：`lucide-react` 1.64、`@types/node` 26.6.6、Bun 1.4.4；GitHub Actions 的 checkout / setup-node / upload-artifact 升到 v7。
 - 移除 GitHub Pages 部署 workflow（`.github/workflows/deploy.yml`），部署迁到 Vercel。
 - 修复：`data/.gitignore` 的全忽略规则导致 232 份 datapack 从未被提交，远端构建缺数据。
 

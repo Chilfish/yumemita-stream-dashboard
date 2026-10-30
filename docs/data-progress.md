@@ -1,26 +1,41 @@
 # 数据抓取进度
 
-目标是补齐宫永ののか（`nonoka`）的全频道历史直播，而不只是最初的最近 30 场。本页记录
-**抓到哪里了、哪些场次判定跳过、下一批从哪开始**；字段口径见 [data-model.md](data-model.md)。
+目标是补齐五位成员（`nonoka` / `arale` / `ritsu` / `miyako` / `yuno`）的全频道历史直播。本页记录
+**每位成员抓到哪里了、哪些场次判定跳过、下一批从哪开始**；字段口径见 [data-model.md](data-model.md)。
 
-最后更新：**2026-10-28**
+最后更新：**2026-10-30**
 
 ## 总览
 
 | 项 | 值 |
 | --- | --- |
-| 频道 | 宮永ののか（`UCGeCnpimiSN5rgiKbJzHd3A`） |
-| 频道 `/streams` 公开列表 | **262** 条 |
-| 已入库 datapack | **262**（公开列表与会员限定场次已全部补齐） |
-| 公开列表内待抓 | **0** |
-| 已覆盖时间范围 | 2023-11-19 – 2026-10-22 |
-| 有 VSTATS 快照的场次 | **15**（越往前越可能缺失） |
-| 数据体积 | `data/nonoka/` 约 **6.91 MB** |
+| 成员 | **5**（`nonoka` / `arale` / `ritsu` / `miyako` / `yuno`） |
+| 已入库 datapack | **1891** |
+| 待抓场次 | **0** |
+| 已覆盖时间范围 | 2023-11-18 – 2026-10-29 |
+| 有 VSTATS 快照的场次 | **118**（越往前越可能缺失） |
+| 数据体积 | 以对象存储上的 datapack 为准；`data/` 只是本地暂存区 |
+
+| dataset | 成员 | 频道 | 场次 | 时间范围 | VSTATS |
+| --- | --- | --- | ---: | --- | ---: |
+| `nonoka` | 宮永ののか | `UCGeCnpimiSN5rgiKbJzHd3A` | 287 | 2023-11-19 – 2026-10-29 | 16 |
+| `arale` | 仲町あられ | `UCWfF0DB6m_t2CE3KcOOOX7g` | 505 | 2023-11-19 – 2026-10-29 | 27 |
+| `ritsu` | 峰月律 | `UCxc0MrPoACKTFlV24GqX2sg` | 339 | 2023-11-19 – 2026-10-27 | 28 |
+| `miyako` | 藤都子 | `UCZXxRYaP7mfuglPnptnBBCA` | 321 | 2023-11-18 – 2026-10-28 | 21 |
+| `yuno` | 千石ユノ | `UC99kOG6_9RD0mR3OG4EOfxw` | 439 | 2023-11-19 – 2026-10-29 | 26 |
+
+数字取自远端 `manifest.json`（2026-10-30 快照）。本地 `data/` 可能只暂存部分 pack，
+`fetch-streams` 会先从对象存储恢复缺失的 manifest 与 datapack，再按同样规则跳过已抓场次。
+
+## nonoka 抓取批次
+
+以下是 `nonoka` 的历史抓取记录，保留用于回顾跳过判定与口径；其余成员按同一流程补齐，
+逐场清单以远端 manifest 为准。
 
 抓取来源与命令见 [scripts/README.md](../scripts/README.md)。原始会话留在归档工程
 `claude-messages/temp/youtube-live/`，本仓库只接收 datapack。
 
-## 批次一：2026-10-28（+8）
+### 批次一：2026-10-28（+8）
 
 从最近 30 场向前续抓，全部为公开存档：
 
@@ -35,7 +50,7 @@
 | 2026-07-23 | [`pIUX59V2ewc`](https://www.youtube.com/watch?v=pIUX59V2ewc) | 弾き語り アニメ6話たいき | 0:57:56 | 1296 | 3 | 4 | — |
 | 2024-12-13 | [`TbPTEdGTNhc`](https://www.youtube.com/watch?v=TbPTEdGTNhc) | 名刺づくり改 リベンジ | 1:28:04 | 2514 | 2 | 12 | — |
 
-## 批次二：2026-10-28（+10）
+### 批次二：2026-10-28（+10）
 
 继续按频道顺序向前，覆盖 2026-06-22 – 2026-07-18：
 
@@ -55,33 +70,35 @@
 `—` 表示站点没有该场条目（`vstats` 为 `null`），不是抓取失败。VSTATS 对该企划的收录从
 2026-08 中旬开始，越往前越可能没有；2026-07 及更早的场次实测单场页返回 5 字节空页。
 
-## 判定跳过
+### 判定跳过
 
 | 日期 | videoId | 原因 |
 | --- | --- | --- |
 | 2026-08-28 | `5APd1wj9QlA` | 4:48 的同名摘要/预告，正片是会员限定的 `8pLN7zBYnc`（2:04:15）。按「同名去重、保留正片」跳过。 |
 | — | `2Q5A9SWgHtA` | 未来场占位（yt-dlp 提示 680 天后开播），没有可抓内容。 |
 
-## 批次三：2026-10-28（+214，全量补齐）
+### 批次三：2026-10-28（+214，全量补齐）
 
 继续按频道顺序向前抓取，直到公开列表与会员限定场次全部入库：新增 **214** 场，累计 **262** 场。
-逐场清单以 [`data/nonoka/manifest.json`](../data/nonoka/manifest.json) 为准，本页不再逐条抄录。
+之后又补齐 **25** 场（会员限定与补漏），当前 **287** 场。逐场清单以远端 `manifest.json` 为准，
+本页不再逐条抄录。
 
 ## 下一批候选
 
-当前没有待抓场次。频道新增直播后，用下面的命令重新生成差值列表：
+当前五位成员都没有待抓场次。频道新增直播后，用下面的命令重新生成差值列表：
 
 ```powershell
+# <id> 与 <channelId> 取自 data-sources.json
 yt-dlp --flat-playlist --print "%(id)s" `
-  "https://www.youtube.com/channel/UCGeCnpimiSN5rgiKbJzHd3A/streams" > channel.txt
-# 与 data/nonoka/manifest.json 的 streams[].videoId 求差集，保留频道顺序
+  "https://www.youtube.com/channel/<channelId>/streams" > channel.txt
+# 与 data/<id>/manifest.json 的 streams[].videoId 求差集，保留频道顺序
 ```
 
 ## 更新流程
 
 ```powershell
 # 一次跑完：频道列表 → meta/弹幕/评论/VSTATS → 每 5 场自动生成 datapack
-bun scripts/fetch-streams.ts --dataset nonoka `
+bun scripts/fetch-streams.ts --dataset <id> `
   --root "D:/projects/claude-messages/temp/youtube-live" `
   --concurrency 3
 
@@ -90,14 +107,14 @@ Get-Content -Wait "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fe
 Get-Content "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch-progress.json"
 
 # 单场返工：清掉该场本地素材重抓，datapack 更新后自动增量发布
-bun scripts/fetch-streams.ts --dataset nonoka --force <videoId>
+bun scripts/fetch-streams.ts --dataset <id> --force <videoId>
 
 # 最后同步/校验
 bun run sync:data
 bun run validate:data
 ```
 
-`--root` 是**原始会话目录**，不是 `data/`；datapack 仍按 `data-sources.json` 写到 `data/nonoka/`。
+`--root` 是**原始会话目录**，不是 `data/`；datapack 仍按 `data-sources.json` 写到 `data/<id>/`。
 已入库和已有素材的场次会自动跳过，中断后直接重跑同一条命令即可。
 
 换设备或清掉 `data/` 后不需要先跑别的脚本：本地没有 manifest 时，`fetch-streams` 会先从
@@ -106,6 +123,7 @@ bun run validate:data
 
 ## 口径提醒
 
+- **以远端为准**：场次数、日期范围与 VSTATS 覆盖都读对象存储上的 `manifest.json`；`data/` 是可重建的本地暂存区，不保证完整。
 - **同名去重**：教学/游戏系列会同一标题分多场，manifest 只保留时长正常的正片；摘要、预告、切片不进数据集。
 - **会员限定**：`availability: "subscriber_only"` 的场次需要已登录 Firefox cookie 才能取到 chat replay。
 - **评论区是抓取上限**：`commentsCaptured` 是 yt-dlp `--write-comments` 抓到的条数，不是视频总评论数。

@@ -75,6 +75,7 @@
 6. `useDataset(datasetId)` 并行拉 manifest 与 insights，然后用 `buildSummaryRows` 得到按开播时间倒序的 `StreamSummary[]`。列表页不再等待所有 datapack。
 7. 列表视图（总览 / 数据表 / 对比指标）只消费 summary 与预聚合 totals；单场和对比的逐分钟曲线通过 `useStreamPacks` 按 videoId 向对象存储请求 datapack（`VITE_DATAPACK_BASE`），`lib/data.ts` 里有缓存与并发去重。
 8. 各视图消费 `rows` / `totals`；图表组件只接收已整理好的数据。
+9. 组级页面走 `GroupLayout`：`useGroupData` 并行拉取所有成员的 manifest（不拉 datapack），`buildGroupData` 合成 `GroupStreamRow[]` / `GroupMemberSummary[]` / `GroupTotals`，再经 `GroupDataContext` 交给组首页与全组相册。单个成员失败时跳过并提示，不阻塞其余成员。
 
 ### 封面图
 
@@ -100,7 +101,8 @@
 
 | URL | 页面 |
 | --- | --- |
-| `#/` | 重定向到上次访问的成员，否则第一个数据集 |
+| `#/` | 组首页：全组脉搏（近 7 天 / 本月）、焦点场、最近更新、成员入口 |
+| `#/gallery?member=&type=&order=` | 全组相册：跨成员封面墙；成员 / 内容类型筛选可分享 |
 | `#/:datasetId` | 成员首页（L1，glance） |
 | `#/:datasetId/streams?q=&type=&sort=&dir=&vstats=` | 场次页（L2，browse）；筛选/排序状态可分享 |
 | `#/:datasetId/trends` | 趋势页；月度趋势、月度明细、内容类型对比 |
@@ -151,6 +153,12 @@
 ```text
 src/components/dashboard/
   dataset-layout.tsx   Sidebar + Header + 数据加载 + Outlet
+  group-layout.tsx    组级壳层：全组数据加载 + Outlet（组首页 / 全组相册）
+  group-data-context.ts  GroupData 的 context
+  group-hero.tsx      组首页首屏：最近一场焦点 + 其他成员列表 + 本周活跃
+  group-pulse.tsx     近 7 天 / 本月三项数字 + 全组累计脚注
+  group-recent-updates.tsx 跨成员最近更新列表
+  group-member-entries.tsx 按成员进入 + 全组相册入口
   dataset-index-gate.tsx  索引加载/错误门禁 + context
   app-sidebar.tsx     侧边导航：品牌、成员列表、页面、主题
   app-header.tsx      顶栏：折叠按钮、面包屑、⌘K 搜索、场次统计
@@ -188,6 +196,7 @@ src/components/dashboard/
 src/pages/
   lazy-pages.tsx      路由级 lazy() 包装
   home-redirect.tsx   重定向到上次访问 / 首个 dataset
+  group-home-page.tsx / group-gallery-page.tsx
   home-page.tsx / streams-page.tsx / stream-index-page.tsx / trends-page.tsx
   gallery-page.tsx / transcripts-page.tsx
   stream-page.tsx / compare-page.tsx / about-page.tsx
@@ -224,6 +233,7 @@ src/components/charts/
 4. 在 `src/router.tsx` 的 `:datasetId` children 加一条 route。
 5. 在 `src/lib/routes.ts` 的 `VIEWS` 加 key，并在 `app-sidebar.tsx` 的 `NAV_ITEMS` 加导航项。
 6. 需要新指标时，先加到 `src/lib/aggregate.ts`，不要在视图里重复算。
+7. 组级（跨成员）视图挂在根路由的 `GroupLayout` 下：把 key 加进 `GROUP_VIEWS`，数据从 `useGroupDataContext()` 取 `GroupData`。
 
 ### 加一个图表
 

@@ -1,7 +1,7 @@
 # UI 重构实施进度
 
 > 方案见 [ui-refactor.md](ui-refactor.md)。本文件只记录**实施状态与文件归属**，避免并行改动互相覆盖。
-> 最近更新：2026-10-29。
+> 最近更新：2026-10-30。
 
 ## 阶段与状态
 
@@ -75,6 +75,16 @@
 | 顶栏滚动阴影 | 已完成 | `dashboard/app-header.tsx`：`.scroll-edge`，`@supports (animation-timeline: scroll())` |
 | 验证 | 已完成 | Chromium 1440 复核：路由过渡 `opacity`/`translate` 在跑；折线 `stroke-dashoffset` 1px → 0px；主题切换触发 1 次 `startViewTransition` 并落盘 `dark`；相册与趋势页截图无破图/无未绘制图表；`typecheck` / `lint` / `build` 通过 |
 
+## P10 组级页面（跨成员）
+
+| 项 | 状态 | 落点 |
+| --- | --- | --- |
+| 跨成员数据模型 | 已完成 | `data-sources.json`（5 位成员）、`lib/group.ts`、`hooks/use-group-data.ts`、`dashboard/group-data-context.ts` |
+| 组首页 | 已完成 | `pages/group-home-page.tsx`、`dashboard/group-layout.tsx`、`group-hero.tsx`、`group-pulse.tsx`、`group-recent-updates.tsx`、`group-member-entries.tsx`、`group-focus-stream.tsx`、`group-member-row.tsx`、`group-week-activity.tsx`、`lib/group-home.ts` |
+| 全组相册 | 已完成 | `pages/group-gallery-page.tsx`、`lib/gallery-params.ts`、`dashboard/gallery-view.tsx`（`showMember` + 筛选区） |
+| 路由与导航 | 已完成 | `src/router.tsx` 根路由组级 children；`lib/routes.ts` 的 `GROUP_VIEWS` / `groupGalleryPath`；侧栏与移动端标签栏入口 |
+| 加载失败降级 | 已完成 | `group-layout.tsx`：单个成员失败时跳过并在页头提示，不影响其余成员 |
+
 ## 文件归属（同一时刻只允许一个工作流修改）
 
 | 工作流 | 独占文件 |
@@ -90,6 +100,7 @@
 | P5-c 表格 | `dashboard/data-table.tsx`、`dashboard/streams-view.tsx`、`dashboard/streams-toolbar.tsx` |
 | P6 日历与趋势 | `charts/calendar-heatmap.tsx`、`dashboard/home-calendar.tsx`、`charts/trend-line.tsx`、`dashboard/trends-view.tsx`、`pages/trends-page.tsx`、`lib/aggregate.ts`、`lib/aggregate.test.ts` |
 | P8 封面与逐字稿 | `dashboard/stream-cover.tsx`、`dashboard/gallery-view.tsx`、`dashboard/transcript-view.tsx`、`dashboard/transcripts-view.tsx`、`pages/gallery-page.tsx`、`pages/transcripts-page.tsx`、`hooks/use-transcript.ts`、`lib/transcripts.ts`、`content/transcripts/`、`scripts/fetch-thumbnails.ts`、`scripts/transcript-*.ts`、`scripts/publish-transcripts.ts` |
+| P10 组级页面 | `dashboard/group-*.tsx`、`pages/group-*.tsx`、`lib/group.ts`、`lib/group-home.ts`、`lib/gallery-params.ts`、`hooks/use-group-data.ts` |
 
 > P5 完成后，`data-table.tsx` 回到 F1，`streams-view.tsx` / `streams-toolbar.tsx` 回到 L2。
 
@@ -155,18 +166,18 @@
 ## 验证
 
 ```bash
-bun run check        # typecheck + 77 个单测 + lint
+bun run check        # typecheck + 158 个单测 + lint
 bun run build        # sync:data + tsc -b + vite build
 bun run test:smoke   # 需先启动 dev/preview
 ```
 
-当前基线（2026-10-28）：
+当前基线（2026-10-30）：
 
 - `bun run typecheck`：通过。
-- `bun run test`：6 个文件 / 77 个用例通过。
+- `bun run test`：12 个文件 / 158 个用例通过。
 - `bun run lint`：0 warning / 0 error。
-- `bun run build`：通过，主包约 349 KB（gzip ~112 KB）。
-- `bun run test:smoke`：6/6 场景通过（首页重定向、单场深链、无效 id、对比深链、趋势深链、前进后退）。
+- `bun run build`：通过，主包约 415 KB（gzip ~133 KB）。
+- `bun run test:smoke`：上次复核 2026-10-28 为 6/6 场景（首页重定向、单场深链、无效 id、对比深链、趋势深链、前进后退）；本次文档同步未重跑。
 - 浏览器复核（390 / 320 / 1440）：
   - 底栏贴底（间距 0）、高 53px，≥44px 触控目标；
   - 场次表横向滚动 260px 时首列位移 0（吸附生效）；

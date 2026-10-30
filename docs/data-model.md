@@ -46,8 +46,8 @@
   "generatedAt": "2026-10-28T03:24:04+09:00",
   "subject": "宮永ののか",
   "channelId": "UCGeCnpimiSN5rgiKbJzHd3A",
-  "scope": "按频道顺序补齐的历史场次（48/262；同名去重，保留正片）",
-  "count": 48,
+  "scope": "按频道顺序补齐的历史场次（同名去重，保留正片）",
+  "count": 287,
   "note": "vstats 为 null 表示该场没有 VSTATS 条目。",
   "streams": []
 }
