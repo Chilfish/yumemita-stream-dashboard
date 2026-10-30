@@ -188,7 +188,8 @@ if (groupManifests.length > 0) {
   const groupGallery = buildGroupGallery(groupManifests, index.generatedAt);
   writeJsonCompact(join(outputRoot, "group-summary.json"), groupSummary);
   writeJsonCompact(join(outputRoot, "group-gallery.json"), groupGallery);
-  console.log(`[sync-data] 组级数据：${groupSummary.stats.length} 场 -> public/data/group-summary.json + group-gallery.json`);
+  const groupStreams = groupSummary.members.reduce((sum, member) => sum + member.streamCount, 0);
+  console.log(`[sync-data] 组级数据：${groupStreams} 场 / ${groupSummary.days.length} 个日期桶 -> public/data/group-summary.json + group-gallery.json`);
 } else {
   rmSync(join(outputRoot, "group-summary.json"), { force: true });
   rmSync(join(outputRoot, "group-gallery.json"), { force: true });
