@@ -106,10 +106,11 @@ for (const source of config.datasets) {
       : null;
     if (manifest && insights) {
       mkdirSync(destDir, { recursive: true });
-      // datapack 由浏览器直接向远端请求，产物里不留旧副本。
+      // datapack / 作者索引由浏览器直接向远端请求，产物里不留旧副本。
       for (const name of readdirSync(destDir)) {
         if (name.endsWith(".datapack.json")) rmSync(join(destDir, name));
       }
+      rmSync(join(destDir, "authors.json"), { force: true });
     } else if (existsSync(localManifestPath) && existsSync(localInsightsPath)) {
       console.warn(`[sync-data]   ! ${id} 远端还没有数据，回退本地暂存区`);
       fromRemote = false;
@@ -135,6 +136,10 @@ for (const source of config.datasets) {
       if (!name.endsWith(".datapack.json")) continue;
       copyFileSync(join(stagingDir, name), join(destDir, name));
       packCount += 1;
+    }
+    const localAuthorsPath = join(stagingDir, "authors.json");
+    if (existsSync(localAuthorsPath)) {
+      copyFileSync(localAuthorsPath, join(destDir, "authors.json"));
     }
   }
 

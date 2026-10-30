@@ -1,4 +1,9 @@
-/** `yumemita.stream-datapack/v1` 的 TypeScript 镜像。字段口径见 docs/data-model.md。 */
+/** `yumemita.stream-datapack/v1` / `/v2` 的 TypeScript 镜像。字段口径见 docs/data-model.md。 */
+
+/** v2 起新增全量聚合字段；v1 datapack 只有截断后的 Top 列表。 */
+export type DatapackSchema =
+  | "yumemita.stream-datapack/v1"
+  | "yumemita.stream-datapack/v2";
 
 export interface CurrencyTotal {
   count: number;
@@ -119,11 +124,23 @@ export interface PaidInfo {
 
 export interface TopAuthor {
   author: string;
+  /** v2 起带稳定的频道 ID；旧 pack 或原始回放缺失时为 null / undefined。 */
+  authorId?: string | null;
   messages: number;
   superchats: number;
   stickers: number;
   memberships: number;
   badges: string[];
+}
+
+/** v2 的全量作者统计：不截断，用于精确跨场聚合与观众重叠。 */
+export interface AuthorStat {
+  author: string;
+  authorId: string | null;
+  messages: number;
+  superchats: number;
+  stickers: number;
+  memberships: number;
 }
 
 export interface TopWord {
@@ -154,6 +171,10 @@ export interface ChatInfo {
   paid: PaidInfo;
   topAuthors: TopAuthor[];
   topWords: TopWord[];
+  /** v2：全量作者统计（按发言数降序），不截断；v1 缺失。 */
+  authors?: AuthorStat[];
+  /** v2：全量分词词频，不截断；v1 缺失。 */
+  wordCounts?: Record<string, number>;
   hashtags: Record<string, number>;
   emojiKinds: EmojiKinds;
 }
@@ -185,7 +206,7 @@ export interface DerivedInfo {
 }
 
 export interface StreamDatapack {
-  schema: "yumemita.stream-datapack/v1";
+  schema: DatapackSchema;
   generatedAt: string;
   video: VideoInfo;
   vstats: VstatsInfo | null;

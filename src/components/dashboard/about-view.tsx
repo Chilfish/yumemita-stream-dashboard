@@ -5,11 +5,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Kbd } from "@/components/ui/kbd";
 import { formatDateTime } from "@/lib/format";
 import { SHORTCUTS } from "@/lib/keyboard";
+import type { DatasetTotals } from "@/lib/aggregate";
 import type { BatchManifest, DatasetIndexEntry } from "@/types/dataset";
 
 interface AboutViewProps {
   dataset: DatasetIndexEntry;
   manifest: BatchManifest;
+  totals: DatasetTotals;
 }
 
 const METRICS_NOTE: [string, string][] = [
@@ -81,7 +83,26 @@ function KeyValueList({ items }: { items: [string, ReactNode][] }) {
   );
 }
 
-export function AboutView({ dataset, manifest }: AboutViewProps) {
+export function AboutView({ dataset, manifest, totals }: AboutViewProps) {
+  const aggregation = totals.aggregation;
+  const fullAggregation =
+    aggregation?.words === "full" && aggregation?.authors === "full";
+  const partialAggregation =
+    !fullAggregation &&
+    (aggregation?.words === "partial" || aggregation?.authors === "partial");
+  const coverage = aggregation?.coverage;
+  const coverageText = coverage
+    ? `词频 ${coverage.words}/${coverage.total} 场、发言者 ${coverage.authors}/${coverage.total} 场`
+    : "";
+  const wordAuthorNote = fullAggregation
+    ? "全量重扫后跨场精确聚合。"
+    : partialAggregation
+      ? `部分场次已全量重扫（${coverageText}），其余按榜单相加。`
+      : "每场只保留高频部分，跨场相加是近似值。";
+  const metricNotes = METRICS_NOTE.map(([term, description]): [string, string] =>
+    term === "词频 / 发言者" ? [term, wordAuthorNote] : [term, description],
+  );
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -107,7 +128,7 @@ export function AboutView({ dataset, manifest }: AboutViewProps) {
         </Section>
 
         <Section title="数据口径">
-          <KeyValueList items={METRICS_NOTE} />
+          <KeyValueList items={metricNotes} />
         </Section>
 
         <Section title="键盘快捷键">
@@ -130,14 +151,19 @@ export function AboutView({ dataset, manifest }: AboutViewProps) {
         </Section>
 
         <Section title="已知限制">
-          <Alert variant="warning">
-            <Info aria-hidden="true" />
-            <AlertTitle>跨场聚合是“榜单相加”</AlertTitle>
-            <AlertDescription>
-              高频词、发言者、徽章、表情都来自每场直播的排行榜，不是重新分析全部弹幕；
-              全月榜适合看趋势，不适合做精确排名。
-            </AlertDescription>
-          </Alert>
+          {fullAggregation ? null : (
+            <Alert variant="warning">
+              <Info aria-hidden="true" />
+              <AlertTitle>
+                {partialAggregation ? "部分场次仍是“榜单相加”" : "跨场聚合是“榜单相加”"}
+              </AlertTitle>
+              <AlertDescription>
+                {partialAggregation
+                  ? `已全量重扫的场次为精确值（${coverageText}），其余场次仍来自每场 Top 排行榜；补齐原始弹幕后会逐步转成全量。`
+                  : "高频词、发言者、徽章、表情都来自每场直播的排行榜，不是重新分析全部弹幕；全月榜适合看趋势，不适合做精确排名。"}
+              </AlertDescription>
+            </Alert>
+          )}
           <ul className="flex list-disc flex-col gap-1 ps-4 text-footnote text-foreground">
             {LIMITATIONS.map(item => (
               <li key={item}>{item}</li>

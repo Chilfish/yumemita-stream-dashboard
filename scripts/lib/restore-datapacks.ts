@@ -19,7 +19,7 @@ import {
   runPool,
 } from './object-storage.ts'
 
-const PACK_SCHEMA = 'yumemita.stream-datapack/v1'
+const PACK_SCHEMAS = new Set(['yumemita.stream-datapack/v1', 'yumemita.stream-datapack/v2'])
 const PACK_SUFFIX = '.datapack.json'
 
 interface ManifestStream {
@@ -217,7 +217,7 @@ export async function restoreDataset(options: RestoreOptions): Promise<RestoreRe
       if (text == null)
         throw new Error('远端不存在')
       const pack = JSON.parse(text) as { schema?: string, video?: { id?: string } }
-      if (pack.schema !== PACK_SCHEMA)
+      if (!PACK_SCHEMAS.has(pack.schema ?? ''))
         throw new Error(`schema 不匹配：${pack.schema ?? '(缺失)'}`)
       if (pack.video?.id !== id)
         throw new Error(`video.id 不匹配：${pack.video?.id ?? '(缺失)'}`)

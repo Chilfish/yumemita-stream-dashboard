@@ -27,12 +27,14 @@ import { upsertManifestStream } from './lib/dataset-manifest.ts'
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
 
-const SCHEMA = 'yumemita.stream-datapack/v1'
+const SCHEMA = 'yumemita.stream-datapack/v2'
 const JST_OFFSET_MIN = 540
 const ANY_DANMAKU_RE = /^danmaku_.*\.jsonl$/
 
 interface ChatMsg {
   author?: string
+  /** 稳定的频道 ID；旧 jsonl 没有这个字段。 */
+  authorId?: string
   text?: string
   sc?: string | null
   kind?: string
@@ -305,7 +307,7 @@ function isEmojiOnly(msg: ChatMsg): boolean {
  * 弹幕里值得看的词：汉字・片假名・拉丁词，以及够长的平假名词（「ありがとう」「かわいい」）。
  * 太短的平假名几乎全是助词・语尾，留着只会把榜单挤满。
  */
-function topWords(texts: string[], limit = 40): { word: string, count: number }[] {
+function countWords(texts: string[]): Map<string, number> {
   const counts = new Map<string, number>()
   for (const text of texts) {
     for (const seg of SEGMENTER.segment(text)) {
@@ -318,6 +320,11 @@ function topWords(texts: string[], limit = 40): { word: string, count: number }[
       counts.set(word, (counts.get(word) ?? 0) + 1)
     }
   }
+  return counts
+}
+
+/** v1 的 Top 列表：从全量词频里取 ≥3 次的前 40 个，单场页直接用。 */
+function topWords(counts: Map<string, number>, limit = 40): { word: string, count: number }[] {
   return [...counts.entries()]
     .filter(([, count]) => count >= 3)
     .sort((a, b) => b[1] - a[1])
@@ -361,7 +368,16 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
     .sort((a, b) => a.at - b.at)
 
   const byKind = { text: 0, superchat: 0, sticker: 0, membership: 0 }
-  const authors = new Map<string, { messages: number, superchats: number, stickers: number, memberships: number, badges: Set<string> }>()
+  // 按稳定 ID 去重；没有 ID 的旧数据退回显示名。显示名会改、会重名，不能当主键。
+  const authors = new Map<string, {
+    author: string
+    authorId: string | null
+    messages: number
+    superchats: number
+    stickers: number
+    memberships: number
+    badges: Set<string>
+  }>()
   const badges = new Map<string, number>()
   const emoji = new Map<string, number>()
   const scList: { at: string, author: string, amountText: string, currency: string, amount: number, message: string }[] = []
@@ -379,7 +395,17 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
       byKind[kind] += 1
 
     const author = record.msg.author ?? '(unknown)'
-    const entry = authors.get(author) ?? { messages: 0, superchats: 0, stickers: 0, memberships: 0, badges: new Set<string>() }
+    const authorKey = record.msg.authorId ? `id:${record.msg.authorId}` : `name:${author}`
+    const entry = authors.get(authorKey) ?? {
+      author,
+      authorId: record.msg.authorId ?? null,
+      messages: 0,
+      superchats: 0,
+      stickers: 0,
+      memberships: 0,
+      badges: new Set<string>(),
+    }
+    entry.author = author
     entry.messages += 1
     if (kind === 'superchat')
       entry.superchats += 1
@@ -393,7 +419,7 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
       if (badge === 'Owner')
         ownerMessages += 1
     }
-    authors.set(author, entry)
+    authors.set(authorKey, entry)
 
     const text = record.msg.text ?? ''
     if (isEmojiOnly(record.msg))
@@ -451,17 +477,31 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
 
   const peakIndex = perMinute.reduce((best, count, i) => (count > (perMinute[best] ?? 0) ? i : best), 0)
 
-  const topAuthors = [...authors.entries()]
-    .sort((a, b) => b[1].messages - a[1].messages)
-    .slice(0, 20)
-    .map(([author, entry]) => ({
-      author,
-      messages: entry.messages,
-      superchats: entry.superchats,
-      stickers: entry.stickers,
-      memberships: entry.memberships,
-      badges: [...entry.badges],
-    }))
+  const authorList = [...authors.values()].sort((a, b) => b.messages - a.messages)
+  const topAuthors = authorList.slice(0, 20).map(entry => ({
+    author: entry.author,
+    authorId: entry.authorId,
+    messages: entry.messages,
+    superchats: entry.superchats,
+    stickers: entry.stickers,
+    memberships: entry.memberships,
+    badges: [...entry.badges],
+  }))
+  // v2 全量作者：跨场精确聚合与观众重叠都靠它，不再被 Top 20 截断。
+  const authorStats = authorList.map(entry => ({
+    author: entry.author,
+    authorId: entry.authorId,
+    messages: entry.messages,
+    superchats: entry.superchats,
+    stickers: entry.stickers,
+    memberships: entry.memberships,
+  }))
+
+  const wordCounts = countWords(timed.map(({ record }) => record.msg.text ?? ''))
+  // 先按次数、再按词排序：同样的输入每次产出同样的 JSON，方便比对 diff。
+  const wordCountPayload = Object.fromEntries(
+    [...wordCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+  )
 
   const hashtags = new Map<string, number>()
   for (const { record } of timed) {
@@ -534,7 +574,9 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
         paidSharePct: timed.length ? round(((scList.length + stickerList.length + membershipList.length) / timed.length) * 100, 1) : null,
       },
       topAuthors,
-      topWords: topWords(timed.map(({ record }) => record.msg.text ?? '')),
+      authors: authorStats,
+      topWords: topWords(wordCounts),
+      wordCounts: wordCountPayload,
       hashtags: Object.fromEntries([...hashtags.entries()].sort((a, b) => b[1] - a[1])),
       emojiKinds: { distinct: emoji.size, top: [...emoji.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([id, count]) => ({ id, count })) },
     },

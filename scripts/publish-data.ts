@@ -26,6 +26,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { aggregateDataset, buildStreamRows } from '../src/lib/aggregate.ts'
+import { buildAuthorIndex } from '../src/lib/author-index.ts'
 import type { StreamDatapack } from '../src/types/datapack.ts'
 import type { BatchManifest } from '../src/types/dataset.ts'
 import { THUMB_VARIANTS } from '../src/lib/thumb-variants.ts'
@@ -35,6 +36,7 @@ import { buildStreamSummary, isoJst } from './lib/dataset-manifest.ts'
 import {
   INSIGHTS_SCHEMA,
   MANIFEST_SCHEMA,
+  authorsKey,
   createObjectStore,
   datapackKey,
   insightsKey,
@@ -234,10 +236,13 @@ for (const source of selected) {
   }
   const totals = aggregateDataset(buildStreamRows(manifest, packsById))
   const insights = { schema: INSIGHTS_SCHEMA, generatedAt: publishStartedAt, totals }
+  const authorIndex = buildAuthorIndex(source.id, packs, publishStartedAt)
 
   const dir = resolve(APP_ROOT, source.datapackDir)
   writeJson(join(dir, 'manifest.json'), manifest)
   writeJson(join(dir, 'insights.json'), insights)
+  if (authorIndex)
+    writeJson(join(dir, 'authors.json'), authorIndex)
 
   const thumbs = collectThumbs(source)
   thumbUploads.push(...thumbs.uploads)
@@ -256,12 +261,27 @@ for (const source of selected) {
   }
 
   const variantCount = thumbs.uploads.filter(item => item.contentType === 'image/webp').length
-  console.log(`[publish-data] ${source.label} (${source.id})：${streams.length} 场，本地已生成 manifest + insights，封面 ${thumbs.uploads.length - variantCount} 张 + 变体 ${variantCount} 个`)
+  const agg = totals.aggregation
+  const modeLabel = (mode: string | undefined, count: number): string => {
+    if (mode === 'full')
+      return '全量'
+    if (mode === 'partial')
+      return `部分 ${count}/${agg?.coverage.total ?? 0} 场`
+    return 'Top 榜单相加'
+  }
+  const wordsMode = modeLabel(agg?.words, agg?.coverage.words ?? 0)
+  const authorsMode = modeLabel(agg?.authors, agg?.coverage.authors ?? 0)
+  console.log(`[publish-data] ${source.label} (${source.id})：${streams.length} 场，本地已生成 manifest + insights（词频 ${wordsMode} / 发言者 ${authorsMode}），封面 ${thumbs.uploads.length - variantCount} 张 + 变体 ${variantCount} 个`)
+  if (!authorIndex) {
+    console.warn(`[publish-data]   ! ${source.id} 还有 v1 datapack，跳过作者索引；全量数据可精确聚合与观众重叠`)
+  }
 
   for (const pack of packs)
     packUploads.push({ key: datapackKey(source.id, pack.video.id as string), body: JSON.stringify(pack) })
   indexUploads.push({ key: manifestKey(source.id), body: JSON.stringify(manifest) })
   indexUploads.push({ key: insightsKey(source.id), body: JSON.stringify(insights) })
+  if (authorIndex)
+    indexUploads.push({ key: authorsKey(source.id), body: JSON.stringify(authorIndex) })
 
   indexSources.set(source.id, {
     id: source.id,

@@ -28,6 +28,21 @@ export interface AggregatedAuthor extends TopAuthor {
   streams: number;
 }
 
+/**
+ * 跨场聚合口径：
+ * - `full`：所有场次都有全量字段，结果精确；
+ * - `partial`：部分场次有全量字段，其余仍用 Top 榜单相加；
+ * - `top-lists`：全部场次都只有 Top 榜单。
+ */
+export type AggregationMode = "full" | "partial" | "top-lists";
+
+export interface AggregationSummary {
+  words: AggregationMode;
+  authors: AggregationMode;
+  /** 参与全量聚合的场次数；分母是 `total`。 */
+  coverage: { words: number; authors: number; total: number };
+}
+
 export interface CurrencyRow extends CurrencyTotal {
   currency: string;
 }
@@ -92,6 +107,8 @@ export interface DatasetTotals {
   stickerByCurrency: CurrencyRow[];
   topWords: AggregatedWord[];
   topAuthors: AggregatedAuthor[];
+  /** 旧 insights.json 没有这个字段；缺失时按 `top-lists` 理解。 */
+  aggregation?: AggregationSummary;
   badges: { name: string; count: number }[];
   emoji: EmojiCount[];
   hashtags: { tag: string; count: number }[];
@@ -240,7 +257,17 @@ export function buildStreamShape(
   };
 }
 
+function aggregationMode(fullCount: number, total: number): AggregationMode {
+  if (fullCount === 0) return "top-lists";
+  return fullCount === total ? "full" : "partial";
+}
+
 export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
+  // 逐场判断：有全量字段就用全量，没有就退回该场的 Top 榜单；
+  // 最终按覆盖场次数标 full / partial / top-lists，避免“一场缺失拉垮整个 dataset”。
+  let wordsFullCount = 0;
+  let authorsFullCount = 0;
+
   const chatByKind = emptyKind();
   const scTotals = new Map<string, CurrencyTotal>();
   const stickerTotals = new Map<string, CurrencyTotal>();
@@ -300,28 +327,67 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
     addCurrency(scTotals, chat.paid.scTotalsByCurrency);
     addCurrency(stickerTotals, chat.paid.stickerTotalsByCurrency);
 
-    for (const word of chat.topWords) {
-      const current = wordCounts.get(word.word) ?? { word: word.word, count: 0, streams: 0 };
-      current.count += word.count;
-      current.streams += 1;
-      wordCounts.set(word.word, current);
+    if (chat.wordCounts) {
+      wordsFullCount += 1;
+      for (const [word, count] of Object.entries(chat.wordCounts)) {
+        const current = wordCounts.get(word) ?? { word, count: 0, streams: 0 };
+        current.count += count;
+        current.streams += 1;
+        wordCounts.set(word, current);
+      }
     }
-    for (const author of chat.topAuthors) {
-      const current = authorCounts.get(author.author) ?? {
-        author: author.author,
-        messages: 0,
-        superchats: 0,
-        stickers: 0,
-        memberships: 0,
-        badges: author.badges,
-        streams: 0,
-      };
-      current.messages += author.messages;
-      current.superchats += author.superchats;
-      current.stickers += author.stickers;
-      current.memberships += author.memberships;
-      current.streams += 1;
-      authorCounts.set(author.author, current);
+    else {
+      for (const word of chat.topWords) {
+        const current = wordCounts.get(word.word) ?? { word: word.word, count: 0, streams: 0 };
+        current.count += word.count;
+        current.streams += 1;
+        wordCounts.set(word.word, current);
+      }
+    }
+
+    if (chat.authors) {
+      authorsFullCount += 1;
+      for (const author of chat.authors) {
+        // 稳定 ID 优先；旧数据没有 ID 时才退回显示名。
+        const key = author.authorId ? `id:${author.authorId}` : `name:${author.author}`;
+        const current = authorCounts.get(key) ?? {
+          author: author.author,
+          authorId: author.authorId,
+          messages: 0,
+          superchats: 0,
+          stickers: 0,
+          memberships: 0,
+          badges: [],
+          streams: 0,
+        };
+        current.author = author.author;
+        current.messages += author.messages;
+        current.superchats += author.superchats;
+        current.stickers += author.stickers;
+        current.memberships += author.memberships;
+        current.streams += 1;
+        authorCounts.set(key, current);
+      }
+    }
+    else {
+      for (const author of chat.topAuthors) {
+        const key = `name:${author.author}`;
+        const current = authorCounts.get(key) ?? {
+          author: author.author,
+          messages: 0,
+          superchats: 0,
+          stickers: 0,
+          memberships: 0,
+          badges: author.badges,
+          streams: 0,
+        };
+        current.messages += author.messages;
+        current.superchats += author.superchats;
+        current.stickers += author.stickers;
+        current.memberships += author.memberships;
+        current.streams += 1;
+        authorCounts.set(key, current);
+      }
     }
     for (const [badge, count] of Object.entries(chat.badges)) {
       badgeCounts.set(badge, (badgeCounts.get(badge) ?? 0) + count);
@@ -385,6 +451,11 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
     stickerByCurrency: currencyRows(Object.fromEntries(stickerTotals)),
     topWords: [...wordCounts.values()].sort((a, b) => b.count - a.count).slice(0, 40),
     topAuthors: [...authorCounts.values()].sort((a, b) => b.messages - a.messages).slice(0, 30),
+    aggregation: {
+      words: aggregationMode(wordsFullCount, rows.length),
+      authors: aggregationMode(authorsFullCount, rows.length),
+      coverage: { words: wordsFullCount, authors: authorsFullCount, total: rows.length },
+    },
     badges: [...badgeCounts.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count),

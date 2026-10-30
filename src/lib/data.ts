@@ -1,4 +1,5 @@
 import type { DatasetTotals } from "@/lib/aggregate";
+import type { AuthorIndexFile } from "@/lib/author-index";
 import { THUMB_VARIANTS, thumbVariantName } from "@/lib/thumb-variants";
 import type { StreamDatapack } from "@/types/datapack";
 import type { BatchManifest, DatasetIndex } from "@/types/dataset";
@@ -94,6 +95,18 @@ export async function fetchInsights(
     throw new Error("汇总数据不完整。");
   }
   return file.totals;
+}
+
+/** 作者 → 场次索引；只有 v2 dataset 才会生成，观众重叠等分析页按需加载。 */
+export async function fetchAuthorIndex(
+  datasetId: string,
+  signal?: AbortSignal,
+): Promise<AuthorIndexFile> {
+  const file = await fetchRemoteFirst<AuthorIndexFile>(`${datasetId}/authors.json`, signal);
+  if (!Array.isArray(file.authors) || !Array.isArray(file.streams)) {
+    throw new Error("作者索引不完整。");
+  }
+  return file;
 }
 
 const packCache = new Map<string, StreamDatapack>();

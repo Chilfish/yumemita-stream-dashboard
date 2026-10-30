@@ -99,6 +99,15 @@ const ChatDensitySchema = v.object({
   perMinuteSc: v.array(v.number()),
 });
 
+const AuthorStatSchema = v.object({
+  author: v.string(),
+  authorId: v.nullable(v.string()),
+  messages: v.number(),
+  superchats: v.number(),
+  stickers: v.number(),
+  memberships: v.number(),
+});
+
 const SuperchatSchema = v.object({
   at: v.string(),
   author: v.string(),
@@ -117,6 +126,9 @@ const DatapackChatSchema = v.object({
     superchats: v.array(SuperchatSchema),
     scTotalsByCurrency: CurrencyTotalsSchema,
   }),
+  // v2 字段；v1 pack 没有，校验时按可选处理。
+  authors: v.optional(v.array(AuthorStatSchema)),
+  wordCounts: v.optional(v.record(v.string(), v.number())),
 });
 
 const CommentItemSchema = v.object({
@@ -146,7 +158,7 @@ const DerivedSchema = v.object({
 });
 
 export const DatapackSchema = v.object({
-  schema: v.literal("yumemita.stream-datapack/v1"),
+  schema: v.picklist(["yumemita.stream-datapack/v1", "yumemita.stream-datapack/v2"]),
   generatedAt: v.string(),
   video: DatapackVideoSchema,
   vstats: v.nullable(VstatsSchema),

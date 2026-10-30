@@ -38,7 +38,8 @@ const packPath = resolve(process.cwd(), inputPath);
 if (!existsSync(packPath)) fail(`找不到文件：${packPath}`);
 
 const pack = readJson(packPath);
-if (pack.schema !== "yumemita.stream-datapack/v1") {
+const SUPPORTED_SCHEMAS = new Set(["yumemita.stream-datapack/v1", "yumemita.stream-datapack/v2"]);
+if (!SUPPORTED_SCHEMAS.has(pack.schema)) {
   fail(`不支持的 schema：${pack.schema}`);
 }
 const videoId = pack.video?.id;

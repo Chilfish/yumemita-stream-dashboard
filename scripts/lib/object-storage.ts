@@ -27,6 +27,11 @@ export function insightsKey(datasetId: string): string {
   return `${datasetId}/insights.json`
 }
 
+/** 作者 → 场次索引，只在观众重叠等分析页按需加载。 */
+export function authorsKey(datasetId: string): string {
+  return `${datasetId}/authors.json`
+}
+
 /**
  * 封面图的 key 只由 dataset + videoId 决定，不读 manifest：
  * 离线也能拼出 URL，删掉本地文件重发即可下架。

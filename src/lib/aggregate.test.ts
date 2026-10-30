@@ -68,6 +68,8 @@ interface PackOptions {
   sc?: { currency: string; amount: number; count: number };
   words?: { word: string; count: number }[];
   authors?: StreamDatapack["chat"]["topAuthors"];
+  fullWords?: Record<string, number>;
+  fullAuthors?: NonNullable<StreamDatapack["chat"]["authors"]>;
   peakOffset?: number;
   availability?: string;
   views?: number;
@@ -85,7 +87,10 @@ function makePack(options: PackOptions): StreamDatapack {
   const scCount = options.sc?.count ?? 0;
 
   return {
-    schema: "yumemita.stream-datapack/v1",
+    schema:
+      options.fullWords || options.fullAuthors
+        ? "yumemita.stream-datapack/v2"
+        : "yumemita.stream-datapack/v1",
     generatedAt: startedAt,
     video: {
       id,
@@ -174,6 +179,8 @@ function makePack(options: PackOptions): StreamDatapack {
       },
       topAuthors: options.authors ?? [],
       topWords: options.words ?? [],
+      ...(options.fullAuthors ? { authors: options.fullAuthors } : {}),
+      ...(options.fullWords ? { wordCounts: options.fullWords } : {}),
       hashtags: {},
       emojiKinds: { distinct: 0, top: [] },
     },
@@ -288,6 +295,11 @@ describe("aggregate", () => {
       value: 100,
       offsetMin: 5,
     });
+    expect(totals.aggregation).toEqual({
+      words: "top-lists",
+      authors: "top-lists",
+      coverage: { words: 0, authors: 0, total: 2 },
+    });
   });
 
   it("sorts currency rows by amount", () => {
@@ -342,6 +354,94 @@ describe("aggregate", () => {
     pack.chat.density.perMinute = [];
 
     expect(buildStreamShape([{ pack }])).toBeNull();
+  });
+});
+
+describe("aggregate with full v2 data", () => {
+  const v2a = {
+    summary: makeSummary({
+      videoId: "a",
+      startedAt: "2026-10-01T20:00:00+09:00",
+      durationSec: 3600,
+    }),
+    pack: makePack({
+      id: "a",
+      startedAt: "2026-10-01T20:00:00+09:00",
+      durationSec: 3600,
+      avg: null,
+      chat: 100,
+      words: [{ word: "ライブ", count: 5 }],
+      fullWords: { "ライブ": 60, "かわいい": 10 },
+      fullAuthors: [
+        { author: "@old", authorId: "UC1", messages: 30, superchats: 1, stickers: 0, memberships: 0 },
+        { author: "@b", authorId: "UC2", messages: 5, superchats: 0, stickers: 0, memberships: 0 },
+      ],
+    }),
+  };
+  const v2b = {
+    summary: makeSummary({
+      videoId: "b",
+      startedAt: "2026-10-02T20:00:00+09:00",
+      durationSec: 3600,
+    }),
+    pack: makePack({
+      id: "b",
+      startedAt: "2026-10-02T20:00:00+09:00",
+      durationSec: 3600,
+      avg: null,
+      chat: 50,
+      words: [{ word: "ライブ", count: 3 }],
+      fullWords: { "ライブ": 40, "すごい": 20 },
+      fullAuthors: [
+        { author: "@new", authorId: "UC1", messages: 20, superchats: 0, stickers: 0, memberships: 0 },
+      ],
+    }),
+  };
+
+  it("sums every occurrence and merges authors by stable id", () => {
+    const totals = aggregateDataset([v2a, v2b]);
+    expect(totals.aggregation).toEqual({
+      words: "full",
+      authors: "full",
+      coverage: { words: 2, authors: 2, total: 2 },
+    });
+    expect(totals.topWords.find(word => word.word === "ライブ")).toMatchObject({
+      count: 100,
+      streams: 2,
+    });
+    expect(totals.topWords.find(word => word.word === "すごい")).toMatchObject({
+      count: 20,
+      streams: 1,
+    });
+    const shared = totals.topAuthors.filter(author => author.authorId === "UC1");
+    expect(shared).toHaveLength(1);
+    expect(shared[0]).toMatchObject({ author: "@new", messages: 50, streams: 2 });
+  });
+
+  it("mixes full and top-list rows when only some streams are v2", () => {
+    const v1 = {
+      summary: makeSummary({
+        videoId: "c",
+        startedAt: "2026-10-03T20:00:00+09:00",
+        durationSec: 3600,
+      }),
+      pack: makePack({
+        id: "c",
+        startedAt: "2026-10-03T20:00:00+09:00",
+        durationSec: 3600,
+        avg: null,
+        chat: 50,
+        words: [{ word: "ライブ", count: 3 }],
+      }),
+    };
+    const totals = aggregateDataset([v2a, v1]);
+    expect(totals.aggregation).toEqual({
+      words: "partial",
+      authors: "partial",
+      coverage: { words: 1, authors: 1, total: 2 },
+    });
+    // v2 场次用全量 60，v1 场次退回它自己的 Top 列表 3。
+    expect(totals.topWords.find(word => word.word === "ライブ")?.count).toBe(63);
   });
 });
 

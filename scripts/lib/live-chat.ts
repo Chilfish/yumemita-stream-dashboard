@@ -14,6 +14,7 @@ import { parseArgs } from 'node:util'
 
 interface Renderer {
   authorName?: { simpleText?: string }
+  authorExternalChannelId?: string
   authorBadges?: BadgeWrapper[]
   message?: { runs?: Run[] }
   timestampUsec?: string
@@ -49,6 +50,8 @@ export interface ChatRecord {
   ts: number
   msg: {
     author?: string
+    /** 稳定的频道 ID（`authorExternalChannelId`）；显示名会改、会重名，重叠分析要用它。 */
+    authorId?: string
     text?: string
     sc?: string | null
     kind: 'text' | 'superchat' | 'sticker' | 'membership'
@@ -124,6 +127,8 @@ function toRecord(item: ChatItemWrapper | undefined, videoId: string, seq: numbe
     sc: renderer.purchaseAmountText?.simpleText ?? null,
     timestampUs,
   }
+  if (renderer.authorExternalChannelId)
+    msg.authorId = renderer.authorExternalChannelId
   if (emoji.length)
     msg.emoji = emoji
   const badges = badgeNames(renderer.authorBadges)
