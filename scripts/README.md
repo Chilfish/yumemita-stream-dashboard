@@ -157,6 +157,53 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 页面侧约定：`src/lib/thumb-variants.ts` 定义宽度与命名，`src/lib/data.ts` 拼 `thumbnailUrl()` /
 `thumbnailSrcSet()`，`StreamCover` 用 `srcset` + `sizes` 交给浏览器选档。
 
+## 补缺失弹幕（v2 全量升级）
+
+只抓 `live_chat` 回放，不重新抓 meta / 评论 / VSTATS；已有 pack 的其余字段原样保留。
+
+```bash
+# 1. 生成缺失清单（有弹幕、但本机没有 danmaku_<id>.jsonl）
+bun run missing:danmaku --root "D:/projects/claude-messages/temp/youtube-live"
+
+# 2. 只抓缺失弹幕；不带 --dataset 就是全部成员
+bun run fetch:danmaku --root "D:/projects/claude-messages/temp/youtube-live" --concurrency 3
+
+# 3. 用新弹幕把 v1 pack 升级成 v2
+bun run enrich:chat --root "D:/projects/claude-messages/temp/youtube-live"
+
+# 4. 重建 insights（本地；确认后再去掉 --no-upload 发布）
+bun run publish:data --no-upload
+```
+
+多实例并行（互不重叠）：
+
+```bash
+bun run fetch:danmaku --root "..." --shard 1/4 --concurrency 3
+bun run fetch:danmaku --root "..." --shard 2/4 --concurrency 3
+bun run fetch:danmaku --root "..." --shard 3/4 --concurrency 3
+bun run fetch:danmaku --root "..." --shard 4/4 --concurrency 3
+```
+
+- `--shard i/n` 按全局任务顺序取模分片，多个实例不会抢同一场；中断后重跑会跳过已有 jsonl。
+- 建议总并发（实例数 × `--concurrency`）控制在 8–12，太高容易触发 YouTube 限流。
+- 会员限定场次需要 Firefox cookie；默认 `--cookies-from-browser firefox`，也可 `--cookies <jar>`。
+- 没有弹幕回放的场次会写 `work/chat-unavailable.txt`，下次跳过；失败写 `data/missing-danmaku/failed*.json`。
+- `enrich:chat` 只重算作者 / 词频 / 徽章 / 构成，保留 video / vstats / comments / density / paid。
+
+## 校验 v2 数据
+
+`validate:data` 只检查文件存在与场次数；`verify:data` 检查内容是否自洽、发布是否真的生效。
+
+```bash
+bun run verify:data             # 本地：authors 求和、uniqueAuthors、insights 重算、coverage、authors.json
+bun run verify:data --remote    # 再对比对象存储上的 insights / authors.json / 抽样 pack / manifest
+```
+
+- `authors.messages` 之和必须等于 `chat.total`，`authors.length` 必须等于 `uniqueAuthors`。
+- `insights.topWords` / `topAuthors` 必须与直接重算 pack 的结果一致。
+- `aggregation.coverage` 必须与 v2 场次数一致。
+- `--remote` 会直接读桶（有 `R2_*`）或带时间戳走公开地址，避免被 CDN 旧缓存骗过去。
+
 ## 抓取侧（不在本仓库）
 
 本仓库只放结果。原始会话由归档工程的 `yt-dlp` + `scripts/danmaku` 产出：
@@ -192,7 +239,9 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 
 输入全部可选，缺哪块就跳过哪块；至少要 `meta/info.json`（里面要能读到 `id`）。
 
-## 输出结构（`yumemita.stream-datapack/v1`）
+## 输出结构（`yumemita.stream-datapack/v2`）
+
+> v2 在 v1 基础上追加 `chat.authors` / `chat.wordCounts` 与 `topAuthors[].authorId`；旧 v1 pack 仍可读取，跨场聚合会自动回退。
 
 | 段         | 内容                                                                                                                                        |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -221,8 +270,10 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 | `paid.stickers` / `stickerTotalsByCurrency` | 贴纸同上                                                                  |
 | `paid.memberships`                          | 会员里程碑（`header` 取自原始回放的 `headerSubtext`，如「Welcome to …」） |
 | `paid.paidSharePct`                         | 付费条目占全部条目的比例                                                  |
-| `topAuthors`                                | 发言数 Top 20（含各自 SC / 贴纸 / 会员次数）                              |
+| `topAuthors`                                | 发言数 Top 20（含 `authorId` / 各自 SC / 贴纸 / 会员次数）                |
 | `topWords`                                  | 分词后词频（`Intl.Segmenter` 日语分词；≥3 次、最多 40 个）                |
+| `authors`                                   | **v2 全量**：`author` / `authorId` / `messages` / SC / 贴纸 / 会员次数    |
+| `wordCounts`                                | **v2 全量**：`{ 词: 次数 }`，不截断；跨场精确词频靠它                     |
 | `hashtags`                                  | `#` / `＃` 标签计数                                                       |
 | `emojiKinds`                                | 表情种类数 ＋ Top 15（频道表情的 id 形如 `<channelId>/<hash>`）           |
 
@@ -239,6 +290,8 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 - **纯表情**沿用归档工程 `scripts/danmaku` 的判定：`emoji.id` 含 `/` 的频道表情全部折成 `[表情]`，去掉后为空才算。
 - **SC 金额不换算**：`¥ / HK$ / NT$ / ₩` 各记各的，合计只按币种分组（汇率随时变，不做隐含假设）。
 - **词频不做语义过滤**：只剩助词/语尾的短平假名会被丢掉，但同义词、表记揺れ不会合并。
+- **作者身份**：归一化弹幕带 `msg.authorId`（来自 `authorExternalChannelId`）。显示名会改、会重名，观众重叠按 ID 合并；旧 jsonl 没有该字段，需要重新归一化。
+- **体积**：v2 每场多约 20–30 KB（全量词表 + 作者），只在单场页按需下载。
 - **没有同接曲线**：VSTATS 只给平均/最大＋最大值时刻，YouTube 也不保存历史同接。
 - **会员里程碑 ≠ 入会人数**：`liveChatMembershipItemRenderer` 只记录直播中出现的那几条。
 - **评论区口径**取决于抓取时的 `--write-comments` 上限，`comments.total` 是**抓到的**条数，不是视频的总评论数（后者看 `video.snapshot.comments`）。

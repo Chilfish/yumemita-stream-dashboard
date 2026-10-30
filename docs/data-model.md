@@ -108,6 +108,7 @@
     "scByCurrency": [],
     "topWords": [],
     "topAuthors": [],
+    "aggregation": { "words": "full", "authors": "full" },
     "bestByAvg": null,
     "peakChatMinute": null
   }
@@ -115,18 +116,21 @@
 ```
 
 - `totals` 的结构与 `src/lib/aggregate.ts` 的 `DatasetTotals` 一致：KPI、币种、Top 词/发言者、最佳场次、峰值分钟、典型节奏等。
+- `aggregation` 标明跨场口径：`full` = 全部场次用 v2 全量字段重扫，`partial` = 部分场次全量、其余按 Top 列表相加，`top-lists` = 全部按 Top 列表相加。旧 insights 没有该字段时按 `top-lists` 理解。
+- `coverage` 给出参与全量聚合的场次数（`words` / `authors` / `total`），页面的“精确覆盖 X/Y 场”直接读它。
+- 逐场判断：v2 pack 用全量字段，v1 pack 用该场 Top 列表，不会因为少数缺失场次把整个 dataset 判成近似。
 - **生成物，不要手改**；数据更新后重新 `bun run publish:data`。
 - 列表页依赖它渲染总览；缺失时页面会提示重新发布。
 
 ## 4. datapack
 
-`<base>/<dataset>/<videoId>.datapack.json`（对象存储），schema `yumemita.stream-datapack/v1`。本地暂存在 `data/<dataset>/<videoId>.datapack.json`，是唯一真源。
+`<base>/<dataset>/<videoId>.datapack.json`（对象存储），schema `yumemita.stream-datapack/v1` 或 `/v2`。本地暂存在 `data/<dataset>/<videoId>.datapack.json`，是唯一真源。v2 在 v1 基础上追加全量作者与全量词频；旧 pack 继续可用。
 
 ### 顶层
 
 | 字段 | 说明 |
 | --- | --- |
-| `schema` | 固定 `yumemita.stream-datapack/v1` |
+| `schema` | `yumemita.stream-datapack/v1` 或 `/v2` |
 | `generatedAt` | datapack 生成时间（JST） |
 | `video` | 视频元信息 |
 | `vstats` | VSTATS 单场快照，可能为 `null` |
@@ -184,10 +188,14 @@
 | `paid.stickers` / `stickerTotalsByCurrency` | 贴纸同上 |
 | `paid.memberships` | 会员里程碑（`header` 来自原始 chat 回放） |
 | `paid.paidSharePct` | 付费条目占比 |
-| `topAuthors` | 发言数 Top 20（含 SC / 贴纸 / 会员次数） |
+| `topAuthors` | 发言数 Top 20（含 `authorId` / SC / 贴纸 / 会员次数） |
 | `topWords` | 分词词频（≥3 次、最多 40 个） |
+| `authors` | **v2**：全量作者统计，按发言数降序；字段 `author` / `authorId` / `messages` / `superchats` / `stickers` / `memberships` |
+| `wordCounts` | **v2**：全量分词词频 `{ 词: 次数 }`，不截断 |
 | `hashtags` | `#` / `＃` 标签计数 |
 | `emojiKinds` | 表情种类数 + Top 15 |
+
+`authorId` 是 YouTube 的稳定频道 ID（原始回放里的 `authorExternalChannelId`）。显示名会改、也会重名，**观众重叠必须按 `authorId` 合并**；没有 ID 的旧数据才退回显示名。
 
 ### `comments`
 
@@ -208,7 +216,26 @@
 | `scPerHour` | SC 笔/小时 |
 | `vstatsVsYtdlpViews` | VSTATS 播放 − 抓取时点播放（可能为负） |
 
-## 5. 逐字稿
+## 5. 作者索引
+
+`<base>/<dataset>/authors.json` 由 `publish:data` 从 v2 pack 派生，只在观众重叠等分析页按需加载，不参与首屏。
+
+```json
+{
+  "schema": "yumemita.dashboard.authors/v1",
+  "generatedAt": "2026-10-30T02:00:00.000Z",
+  "datasetId": "nonoka",
+  "authors": [{ "id": "UC…", "name": "@…" }],
+  "streams": [{ "videoId": "…", "authors": [0, 3, 7] }]
+}
+```
+
+- `authors[]` 按稳定 ID 去重；`name` 取最新场次里抓到的显示名。
+- `streams[].authors` 是指向 `authors[]` 的下标，按最新场次在前排列，单场内升序。
+- 任一场还是 v1（缺 `chat.authors`）时**不生成**该文件：宁可不给，也不用半套数据算重叠。
+- 体积参考：约 166 人/场、1891 场时，全量作者记录约 8 MB（JSON），远小于逐场拉 datapack。
+
+## 6. 逐字稿
 
 逐字稿是作者手写的 Markdown，源文件在 `content/transcripts/<datasetId>/<videoId>.md`（进 git）。发布后页面读两份 JSON：
 
@@ -263,16 +290,20 @@
 - **SC / 贴纸金额不换算汇率**，只按币种分组。页面上的币种占比按**笔数**画，金额单独列。
 - **`vstats` 可能为 null**：会员限定、站点未收录、或早于收录起始日。相关图表会跳过/显示“—”。
 - **评论区是抓取上限内的条数**，不等于视频总评论数；`video.snapshot.comments` 是 YouTube 侧的总数。
-- **Top 列表有截断**：`topWords` 最多 40、`topAuthors` 最多 20。跨场聚合是“榜单相加”，不是全量重扫。
+- **Top 列表有截断**：`topWords` 最多 40、`topAuthors` 最多 20，单场页直接用它们。
+- **跨场精确聚合依赖 v2**：v2 pack 另存全量 `wordCounts` / `authors`，`publish:data` 据此重扫；v1 场次自动回退到该场的 Top 列表相加。`insights.totals.aggregation` 标出 `full` / `partial` / `top-lists` 与覆盖率，页面文案随之切换。
+- **作者身份以 `authorId` 为准**：旧 jsonl 没有该字段（显示名会改、会重名），需要归档侧重跑归一化才能补齐；缺 ID 时只能按显示名匹配，重叠结果仅供参考。
 - **会员里程碑 ≠ 入会人数**：只记录直播中出现的提示。
 - **播放/点赞有两套时点**：`vstats` 是站点快照，`video.snapshot` 是 yt-dlp 抓取时点；差值方向不固定。
 - **纯表情单列**：`chat.total` 含纯表情；正文条数 = `total - pureEmojiOnly` 的近似（还要扣掉 SC/贴纸/会员条目，页面按 `byKind` 分别展示）。
 
 ## 版本演进
 
-- 当前 schema：`yumemita.stream-datapack/v1`。
+- 当前 schema：`yumemita.stream-datapack/v1` / `/v2` 并存。
+- **v2**：在 v1 上追加 `chat.authors` / `chat.wordCounts`，并给 `topAuthors` 增加可选 `authorId`。字段全部可选，v1 pack 与 v2 pack 可以同时存在。
+- 兼容策略是逐场混合：有全量字段的场次用全量，没有的用该场 Top 列表；`insights.totals.aggregation` 按覆盖场次数标 `full` / `partial` / `top-lists`，并给出 `coverage`。
 - **加字段**：向后兼容，旧 datapack 缺失时用 `?? null`；更新 `src/types/datapack.ts` 与本文档。
-- **改语义 / 删字段**：提升 schema 版本（如 `/v2`），在 `src/lib/data.ts` 做兼容或迁移，不要静默改变旧数据含义。
+- **改语义 / 删字段**：提升 schema 版本（如 `/v3`），在 `src/lib/aggregate.ts` 做兼容或迁移，不要静默改变旧数据含义。
 - manifest schema：`yumemita.stream-datapack.batch/v1`；新增摘要字段同样按“可选 + 默认值”处理。
 
 ## 校验

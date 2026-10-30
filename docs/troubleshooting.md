@@ -37,6 +37,7 @@ bun run validate:data -- --remote  # 逐条 HEAD 确认可达
 - **没有 SC**：币种环图显示“本 dataset 没有 SC 记录”。
 - **没有评论**：评论区显示空状态；`comments` 可能为 `null`。
 - **词频/发言者为空**：datapack 的 `topWords` / `topAuthors` 是 Top 截断列表，场次太短可能不足阈值。
+- **趋势页仍显示“榜单相加”**：说明该 dataset 还有 v1 datapack；用 `stream-datapack.ts` 重建为 v2 后重跑 `publish:data`。只重建了一部分时 `insights.totals.aggregation` 为 `partial`，页面会显示精确覆盖的场次数；全部重建后才变成 `full`。
 
 ## 更新日历是空的
 

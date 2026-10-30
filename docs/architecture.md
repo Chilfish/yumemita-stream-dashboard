@@ -271,6 +271,7 @@ src/components/charts/
 | 数据源 | pack 派生 index/manifest/insights，整体上传对象存储 | 单一真源，索引不会与 pack 漂移；发布即生效 |
 | 封面 | 镜像到对象存储，不热链 YouTube | URL 稳定、无 CORS/限流，相册可懒加载 |
 | 逐字稿 | git 存 Markdown，发布成 JSON，运行时渲染 | 作者可版本管理；发布即生效，不重构建 |
+| 精确词频 / 发言者 | 全量字段写进 v2 datapack，发布时聚合 | 只保留一份真源；页面不重扫，换机器恢复 pack 后仍可精确重算 |
 
 ## 性能与限制
 
@@ -278,7 +279,8 @@ src/components/charts/
 - 单场页只请求该场的 datapack；对比页最多请求所选 4 场。`fetchDatapack` 用模块级缓存与 in-flight 去重，来回切换不会重复下载。
 - `insights.json` 由 `publish:data` 预聚合，页面内不再对全部场次重算 totals；`buildSummaryRows` 只做排序。
 - 图表用 ResizeObserver，窗口缩放不会重建数据。
-- 词频/发言者是“各场 Top 列表相加”，不是全量重扫；精确聚合需要扩展 datapack schema。
+- 词频/发言者：v2 datapack 带全量 `wordCounts` / `authors`，`publish:data` 据此精确聚合；v1 场次逐场回退到 Top 列表，`insights.totals.aggregation` 标明 `full` / `partial` / `top-lists` 与覆盖率。
+- v2 datapack 单场约多 20–30 KB（全量词表 + 作者），只在单场页按需下载；首屏与列表页不读这些字段。
 - 使用 hash 路由，刷新/分享任一页面都能还原；视图按路由 `React.lazy()` 拆包，首屏只加载当前页。
 - 索引每次启动带时间戳重新取；manifest / insights 用索引的 `generatedAt` 做版本参数，发布后自动换 URL，不吃 CDN 旧缓存；datapack 按 videoId 长缓存。仓库体积与场次数无关。
 - manifest 会随场次线性增长（3000 场约 4 MB raw / 460 KB gzip）。再往上需要按年份切片或引入服务端分页。

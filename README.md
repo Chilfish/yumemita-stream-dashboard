@@ -21,7 +21,7 @@
 - **组首页**：近 7 天 / 本月脉冲、最近一场焦点、跨成员最近更新、按成员进入；单个成员加载失败不影响其余成员。
 - **成员首页**：规模指标条、最近一场、本月变化、全期记录、最近场次、更新日历（按日看场次 / 弹幕 / SC 热度）。
 - **场次页**：完整表格、搜索、内容类型筛选、仅有 VSTATS、排序、导出 CSV；筛选与排序写进 URL。
-- **趋势页**：月度趋势（场次 / 弹幕每分 / SC / 平均同接）、月度明细、内容类型对比、典型节奏曲线、全期高频词与发言者。
+- **趋势页**：月度趋势（场次 / 弹幕每分 / SC / 平均同接）、月度明细、内容类型对比、典型节奏曲线、全期高频词与发言者（v2 数据为全量精确聚合，v1 仍按榜单相加并明确标注）。
 - **单场详情**：概览 / 时间轴 / 弹幕与词 / 付费 / 评论五个子视图；有逐字稿时多一个「逐字稿」分段，支持目录与时间戳跳转。
 - **相册**：成员相册与全组相册（`#/gallery`），按 JST 自然月分组的封面墙；全组可按成员 / 内容类型筛选并分享 URL，懒加载、可切最新/最早在前。
 - **逐字稿**：作者手写 Markdown（`content/transcripts/`），发布后在站内渲染，不在站内编辑。
@@ -55,7 +55,11 @@ bun run dev
 | `bun run sync:data` | 生成 `public/data/` 兜底快照（远端优先，失败回退本地暂存区） |
 | `bun run publish:data` | 由 pack 重建 manifest + insights + dataset 索引并上传对象存储 |
 | `bun run validate:data` | 校验 index → manifest → insights；加 `--remote` 检查对象存储 |
+| `bun run verify:data` | 校验 v2 不变量（authors/top/coverage/authors.json）；加 `--remote` 对比远端实际内容 |
 | `bun run add:datapack` | 加一份 datapack，自动更新 manifest |
+| `bun run missing:danmaku` | 列出缺原始弹幕的场次，写 `data/missing-danmaku/` |
+| `bun run fetch:danmaku` | 只抓缺失场次的 live_chat 回放，可 `--shard i/n` 多实例并行 |
+| `bun run enrich:chat` | 用新弹幕把 v1 pack 升级为 v2（不重抓素材） |
 | `bun run fetch:thumbs` | 从 YouTube 镜像封面到 `data/<id>/thumbs/`；发布后进对象存储 |
 | `bun run transcript:new` | 从模板建一篇逐字稿，日期 / 标题取自 manifest |
 | `bun run transcript:import` | 把已有 Markdown 复制进 `content/transcripts/` |

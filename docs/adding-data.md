@@ -151,14 +151,14 @@ bun run publish:transcripts --force       # 忽略 data/.publish-state.json，�
 
 | 检查项 | 说明 |
 | --- | --- |
-| schema | 必须是 `yumemita.stream-datapack/v1` |
+| schema | `yumemita.stream-datapack/v1` 或 `/v2`（新抓取统一写 v2） |
 | `video.id` | 必须等于文件名里的 videoId |
 | `startedAt` | 必须带 `+09:00`（JST） |
 | `durationSec` | 与 `chat.density.perMinute.length` 大致对应（分钟数） |
 | `vstats` | 没有 VSTATS 时保持 `null`，不要填 0 |
 | `scTotalsByCurrency` | 金额按原文，不换算汇率 |
 | `comments` | 允许 `null`；`comments.total` 是抓取到的条数 |
-| `topWords` / `topAuthors` | 允许为空数组；跨场聚合是近似值 |
+| `topWords` / `topAuthors` | 允许为空数组；v2 另有全量 `wordCounts` / `authors`，跨场精确聚合依赖它们 |
 | 会员限定 | `availability: "subscriber_only"`；确认可公开范围 |
 
 跑一遍：

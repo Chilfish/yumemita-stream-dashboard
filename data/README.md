@@ -24,7 +24,7 @@ data/
 | `yuno` | 千石ユノ | 236 | 2025-05-08 – 2026-10-24 | `UC99kOG6_9RD0mR3OG4EOfxw` |
 
 - 抓取进度、跳过判定与下一批候选见 [../docs/data-progress.md](../docs/data-progress.md)。
-- `<videoId>.datapack.json`：每场完整数据，schema `yumemita.stream-datapack/v1`。
+- `<videoId>.datapack.json`：每场完整数据，schema `yumemita.stream-datapack/v1` 或 `/v2`（新抓取写 v2）。
 - `manifest.json` / `insights.json`：`bun run publish:data` 生成，不要手改。
 
 ## 文件命名
