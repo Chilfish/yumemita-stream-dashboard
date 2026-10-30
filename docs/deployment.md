@@ -128,8 +128,8 @@ bun run publish:transcripts
 ### 构建
 
 - 构建只需要 `VITE_DATAPACK_BASE`（公开根地址，例如 `https://pub-xxxx.r2.dev`），不需要写权限凭据。用了 `R2_PREFIX` 时，这里也要带上同一前缀（如 `https://example.com/stream-dashboard`）。
-- 页面运行时直接请求 `<base>/index.json`、`<base>/<datasetId>/manifest.json`、`insights.json` 与 `<base>/<datasetId>/<videoId>.datapack.json`。
-- `sync:data` 从该地址拉 `index.json`、`manifest.json` 与 `insights.json`，缓存到 `node_modules/.cache/stream-dashboard/`，写进 `public/data/` 作为兜底快照；拉取失败时回退缓存，远端 index 不可用则按本地配置构造。
+- 页面运行时直接请求 `<base>/index.json`、`<base>/group-summary.json`、`<base>/group-gallery.json`、`<base>/<datasetId>/manifest.json`、`insights.json` 与 `<base>/<datasetId>/<videoId>.datapack.json`。
+- `sync:data` 从该地址拉 `index.json`、`manifest.json` 与 `insights.json`，缓存到 `node_modules/.cache/stream-dashboard/`，写进 `public/data/` 作为兜底快照；再从 manifest 生成 `<base>/group-summary.json` / `group-gallery.json` 的同源副本。拉取失败时回退缓存，远端 index 不可用则按本地配置构造。
 
 ### CORS
 
@@ -150,8 +150,8 @@ bun run publish:transcripts
 
 - datapack 内容随 videoId 固定，可以长缓存：`Cache-Control: public, max-age=31536000, immutable`。
 - 逐字稿正文 key 带 videoId，但同一场会改稿，建议短缓存或发布时带 `updatedAt` 查询参数；索引本身同样是短缓存。
-- `index.json` 每次启动带时间戳请求，CDN 缓存不影响新鲜度；manifest / insights 用索引的 `generatedAt` 作查询参数，发布后自动换 URL，可以放心短缓存或长缓存。
-- 发布后跑 `bun run validate:data -- --remote` 逐条 HEAD（含根目录 `index.json`），确认地址可达。
+- `index.json` 每次启动带时间戳请求，CDN 缓存不影响新鲜度；manifest / insights / `group-*.json` 用索引的 `generatedAt` 作查询参数，发布后自动换 URL，可以放心短缓存或长缓存。
+- 发布后跑 `bun run validate:data -- --remote` 逐条 HEAD（含根目录 `index.json`、`group-summary.json`、`group-gallery.json`），确认地址可达。
 
 #### 封面与变体
 
@@ -168,7 +168,7 @@ bun run publish:transcripts
    - Edge TTL：`Override origin` → `1 year`
    - Browser TTL：`Override origin` → `1 year`
 3. 同一思路可选加到 datapack：`(http.request.uri.path ends_with ".datapack.json")`，同样 1 年。
-4. `index.json` / `manifest.json` / `insights.json` 不要套长缓存：页面用时间戳 / `generatedAt` 参数保证新鲜度，
+4. `index.json` / `group-*.json` / `manifest.json` / `insights.json` 不要套长缓存：页面用时间戳 / `generatedAt` 参数保证新鲜度，
    让它们走默认（不缓存）最省心。
 5. CORS 见上一节，需要允许 `GET` / `HEAD`。
 

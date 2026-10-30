@@ -1,6 +1,6 @@
 # 数据模型
 
-页面消费四层 JSON：**dataset 索引 → manifest → insights → datapack**。四层都是纯 JSON，没有数据库，全部放在对象存储（R2 等），页面运行时直接读取。`public/data/` 里的同源副本由 `sync:data` 生成，只在远端不可达时兜底。
+成员页消费四层 JSON：**dataset 索引 → manifest → insights → datapack**；组首页与全组相册另有 **group-summary / group-gallery** 两份精简派生文件（见第 3 节）。它们都是纯 JSON，没有数据库，全部放在对象存储（R2 等），页面运行时直接读取。`public/data/` 里的同源副本由 `sync:data` 生成，只在远端不可达时兜底。
 
 所有数据由 `bun run publish:data` 从本地 pack 派生并上传；git 里只有 `data-sources.json`。
 
@@ -94,7 +94,75 @@
 发布顺序是 **thumbs → pack → manifest / insights → index**，所以 `streams[].thumbnail` 出现时
 原图与全部 `srcset` 候选都一定已经在桶里。
 
-## 3. insights
+## 3. 组级精简数据
+
+组首页与全组相册不拉五份完整 manifest，而是读两份由 manifest 派生的精简文件：
+
+- `<base>/group-summary.json`（schema `yumemita.dashboard.group-summary/v1`）：组首页，约 17 KB raw / 3.6 KB gzip。
+- `<base>/group-gallery.json`（schema `yumemita.dashboard.group-gallery/v1`）：全组相册，约 829 KB raw / 149 KB gzip，只在 `/gallery` 加载。
+
+`publish:data` 生成并上传这两份文件（与 manifest / insights 一起，index 最后）；`sync:data` 生成 `public/data/` 兜底副本。远端缺失时页面回退到构建快照，再回退到逐成员 manifest。
+
+### group-summary.json
+
+```json
+{
+  "schema": "yumemita.dashboard.group-summary/v1",
+  "generatedAt": "2026-10-30T15:28:17+09:00",
+  "members": [
+    {
+      "datasetId": "nonoka",
+      "streamCount": 287,
+      "chatTotal": 770849,
+      "superchats": 2661,
+      "durationSec": 1234567,
+      "avgConcurrent": 626.32
+    }
+  ],
+  "days": [
+    { "datasetId": "nonoka", "date": "2026-10-29", "streams": 1, "chat": 3463 }
+  ],
+  "latest": [],
+  "recent": []
+}
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `members` | 全期汇总：场次、弹幕、SC、时长、按时长加权的平均同接。不随“今天”变化。 |
+| `days` | 最近 40 天有场次的日期桶（`streams` / `chat`）。近 7 天与本月窗口最多覆盖 31 天，客户端用当前日期在这些桶上求和；不需要 1,891 行逐场明细。 |
+| `latest` | 每位成员最新一场，供 hero、成员列表与 SEO 分享图。 |
+| `recent` | 全组最近 20 场，首页实际展示前 8 条。 |
+
+`latest` / `recent` 的每一行是 `GroupStreamSummary`，即 `StreamSummary` 的精简子集：
+
+| 字段 | 说明 |
+| --- | --- |
+| `datasetId` | 归属成员 |
+| `date` / `videoId` / `title` / `startedAt` | 场次标识与标题 |
+| `durationSec` / `availability` | 时长、会员限定 |
+| `avgConcurrent` / `maxConcurrent` | 同接 |
+| `chatTotal` / `superchats` | 弹幕、SC |
+| `vstatsViews` / `snapshotViews` | 播放（优先 VSTATS） |
+| `thumbnail` | 封面相对 key，与 manifest 同义 |
+
+### group-gallery.json
+
+```json
+{
+  "schema": "yumemita.dashboard.group-gallery/v1",
+  "generatedAt": "2026-10-30T15:28:17+09:00",
+  "streams": []
+}
+```
+
+相册需要铺满所有场次，所以 `streams` 是全部 `GroupStreamSummary`（按开播时间倒序）；组首页不加载它。
+
+### 为什么不用逐场 `stats`
+
+窗口（近 7 天 / 本月）依赖“今天”，不能在发布时写死；但也不该把 1,891 行逐场统计塞进首页。用 `members`（全期汇总）+ `days`（最近 40 天按日桶）即可在客户端精确求和，体积从约 24 KB gzip 降到 3.6 KB gzip。
+
+## 4. insights
 
 `<base>/<dataset>/insights.json` 由 `publish:data` 用 `aggregateDataset` 预聚合，schema `yumemita.dashboard.insights/v1`，页面直接从对象存储请求，`sync:data` 只生成兜底副本。
 
@@ -122,7 +190,7 @@
 - **生成物，不要手改**；数据更新后重新 `bun run publish:data`。
 - 列表页依赖它渲染总览；缺失时页面会提示重新发布。
 
-## 4. datapack
+## 5. datapack
 
 `<base>/<dataset>/<videoId>.datapack.json`（对象存储），schema `yumemita.stream-datapack/v1` 或 `/v2`。本地暂存在 `data/<dataset>/<videoId>.datapack.json`，是唯一真源。v2 在 v1 基础上追加全量作者与全量词频；旧 pack 继续可用。
 
@@ -216,7 +284,7 @@
 | `scPerHour` | SC 笔/小时 |
 | `vstatsVsYtdlpViews` | VSTATS 播放 − 抓取时点播放（可能为负） |
 
-## 5. 作者索引
+## 6. 作者索引
 
 `<base>/<dataset>/authors.json` 由 `publish:data` 从 v2 pack 派生，只在观众重叠等分析页按需加载，不参与首屏。
 
@@ -235,7 +303,7 @@
 - 任一场还是 v1（缺 `chat.authors`）时**不生成**该文件：宁可不给，也不用半套数据算重叠。
 - 体积参考：约 166 人/场、1891 场时，全量作者记录约 8 MB（JSON），远小于逐场拉 datapack。
 
-## 6. 逐字稿
+## 7. 逐字稿
 
 逐字稿是作者手写的 Markdown，源文件在 `content/transcripts/<datasetId>/<videoId>.md`（进 git）。发布后页面读两份 JSON：
 
@@ -282,7 +350,8 @@
 
 - 索引最后写；单篇失败只记日志，不阻塞其余稿件。
 - `videoId` 是关联场次的唯一键；`markdown` 保留原始时间码，渲染时再改写成深链。
-- 远端不可达时页面回退到构建期的 Markdown 快照（Vite `import.meta.glob`），所以本地不发布也能预览。
+- `sync:data` 从 `content/transcripts/` 的 frontmatter 生成同结构的 `public/data/transcripts/index.json`，离线时列表页只读这一份索引。
+- 远端不可达时正文回退到构建期的 Markdown 快照（Vite `import.meta.glob`，懒加载：打开哪篇读哪篇），所以本地不发布也能预览。
 
 ## 口径与限制
 
@@ -319,7 +388,9 @@ bun run validate:data
 - 每个 manifest 有 `streams`；
 - 每个 dataset 的 `insights.json` 存在，且 `totals.streamCount` 与 manifest 场次数一致；
 - 每个 `streams[].videoId` 非空；
-- 加 `--remote` 时逐条 HEAD `<base>` 上的 `index.json`、manifest / insights / datapack。
+- `group-summary.json` 的 `members` 覆盖全部 dataset、场次合计与 manifest 一致，`days` 的日期合法且 `(datasetId, date)` 不重复，`latest` 不含重复成员；
+- `group-gallery.json` 的 `streams` 场次数与 manifest 合计一致；
+- 加 `--remote` 时逐条 HEAD `<base>` 上的 `index.json`、`group-summary.json`、`group-gallery.json`、manifest / insights / datapack。
 
 datapack 的字段级校验（`schema`、`video.id === videoId`、`chat.total`、`density.perMinute` 等）
 在 `publish:data` 读取 pack 时完成：`video.id` 与文件名不一致会直接中止发布。

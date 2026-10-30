@@ -5,6 +5,7 @@
 | 文档 | 内容 | 什么时候读 |
 | --- | --- | --- |
 | [architecture.md](architecture.md) | 分层、数据流、路由、状态管理、图表策略、扩展点 | 想改页面结构或加新视图 |
+| [performance.md](performance.md) | 首屏数据流、缓存分层、图片/字体/拆包、实测数字与回归方式 | 改加载逻辑或排查性能回归 |
 | [data-model.md](data-model.md) | manifest / datapack 的字段、口径、版本演进 | 读写 JSON、排查数据问题 |
 | [adding-data.md](adding-data.md) | 加场次、加成员、加数据集、数据校验 | 数据有更新 |
 | [data-progress.md](data-progress.md) | 频道历史抓取进度、跳过判定、下一批候选 | 继续补历史场次 |

@@ -174,7 +174,7 @@ bun run transcript:import "D:/messages/archives/…/2026-10-13_ライブ振り�
 ```
 
 - `bun run publish:transcripts`：解析 frontmatter → 写索引 → 上传正文 JSON；单篇失败跳过并记录，索引最后写。
-- `sync:data` 顺带拉一份 `transcripts/index.json` 到 `public/data/` 作为离线兜底。
+- `sync:data` 从 `content/transcripts/` 的 frontmatter 生成 `transcripts/index.json` 到 `public/data/`，作为离线兜底。
 - 页面远端优先，失败回退到构建快照。
 - 正文保留 Markdown 原文，客户端渲染；不预渲染 HTML，避免 sanitizer 版本与缓存问题。
 

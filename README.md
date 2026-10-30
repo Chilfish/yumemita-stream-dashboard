@@ -188,6 +188,7 @@ data-sources.json  # 成员注册表
 
 - [docs/README.md](docs/README.md) 文档索引
 - [docs/architecture.md](docs/architecture.md) 分层、数据流、路由
+- [docs/performance.md](docs/performance.md) 首屏数据流、缓存、图片与实测数字
 - [docs/data-model.md](docs/data-model.md) manifest / datapack 字段与口径
 - [docs/adding-data.md](docs/adding-data.md) 加场次、成员、数据集
 - [docs/development.md](docs/development.md) 本地开发、代码规范、图表写法

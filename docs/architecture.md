@@ -67,15 +67,15 @@
 
 ## 数据流
 
-1. `scripts/publish-data.ts` 从 `data/<id>/*.datapack.json` 派生 `index.json`、`manifest.json`、`insights.json`，按 pack → manifest/insights → index 的顺序上传对象存储。
-2. 页面启动时 `src/lib/data.ts` 先向对象存储请求 `<base>/index.json`。索引请求带时间戳，避免 CDN 返回旧副本；远端不可达或还没发布过索引时回退到 `public/data/index.json`。
-3. manifest 与 insights 用索引的 `generatedAt` 作版本参数请求同一个 `<base>`，同样在失败时回退同源快照；构建阶段不重算。
-4. `scripts/sync-data.mjs` 只负责生成兜底快照：配了 `DATAPACK_BASE` / `VITE_DATAPACK_BASE` 时原样拉取远端的 index / manifest / insights（带本地缓存），没配时用本地 `data/<id>/`。
+1. `scripts/publish-data.ts` 从 `data/<id>/*.datapack.json` 派生 `index.json`、`manifest.json`、`insights.json`，以及组级 `group-summary.json` / `group-gallery.json`；按 thumbs → pack → manifest/insights/组级文件 → index 的顺序上传对象存储。
+2. 页面启动时 `src/lib/data.ts` 先读 sessionStorage 里的索引（版本匹配时立即渲染），同时在后台带时间戳重新请求 `<base>/index.json`；远端不可达或还没发布过索引时回退到 `public/data/index.json`。
+3. manifest 与 insights 用索引的 `generatedAt` 作版本参数请求同一个 `<base>`，同样在失败时回退同源快照；构建阶段不重算。模块内有 5 分钟缓存与 in-flight 去重。
+4. `scripts/sync-data.mjs` 只负责生成兜底快照：配了 `DATAPACK_BASE` / `VITE_DATAPACK_BASE` 时原样拉取远端的 index / manifest / insights（带本地缓存），没配时用本地 `data/<id>/`；并从 manifest 生成 `public/data/group-summary.json` / `group-gallery.json`，从 `content/transcripts/` 的 frontmatter 生成 `public/data/transcripts/index.json`。
 5. `useDatasetIndex()` 拉 index；默认选中第一个 dataset。
 6. `useDataset(datasetId)` 并行拉 manifest 与 insights，然后用 `buildSummaryRows` 得到按开播时间倒序的 `StreamSummary[]`。列表页不再等待所有 datapack。
 7. 列表视图（总览 / 数据表 / 对比指标）只消费 summary 与预聚合 totals；单场和对比的逐分钟曲线通过 `useStreamPacks` 按 videoId 向对象存储请求 datapack（`VITE_DATAPACK_BASE`），`lib/data.ts` 里有缓存与并发去重。
 8. 各视图消费 `rows` / `totals`；图表组件只接收已整理好的数据。
-9. 组级页面走 `GroupLayout`：`useGroupData` 并行拉取所有成员的 manifest（不拉 datapack），`buildGroupData` 合成 `GroupStreamRow[]` / `GroupMemberSummary[]` / `GroupTotals`，再经 `GroupDataContext` 交给组首页与全组相册。单个成员失败时跳过并提示，不阻塞其余成员。
+9. 组级页面走 `GroupLayout`：组首页只拉 `group-summary.json`（成员全期汇总 + 最近 40 天按日桶 + 最新/最近场次），相册才拉 `group-gallery.json`（全部精简行）。文件缺失时回退到逐成员 manifest，`buildGroupDataFromSummary` / `buildGroupDataFromStreams` 合成 `GroupStreamRow[]` / `GroupMemberSummary[]` / `GroupTotals`，再经 `GroupDataContext` 交给组首页与全组相册。单个成员失败时跳过并提示，不阻塞其余成员。
 
 ### 封面图
 
@@ -89,7 +89,7 @@
 
 1. 源文件是 `content/transcripts/<datasetId>/<videoId>.md`（作者手写、进 git）。
 2. `publish:transcripts` 解析 frontmatter → 先传正文 `<base>/<dataset>/transcripts/<videoId>.json`，最后写 `<base>/transcripts/index.json`；失败只记日志。
-3. `useTranscriptIndex` / `useTranscript` 远端优先；远端不可达时回退到 Vite 的 `import.meta.glob("/content/transcripts/**/*.md")` 构建快照。
+3. `useTranscriptIndex` / `useTranscript` 远端优先；远端不可达时回退到 Vite 的 `import.meta.glob("/content/transcripts/**/*.md")` 构建快照。glob 是懒加载的：路径就是 `datasetId/videoId`，判断「这场有没有稿」不读文件内容；只有打开某篇稿（或离线时的逐字稿索引页）才加载对应 Markdown。
 4. `react-markdown` + `remark-gfm` 渲染；`rewriteTimecodes` 把行首 `[12:34]` 换成 YouTube 深链，`extractToc` 生成目录。原始 HTML 不渲染。
 
 ## 路由与 URL 状态
@@ -291,15 +291,14 @@ src/components/charts/
 
 ## 性能与限制
 
-- 首屏只加载 `index.json` + 当前 dataset 的 `manifest.json` + `insights.json`（单个 dataset 约 300 场时约 400 KB，gzip 后约 47 KB），不拉任何 datapack。
+完整记录见 [performance.md](performance.md)。当前关键数字与约束：
+
+- 组首页只加载 `index.json` + `group-summary.json`（约 17 KB raw / 3.6 KB gzip），不再拉 5 份 manifest（约 2.7 MB raw / 293 KB gzip）；`group-gallery.json`（约 829 KB raw / 149 KB gzip）只在 `/gallery` 加载。
+- 成员页首屏是 `index.json` + 当前 dataset 的 manifest / insights；manifest / insights 有 5 分钟内存缓存与 in-flight 去重，索引与组首页摘要走 sessionStorage（10 分钟、按索引版本校验）。
 - 单场页只请求该场的 datapack；对比页最多请求所选 4 场。`fetchDatapack` 用模块级缓存与 in-flight 去重，来回切换不会重复下载。
 - `insights.json` 由 `publish:data` 预聚合，页面内不再对全部场次重算 totals；`buildSummaryRows` 只做排序。
-- 图表用 ResizeObserver，窗口缩放不会重建数据。
-- 词频/发言者：v2 datapack 带全量 `wordCounts` / `authors`，`publish:data` 据此精确聚合；v1 场次逐场回退到 Top 列表，`insights.totals.aggregation` 标明 `full` / `partial` / `top-lists` 与覆盖率。
-- v2 datapack 单场约多 20–30 KB（全量词表 + 作者），只在单场页按需下载；首屏与列表页不读这些字段。
-- 使用 path 路由，刷新/分享任一页面都能还原；视图按路由 `React.lazy()` 拆包，首屏只加载当前页。
-- 构建产物会多出约 1900 个静态 HTML（每个路由一份 head）+ `sitemap.xml` / `robots.txt`，体积约 15 MB；它们只影响托管文件数，不进入首屏 JS。
-- 索引每次启动带时间戳重新取；manifest / insights 用索引的 `generatedAt` 做版本参数，发布后自动换 URL，不吃 CDN 旧缓存；datapack 按 videoId 长缓存。仓库体积与场次数无关。
-- manifest 会随场次线性增长（3000 场约 4 MB raw / 460 KB gzip）。再往上需要按年份切片或引入服务端分页。
-- 封面原图约 144 KB（1280×720 JPEG），三档 WebP 分别约 24 / 56 / 78 KB；列表与相册靠 `srcset` 只下 480w，首屏主图下 960w 或 1280w。相册按可视区域懒加载，`StreamCover` 用 `aspect-video` 预留高度，避免 CLS。
-- 逐字稿的构建快照走 `import.meta.glob`，稿件数量大时 bundle 会增长；超过百篇后把兜底改为 `public/data` 快照。
+- 词频/发言者：v2 datapack 带全量 `wordCounts` / `authors`，只在单场页按需下载；v1 场次逐场回退到 Top 列表。
+- 路由全部 `React.lazy()`；命令面板首次按 ⌘K 才加载；逐字稿 Markdown 单独成 chunk。入口 JS 约 364 KB raw / 117 KB gzip。
+- 头像已压到 128×128（5 张合计约 30 KB，原来约 632 KB）；封面用 480 / 960 / 1280w WebP + `srcset`，首屏主图 `fetchPriority="high"`。
+- manifest 仍随场次线性增长（3000 场约 4 MB raw / 460 KB gzip）。再往上需要按年份切片或引入服务端分页。
+- 逐字稿的构建快照走懒加载 `import.meta.glob`：每篇 Markdown 单独成 chunk，刷新页面不下载，打开某场逐字稿才取那一篇。列表页只读索引：远端是 `transcripts/index.json`，离线时是 `sync:data` 生成的 `public/data/transcripts/index.json`，不会为了列标题去解析全部 Markdown。

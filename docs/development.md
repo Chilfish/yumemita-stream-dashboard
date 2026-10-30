@@ -18,7 +18,7 @@ bun run dev
 | `bun run dev` | `sync:data` → `vite` |
 | `bun run build` | `sync:data` → `tsc -b` → `vite build` |
 | `bun run preview` | 预览 `dist/` |
-| `bun run sync:data` | 生成 `public/data/` 兜底快照（远端优先） |
+| `bun run sync:data` | 生成 `public/data/` 兜底快照（远端优先），含逐字稿索引 |
 | `bun run publish:data` | 由 pack 重建 index + manifest + insights，增量上传对象存储 |
 | `bun run validate:data` | 校验数据引用链（`--remote` 检查对象存储） |
 | `bun run add:datapack` | 加一份 datapack 并更新 manifest |
