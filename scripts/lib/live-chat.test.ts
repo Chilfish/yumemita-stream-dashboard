@@ -94,6 +94,7 @@ describe('normalizeLiveChat', () => {
           author?: string
           authorId?: string
           text?: string
+          header?: string
           giftCount?: number
         }
       })
@@ -109,6 +110,8 @@ describe('normalizeLiveChat', () => {
     expect(redemption.msg.author).toBe('@saigoarashi5895')
     expect(redemption.msg.text).toBe('received a gift membership by @steinberg11')
 
-    expect(records.find(record => record.msg.kind === 'membership')!.msg.text).toBe('')
+    const membership = records.find(record => record.msg.kind === 'membership')!
+    expect(membership.msg.text).toBe('')
+    expect(membership.msg.header).toBe("Welcome to YUNO's＋!")
   })
 })

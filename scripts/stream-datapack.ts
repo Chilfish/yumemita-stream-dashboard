@@ -43,6 +43,7 @@ interface ChatMsg {
   badges?: string[]
   emoji?: { id: string }[]
   timestampUs?: string | number
+  header?: string
   giftCount?: number
 }
 
@@ -442,12 +443,12 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
       stickerTotals.set(parsed.currency, total)
     }
     if (kind === 'membership') {
-      // 领取赠礼的文案就在归一化弹幕里（`received a gift membership by …`），
-      // 自己入会/续费的 milestone 文案则只在原始回放的 `headerSubtext` 里。
+      // 领取赠礼的文案就在归一化弹幕里（`received a gift membership by …`）。
+      // 自己入会/续费的文案优先用 jsonl 里的 `msg.header`，旧 jsonl 才回退原始回放。
       const raw = record.msg.timestampUs
       const header = rawKind === 'giftRedemption'
         ? text.trim() || null
-        : raw != null ? headers.get(String(raw)) ?? null : null
+        : record.msg.header?.trim() || (raw != null ? headers.get(String(raw)) ?? null : null)
       membershipList.push({ at: jstIso(at), author, header })
     }
     if (rawKind === 'gift')

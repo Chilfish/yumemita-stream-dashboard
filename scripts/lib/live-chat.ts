@@ -25,6 +25,8 @@ interface Renderer {
   authorBadges?: BadgeWrapper[]
   message?: { runs?: Run[] }
   header?: { liveChatSponsorshipsHeaderRenderer?: SponsorshipsHeader }
+  /** 会员入会/续费文案；普通弹幕没有。 */
+  headerSubtext?: { runs?: Run[] }
   timestampUsec?: string
   purchaseAmountText?: { simpleText?: string }
 }
@@ -68,6 +70,8 @@ export interface ChatRecord {
     timestampUs?: string
     emoji?: { id: string }[]
     badges?: string[]
+    /** 会员里程碑文案，如 `Welcome to …`（仅 `kind: 'membership'`）。 */
+    header?: string
     /** 一次赠送的会员个数（仅 `kind: 'gift'`）。 */
     giftCount?: number
   }
@@ -162,6 +166,11 @@ function toRecord(item: ChatItemWrapper | undefined, videoId: string, seq: numbe
     kind,
     sc: renderer.purchaseAmountText?.simpleText ?? null,
     timestampUs,
+  }
+  if (kind === 'membership') {
+    const header = (renderer.headerSubtext?.runs ?? []).map(run => run.text ?? '').join('').trim()
+    if (header)
+      msg.header = header
   }
   if (kind === 'gift') {
     const giftCount = giftCountOf(runs, text)
