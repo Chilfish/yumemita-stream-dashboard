@@ -23,7 +23,7 @@ const YOUTUBE_TIME_LINK = /^https:\/\/www\.youtube\.com\/watch\?v=[^&]+&t=\d+s$/
 const EMPTY_TOC: TranscriptHeading[] = [];
 
 const BODY_CLASS =
-  "mx-auto w-full max-w-[80ch] text-[0.9375rem] leading-[1.75] text-foreground [overflow-wrap:anywhere] md:leading-[1.8]";
+  "mx-auto w-full max-w-[80ch] text-[0.9375rem] leading-[1.75] text-foreground wrap-anywhere md:leading-[1.8]";
 
 function youtubeUrl(videoId: string): string {
   return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
