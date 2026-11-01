@@ -36,6 +36,10 @@ const outputRoot = join(appRoot, "public", "data");
 const transcriptRoot = join(appRoot, "content", "transcripts");
 const cacheRoot = join(appRoot, "node_modules", ".cache", "stream-dashboard");
 const remoteBase = (process.env.DATAPACK_BASE ?? process.env.VITE_DATAPACK_BASE ?? "").replace(/\/+$/, "");
+const globalEmojiDir = join(appRoot, "data", "youtube", "emoji");
+const globalEmojiNames = new Set(
+  existsSync(globalEmojiDir) ? readdirSync(globalEmojiDir) : [],
+);
 
 const INDEX_SCHEMA = "yumemita.dashboard.datasets/v1";
 
@@ -156,12 +160,16 @@ for (const source of config.datasets) {
     if (existsSync(localAuthorsPath)) {
       copyFileSync(localAuthorsPath, join(destDir, "authors.json"));
     }
+    // 表情目录按本地暂存区重建，避免旧版本把全局表情复制进成员目录后一直留着。
     const localEmojiDir = join(stagingDir, "emoji");
+    const destEmoji = join(outputRoot, "emojis", id);
+    rmSync(destEmoji, { recursive: true, force: true });
     if (existsSync(localEmojiDir)) {
-      const destEmoji = join(outputRoot, "emojis", id);
       mkdirSync(destEmoji, { recursive: true });
-      for (const name of readdirSync(localEmojiDir))
+      for (const name of readdirSync(localEmojiDir)) {
+        if (globalEmojiNames.has(name)) continue;
         copyFileSync(join(localEmojiDir, name), join(destEmoji, name));
+      }
     }
   }
 
@@ -195,6 +203,15 @@ for (const source of config.datasets) {
     ? `manifest/insights 来自 ${remoteBase}`
     : `本地 datapack ${packCount} 份`;
   console.log(`[sync-data] ${label} (${id}) -> ${manifest.streams.length} 场，${sourceNote}`);
+}
+
+// YouTube 全局表情只存一份，和成员目录平级。
+const destGlobalEmoji = join(outputRoot, "emojis", "youtube");
+rmSync(destGlobalEmoji, { recursive: true, force: true });
+if (existsSync(globalEmojiDir)) {
+  mkdirSync(destGlobalEmoji, { recursive: true });
+  for (const name of readdirSync(globalEmojiDir))
+    copyFileSync(join(globalEmojiDir, name), join(destGlobalEmoji, name));
 }
 
 // 组级数据：首页只读 summary（聚合 + 最近若干行），相册才读完整精简行。

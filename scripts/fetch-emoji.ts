@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSyn
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { emojiFileName } from '../src/lib/emoji.ts'
+import { emojiFileName, emojiFolder } from '../src/lib/emoji.ts'
 import { parseEmojiPicker } from './lib/emoji-picker.ts'
 import { runPool } from './lib/object-storage.ts'
 
@@ -44,6 +44,8 @@ interface Candidate {
   emojiId: string
   name: string | null
   url: string
+  /** `youtube` 或 dataset id；全局表情只存一份。 */
+  folder: string
 }
 
 const EMOJI_INDEX_SCHEMA = 'yumemita.emoji-index/v1'
@@ -66,8 +68,9 @@ const OPTIONS = {
 const USAGE = `用法：bun scripts/fetch-emoji.ts [选项]
 
 把频道表情镜像到 data/<datasetId>/emoji/<hash>.png，发布时由
-bun run publish:data 一起上传。来源有两处：
+bun run publish:data 一起上传。来源：
   - data/emoji-<datasetId>.html：频道表情选择器的 HTML（不依赖任何一场的原始回放）
+  - data/emoji-youtube.html：YouTube 全局表情选择器（UCksz… 前缀）
   - datapack 的 chat.emojis：重新归一化过的场次带上的图片地址
 已存在的图片默认跳过；单张失败只记日志，不阻塞其余表情。
 
@@ -94,11 +97,15 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** 频道表情字典：DevTools 里保存的 picker HTML，或手动放进 dataset 目录的 `emoji-picker.html`。 */
+/**
+ * 表情字典：频道自己的 picker HTML（`data/emoji-<datasetId>.html`，或放在 dataset 目录的
+ * `emoji-picker.html`）+ YouTube 全局表情（`data/emoji-youtube.html`，id 前缀 UCksz…）。
+ */
 function dictionaryPaths(source: DatasetSource): string[] {
   return [
     join(APP_ROOT, 'data', `emoji-${source.id}.html`),
     join(resolve(APP_ROOT, source.datapackDir), 'emoji-picker.html'),
+    join(APP_ROOT, 'data', 'emoji-youtube.html'),
   ].filter(path => existsSync(path))
 }
 
@@ -111,9 +118,9 @@ function collectCandidates(source: DatasetSource): Candidate[] {
   const seen = new Map<string, Candidate>()
   const add = (emojiId: string, url: string, name: string | null) => {
     const file = emojiFileName(emojiId)
-    if (!file || seen.has(file))
+    if (!file || seen.has(emojiId))
       return
-    seen.set(file, { file, emojiId, name, url })
+    seen.set(emojiId, { file, emojiId, name, url, folder: emojiFolder(source.id, emojiId) })
   }
 
   for (const path of dictionaryPaths(source)) {
@@ -198,6 +205,13 @@ function formatBytes(bytes: number): string {
   return bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`
 }
 
+/** 频道表情放 dataset 目录；YouTube 全局表情只存一份 `data/youtube/emoji/`。 */
+function emojiDir(source: DatasetSource, folder: string): string {
+  return folder === 'youtube'
+    ? join(APP_ROOT, 'data', 'youtube', 'emoji')
+    : join(resolve(APP_ROOT, source.datapackDir), 'emoji')
+}
+
 async function fetchDataset(
   source: DatasetSource,
   limit: number,
@@ -215,18 +229,19 @@ async function fetchDataset(
     return { ok: 0, skipped: 0, failed: 0 }
   }
 
-  const existing = force ? [] : candidates.filter(item => existsSync(join(outDir, item.file)))
-  const known = new Set(existing.map(item => item.file))
-  const pendingAll = candidates.filter(item => !known.has(item.file))
+  const existing = force ? [] : candidates.filter(item => existsSync(join(emojiDir(source, item.folder), item.file)))
+  const known = new Set(existing.map(item => item.emojiId))
+  const pendingAll = candidates.filter(item => !known.has(item.emojiId))
   const pending = limit > 0 ? pendingAll.slice(0, limit) : pendingAll
+  const globalCount = candidates.filter(item => item.folder === 'youtube').length
 
-  console.log(`[fetch-emoji] ${source.id}：${candidates.length} 个表情，已有 ${existing.length} 个，本次处理 ${pending.length} 个（并发 ${concurrency}）`)
+  console.log(`[fetch-emoji] ${source.id}：${candidates.length} 个表情（YouTube 全局 ${globalCount} 个），已有 ${existing.length} 个，本次处理 ${pending.length} 个（并发 ${concurrency}）`)
   if (pendingAll.length > pending.length)
     console.log(`[fetch-emoji] ${source.id}：--limit ${limit} 只抓 ${pending.length} 个，其余 ${pendingAll.length - pending.length} 个留到下次`)
 
   if (dryRun) {
     for (const item of pending)
-      console.log(`  emojis/${source.id}/${item.file}  ←  ${item.emojiId}`)
+      console.log(`  emojis/${item.folder}/${item.file}  ←  ${item.emojiId}`)
     console.log(`[fetch-emoji] ${source.id}：成功 0 / 跳过 ${existing.length} / 失败 0`)
     return { ok: 0, skipped: existing.length, failed: 0 }
   }
@@ -244,17 +259,20 @@ async function fetchDataset(
     'utf8',
   )
 
+  for (const folder of new Set(pending.map(item => item.folder)))
+    mkdirSync(emojiDir(source, folder), { recursive: true })
+
   const counts: Counts = { ok: 0, skipped: existing.length, failed: 0 }
   await runPool(pending, concurrency, async (item) => {
     try {
       const bytes = await downloadEmoji(item.url)
-      writeAtomic(join(outDir, item.file), bytes)
+      writeAtomic(join(emojiDir(source, item.folder), item.file), bytes)
       counts.ok += 1
-      console.log(`[fetch-emoji] ${source.id}/${item.emojiId} 成功：${formatBytes(bytes.byteLength)}`)
+      console.log(`[fetch-emoji] ${item.folder}/${item.emojiId} 成功：${formatBytes(bytes.byteLength)}`)
     }
     catch (error) {
       counts.failed += 1
-      console.warn(`[fetch-emoji] ${source.id}/${item.emojiId} 失败：${describe(error)}`)
+      console.warn(`[fetch-emoji] ${item.folder}/${item.emojiId} 失败：${describe(error)}`)
     }
   })
 

@@ -89,8 +89,10 @@
 > manifest 是**摘要**，页面图表需要的逐分钟序列、SC 明细、Top 列表在 datapack 里。
 
 频道专属表情是静态资源，手动跑一次即可：`bun run fetch:emoji` 合并
-`data/emoji-<dataset>.html`（频道表情选择器）与 `chat.emojis[].url` 两处来源，镜像到
+`data/emoji-<dataset>.html`、`data/emoji-youtube.html`（频道 / YouTube 全局表情选择器）与
+`chat.emojis[].url`，镜像到
 `data/<dataset>/emoji/<hash>.png`，发布到 `<base>/emojis/<dataset>/<hash>.png`；
+`UCksz…` 开头的 YouTube 全局表情单独放 `emojis/youtube/`，不按成员复制。
 同目录的 `index.json` 提供 id → 名称，旧 pack 也能显示文字标签。
 页面按 `emojiId`（`<channelId>/<hash>`）直接拼 URL，不读图片清单。发布顺序与封面相同。
 

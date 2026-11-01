@@ -199,13 +199,32 @@ function collectThumbs(source: DatasetSource): ThumbCollection {
   return { uploads, present, missingVariants }
 }
 
+const GLOBAL_EMOJI_DIR = join(APP_ROOT, 'data', 'youtube', 'emoji')
+
+/** YouTube 全局表情只存一份，key 用 `emojis/youtube/`。 */
+function collectGlobalEmoji(): ThumbUpload[] {
+  if (!existsSync(GLOBAL_EMOJI_DIR))
+    return []
+  return readdirSync(GLOBAL_EMOJI_DIR)
+    .filter(name => name.endsWith('.png'))
+    .map(name => ({
+      key: emojiKey('youtube', name),
+      body: readFileSync(join(GLOBAL_EMOJI_DIR, name)),
+      contentType: 'image/png',
+    }))
+}
+
 /** `data/<id>/emoji/<hash>.png` → 上传项；key 与页面拼 URL 的规则一致。 */
 function collectEmoji(source: DatasetSource): ThumbUpload[] {
   const dir = join(resolve(APP_ROOT, source.datapackDir), 'emoji')
   if (!existsSync(dir))
     return []
+  // 全局表情已经单独上传；旧目录里残留的副本不再重复上传。
+  const globalFiles = new Set(existsSync(GLOBAL_EMOJI_DIR) ? readdirSync(GLOBAL_EMOJI_DIR) : [])
   const uploads: ThumbUpload[] = []
   for (const name of readdirSync(dir)) {
+    if (name.endsWith('.png') && globalFiles.has(name))
+      continue
     if (name === 'index.json') {
       uploads.push({
         key: emojiKey(source.id, name),
@@ -242,7 +261,7 @@ if (!values['no-upload'] && !credentials)
 const store = credentials && !values['no-upload'] ? createObjectStore(credentials) : null
 const publishStartedAt = isoJst(new Date())
 const thumbUploads: ThumbUpload[] = []
-const emojiUploads: ThumbUpload[] = []
+const emojiUploads: ThumbUpload[] = collectGlobalEmoji()
 const packUploads: { key: string, body: string }[] = []
 const indexUploads: { key: string, body: string }[] = []
 const indexSources = new Map<string, DatasetIndexSource>()

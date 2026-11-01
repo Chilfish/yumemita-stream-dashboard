@@ -239,10 +239,11 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 
 ## 频道表情
 
-表情是静态资源，**手动跑一次就够了**，不进每日增量。来源有两处：
+表情是静态资源，**手动跑一次就够了**，不进每日增量。来源：
 
 - `data/emoji-<datasetId>.html`：频道表情选择器（`yt-emoji-picker-category-renderer`）的 HTML，
   一个频道一份。它能覆盖该频道当前的全部表情，旧场次不需要重抓弹幕。
+- `data/emoji-youtube.html`：YouTube 全局表情（`UCksz…` 前缀，`CATEGORY_TYPE_GLOBAL`），同样按 id 镜像。
 - 每场原始回放的 emoji run（`yt3.ggpht.com` 48×48）；归一化时写成
   `danmaku/emoji_<videoId>.json`，`stream-datapack` 合并进 pack 的 `chat.emojis`。
 
@@ -271,11 +272,15 @@ bun run publish:data --dataset yuno                  # 上传表情与 index.jso
   15 秒超时、失败重试 2 次，单张失败只记日志。
 - 上传顺序与封面相同（表情 / 封面 → pack → manifest / insights → index）。
 
+按 id 的 scope 分目录：频道表情归成员，`UCksz…` 开头的 YouTube 全局表情只存一份。
+
 ```text
-data/<datasetId>/emoji/<hash>.png        # 本地暂存（gitignore）
+data/<datasetId>/emoji/<hash>.png        # 成员表情（gitignore）
 data/<datasetId>/emoji/index.json        # id → 名称，供旧 pack 渲染标签
+data/youtube/emoji/<hash>.png            # YouTube 全局表情（只存一份）
 <base>/emojis/<datasetId>/<hash>.png     # 对象存储（R2_PREFIX 之后）
 <base>/emojis/<datasetId>/index.json     # 名称索引
+<base>/emojis/youtube/<hash>.png         # 全局表情
 ```
 
 ## 补缺失弹幕（v2 全量升级）

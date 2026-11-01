@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { emojiFileName, isCustomEmojiId } from "./emoji";
+import {
+  emojiFileName,
+  emojiFolder,
+  emojiScope,
+  isCustomEmojiId,
+  YOUTUBE_EMOJI_SCOPE,
+} from "./emoji";
 
 describe("emojiFileName", () => {
   it("uses the hash half of a channel emoji id", () => {
@@ -16,5 +22,15 @@ describe("emojiFileName", () => {
     expect(emojiFileName("UC1/../etc")).toBeNull();
     expect(isCustomEmojiId("🍷")).toBe(false);
     expect(isCustomEmojiId("UC1/hash")).toBe(true);
+  });
+
+  it("routes YouTube-wide emojis to the shared youtube folder", () => {
+    expect(emojiScope("UC99kOG6_9RD0mR3OG4EOfxw/54y5aNPZFd-QoPwPxrGNqQk")).toBe(
+      "UC99kOG6_9RD0mR3OG4EOfxw",
+    );
+    expect(emojiFolder("yuno", "UC99kOG6_9RD0mR3OG4EOfxw/54y5aNPZFd-QoPwPxrGNqQk")).toBe("yuno");
+    expect(emojiFolder("yuno", `${YOUTUBE_EMOJI_SCOPE}/popcorn-yellow-striped-smile`)).toBe(
+      "youtube",
+    );
   });
 });

@@ -1,6 +1,6 @@
 import type { DatasetTotals } from "@/lib/aggregate";
 import type { AuthorIndexFile } from "@/lib/author-index";
-import { emojiFileName } from "@/lib/emoji";
+import { emojiFileName, emojiFolder } from "@/lib/emoji";
 import { THUMB_VARIANTS, thumbVariantName } from "@/lib/thumb-variants";
 import type { StreamDatapack } from "@/types/datapack";
 import type { BatchManifest, DatasetIndex } from "@/types/dataset";
@@ -41,13 +41,13 @@ export function thumbnailSrcSet(datasetId: string, videoId: string): string {
 }
 
 /**
- * 频道专属表情图片：`emojis/<dataset>/<hash>.png`，静态资源，手动跑一次 fetch:emoji
- * 后由 publish:data 上传。id 不是 `<channelId>/<hash>` 时返回 null。
+ * 频道专属表情图片：频道表情放 `emojis/<dataset>/`，YouTube 全局表情放 `emojis/youtube/`。
+ * 静态资源，手动跑一次 fetch:emoji 后由 publish:data 上传；id 不合法时返回 null。
  */
 export function emojiUrl(datasetId: string, emojiId: string): string | null {
   const file = emojiFileName(emojiId);
   if (!file) return null;
-  const path = `emojis/${datasetId}/${file}`;
+  const path = `emojis/${emojiFolder(datasetId, emojiId)}/${file}`;
   return REMOTE_DATA_BASE ? `${REMOTE_DATA_BASE}/${path}` : `${LOCAL_DATA_BASE}/${path}`;
 }
 
