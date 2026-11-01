@@ -21,8 +21,6 @@ import { parseArgs } from 'node:util'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_OUT = join(APP_ROOT, 'node_modules', '.cache', 'stream-dashboard', 'yt-cookies.txt')
-/** yt-dlp 自己的测试视频，几乎不会下架；拿不到 manifest 时用它触发一次请求。 */
-const FALLBACK_URL = 'https://www.youtube.com/watch?v=BaW_jenozKc'
 
 const OPTIONS = {
   browser: { type: 'string', default: 'firefox' },
@@ -42,7 +40,7 @@ const USAGE = `用法：bun scripts/export-yt-cookies.ts [选项]
 选项：
   --browser <name>   firefox / chrome / edge / brave / safari，默认 firefox
   --out <文件>       输出路径，默认 node_modules/.cache/stream-dashboard/yt-cookies.txt
-  --url <地址>       触发导出的 YouTube 地址，默认取本地清单里最新一场
+  --url <地址>       触发导出的 YouTube 地址，默认取本地清单里最新一场，没有清单时用首个频道的 /streams
   --domains <列表>   只保留这些域的 cookie，逗号分隔，默认 youtube.com,google.com（空 = 全留）
   --push             导出后执行 gh secret set
   --secret <名字>    Secrets 名称，默认 YT_COOKIES
@@ -116,6 +114,23 @@ function latestVideoUrl(): string | null {
 }
 
 /**
+ * 清单为空时退回首个频道的 /streams：yt-dlp 列一次列表就能拿到 cookie。
+ * 以前写死的是 yt-dlp 的测试视频 BaW_jenozKc，它下架后这里会直接失败。
+ */
+function fallbackUrl(): string | null {
+  try {
+    const sources = JSON.parse(readFileSync(join(APP_ROOT, 'data-sources.json'), 'utf8')) as {
+      datasets?: { channelId?: string }[]
+    }
+    const channelId = sources.datasets?.find(item => item.channelId)?.channelId
+    return channelId ? `https://www.youtube.com/channel/${channelId}/streams` : null
+  }
+  catch {
+    return null
+  }
+}
+
+/**
  * 按域裁剪 Netscape cookie 文件。`#HttpOnly_` 只是前缀标记，不是注释，
  * 它的域也要参与匹配（YouTube 的 SID / __Secure-* 全是 HttpOnly）。
  */
@@ -156,7 +171,11 @@ async function main(): Promise<void> {
 
   const out = resolve(values.out ?? DEFAULT_OUT)
   mkdirSync(dirname(out), { recursive: true })
-  const url = values.url ?? latestVideoUrl() ?? FALLBACK_URL
+  const url = values.url ?? latestVideoUrl() ?? fallbackUrl()
+  if (!url) {
+    console.error('[cookies] 找不到可用的 YouTube 地址：本地没有 data 清单，data-sources.json 里也没有 channelId。用 --url 指定一个视频页。')
+    process.exit(1)
+  }
 
   console.log(`[cookies] 从 ${values.browser} 导出，输出 ${out}`)
   console.log(`[cookies] 触发地址：${url}`)
@@ -170,6 +189,8 @@ async function main(): Promise<void> {
     '--cookies', out,
     '--skip-download',
     '--simulate',
+    '--flat-playlist',
+    '--playlist-items', '1',
     '--no-warnings',
     url,
   ])

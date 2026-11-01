@@ -4,6 +4,9 @@ name: Data update
 # 回放 / 弹幕 / VSTATS 也已经开放；避开整点可以减少 GitHub 调度延迟。
 on:
   schedule:
+    # GitHub 的 schedule 只是「理想时间」：高负载会排队，实测晚了 5–6 小时。
+    # 2026-10-31 的 05:17Z 那次 10:55Z 才真正开始，11-01 的 05:17Z 这次是 11:50Z，
+    # 对应北京时间 19 点左右。想要卡准 14:17 JST 得靠外部调度器打 workflow_dispatch。
     - cron: '17 5 * * *'
   workflow_dispatch:
     inputs:
@@ -186,15 +189,29 @@ jobs:
       # cookie 过期 / PO token 缺失时，每个 watch 页都会被 bot 检查拦，
       # 而 fetch-streams 以前把元信息失败只记进进度文件。先探一场已知可读的场次，
       # 让失败停在日志清楚的地方，而不是跑完 7 分钟再报「成功」。
+      # 探针不能写死视频 ID：yt-dlp 的测试视频 BaW_jenozKc 下架之后，这步会把
+      # 「视频没了」误报成 cookie / 代理故障。优先取缓存里最近的一场真实场次。
       - name: Check YouTube access
         run: |
           set -uo pipefail
           echo "egress: $(curl -s --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -E '^(ip|loc)=' | tr '\n' ' ')"
-          args=(--simulate -J --cookies "$RUNNER_TEMP/cookies.txt" --socket-timeout 30 --retries 2)
+          common=(--cookies "$RUNNER_TEMP/cookies.txt" --socket-timeout 30 --retries 2)
           if [ -n "${YTDLP_PROXY:-}" ]; then
-            args+=(--proxy "$YTDLP_PROXY")
+            common+=(--proxy "$YTDLP_PROXY")
           fi
-          if yt-dlp -v "${args[@]}" "https://www.youtube.com/watch?v=BaW_jenozKc" > /dev/null 2> /tmp/probe.log; then
+          probe=$(jq -r '.streams[0]? // empty | "\(.startedAt // "")\t\(.videoId // "")"' data/*/manifest.json 2>/dev/null \
+            | sort -r | head -n 1 | cut -f 2)
+          if [ -z "$probe" ]; then
+            channel=$(jq -r '.datasets[0].channelId' data-sources.json)
+            probe=$(yt-dlp --flat-playlist --playlist-items 1 --print '%(id)s' "${common[@]}" \
+              "https://www.youtube.com/channel/${channel}/streams" 2> /dev/null | head -n 1)
+          fi
+          if [ -z "$probe" ]; then
+            echo "::error::拿不到探针视频：数据缓存为空，频道 /streams 也读不出来。先查 YT_COOKIES 与代理。"
+            exit 1
+          fi
+          echo "probe: https://www.youtube.com/watch?v=${probe}"
+          if yt-dlp -v --simulate -J "${common[@]}" "https://www.youtube.com/watch?v=${probe}" > /dev/null 2> /tmp/probe.log; then
             grep -E '\[pot\]|Generating a .* PO Token|cookies are no longer valid' /tmp/probe.log | sort -u || true
             echo "yt-dlp 可以读取元信息"
             exit 0
