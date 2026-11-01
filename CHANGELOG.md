@@ -52,6 +52,10 @@
 ### 工程
 
 - **SEO**：路由从 hash 改为真实路径（`createBrowserRouter` + `basename`），旧 `#/...` 链接由 `index.html` 内联脚本改写；`vercel.json` 增加 SPA rewrite。新增 `src/lib/seo.ts`（`buildSeo` / `buildSitemap` 纯函数）与 `useSeo`，统一每页 title / description / canonical / OG / JSON-LD；`scripts/generate-seo.ts` 在构建时为组首页、全组相册、每位成员的 6 个栏目页与 1891 个单场页生成静态 head 和 `<noscript>` 摘要，并输出 `sitemap.xml` / `robots.txt`；`verify:seo` 进 CI。对比页与未知路径 noindex，canonical 丢弃 query。
+- **代理出口改为日本优先**：`mihomo-config.ts` 不再写死只留香港节点，按 `MIHOMO_REGION`（默认 `日本,香港`）挑选地区，工作流显式设 `日本,香港`。出口地区要跟 `YT_COOKIES` 的签发地区一致，日本 cookie 配香港出口正是这次 100% 撞 bot 检查的原因。
+- **`export-yt-cookies` 只导 YouTube**：新增 `--domains`（默认 `youtube.com,google.com`），浏览器 profile 里 bilibili / pixiv / tiktok 等站的会话不再被塞进 CI secret；导出体积从 28 KB 降到 8 KB。导出前会删掉旧文件，避免上次裁剪坏了导致 yt-dlp 拒绝读写。
+- **定时任务抗 bot 检查**：`data.yml` 增加 `bgutil-ytdlp-pot-provider` 插件 + 本地 `4416` 令牌容器，cookie 与 PO token 同时具备；新增 `Check YouTube access` 预检（出口 IP/地区、PO token 提供者、cookie 是否失效，读不到直接在报错处停下）。`fetch-streams` 不再吞掉元信息失败——bot 检查计入失败并触发 `Data update failed` issue，会员限定降级为跳过；同时去掉 `--no-warnings`，失败时能看到 cookie / PO token 的真实提示。
+
 - **封面管线**：新增 `fetch:thumbs`（`maxresdefault` → `mqdefault`、并发、重试、单张失败跳过），`publish:data` 按 thumbs → pack → manifest/insights → index 上传，沿用增量发布进度。
 - **封面变体**：`fetch:thumbs` 用 `Bun.Image` 额外编码 480 / 960 / 1280w 的 WebP（480w 约 24 KB，原图约 144 KB），已有原图时自动补齐；`StreamCover` 用 `srcset` + `sizes` 由浏览器选档，变体缺失时退回原图。发布脚本把变体与 `Content-Type: image/webp` 一起上传，缺变体只警告。对象存储侧的长缓存规则见 [docs/deployment.md](docs/deployment.md) 的「封面与变体」。
 - **逐字稿管线**：新增 `transcript:new` / `transcript:import` / `publish:transcripts`；正文先传、索引最后写，单篇失败不阻塞；离线回退到构建期 Markdown 快照。

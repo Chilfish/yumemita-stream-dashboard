@@ -161,13 +161,29 @@ bun scripts/export-yt-cookies.ts --browser edge --push
 文件是 Netscape 格式，等同账号凭据：默认路径在 gitignore 内，不要提交、不要贴到聊天里。
 导出时会检查是否存在 `SID` / `__Secure-3PSID`，没有登录态会直接报错。
 
+### CI 抗 bot 检查
+
+GitHub runner 是云厂商 IP，YouTube 除了认 cookie 还要 PO token。工作流里：
+
+- 装 `bgutil-ytdlp-pot-provider` 插件（`~/.config/yt-dlp/plugins/`）并起一个 `127.0.0.1:4416` 的令牌容器；
+- `Check YouTube access` 先用 cookie 读一场已知视频的元信息，日志里打出出口 IP/地区、加载到的 PO token 提供者和 `cookies are no longer valid`；读不到直接报错停下；
+- `fetch-streams` 不再吞掉元信息失败：bot 检查、会员限定分别归类，前者计入失败并让工作流开 issue。
+
+排查顺序写在 [docs/deployment.md](../docs/deployment.md) 的「定时增量更新」。
+
 ### CI 代理（可选）
 
-GitHub runner 的出口 IP 更容易被 YouTube 的 bot 检查拦。配置 `MIHOMO_SUB_URL` 后，工作流会：
+配置 `MIHOMO_SUB_URL` 后，工作流会：
 
-1. `bun scripts/mihomo-config.ts <订阅> <config>`：只保留香港节点，开 `7890` 混合端口与 `9099` 控制端口，并写出默认节点名；
+1. `bun scripts/mihomo-config.ts <订阅> <config>`：只保留 `MIHOMO_REGION` 指定地区的节点（默认 `日本,香港`，先写的地区优先），开 `7890` 混合端口与 `9099` 控制端口，并写出默认节点名；
 2. 起 mihomo 并切到该节点；
 3. 导出 `YTDLP_PROXY=http://127.0.0.1:7890`。`fetch-streams` 与 `daily-update` 只把这个变量加给 yt-dlp（`--proxy`），R2 上传与 VSTATS 请求仍直连。
+
+出口地区要跟 `YT_COOKIES` 的签发地区一致，否则一样会撞 bot 检查。本地想指定地区：
+
+```bash
+MIHOMO_REGION=日本 bun scripts/mihomo-config.ts ./sub.yaml ./config.yaml
+```
 
 订阅拉不到或代理起不来时只发警告，任务继续直连。本地想临时走代理也可以：
 
