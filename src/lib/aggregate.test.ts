@@ -14,6 +14,7 @@ import {
   findStreamRow,
   findStreamSummary,
   percentChange,
+  streamTopWords,
 } from "./aggregate";
 
 function makeSummary(
@@ -442,6 +443,69 @@ describe("aggregate with full v2 data", () => {
     });
     // v2 场次用全量 60，v1 场次退回它自己的 Top 列表 3。
     expect(totals.topWords.find(word => word.word === "ライブ")?.count).toBe(63);
+  });
+
+  it("drops English stopwords from both full and top-list aggregates", () => {
+    const full = {
+      summary: makeSummary({
+        startedAt: "2026-10-01T20:00:00+09:00",
+        videoId: "a",
+        durationSec: 3600,
+      }),
+      pack: makePack({
+        id: "a",
+        startedAt: "2026-10-01T20:00:00+09:00",
+        durationSec: 3600,
+        avg: null,
+        chat: 100,
+        words: [{ word: "said", count: 40 }],
+        fullWords: { said: 40, hi: 40, the: 8, "かわいい": 27 },
+      }),
+    };
+    const list = {
+      summary: makeSummary({
+        startedAt: "2026-10-02T20:00:00+09:00",
+        videoId: "b",
+        durationSec: 3600,
+      }),
+      pack: makePack({
+        id: "b",
+        startedAt: "2026-10-02T20:00:00+09:00",
+        durationSec: 3600,
+        avg: null,
+        chat: 50,
+        words: [{ word: "hi", count: 30 }, { word: "ライブ", count: 3 }],
+      }),
+    };
+
+    const words = aggregateDataset([full, list]).topWords.map(word => word.word);
+    expect(words).toEqual(["かわいい", "ライブ"]);
+  });
+});
+
+describe("streamTopWords", () => {
+  it("drops stopwords from a v1 top list", () => {
+    expect(
+      streamTopWords({
+        topWords: [
+          { word: "said", count: 40 },
+          { word: "hi", count: 40 },
+          { word: "かわいい", count: 27 },
+        ],
+      }),
+    ).toEqual([{ word: "かわいい", count: 27 }]);
+  });
+
+  it("rebuilds from full wordCounts and re-sorts after filtering", () => {
+    expect(
+      streamTopWords({
+        topWords: [],
+        wordCounts: { said: 40, hi: 40, the: 9, "かわいい": 27, "ライブ": 12 },
+      }),
+    ).toEqual([
+      { word: "かわいい", count: 27 },
+      { word: "ライブ", count: 12 },
+    ]);
   });
 });
 

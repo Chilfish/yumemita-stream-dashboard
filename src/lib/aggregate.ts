@@ -4,6 +4,7 @@ import {
   classifyTitle,
   type ContentTypeKey,
 } from "@/lib/classify";
+import { isStopword } from "@/lib/stopwords";
 import type {
   ChatByKind,
   CurrencyTotal,
@@ -136,6 +137,23 @@ export function buildStreamRows(
     })
     .filter((row): row is StreamRow => row !== null)
     .sort((a, b) => (b.summary.startedAt ?? "").localeCompare(a.summary.startedAt ?? ""));
+}
+
+/**
+ * 单场高频词：v2 用全量 `wordCounts` 过滤停用词后重排，v1 退回已截断的 `topWords`。
+ * 旧 pack 的 Top 列表里还留着 `said` / `hi` 这类噪声，展示前统一过掉。
+ */
+export function streamTopWords(chat: {
+  topWords: TopWord[];
+  wordCounts?: Record<string, number>;
+}): TopWord[] {
+  if (chat.wordCounts) {
+    return Object.entries(chat.wordCounts)
+      .filter(([word]) => !isStopword(word))
+      .map(([word, count]) => ({ word, count }))
+      .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word));
+  }
+  return chat.topWords.filter(entry => !isStopword(entry.word));
 }
 
 export function currencyRows(totals: CurrencyTotals): CurrencyRow[] {
@@ -330,6 +348,7 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
     if (chat.wordCounts) {
       wordsFullCount += 1;
       for (const [word, count] of Object.entries(chat.wordCounts)) {
+        if (isStopword(word)) continue;
         const current = wordCounts.get(word) ?? { word, count: 0, streams: 0 };
         current.count += count;
         current.streams += 1;
@@ -338,6 +357,7 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
     }
     else {
       for (const word of chat.topWords) {
+        if (isStopword(word.word)) continue;
         const current = wordCounts.get(word.word) ?? { word: word.word, count: 0, streams: 0 };
         current.count += word.count;
         current.streams += 1;

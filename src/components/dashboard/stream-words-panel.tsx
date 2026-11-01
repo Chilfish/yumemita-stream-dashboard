@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { TopBars } from "@/components/charts/top-bars";
 import type { StreamRow } from "@/lib/aggregate";
+import { streamTopWords } from "@/lib/aggregate";
 import { formatInteger } from "@/lib/format";
 
 interface StreamWordsPanelProps {
@@ -22,7 +23,7 @@ export function StreamWordsPanel({ row }: StreamWordsPanelProps) {
   const { pack } = row;
   const chat = pack.chat;
 
-  const words = chat.topWords.slice(0, 16).map(word => ({
+  const words = streamTopWords(chat).slice(0, 16).map(word => ({
     label: word.word,
     value: word.count,
     hint: `${formatInteger(word.count)} 次`,

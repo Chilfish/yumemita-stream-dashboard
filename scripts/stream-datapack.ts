@@ -23,6 +23,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { upsertManifestStream } from './lib/dataset-manifest.ts'
+import { isStopword } from '../src/lib/stopwords.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
@@ -316,6 +317,8 @@ function countWords(texts: string[]): Map<string, number> {
         continue
       const informative = INFORMATIVE_RE.test(word) || word.length >= 4
       if (!informative)
+        continue
+      if (isStopword(word))
         continue
       counts.set(word, (counts.get(word) ?? 0) + 1)
     }

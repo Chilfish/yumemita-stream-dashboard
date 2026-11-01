@@ -24,6 +24,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { createObjectStore, readCredentials, remoteBase } from './lib/object-storage.ts'
+import { isStopword } from '../src/lib/stopwords.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(APP_ROOT, 'data')
@@ -109,12 +110,18 @@ for (const ds of datasets) {
   for (const { pack } of packs) {
     const chat = pack.chat
     if (chat.wordCounts) {
-      for (const [word, count] of Object.entries(chat.wordCounts))
+      for (const [word, count] of Object.entries(chat.wordCounts)) {
+        if (isStopword(word))
+          continue
         wordTotals.set(word, (wordTotals.get(word) ?? 0) + count)
+      }
     }
     else {
-      for (const word of chat.topWords)
+      for (const word of chat.topWords) {
+        if (isStopword(word.word))
+          continue
         wordTotals.set(word.word, (wordTotals.get(word.word) ?? 0) + word.count)
+      }
     }
 
     if (chat.authors) {

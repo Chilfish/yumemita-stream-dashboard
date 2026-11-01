@@ -14,6 +14,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { isStopword } from '../src/lib/stopwords.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
@@ -130,6 +131,8 @@ function countWords(texts: string[]): Map<string, number> {
       if (!segment.isWordLike || word.length < 2)
         continue
       if (!(INFORMATIVE_RE.test(word) || word.length >= 4))
+        continue
+      if (isStopword(word))
         continue
       counts.set(word, (counts.get(word) ?? 0) + 1)
     }
