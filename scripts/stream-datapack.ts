@@ -22,6 +22,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { parseAmount } from './lib/amount.ts'
 import { upsertManifestStream } from './lib/dataset-manifest.ts'
 import { isStopword } from '../src/lib/stopwords.ts'
 
@@ -237,20 +238,6 @@ function parseVstats(html: string): VstatsVideo {
     views: num(STAT_NUMBER_RE.exec(viewBlock ?? '')?.[1]),
     likes: num(STAT_NUMBER_RE.exec(likeBlock ?? '')?.[1]),
   }
-}
-
-const AMOUNT_RE = /^([¥₩$€£]|HK\$|NT\$|A\$|C\$)\s*([\d,]+(?:\.\d+)?)$/
-const AMOUNT_SEPARATOR_RE = /,/g
-
-function parseAmount(text: string | null | undefined): { currency: string, amount: number } | null {
-  if (!text)
-    return null
-  const m = AMOUNT_RE.exec(text.trim())
-  const currency = m?.[1]
-  const raw = m?.[2]
-  if (!currency || !raw)
-    return null
-  return { currency, amount: Number(raw.replace(AMOUNT_SEPARATOR_RE, '')) }
 }
 
 function chatTimestamp(record: ChatRecord): number | null {

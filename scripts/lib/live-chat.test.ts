@@ -82,6 +82,7 @@ describe('normalizeLiveChat', () => {
     })
     expect(result.total).toBe(4)
     expect(result.skipped).toBe(1)
+    expect(result.skippedKinds).toEqual({ liveChatViewerEngagementMessageRenderer: 1 })
 
     const records = readFileSync(output, 'utf8')
       .trim()

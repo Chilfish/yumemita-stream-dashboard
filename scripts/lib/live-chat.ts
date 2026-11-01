@@ -77,6 +77,8 @@ export interface NormalizeResult {
   total: number
   counts: Record<ChatRecord['msg']['kind'], number>
   skipped: number
+  /** 被丢弃的 renderer 类型 → 条数；用来发现还没收录的事件类型。 */
+  skippedKinds: Record<string, number>
 }
 
 const BADGE_SUFFIX_RE = /\s*\(.*\)\s*$/
@@ -202,8 +204,13 @@ export async function normalizeLiveChat(
     gift: 0,
     giftRedemption: 0,
   }
+  const skippedKinds: Record<string, number> = {}
   let seq = 0
   let skipped = 0
+  const noteSkipped = (kind: string) => {
+    skipped += 1
+    skippedKinds[kind] = (skippedKinds[kind] ?? 0) + 1
+  }
 
   for (const rawLine of text.split('\n')) {
     const trimmed = rawLine.trim()
@@ -214,14 +221,15 @@ export async function normalizeLiveChat(
       line = JSON.parse(trimmed) as RawLine
     }
     catch {
-      skipped += 1
+      noteSkipped('(unparsable line)')
       continue
     }
     for (const action of line.replayChatItemAction?.actions ?? []) {
-      const record = toRecord(action.addChatItemAction?.item, videoId, ++seq)
+      const item = action.addChatItemAction?.item
+      const record = toRecord(item, videoId, ++seq)
       if (!record) {
-        if (action.addChatItemAction?.item)
-          skipped += 1
+        if (item)
+          noteSkipped(Object.keys(item).find(key => key.endsWith('Renderer')) ?? '(unknown item)')
         continue
       }
       counts[record.msg.kind] += 1
@@ -233,7 +241,7 @@ export async function normalizeLiveChat(
     stream.end((error?: Error | null) => (error ? fail(error) : done()))
   })
 
-  return { total: Object.values(counts).reduce((sum, n) => sum + n, 0), counts, skipped }
+  return { total: Object.values(counts).reduce((sum, n) => sum + n, 0), counts, skipped, skippedKinds }
 }
 
 if (import.meta.main) {
@@ -256,5 +264,8 @@ if (import.meta.main) {
     ? resolve(values.out)
     : join(dirname(inputPath), `danmaku_${videoId}.jsonl`)
   const result = await normalizeLiveChat(inputPath, outputPath, videoId)
-  console.log(`[live-chat] ${result.total} 条（SC ${result.counts.superchat} / 贴纸 ${result.counts.sticker} / 会员 ${result.counts.membership} / 赠出会员 ${result.counts.gift} / 领取赠礼 ${result.counts.giftRedemption}；跳过 ${result.skipped}）→ ${outputPath}`)
+  const skippedDetail = Object.entries(result.skippedKinds)
+    .map(([kind, count]) => `${kind.replace(/^liveChat|Renderer$/g, '')} ${count}`)
+    .join(' / ')
+  console.log(`[live-chat] ${result.total} 条（SC ${result.counts.superchat} / 贴纸 ${result.counts.sticker} / 会员 ${result.counts.membership} / 赠出会员 ${result.counts.gift} / 领取赠礼 ${result.counts.giftRedemption}；跳过 ${result.skipped}${skippedDetail ? `：${skippedDetail}` : ''}）→ ${outputPath}`)
 }
