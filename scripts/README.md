@@ -381,7 +381,8 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 
 - **时间一律 JST（UTC+9）**；`video.startedAt` 取 `release_timestamp`（开播），不是 `timestamp`（公开）。
 - **纯表情**沿用归档工程 `scripts/danmaku` 的判定：`emoji.id` 含 `/` 的频道表情全部折成 `[表情]`，去掉后为空才算。
-- **SC 金额不换算**：`¥ / HK$ / NT$ / ₩` 各记各的，合计只按币种分组（汇率随时变，不做隐含假设）。
+- **SC 金额不换算**：`¥ / HK$ / NT$ / MX$ / SGD / IDR …` 各记各的，合计只按币种分组（汇率随时变，不做隐含假设）。币种取金额原文里第一个数字之前的前缀，不做白名单。
+- **只收 `addChatItemAction` 的事件**：banner / ticker 是同一事件的置顶与滚动副本，跳过避免重复；删除类 action 不回改已记录条数。Q&A、慢速模式、auto-mod 这类系统提示也不入库，但会按 renderer 类型计入归一化的 skipped 统计。
 - **词频剔除英文虚词/寒暄词**：只剩助词/语尾的短平假名会被丢掉，`said` / `hi` / `the` 这类 token 走 `src/lib/stopwords.ts` 的停用词表；同义词、表记揺れ仍不合并。
 - **作者身份**：归一化弹幕带 `msg.authorId`（来自 `authorExternalChannelId`）。显示名会改、会重名，观众重叠按 ID 合并；旧 jsonl 没有该字段，需要重新归一化。
 - **体积**：v2 每场多约 20–30 KB（全量词表 + 作者），只在单场页按需下载。

@@ -267,6 +267,20 @@
 
 `authorId` 是 YouTube 的稳定频道 ID（原始回放里的 `authorExternalChannelId`）。显示名会改、也会重名，**观众重叠必须按 `authorId` 合并**；没有 ID 的旧数据才退回显示名。
 
+#### 事件覆盖
+
+| renderer | 记录为 |
+| --- | --- |
+| `liveChatTextMessageRenderer` | `text` |
+| `liveChatPaidMessageRenderer` / `liveChatPaidStickerRenderer` | `superchat` / `sticker`（金额取 `purchaseAmountText`） |
+| `liveChatMembershipItemRenderer` | `membership`（入会/续费里程碑） |
+| `liveChatSponsorshipsGiftPurchaseAnnouncementRenderer` | `gift`（赠送方 + 个数） |
+| `liveChatSponsorshipsGiftRedemptionAnnouncementRenderer` | `giftRedemption`，在 pack 里并入 `membership` |
+
+主动忽略的：`liveChatViewerEngagementMessageRenderer`（系统欢迎语）、`liveChatModeChangeMessageRenderer`（慢速/会员限定开关）、auto-mod 提示、`liveChatBannerRenderer` / ticker（置顶与滚动副本，回放里它们的 renderer id 都能在 `addChatItemAction` 找到）、删除类 action（已记录的条目不回溯改写）。Q&A（`liveChatCallForQuestionsRenderer` / `liveChatCreatorAnswersQuestionsRenderer`）尚未收录，出现时会进入归一化的 skipped 统计。
+
+YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实时同接曲线也只有 VSTATS 的平均/最大两个快照值。
+
 ### `comments`
 
 | 字段 | 说明 |
@@ -358,7 +372,7 @@
 ## 口径与限制
 
 - **时间一律 JST（UTC+9）**。`video.startedAt` 取 `release_timestamp`（开播），不是 `timestamp`（公开）。
-- **SC / 贴纸金额不换算汇率**，只按币种分组。页面上的币种占比按**笔数**画，金额单独列。
+- **SC / 贴纸金额不换算汇率**，只按币种分组。币种取 `purchaseAmountText` 里第一个数字之前的前缀（`¥` / `HK$` / `MX$` / `SGD` / `₫` …），不维护白名单。页面上的币种占比按**笔数**画，金额单独列。
 - **`vstats` 可能为 null**：会员限定、站点未收录、或早于收录起始日。相关图表会跳过/显示“—”。
 - **评论区是抓取上限内的条数**，不等于视频总评论数；`video.snapshot.comments` 是 YouTube 侧的总数。
 - **Top 列表有截断**：`topWords` 最多 40、`topAuthors` 最多 20，单场页直接用它们。
