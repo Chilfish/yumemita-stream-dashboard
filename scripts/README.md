@@ -113,7 +113,7 @@ manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` �
 
 ## 每日增量更新
 
-`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面 → 定点发布」串成一条命令，本地和 GitHub Actions 共用。
+`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面与表情 → 定点发布」串成一条命令，本地和 GitHub Actions 共用。
 定时任务见 [docs/deployment.md](../docs/deployment.md) 的「定时增量更新」。
 
 ```powershell
@@ -237,6 +237,39 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 页面侧约定：`src/lib/thumb-variants.ts` 定义宽度与命名，`src/lib/data.ts` 拼 `thumbnailUrl()` /
 `thumbnailSrcSet()`，`StreamCover` 用 `srcset` + `sizes` 交给浏览器选档。
 
+## 频道表情
+
+原始回放的 emoji run 自带 `yt3.ggpht.com` 图片地址（48×48 PNG）。归一化时把本场出现过的
+频道专属表情写成 `danmaku/emoji_<videoId>.json`，`stream-datapack` 合并进 pack 的
+`chat.emojis`；`fetch-emoji.ts` 按这份清单镜像到本地，发布后页面按 id 渲染，不直连 YouTube。
+
+```powershell
+bun run fetch:emoji --dataset yuno                   # 只补缺失
+bun run fetch:emoji --dataset yuno --force           # 重抓全部
+bun run fetch:emoji --dataset yuno --dry-run
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dataset <id>` | dataset；不传则处理 `data-sources.json` 里的全部 |
+| `--limit <n>` | 每个 dataset 本次最多抓 n 张；0 = 全部 |
+| `--force` | 已存在的表情也重新下载 |
+| `--dry-run` | 只列出候选，不发请求、不写文件 |
+| `--concurrency <n>` | 并发，默认 4 |
+| `-h, --help` | 帮助 |
+
+- 只处理 `chat.emojis` 里有的表情；旧 pack 没有这个字段，需要重抓该场弹幕才会带上地址。
+- id 形如 `<channelId>/<hash>`，文件名固定为 `<hash>.png`；Unicode 表情不镜像，页面直接显示字符。
+- 校验：`content-type` 是 `image/*`、字节数 > 200；非 PNG（少见）用 `Bun.Image` 转码；
+  15 秒超时、失败重试 2 次，单张失败只记日志。
+- 上传顺序与封面相同（表情 / 封面 → pack → manifest / insights → index）。
+
+```text
+data/<datasetId>/emoji/<hash>.png        # 本地暂存（gitignore）
+<base>/<datasetId>/emoji/<hash>.png      # 对象存储
+<dataset>/emoji/<hash>                   # 页面由 emojiId 推导，不读清单
+```
+
 ## 补缺失弹幕（v2 全量升级）
 
 只抓 `live_chat` 回放，不重新抓 meta / 评论 / VSTATS；已有 pack 的其余字段原样保留。
@@ -325,6 +358,7 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 ├── meta/info.json                    # yt-dlp -J 原样输出
 ├── danmaku/danmaku_<videoId>.jsonl   # 归一化弹幕
 ├── danmaku/<videoId>.live_chat.json  # 原始回放（补会员里程碑文案；可选）
+├── danmaku/emoji_<videoId>.json      # 频道表情 id → 图片地址（归一化时生成）
 ├── comments/comments_<videoId>.json  # 评论区
 └── web/vstats_video_<videoId>.html   # VSTATS 单场页快照（可选）
 ```
@@ -369,6 +403,7 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 | `wordCounts`                                | **v2 全量**：`{ 词: 次数 }`，不截断；跨场精确词频靠它；同样剔除英文虚词/寒暄词 |
 | `hashtags`                                  | `#` / `＃` 标签计数                                                       |
 | `emojiKinds`                                | 表情种类数 ＋ Top 15（频道表情的 id 形如 `<channelId>/<hash>`）           |
+| `emojis`                                    | 本场频道专属表情的 `id` / `name` / `url`，供 `fetch:emoji` 镜像；旧 pack 缺失 |
 
 `derived`：
 
@@ -384,6 +419,7 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 - **SC 金额不换算**：`¥ / HK$ / NT$ / MX$ / SGD / IDR …` 各记各的，合计只按币种分组（汇率随时变，不做隐含假设）。币种取金额原文里第一个数字之前的前缀，不做白名单。
 - **只收 `addChatItemAction` 的事件**：banner / ticker 是同一事件的置顶与滚动副本，跳过避免重复；删除类 action 不回改已记录条数。Q&A、慢速模式、auto-mod 这类系统提示也不入库，但会按 renderer 类型计入归一化的 skipped 统计。
 - **词频剔除英文虚词/寒暄词**：只剩助词/语尾的短平假名会被丢掉，`said` / `hi` / `the` 这类 token 走 `src/lib/stopwords.ts` 的停用词表；同义词、表记揺れ仍不合并。
+- **频道表情只有重抓过弹幕的场次有**：图片地址来自原始回放的 emoji run；旧 pack 的 `chat.emojis` 缺失，页面退回 id 文本。
 - **作者身份**：归一化弹幕带 `msg.authorId`（来自 `authorExternalChannelId`）。显示名会改、会重名，观众重叠按 ID 合并；旧 jsonl 没有该字段，需要重新归一化。
 - **体积**：v2 每场多约 20–30 KB（全量词表 + 作者），只在单场页按需下载。
 - **没有同接曲线**：VSTATS 只给平均/最大＋最大值时刻，YouTube 也不保存历史同接。

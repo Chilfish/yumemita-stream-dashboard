@@ -4,6 +4,7 @@
 
 ### 数据
 
+- **频道专属表情入库**：归一化把本场出现过的频道表情（id / 名称 / 图片地址）写成 `danmaku/emoji_<videoId>.json`，pack 新增 `chat.emojis` 与 `paid.superchats[].emojis`；新增 `fetch:emoji` 把图片镜像到 `data/<datasetId>/emoji/<hash>.png`，`publish:data` 与封面一起先于 pack 上传。旧 pack 没有 `chat.emojis`，需要重抓该场弹幕。
 - **SC 币种不再丢**：金额解析改为「第一个数字之前的前缀即币种」，不再维护白名单。此前 `MX$` / `SGD` / `MYR` / `THB` / `IDR` / `ARS` / `R$` / `₱` / `₪` / `CA$` / `₫` 这些格式只会计入 SC 条数、不进 `paid.superchats` 与 `scTotalsByCurrency`（614 份 jsonl 里有 27 笔）。页面补上对应币种名称。
 - 归一化 skipped 按 renderer 类型计数并打印，未收录的事件类型（Q&A、mode change、auto-mod…）不再吞成一个总数。
 - **会员里程碑文案落进 jsonl**：`headerSubtext`（如 `Welcome to …`）现在随归一化写入 `msg.header`，不再依赖原始 `.live_chat.json`；`fetch-danmaku` 默认删原始档后重建也不会丢，旧 jsonl 仍回退原始档。
@@ -22,6 +23,7 @@
 
 ### 界面
 
+- 单场「弹幕与词」的表情榜改用图片渲染（频道表情按 id 取对象存储，Unicode 表情仍显示字符）；付费页的 SC 留言也会显示留言里的表情。
 - **封面层**：`fetch:thumbs` 把 YouTube 封面镜像到本地并随 `publish:data` 上传；首页最近一场、最近场次、单场页与相册统一 16:9 渲染，缺图走成员色兜底。
 - **相册页**：`/:datasetId/gallery`，按 JST 自然月分组的封面墙，懒加载、`?order=` 可分享；侧栏与移动端标签栏新增入口。
 - **组首页**：`/` 跨成员首屏：近 7 天 / 本月脉冲、最近一场焦点、跨成员最近更新与按成员进入；单个成员 manifest 加载失败时跳过并提示，不阻塞其余成员。

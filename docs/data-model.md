@@ -88,6 +88,10 @@
 
 > manifest 是**摘要**，页面图表需要的逐分钟序列、SC 明细、Top 列表在 datapack 里。
 
+频道专属表情同理：`bun run fetch:emoji` 把 `chat.emojis[].url` 指向的图片镜像到
+`data/<dataset>/emoji/<hash>.png`，发布到 `<base>/<dataset>/emoji/<hash>.png`；
+页面按 `emojiId`（`<channelId>/<hash>`）直接拼 URL，不读清单。发布顺序与封面相同。
+
 封面图是这套数据里唯一的二进制对象：原图放在 `<base>/<dataset>/thumbs/<videoId>.jpg`，
 同目录另有 480 / 960 / 1280w 的 WebP 变体 `<videoId>.<width>.webp`（本地暂存为
 `data/<dataset>/thumbs/…`，gitignore），都由 `bun run fetch:thumbs` 生成（原图从 YouTube 镜像，变体由
@@ -252,7 +256,7 @@
 | `density.perMinuteSc` | 逐分钟 SC 笔数 |
 | `density.perFiveMinute` / `perTenMinute` | 5/10 分钟汇总；10 分钟档带 `offsetMin` / `at` |
 | `density.peakMinute` | 峰值分钟 `{ offsetMin, at, count }` |
-| `paid.superchats` | SC 全量：`at` / `author` / `amountText` / `currency` / `amount` / `message` |
+| `paid.superchats` | SC 全量：`at` / `author` / `amountText` / `currency` / `amount` / `message` / `emojis`（留言里的表情 id） |
 | `paid.scTotalsByCurrency` | 分币种合计，不换算汇率 |
 | `paid.stickers` / `stickerTotalsByCurrency` | 贴纸同上 |
 | `paid.memberships` | 会员里程碑（`header` 来自归一化弹幕，旧 jsonl 回退原始回放的 `headerSubtext`；领到赠礼时为 `received a gift membership by …`） |
@@ -264,6 +268,7 @@
 | `wordCounts` | **v2**：全量分词词频 `{ 词: 次数 }`，不截断；同样已剔除英文虚词与寒暄词 |
 | `hashtags` | `#` / `＃` 标签计数 |
 | `emojiKinds` | 表情种类数 + Top 15 |
+| `emojis` | 本场出现过的频道专属表情：`id`（`<channelId>/<hash>`）/ `name` / `url`（InnerTube 原图）；旧 pack 缺失 |
 
 `authorId` 是 YouTube 的稳定频道 ID（原始回放里的 `authorExternalChannelId`）。显示名会改、也会重名，**观众重叠必须按 `authorId` 合并**；没有 ID 的旧数据才退回显示名。
 
@@ -378,6 +383,7 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 - **Top 列表有截断**：`topWords` 最多 40、`topAuthors` 最多 20，单场页直接用它们。
 - **英文虚词与寒暄词不进词频**：`Intl.Segmenter` 会把英文句子切成完整单词，`said` / `hi` / `the` 这类不承载内容的 token 不该挤进高频词。分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表，旧 pack 里残留的这类词在展示时也会被过滤。
 - **跨场精确聚合依赖 v2**：v2 pack 另存全量 `wordCounts` / `authors`，`publish:data` 据此重扫；v1 场次自动回退到该场的 Top 列表相加。`insights.totals.aggregation` 标出 `full` / `partial` / `top-lists` 与覆盖率，页面文案随之切换。
+- **频道专属表情只有重新归一化过才有图**：图片地址来自原始回放的 emoji run；旧 pack 没有 `chat.emojis` 时页面退回显示 id。Unicode 表情不镜像，直接显示字符。
 - **作者身份以 `authorId` 为准**：旧 jsonl 没有该字段（显示名会改、会重名），需要归档侧重跑归一化才能补齐；缺 ID 时只能按显示名匹配，重叠结果仅供参考。
 - **会员里程碑 ≠ 入会人数**：只记录直播中出现的提示；领取赠礼同样只算直播里看到的领取，没被领走的赠礼只体现在 `paid.gifts` 的 `count` 里。
 - **播放/点赞有两套时点**：`vstats` 是站点快照，`video.snapshot` 是 yt-dlp 抓取时点；差值方向不固定。
