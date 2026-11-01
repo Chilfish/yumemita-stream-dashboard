@@ -16,7 +16,7 @@ import {
   formatPercent,
   formatTime,
 } from "@/lib/format";
-import type { CurrencyTotals, Membership, Sticker } from "@/types/datapack";
+import type { CurrencyTotals, GiftMembership, Membership, Sticker } from "@/types/datapack";
 
 interface StreamPaidPanelProps {
   row: StreamRow;
@@ -32,8 +32,11 @@ export function StreamPaidPanel({ row }: StreamPaidPanelProps) {
   const superchats = [...paid.superchats].sort((a, b) => b.at.localeCompare(a.at));
   const scTotals = currencyEntries(paid.scTotalsByCurrency);
   const stickerTotals = currencyEntries(paid.stickerTotalsByCurrency);
+  const gifts = paid.gifts ?? [];
+  const giftTotal = gifts.reduce((sum, gift) => sum + gift.count, 0);
   const hasSc = superchats.length > 0;
-  const hasOtherPaid = paid.stickers.length > 0 || paid.memberships.length > 0;
+  const hasOtherPaid =
+    paid.stickers.length > 0 || paid.memberships.length > 0 || gifts.length > 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -115,6 +118,15 @@ export function StreamPaidPanel({ row }: StreamPaidPanelProps) {
 
       {hasOtherPaid ? (
         <section className="grid grid-cols-1 gap-5 border-t border-hairline pt-5 sm:grid-cols-2">
+          {gifts.length > 0 ? (
+            <div>
+              <h3 className="text-caption text-muted-foreground">
+                赠送会员 · {formatInteger(gifts.length)} 次 · 共 {formatInteger(giftTotal)} 个
+              </h3>
+              <GiftList gifts={gifts} />
+            </div>
+          ) : null}
+
           {paid.stickers.length > 0 ? (
             <div>
               <h3 className="text-caption text-muted-foreground">
@@ -172,6 +184,29 @@ function StickerList({ stickers }: { stickers: Sticker[] }) {
   );
 }
 
+function GiftList({ gifts }: { gifts: GiftMembership[] }) {
+  return (
+    <ul className="mt-1 flex flex-col gap-0.5 divide-y divide-hairline">
+      {gifts.slice(0, 8).map((gift, index) => (
+        <li
+          className="flex items-baseline justify-between gap-2 py-1 text-footnote"
+          key={`${gift.at}-${gift.author}-${index}`}
+          title={gift.text}
+        >
+          <span className="min-w-0 truncate text-muted-foreground">
+            <span className="tabular-nums text-ink-3">{formatTime(gift.at)}</span> ·{" "}
+            {gift.author}
+          </span>
+          <span className="shrink-0 tabular-nums text-foreground">×{formatInteger(gift.count)}</span>
+        </li>
+      ))}
+      {gifts.length > 8 ? (
+        <li className="py-1 text-caption text-ink-3">另有 {gifts.length - 8} 次未展开</li>
+      ) : null}
+    </ul>
+  );
+}
+
 function MembershipList({ memberships }: { memberships: Membership[] }) {
   return (
     <ul className="mt-1 flex flex-col gap-0.5 divide-y divide-hairline">
@@ -181,7 +216,10 @@ function MembershipList({ memberships }: { memberships: Membership[] }) {
           key={`${membership.at}-${membership.author}-${index}`}
         >
           <span className="min-w-0 truncate text-foreground">{membership.author}</span>
-          <span className="shrink-0 text-caption text-ink-3">
+          <span
+            className="max-w-[60%] shrink-0 truncate text-caption text-ink-3"
+            title={membership.header ?? undefined}
+          >
             {membership.header ?? formatTime(membership.at)}
           </span>
         </li>

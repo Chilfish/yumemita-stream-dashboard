@@ -35,11 +35,13 @@ export function StreamWordsPanel({ row }: StreamWordsPanelProps) {
     hint: `${formatInteger(author.messages)} 条 · SC ${author.superchats} 笔`,
   }));
 
+  const giftCount = chat.byKind.gift ?? 0;
   const kindRows: KeyValueRow[] = [
     { label: "文字", value: formatInteger(chat.byKind.text) },
     { label: "Super Chat", value: formatInteger(chat.byKind.superchat) },
     { label: "贴纸", value: formatInteger(chat.byKind.sticker) },
     { label: "会员", value: formatInteger(chat.byKind.membership) },
+    ...(giftCount > 0 ? [{ label: "赠送会员", value: formatInteger(giftCount) }] : []),
     { label: "纯表情条目", value: formatInteger(chat.pureEmojiOnly) },
     { label: "主播本人发言", value: formatInteger(chat.ownerMessages) },
   ];

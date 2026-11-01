@@ -38,6 +38,10 @@ export interface StreamSummary {
   scTotalsByCurrency: CurrencyTotals
   stickers: number
   memberships: number
+  /** 赠送会员公告数；v2 之前的 pack 没有，缺失时记 0。 */
+  gifts: number
+  /** 赠送会员总数（把每次公告的 `count` 相加）。 */
+  giftedMemberships: number
   commentsCaptured: number | null
   chatPer1000AvgViewers: number | null
   likesPer1000Views: number | null
@@ -97,6 +101,7 @@ export interface DatapackSummarySource {
       scTotalsByCurrency: CurrencyTotals
       stickers: unknown[]
       memberships: unknown[]
+      gifts?: { count?: number | null }[] | null
     }
   }
   comments?: { total?: number | null } | null
@@ -144,6 +149,8 @@ export function buildStreamSummary(pack: DatapackSummarySource, datapackRel: str
     scTotalsByCurrency: chat.paid.scTotalsByCurrency,
     stickers: chat.paid.stickers.length,
     memberships: chat.paid.memberships.length,
+    gifts: chat.paid.gifts?.length ?? 0,
+    giftedMemberships: (chat.paid.gifts ?? []).reduce((sum, gift) => sum + (gift.count ?? 0), 0),
     commentsCaptured: pack.comments?.total ?? null,
     chatPer1000AvgViewers: pack.derived?.chatPer1000AvgViewers ?? null,
     likesPer1000Views: pack.derived?.likesPer1000Views ?? null,

@@ -12,6 +12,8 @@ export const ChatByKindSchema = v.object({
   superchat: v.number(),
   sticker: v.number(),
   membership: v.number(),
+  // 赠送会员公告；v2 之前的 pack / manifest 没有。
+  gift: v.optional(v.number()),
 });
 
 export const DatasetIndexSchema = v.object({
@@ -39,6 +41,8 @@ export const StreamSummarySchema = v.object({
   chatTotal: v.number(),
   uniqueAuthors: v.number(),
   superchats: v.number(),
+  gifts: v.optional(v.number()),
+  giftedMemberships: v.optional(v.number()),
   chatByKind: ChatByKindSchema,
   scTotalsByCurrency: CurrencyTotalsSchema,
   availability: v.nullable(v.string()),
@@ -117,6 +121,13 @@ const SuperchatSchema = v.object({
   message: v.string(),
 });
 
+const GiftMembershipSchema = v.object({
+  at: v.string(),
+  author: v.string(),
+  count: v.number(),
+  text: v.string(),
+});
+
 const DatapackChatSchema = v.object({
   total: v.number(),
   byKind: ChatByKindSchema,
@@ -125,6 +136,8 @@ const DatapackChatSchema = v.object({
   paid: v.object({
     superchats: v.array(SuperchatSchema),
     scTotalsByCurrency: CurrencyTotalsSchema,
+    // v2 之前的 pack 没有：只有重新抓过弹幕的场次才有赠送会员。
+    gifts: v.optional(v.array(GiftMembershipSchema)),
   }),
   // v2 字段；v1 pack 没有，校验时按可选处理。
   authors: v.optional(v.array(AuthorStatSchema)),

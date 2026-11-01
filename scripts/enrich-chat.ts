@@ -123,6 +123,11 @@ function isEmojiOnly(msg: ChatMsg): boolean {
   return body.length > 0 && body.replace(CHANNEL_EMOJI_RE, '') === ''
 }
 
+/** 赠送/领取的系统文案不是观众发言，计入词频会把榜单刷满 `gift` / `membership`。 */
+function isSystemChat(kind: string | undefined): boolean {
+  return kind === 'gift' || kind === 'giftRedemption'
+}
+
 function countWords(texts: string[]): Map<string, number> {
   const counts = new Map<string, number>()
   for (const text of texts) {
@@ -186,7 +191,7 @@ function rebuildChat(records: ChatRecord[]) {
     .map(record => ({ record, at: chatTimestamp(record) }))
     .filter((entry): entry is { record: ChatRecord, at: number } => entry.at != null)
 
-  const byKind: Record<string, number> = { text: 0, superchat: 0, sticker: 0, membership: 0 }
+  const byKind: Record<string, number> = { text: 0, superchat: 0, sticker: 0, membership: 0, gift: 0 }
   const authors = new Map<string, AuthorEntry>()
   const badges = new Map<string, number>()
   let pureEmojiOnly = 0
@@ -194,7 +199,9 @@ function rebuildChat(records: ChatRecord[]) {
 
   for (const { record } of timed) {
     const msg = record.msg
-    const kind = (msg.kind ?? 'text') as keyof typeof byKind
+    // 领取赠礼也是一次会员事件，并入 membership；赠送方的一次购买单独记 gift。
+    const rawKind = msg.kind ?? 'text'
+    const kind = rawKind === 'giftRedemption' ? 'membership' : rawKind
     if (kind in byKind)
       byKind[kind] += 1
 
@@ -230,7 +237,11 @@ function rebuildChat(records: ChatRecord[]) {
   }
 
   const authorList = [...authors.values()].sort((a, b) => b.messages - a.messages)
-  const wordCounts = countWords(timed.map(({ record }) => record.msg.text ?? ''))
+  const wordCounts = countWords(
+    timed
+      .filter(({ record }) => !isSystemChat(record.msg.kind))
+      .map(({ record }) => record.msg.text ?? ''),
+  )
 
   return {
     total: timed.length,

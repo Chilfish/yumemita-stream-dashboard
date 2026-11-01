@@ -29,6 +29,10 @@ export interface StreamSummary {
   scTotalsByCurrency: CurrencyTotals;
   stickers: number;
   memberships: number;
+  /** 赠送会员公告数；旧 manifest 没有这个字段。 */
+  gifts?: number;
+  /** 赠送会员总数；旧 manifest 没有这个字段。 */
+  giftedMemberships?: number;
   commentsCaptured: number | null;
   chatPer1000AvgViewers: number | null;
   likesPer1000Views: number | null;

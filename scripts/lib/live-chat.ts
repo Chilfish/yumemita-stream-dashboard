@@ -12,11 +12,19 @@ import { createWriteStream, readFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
+/** 赠送会员公告的作者/文案在 `header` 里，不在 renderer 顶层。 */
+interface SponsorshipsHeader {
+  authorName?: { simpleText?: string }
+  authorBadges?: BadgeWrapper[]
+  primaryText?: { runs?: Run[] }
+}
+
 interface Renderer {
   authorName?: { simpleText?: string }
   authorExternalChannelId?: string
   authorBadges?: BadgeWrapper[]
   message?: { runs?: Run[] }
+  header?: { liveChatSponsorshipsHeaderRenderer?: SponsorshipsHeader }
   timestampUsec?: string
   purchaseAmountText?: { simpleText?: string }
 }
@@ -38,6 +46,8 @@ interface ChatItemWrapper {
   liveChatPaidMessageRenderer?: Renderer
   liveChatPaidStickerRenderer?: Renderer
   liveChatMembershipItemRenderer?: Renderer
+  liveChatSponsorshipsGiftPurchaseAnnouncementRenderer?: Renderer
+  liveChatSponsorshipsGiftRedemptionAnnouncementRenderer?: Renderer
 }
 
 interface RawLine {
@@ -54,10 +64,12 @@ export interface ChatRecord {
     authorId?: string
     text?: string
     sc?: string | null
-    kind: 'text' | 'superchat' | 'sticker' | 'membership'
+    kind: 'text' | 'superchat' | 'sticker' | 'membership' | 'gift' | 'giftRedemption'
     timestampUs?: string
     emoji?: { id: string }[]
     badges?: string[]
+    /** 一次赠送的会员个数（仅 `kind: 'gift'`）。 */
+    giftCount?: number
   }
 }
 
@@ -86,11 +98,23 @@ function badgeNames(wrappers: BadgeWrapper[] | undefined): string[] {
   return names
 }
 
+/** 「Sent 50 … gift memberships」里的数量：优先取纯数字的 run，再退回文案里的第一个数字。 */
+function giftCountOf(runs: Run[] | undefined, text: string): number | null {
+  for (const run of runs ?? []) {
+    const match = /^[\d,]+$/.exec((run.text ?? '').trim())
+    if (match)
+      return Number(match[0].replace(/,/g, ''))
+  }
+  const fallback = /([\d,]+)/.exec(text)
+  return fallback ? Number(fallback[1]!.replace(/,/g, '')) : null
+}
+
 function toRecord(item: ChatItemWrapper | undefined, videoId: string, seq: number): ChatRecord | null {
   if (!item)
     return null
 
   let renderer: Renderer | undefined
+  let header: SponsorshipsHeader | undefined
   let kind: ChatRecord['msg']['kind'] = 'text'
   if (item.liveChatTextMessageRenderer) {
     renderer = item.liveChatTextMessageRenderer
@@ -107,12 +131,22 @@ function toRecord(item: ChatItemWrapper | undefined, videoId: string, seq: numbe
     renderer = item.liveChatMembershipItemRenderer
     kind = 'membership'
   }
+  else if (item.liveChatSponsorshipsGiftPurchaseAnnouncementRenderer) {
+    renderer = item.liveChatSponsorshipsGiftPurchaseAnnouncementRenderer
+    header = renderer.header?.liveChatSponsorshipsHeaderRenderer
+    kind = 'gift'
+  }
+  else if (item.liveChatSponsorshipsGiftRedemptionAnnouncementRenderer) {
+    renderer = item.liveChatSponsorshipsGiftRedemptionAnnouncementRenderer
+    kind = 'giftRedemption'
+  }
   if (!renderer)
     return null
 
+  const runs = header?.primaryText?.runs ?? renderer.message?.runs
   let text = ''
   const emoji: { id: string }[] = []
-  for (const run of renderer.message?.runs ?? []) {
+  for (const run of runs ?? []) {
     if (typeof run.text === 'string')
       text += run.text
     else if (run.emoji?.emojiId)
@@ -121,17 +155,22 @@ function toRecord(item: ChatItemWrapper | undefined, videoId: string, seq: numbe
 
   const timestampUs = renderer.timestampUsec
   const msg: ChatRecord['msg'] = {
-    author: renderer.authorName?.simpleText,
+    author: header?.authorName?.simpleText ?? renderer.authorName?.simpleText,
     text,
     kind,
     sc: renderer.purchaseAmountText?.simpleText ?? null,
     timestampUs,
   }
+  if (kind === 'gift') {
+    const giftCount = giftCountOf(runs, text)
+    if (giftCount != null)
+      msg.giftCount = giftCount
+  }
   if (renderer.authorExternalChannelId)
     msg.authorId = renderer.authorExternalChannelId
   if (emoji.length)
     msg.emoji = emoji
-  const badges = badgeNames(renderer.authorBadges)
+  const badges = badgeNames(header?.authorBadges ?? renderer.authorBadges)
   if (badges.length)
     msg.badges = badges
 
@@ -155,7 +194,14 @@ export async function normalizeLiveChat(
 ): Promise<NormalizeResult> {
   const text = readFileSync(input, 'utf8')
   const stream = createWriteStream(output, 'utf8')
-  const counts: NormalizeResult['counts'] = { text: 0, superchat: 0, sticker: 0, membership: 0 }
+  const counts: NormalizeResult['counts'] = {
+    text: 0,
+    superchat: 0,
+    sticker: 0,
+    membership: 0,
+    gift: 0,
+    giftRedemption: 0,
+  }
   let seq = 0
   let skipped = 0
 
@@ -210,5 +256,5 @@ if (import.meta.main) {
     ? resolve(values.out)
     : join(dirname(inputPath), `danmaku_${videoId}.jsonl`)
   const result = await normalizeLiveChat(inputPath, outputPath, videoId)
-  console.log(`[live-chat] ${result.total} 条（SC ${result.counts.superchat} / 贴纸 ${result.counts.sticker} / 会员 ${result.counts.membership}；跳过 ${result.skipped}）→ ${outputPath}`)
+  console.log(`[live-chat] ${result.total} 条（SC ${result.counts.superchat} / 贴纸 ${result.counts.sticker} / 会员 ${result.counts.membership} / 赠出会员 ${result.counts.gift} / 领取赠礼 ${result.counts.giftRedemption}；跳过 ${result.skipped}）→ ${outputPath}`)
 }

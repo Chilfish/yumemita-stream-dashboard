@@ -59,7 +59,10 @@ export interface ChatByKind {
   text: number;
   superchat: number;
   sticker: number;
+  /** 会员里程碑；领到的赠礼会员也计在这里。 */
   membership: number;
+  /** 赠出会员（购买方的赠送公告）。旧 pack 没有这个字段。 */
+  gift?: number;
 }
 
 export interface TimeRange {
@@ -110,7 +113,19 @@ export interface Sticker {
 export interface Membership {
   at: string;
   author: string;
+  /** 自己入会/续费取原始回放的 `headerSubtext`；领到赠礼时为 `received a gift membership by …`。 */
   header: string | null;
+}
+
+/** 一次赠送会员公告（`Sent 50 … gift memberships`）。 */
+export interface GiftMembership {
+  at: string;
+  /** 赠送方。 */
+  author: string;
+  /** 这次送出的会员个数。 */
+  count: number;
+  /** 公告原文。 */
+  text: string;
 }
 
 export interface PaidInfo {
@@ -119,6 +134,8 @@ export interface PaidInfo {
   stickers: Sticker[];
   stickerTotalsByCurrency: CurrencyTotals;
   memberships: Membership[];
+  /** 赠送会员公告。旧 pack 没有这个字段。 */
+  gifts?: GiftMembership[];
   paidSharePct: number | null;
 }
 

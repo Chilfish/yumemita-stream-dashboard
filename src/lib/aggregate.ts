@@ -172,7 +172,7 @@ function addCurrency(target: Map<string, CurrencyTotal>, source: CurrencyTotals)
 }
 
 function emptyKind(): ChatByKind {
-  return { text: 0, superchat: 0, sticker: 0, membership: 0 };
+  return { text: 0, superchat: 0, sticker: 0, membership: 0, gift: 0 };
 }
 
 function maxBy<T>(items: T[], value: (item: T) => number | null | undefined): T | null {
@@ -322,6 +322,7 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
     chatByKind.superchat += chat.byKind.superchat;
     chatByKind.sticker += chat.byKind.sticker;
     chatByKind.membership += chat.byKind.membership;
+    chatByKind.gift = (chatByKind.gift ?? 0) + (chat.byKind.gift ?? 0);
     pureEmojiOnly += chat.pureEmojiOnly;
     uniqueAuthorsSum += chat.uniqueAuthors;
     commentTotal += pack.comments?.total ?? 0;

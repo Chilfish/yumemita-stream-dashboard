@@ -42,6 +42,7 @@ interface ChatMsg {
   badges?: string[]
   emoji?: { id: string }[]
   timestampUs?: string | number
+  giftCount?: number
 }
 
 interface ChatRecord {
@@ -326,6 +327,11 @@ function countWords(texts: string[]): Map<string, number> {
   return counts
 }
 
+/** 赠送/领取的系统文案不是观众发言，计入词频会把榜单刷满 `gift` / `membership`。 */
+function isSystemChat(kind: string | undefined): boolean {
+  return kind === 'gift' || kind === 'giftRedemption'
+}
+
 /** v1 的 Top 列表：从全量词频里取 ≥3 次的前 40 个，单场页直接用。 */
 function topWords(counts: Map<string, number>, limit = 40): { word: string, count: number }[] {
   return [...counts.entries()]
@@ -370,7 +376,7 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
     .filter((entry): entry is { record: ChatRecord, at: number } => entry.at != null)
     .sort((a, b) => a.at - b.at)
 
-  const byKind = { text: 0, superchat: 0, sticker: 0, membership: 0 }
+  const byKind = { text: 0, superchat: 0, sticker: 0, membership: 0, gift: 0 }
   // 按稳定 ID 去重；没有 ID 的旧数据退回显示名。显示名会改、会重名，不能当主键。
   const authors = new Map<string, {
     author: string
@@ -389,13 +395,16 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
   const stickerTotals = new Map<string, { count: number, amount: number }>()
   const headers = membershipHeaders(rawChatPath)
   const membershipList: { at: string, author: string, header: string | null }[] = []
+  const giftList: { at: string, author: string, count: number, text: string }[] = []
   let pureEmoji = 0
   let ownerMessages = 0
 
   for (const { record, at } of timed) {
-    const kind = (record.msg.kind ?? 'text') as keyof typeof byKind
+    const rawKind = record.msg.kind ?? 'text'
+    // 领取赠礼也是一次会员事件，并入 membership；赠送方的一次购买单独记 gift。
+    const kind = rawKind === 'giftRedemption' ? 'membership' : rawKind
     if (kind in byKind)
-      byKind[kind] += 1
+      byKind[kind as keyof typeof byKind] += 1
 
     const author = record.msg.author ?? '(unknown)'
     const authorKey = record.msg.authorId ? `id:${record.msg.authorId}` : `name:${author}`
@@ -446,9 +455,16 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
       stickerTotals.set(parsed.currency, total)
     }
     if (kind === 'membership') {
+      // 领取赠礼的文案就在归一化弹幕里（`received a gift membership by …`），
+      // 自己入会/续费的 milestone 文案则只在原始回放的 `headerSubtext` 里。
       const raw = record.msg.timestampUs
-      membershipList.push({ at: jstIso(at), author, header: raw != null ? headers.get(String(raw)) ?? null : null })
+      const header = rawKind === 'giftRedemption'
+        ? text.trim() || null
+        : raw != null ? headers.get(String(raw)) ?? null : null
+      membershipList.push({ at: jstIso(at), author, header })
     }
+    if (rawKind === 'gift')
+      giftList.push({ at: jstIso(at), author, count: record.msg.giftCount ?? 0, text })
   }
 
   const firstAt = timed[0]?.at ?? null
@@ -500,7 +516,11 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
     memberships: entry.memberships,
   }))
 
-  const wordCounts = countWords(timed.map(({ record }) => record.msg.text ?? ''))
+  const wordCounts = countWords(
+    timed
+      .filter(({ record }) => !isSystemChat(record.msg.kind))
+      .map(({ record }) => record.msg.text ?? ''),
+  )
   // 先按次数、再按词排序：同样的输入每次产出同样的 JSON，方便比对 diff。
   const wordCountPayload = Object.fromEntries(
     [...wordCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
@@ -574,7 +594,10 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
         stickers: stickerList,
         stickerTotalsByCurrency: Object.fromEntries([...stickerTotals.entries()]),
         memberships: membershipList,
-        paidSharePct: timed.length ? round(((scList.length + stickerList.length + membershipList.length) / timed.length) * 100, 1) : null,
+        gifts: giftList,
+        paidSharePct: timed.length
+          ? round(((scList.length + stickerList.length + membershipList.length + giftList.length) / timed.length) * 100, 1)
+          : null,
       },
       topAuthors,
       authors: authorStats,
