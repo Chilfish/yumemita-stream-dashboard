@@ -257,9 +257,9 @@
 | `paid.memberships` | 会员里程碑（`header` 来自原始 chat 回放） |
 | `paid.paidSharePct` | 付费条目占比 |
 | `topAuthors` | 发言数 Top 20（含 `authorId` / SC / 贴纸 / 会员次数） |
-| `topWords` | 分词词频（≥3 次、最多 40 个） |
+| `topWords` | 分词词频（≥3 次、最多 40 个；已剔除英文虚词与寒暄词） |
 | `authors` | **v2**：全量作者统计，按发言数降序；字段 `author` / `authorId` / `messages` / `superchats` / `stickers` / `memberships` |
-| `wordCounts` | **v2**：全量分词词频 `{ 词: 次数 }`，不截断 |
+| `wordCounts` | **v2**：全量分词词频 `{ 词: 次数 }`，不截断；同样已剔除英文虚词与寒暄词 |
 | `hashtags` | `#` / `＃` 标签计数 |
 | `emojiKinds` | 表情种类数 + Top 15 |
 
@@ -360,6 +360,7 @@
 - **`vstats` 可能为 null**：会员限定、站点未收录、或早于收录起始日。相关图表会跳过/显示“—”。
 - **评论区是抓取上限内的条数**，不等于视频总评论数；`video.snapshot.comments` 是 YouTube 侧的总数。
 - **Top 列表有截断**：`topWords` 最多 40、`topAuthors` 最多 20，单场页直接用它们。
+- **英文虚词与寒暄词不进词频**：`Intl.Segmenter` 会把英文句子切成完整单词，`said` / `hi` / `the` 这类不承载内容的 token 不该挤进高频词。分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表，旧 pack 里残留的这类词在展示时也会被过滤。
 - **跨场精确聚合依赖 v2**：v2 pack 另存全量 `wordCounts` / `authors`，`publish:data` 据此重扫；v1 场次自动回退到该场的 Top 列表相加。`insights.totals.aggregation` 标出 `full` / `partial` / `top-lists` 与覆盖率，页面文案随之切换。
 - **作者身份以 `authorId` 为准**：旧 jsonl 没有该字段（显示名会改、会重名），需要归档侧重跑归一化才能补齐；缺 ID 时只能按显示名匹配，重叠结果仅供参考。
 - **会员里程碑 ≠ 入会人数**：只记录直播中出现的提示。

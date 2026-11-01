@@ -363,9 +363,9 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 | `paid.memberships`                          | 会员里程碑（`header` 取自原始回放的 `headerSubtext`，如「Welcome to …」） |
 | `paid.paidSharePct`                         | 付费条目占全部条目的比例                                                  |
 | `topAuthors`                                | 发言数 Top 20（含 `authorId` / 各自 SC / 贴纸 / 会员次数）                |
-| `topWords`                                  | 分词后词频（`Intl.Segmenter` 日语分词；≥3 次、最多 40 个）                |
+| `topWords`                                  | 分词后词频（`Intl.Segmenter` 日语分词；≥3 次、最多 40 个；剔除英文虚词/寒暄词） |
 | `authors`                                   | **v2 全量**：`author` / `authorId` / `messages` / SC / 贴纸 / 会员次数    |
-| `wordCounts`                                | **v2 全量**：`{ 词: 次数 }`，不截断；跨场精确词频靠它                     |
+| `wordCounts`                                | **v2 全量**：`{ 词: 次数 }`，不截断；跨场精确词频靠它；同样剔除英文虚词/寒暄词 |
 | `hashtags`                                  | `#` / `＃` 标签计数                                                       |
 | `emojiKinds`                                | 表情种类数 ＋ Top 15（频道表情的 id 形如 `<channelId>/<hash>`）           |
 
@@ -381,7 +381,7 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 - **时间一律 JST（UTC+9）**；`video.startedAt` 取 `release_timestamp`（开播），不是 `timestamp`（公开）。
 - **纯表情**沿用归档工程 `scripts/danmaku` 的判定：`emoji.id` 含 `/` 的频道表情全部折成 `[表情]`，去掉后为空才算。
 - **SC 金额不换算**：`¥ / HK$ / NT$ / ₩` 各记各的，合计只按币种分组（汇率随时变，不做隐含假设）。
-- **词频不做语义过滤**：只剩助词/语尾的短平假名会被丢掉，但同义词、表记揺れ不会合并。
+- **词频剔除英文虚词/寒暄词**：只剩助词/语尾的短平假名会被丢掉，`said` / `hi` / `the` 这类 token 走 `src/lib/stopwords.ts` 的停用词表；同义词、表记揺れ仍不合并。
 - **作者身份**：归一化弹幕带 `msg.authorId`（来自 `authorExternalChannelId`）。显示名会改、会重名，观众重叠按 ID 合并；旧 jsonl 没有该字段，需要重新归一化。
 - **体积**：v2 每场多约 20–30 KB（全量词表 + 作者），只在单场页按需下载。
 - **没有同接曲线**：VSTATS 只给平均/最大＋最大值时刻，YouTube 也不保存历史同接。
