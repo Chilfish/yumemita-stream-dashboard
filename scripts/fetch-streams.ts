@@ -170,6 +170,19 @@ function withinGrace(info: InfoJson | undefined, hours: number): boolean {
   return age >= 0 && age < hours * 3600_000
 }
 
+/**
+ * YouTube 的 bot 检查 / 登录墙。CI 上要么 cookie 过期，要么缺 PO token：
+ * 出现这条说明整轮抓取都会失败，不能当成单场的小毛病。
+ */
+function isLoginWall(message: string): boolean {
+  return /Sign in to confirm you.{1,3}re not a bot|Use --cookies/i.test(message)
+}
+
+/** 会员限定：账号没订这个频道时抓不到，属于已知抓不到的类别，不算失败项。 */
+function isMembersOnly(message: string): boolean {
+  return /members-only|join this channel to get access/i.test(message)
+}
+
 function run(command: string, args: string[], capture: boolean, retries = 2): Promise<string> {
   return new Promise((resolvePromise, rejectPromise) => {
     const attempt = (n: number): void => {
@@ -327,7 +340,9 @@ async function main(): Promise<void> {
   // 配了 YTDLP_PROXY（mihomo）就让所有 yt-dlp 请求走代理，没配就直连。
   const proxy = process.env.YTDLP_PROXY
   const proxyArgs = proxy ? ['--proxy', proxy] : []
-  const ytdlpBase = ['--no-warnings', '--socket-timeout', '30', '--retries', '3', ...proxyArgs]
+  // 不要加 --no-warnings：失败时 stderr 里的 "cookies are no longer valid" /
+  // PO token 提示正是判断登录墙的唯一线索。
+  const ytdlpBase = ['--socket-timeout', '30', '--retries', '3', ...proxyArgs]
   const startedAt = new Date().toISOString()
 
   // 换设备 / 丢缓存时先拉回远端的 manifest 与 pack；本地已有 manifest 时不自动跑，
@@ -505,11 +520,19 @@ async function main(): Promise<void> {
           logFile(logPath, `${candidate.id} skip：未来场，暂不抓取`)
           return
         }
+        if (isMembersOnly(message)) {
+          candidate.reason = '会员限定'
+          saveProgress()
+          logFile(logPath, `${candidate.id} skip：会员限定（cookie 没有该频道会员，或者 cookie 根本没被 YouTube 认）`)
+          return
+        }
         candidate.reason = message
         metaFailures.push({ id: candidate.id, step: 'meta', error: message })
         metaProgress.failed = metaFailures.length
         saveProgress()
         logFile(logPath, `${candidate.id} meta failed: ${message}`)
+        if (isLoginWall(message))
+          logFile(logPath, `${candidate.id} 命中 YouTube bot 检查/登录墙：cookie 失效或 CI 缺 PO token，本轮剩下的场次大概率都会失败`)
       }
     })
 
@@ -517,7 +540,10 @@ async function main(): Promise<void> {
     const skipped: { id: string, reason: string }[] = []
     const usable = candidates.filter((candidate) => {
       if (!candidate.info || !candidate.session) {
-        skipped.push({ id: candidate.id, reason: candidate.reason === '未来场' ? '未来场' : '元信息抓取失败' })
+        skipped.push({
+          id: candidate.id,
+          reason: candidate.reason === '未来场' || candidate.reason === '会员限定' ? candidate.reason : '元信息抓取失败',
+        })
         return false
       }
       const status = candidate.info.live_status
@@ -802,12 +828,15 @@ async function main(): Promise<void> {
     progress.finishedAt = new Date().toISOString()
     progress.media = media
     saveProgress()
-    logFile(logPath, `=== done：media ${media.done}/${media.total}，chat ${media.chat}，comments ${media.comments}，vstats ${media.vstats}，失败 ${failures.length}`)
+    logFile(logPath, `=== done：media ${media.done}/${media.total}，chat ${media.chat}，comments ${media.comments}，vstats ${media.vstats}，元信息失败 ${metaFailures.length}，失败 ${failures.length}`)
     console.log(`\n进度文件：${progressPath}`)
     console.log(`日志文件：${logPath}`)
-    if (failures.length > 0) {
-      console.log(`\n仍有 ${failures.length} 项失败（可重跑同一命令重试）：`)
-      for (const failure of failures.slice(0, 20))
+    // 元信息失败以前只进进度文件，上层看不到：新场次全被 bot 检查拦下时
+    // 工作流照样报成功，数据就静默断更了。
+    const allFailures = [...metaFailures, ...failures]
+    if (allFailures.length > 0) {
+      console.log(`\n仍有 ${allFailures.length} 项失败（可重跑同一命令重试）：`)
+      for (const failure of allFailures.slice(0, 20))
         console.log(`  - ${failure.id} [${failure.step}] ${failure.error}`)
       process.exitCode = 1
     }
