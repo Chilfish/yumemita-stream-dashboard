@@ -39,6 +39,9 @@ jobs:
       # 有订阅就走 mihomo 代理；没配就直连（runner 的云厂商 IP 更容易被 bot 检查）。
       MIHOMO_VERSION: v1.19.30
       MIHOMO_SUB_URL: ${{ secrets.MIHOMO_SUB_URL }}
+      # 出口地区要跟 YT_COOKIES 的签发地区一致，否则日本 cookie 配香港出口会直接撞
+      # "Sign in to confirm you're not a bot"。日本优先，没有日本节点时退香港。
+      MIHOMO_REGION: 日本,香港
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -70,6 +73,29 @@ jobs:
           chmod +x "$RUNNER_TEMP/bin/yt-dlp"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/yt-dlp" --version
+
+      # 云厂商 IP 上光有 cookie 不够：YouTube 还要 PO Token，否则每个 watch 页都会
+      # 回 "Sign in to confirm you're not a bot"。插件装进 yt-dlp 插件目录，
+      # 令牌由本地 4416 端口的容器现场生成；起不来就告警降级成纯 cookie。
+      - name: Install PO token provider
+        run: |
+          set -uo pipefail
+          mkdir -p "$HOME/.config/yt-dlp/plugins/bgutil-ytdlp-pot-provider"
+          curl -fsSL -o /tmp/bgutil.zip \
+            "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/latest/download/bgutil-ytdlp-pot-provider.zip"
+          unzip -q -o /tmp/bgutil.zip -d "$HOME/.config/yt-dlp/plugins/bgutil-ytdlp-pot-provider"
+          if docker run --name bgutil-provider -d --init \
+            -p 127.0.0.1:4416:4416 brainicism/bgutil-ytdlp-pot-provider; then
+            for _ in $(seq 1 30); do
+              if curl -sf http://127.0.0.1:4416/ping > /dev/null; then
+                echo "PO token provider ready"
+                exit 0
+              fi
+              sleep 1
+            done
+            docker logs bgutil-provider 2>&1 | tail -n 20 || true
+          fi
+          echo "::warning::PO token provider 没起来，本次只靠 cookie（更容易被 bot 检查拦）"
 
       # 代理是可选兜底：配了 MIHOMO_SUB_URL 才走，起不来就告警并直连。
       - name: Cache mihomo
@@ -157,6 +183,26 @@ jobs:
           printf '%s\n' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"
           chmod 600 "$RUNNER_TEMP/cookies.txt"
 
+      # cookie 过期 / PO token 缺失时，每个 watch 页都会被 bot 检查拦，
+      # 而 fetch-streams 以前把元信息失败只记进进度文件。先探一场已知可读的场次，
+      # 让失败停在日志清楚的地方，而不是跑完 7 分钟再报「成功」。
+      - name: Check YouTube access
+        run: |
+          set -uo pipefail
+          echo "egress: $(curl -s --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -E '^(ip|loc)=' | tr '\n' ' ')"
+          args=(--simulate -J --cookies "$RUNNER_TEMP/cookies.txt" --socket-timeout 30 --retries 2)
+          if [ -n "${YTDLP_PROXY:-}" ]; then
+            args+=(--proxy "$YTDLP_PROXY")
+          fi
+          if yt-dlp -v "${args[@]}" "https://www.youtube.com/watch?v=BaW_jenozKc" > /dev/null 2> /tmp/probe.log; then
+            grep -E '\[pot\]|Generating a .* PO Token|cookies are no longer valid' /tmp/probe.log | sort -u || true
+            echo "yt-dlp 可以读取元信息"
+            exit 0
+          fi
+          tail -n 30 /tmp/probe.log
+          echo "::error::yt-dlp 读不到元信息。按这个顺序查：YT_COOKIES 是否还有效（日志里找 cookies are no longer valid）、PO token 容器是否起来、出口 IP 是否被拦。"
+          exit 1
+
       - name: Update data
         run: |
           args=(--root "$RUNNER_TEMP/youtube-live" --cookies "$RUNNER_TEMP/cookies.txt" --concurrency 2)
@@ -172,9 +218,11 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/cookies.txt"
 
-      - name: Dump mihomo log
+      - name: Dump proxy logs
         if: failure() || cancelled()
-        run: tail -n 100 /tmp/mihomo/core.log || true
+        run: |
+          tail -n 100 /tmp/mihomo/core.log || true
+          docker logs bgutil-provider 2>&1 | tail -n 100 || true
 
       # cron 健康通知：失败时开 issue，避免静默断更。
       - name: Notify on failure
@@ -188,11 +236,13 @@ jobs:
             --repo ${{ github.repository }} \
             --body "定时数据更新失败：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-          检查顺序：MIHOMO_SUB_URL / mihomo 是否可用、YT_COOKIES 是否过期、R2_* 凭据、yt-dlp 是否被 YouTube bot 检查拦。"
+          检查顺序：Check YouTube access 那步的日志（cookie / PO token / 出口 IP）、MIHOMO_SUB_URL / mihomo 是否可用、YT_COOKIES 是否过期、R2_* 凭据。"
 
-      - name: Stop mihomo
+      - name: Stop proxies
         if: always()
-        run: pkill -f "$HOME/mihomo/core" || true
+        run: |
+          pkill -f "$HOME/mihomo/core" || true
+          docker rm -f bgutil-provider > /dev/null 2>&1 || true
 
       - name: Save data cache
         if: always()
