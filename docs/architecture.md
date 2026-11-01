@@ -198,6 +198,7 @@ src/components/dashboard/
   trends-view.tsx     趋势：月度趋势、月度明细、内容类型对比
   stream-detail-view.tsx  L3 单场详情 + 分段控件
   stream-overview-panel.tsx / stream-timeline-panel.tsx
+  stream-description.tsx 本场简介：Markdown 渲染 + 裸链接 / #标签 / @提及跳转
   stream-words-panel.tsx / stream-paid-panel.tsx / stream-comments-panel.tsx
   compare-view.tsx    对比（最多 4 场，受控选择）
   about-view.tsx      口径、限制与更新说明
