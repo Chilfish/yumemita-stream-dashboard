@@ -195,7 +195,9 @@ bun run publish:transcripts
 
 ## 定时增量更新
 
-`.github/workflows/data.yml` 每天 **05:17 UTC（14:17 JST）** 跑一次增量，也可以在 Actions 页面手动触发。
+`.github/workflows/data.yml` 按 **05:17 UTC（14:17 JST）** 的 cron 每天跑一次增量，也可以在 Actions 页面手动触发。
+
+- **触发时间是近似的**：GitHub 的 `schedule` 会排队，官方文档也说明高负载时会延迟甚至丢掉运行。实测 10-31、11-01 两次 cron 分别在 10:55Z、11:50Z 才开始，比 05:17Z 晚了 5–6 小时（北京时间 19 点左右）。想卡准 14:17 JST 只能让外部调度器（Worker cron / cron-job.org）调 `workflow_dispatch`，GitHub 自己做不到。
 
 ```text
 checkout → setup Bun / Node / Deno → 安装 yt-dlp → 装 PO token 插件、起令牌容器
@@ -212,7 +214,7 @@ checkout → setup Bun / Node / Deno → 安装 yt-dlp → 装 PO token 插件�
 - **补发布**：如果上次抓取成功但发布失败（或本地跑过 `--no-publish`），本地 manifest 会比远端新；这种没有新场次的日子也会补一次发布，不会把改动一直卡在本地。
 - **抗 bot 检查**：云厂商 IP 上只有 cookie 不够，YouTube 还要 PO token。工作流把 [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) 的插件放进 yt-dlp 插件目录，并起一个本地 `127.0.0.1:4416` 容器现场生成令牌；容器起不来只告警，降级成纯 cookie。
 - **代理兜底**：配了 `MIHOMO_SUB_URL` 时，每次从订阅生成 mihomo 配置并起本地 `127.0.0.1:7890`，只给 yt-dlp 加 `--proxy`（R2 上传与 VSTATS 仍直连）。`MIHOMO_REGION` 决定挑哪个地区的节点，默认 `日本,香港`——出口地区必须跟 `YT_COOKIES` 的签发地区一致，日本 cookie 走香港出口会直接撞 bot 检查。订阅拉不到或代理起不来会告警并直连，不会挡住任务。
-- **先探一次再跑**：`Check YouTube access` 用 cookie 读一场已知视频的元信息，日志里打出出口 IP / 地区、PO token 提供者和 `cookies are no longer valid`。读不到直接报错停下，不会跑满 7 分钟才发现每场都被拦。
+- **先探一次再跑**：`Check YouTube access` 用 cookie 读缓存里最近一场真实场次的元信息（不再写死 yt-dlp 的测试视频，免得视频下架被误报成 cookie / 代理故障），日志里打出出口 IP / 地区、PO token 提供者和 `cookies are no longer valid`。读不到直接报错停下，不会跑满 7 分钟才发现每场都被拦。
 - **失败通知**：任何一步失败都会开一个 `Data update failed` issue（`issues: write`），避免定时任务静默断更。元信息失败（例如 bot 检查）现在也算失败，不再只写进进度文件。
 - `data/` 在两次运行之间通过 Actions Cache 保留，首次运行会从对象存储恢复约 150 MB 的 pack，之后只增量变化。
 - 手动触发时勾选 `force` 会重抓最近 24 小时结束的场次（用于刷新播放量、点赞、评论快照）。

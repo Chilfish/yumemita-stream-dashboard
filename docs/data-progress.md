@@ -106,7 +106,7 @@ bun scripts/daily-update.ts --force         # 额外重抓最近 24 小时
 bun scripts/daily-update.ts --dry-run       # 只列候选
 ```
 
-定时任务在 `.github/workflows/data.yml`，每天 14:17 JST 跑一次；配置与 cookie 导出见
+定时任务在 `.github/workflows/data.yml`，按 14:17 JST 的 cron 跑（GitHub 调度延迟常见几小时）；配置与 cookie 导出见
 [deployment.md](deployment.md) 的「定时增量更新」。
 
 下面的 `fetch-streams` 是底层命令，用于首次建档、强制返工或需要手动控制批次的场景：
