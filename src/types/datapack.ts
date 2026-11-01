@@ -100,6 +100,16 @@ export interface Superchat {
   currency: string;
   amount: number;
   message: string;
+  /** 留言里的表情 id（按出现顺序）；Unicode 表情是字符本身。 */
+  emojis?: string[];
+}
+
+/** 频道专属表情；`id` 形如 `<channelId>/<hash>`。 */
+export interface EmojiAsset {
+  id: string;
+  name: string | null;
+  /** InnerTube 的原始图片地址，只给抓取脚本用；页面读对象存储。 */
+  url: string;
 }
 
 export interface Sticker {
@@ -175,6 +185,15 @@ export interface EmojiKinds {
   top: EmojiCount[];
 }
 
+/** 主播本人（徽章 `Owner`）的一条发言；按时间顺序存全量。 */
+export interface OwnerChat {
+  at: string;
+  kind: "text" | "superchat" | "sticker" | "membership" | "gift";
+  text: string;
+  /** 留言里的表情 id（按出现顺序）；纯 Unicode 表情不会出现在这里。 */
+  emojis?: string[];
+}
+
 export interface ChatInfo {
   total: number;
   byKind: ChatByKind;
@@ -194,6 +213,10 @@ export interface ChatInfo {
   wordCounts?: Record<string, number>;
   hashtags: Record<string, number>;
   emojiKinds: EmojiKinds;
+  /** 本场出现过的频道专属表情；旧 pack 或没有原始回放时缺失。 */
+  emojis?: EmojiAsset[];
+  /** 主播本人发言明细（全量，按时间顺序）；旧 pack 没有这个字段。 */
+  ownerChats?: OwnerChat[];
 }
 
 export interface CommentItem {

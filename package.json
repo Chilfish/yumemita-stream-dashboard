@@ -23,6 +23,7 @@
     "add:datapack": "bun scripts/add-datapack.mjs",
     "fetch:streams": "bun scripts/fetch-streams.ts",
     "fetch:thumbs": "bun scripts/fetch-thumbnails.ts",
+    "fetch:emoji": "bun scripts/fetch-emoji.ts",
     "transcript:import": "bun scripts/transcript-import.ts",
     "transcript:new": "bun scripts/transcript-new.ts",
     "publish:transcripts": "bun scripts/publish-transcripts.ts",

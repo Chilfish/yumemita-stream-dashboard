@@ -40,6 +40,7 @@ import {
   authorsKey,
   createObjectStore,
   datapackKey,
+  emojiKey,
   groupGalleryKey,
   groupSummaryKey,
   insightsKey,
@@ -198,6 +199,24 @@ function collectThumbs(source: DatasetSource): ThumbCollection {
   return { uploads, present, missingVariants }
 }
 
+/** `data/<id>/emoji/<hash>.png` → 上传项；key 与页面拼 URL 的规则一致。 */
+function collectEmoji(source: DatasetSource): ThumbUpload[] {
+  const dir = join(resolve(APP_ROOT, source.datapackDir), 'emoji')
+  if (!existsSync(dir))
+    return []
+  const uploads: ThumbUpload[] = []
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.png'))
+      continue
+    uploads.push({
+      key: emojiKey(source.id, name),
+      body: readFileSync(join(dir, name)),
+      contentType: 'image/png',
+    })
+  }
+  return uploads
+}
+
 const config = readJson<{ datasets: DatasetSource[] }>(CONFIG_PATH)
 if (!Array.isArray(config.datasets) || config.datasets.length === 0)
   fail('data-sources.json 里没有 datasets')
@@ -215,6 +234,7 @@ if (!values['no-upload'] && !credentials)
 const store = credentials && !values['no-upload'] ? createObjectStore(credentials) : null
 const publishStartedAt = isoJst(new Date())
 const thumbUploads: ThumbUpload[] = []
+const emojiUploads: ThumbUpload[] = []
 const packUploads: { key: string, body: string }[] = []
 const indexUploads: { key: string, body: string }[] = []
 const indexSources = new Map<string, DatasetIndexSource>()
@@ -269,6 +289,8 @@ for (const source of selected) {
 
   const thumbs = collectThumbs(source)
   thumbUploads.push(...thumbs.uploads)
+  const emojiAssets = collectEmoji(source)
+  emojiUploads.push(...emojiAssets)
   // manifest 说“有封面”但本地没文件时只警告：缺图的场次页面走兜底，不该挡住发布。
   const missingThumbs = streams.filter(stream => stream.thumbnail && !thumbs.present.has(stream.videoId))
   if (missingThumbs.length > 0) {
@@ -294,7 +316,7 @@ for (const source of selected) {
   }
   const wordsMode = modeLabel(agg?.words, agg?.coverage.words ?? 0)
   const authorsMode = modeLabel(agg?.authors, agg?.coverage.authors ?? 0)
-  console.log(`[publish-data] ${source.label} (${source.id})：${streams.length} 场，本地已生成 manifest + insights（词频 ${wordsMode} / 发言者 ${authorsMode}），封面 ${thumbs.uploads.length - variantCount} 张 + 变体 ${variantCount} 个`)
+  console.log(`[publish-data] ${source.label} (${source.id})：${streams.length} 场，本地已生成 manifest + insights（词频 ${wordsMode} / 发言者 ${authorsMode}），封面 ${thumbs.uploads.length - variantCount} 张 + 变体 ${variantCount} 个，表情 ${emojiAssets.length} 个`)
   if (!authorIndex) {
     console.warn(`[publish-data]   ! ${source.id} 还有 v1 datapack，跳过作者索引；全量数据可精确聚合与观众重叠`)
   }
@@ -420,8 +442,8 @@ if (!values.force) {
   }
 }
 
-// 封面先传：manifest 的 `thumbnail` 指向这些 key，先有图再更新摘要才不会出现破图。
-const plannedThumbs = thumbUploads.map((item) => {
+// 封面与表情先传：manifest / pack 指向这些 key，先有图再更新摘要才不会出现破图。
+const plannedThumbs = [...thumbUploads, ...emojiUploads].map((item) => {
   const digest = digestBytes(item.body)
   const unchanged = isUnchanged(state.objects[item.key], digest, remote, item.key)
   return { ...item, digest, skip: !values.force && unchanged }
@@ -430,16 +452,16 @@ const pendingThumbs = plannedThumbs.filter(item => !item.skip)
 const skippedThumbs = plannedThumbs.length - pendingThumbs.length
 
 if (plannedThumbs.length === 0) {
-  console.log('[publish-data] 本地没有封面图，跳过（先运行 bun run fetch:thumbs）')
+  console.log('[publish-data] 本地没有封面或表情，跳过（先运行 bun run fetch:thumbs / fetch:emoji）')
 }
 else if (values.force) {
-  console.log(`[publish-data] --force：忽略本地进度，全量上传 ${pendingThumbs.length} 个封面 / 变体...`)
+  console.log(`[publish-data] --force：忽略本地进度，全量上传 ${pendingThumbs.length} 个封面 / 变体 / 表情...`)
 }
 else if (skippedThumbs > 0) {
-  console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体（跳过 ${skippedThumbs} 个未变化）...`)
+  console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体 / 表情（跳过 ${skippedThumbs} 个未变化）...`)
 }
 else {
-  console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体...`)
+  console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体 / 表情...`)
 }
 
 let thumbsUploaded = 0

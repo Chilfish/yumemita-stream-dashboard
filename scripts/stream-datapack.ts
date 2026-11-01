@@ -47,6 +47,12 @@ interface ChatMsg {
   giftCount?: number
 }
 
+interface EmojiAsset {
+  id: string
+  name: string | null
+  url: string
+}
+
 interface ChatRecord {
   seq?: number
   ts?: number
@@ -338,6 +344,7 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
   const danmakuPath = pick(join(sessionDir, 'danmaku'), new RegExp(`^danmaku_${videoId}\\.jsonl$`))
     ?? pick(join(sessionDir, 'danmaku'), ANY_DANMAKU_RE)
   const rawChatPath = pick(join(sessionDir, 'danmaku'), new RegExp(`^${videoId}\\.live_chat\\.json$`))
+  const emojiPath = pick(join(sessionDir, 'danmaku'), new RegExp(`^emoji_${videoId}\\.json$`))
   const commentsPath = pick(join(sessionDir, 'comments'), new RegExp(`^comments_${videoId}\\.json$`))
   const vstatsPath = vstatsOverride
     ?? pick(join(sessionDir, 'web'), new RegExp(`^vstats_video_${videoId}\\.html$`))
@@ -377,15 +384,19 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
   }>()
   const badges = new Map<string, number>()
   const emoji = new Map<string, number>()
-  const scList: { at: string, author: string, amountText: string, currency: string, amount: number, message: string }[] = []
+  const scList: { at: string, author: string, amountText: string, currency: string, amount: number, message: string, emojis?: string[] }[] = []
   const stickerList: { at: string, author: string, amountText: string, currency: string, amount: number }[] = []
   const scTotals = new Map<string, { count: number, amount: number }>()
   const stickerTotals = new Map<string, { count: number, amount: number }>()
+  const emojiAssets = (emojiPath ? readJson<{ emojis?: EmojiAsset[] }>(emojiPath)?.emojis ?? [] : [])
+    .filter(asset => asset?.id && asset.url)
   const headers = membershipHeaders(rawChatPath)
   const membershipList: { at: string, author: string, header: string | null }[] = []
   const giftList: { at: string, author: string, count: number, text: string }[] = []
   let pureEmoji = 0
   let ownerMessages = 0
+  // 主播本人发言单独存一份：徽章 Owner 只统计次数，明细要全量留给页面展示。
+  const ownerChats: { at: string, kind: string, text: string, emojis?: string[] }[] = []
 
   for (const { record, at } of timed) {
     const rawKind = record.msg.kind ?? 'text'
@@ -422,6 +433,15 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
     authors.set(authorKey, entry)
 
     const text = record.msg.text ?? ''
+    if ((record.msg.badges ?? []).includes('Owner')) {
+      const emojiIds = record.msg.emoji?.map(item => item.id) ?? []
+      ownerChats.push({
+        at: jstIso(at),
+        kind,
+        text: text.trim() || record.msg.header?.trim() || '',
+        ...(emojiIds.length ? { emojis: emojiIds } : {}),
+      })
+    }
     if (isEmojiOnly(record.msg))
       pureEmoji += 1
     for (const e of record.msg.emoji ?? [])
@@ -429,7 +449,16 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
 
     const parsed = parseAmount(record.msg.sc)
     if (kind === 'superchat' && parsed) {
-      scList.push({ at: jstIso(at), author, amountText: record.msg.sc ?? '', currency: parsed.currency, amount: parsed.amount, message: text })
+      const emojiIds = record.msg.emoji?.map(item => item.id) ?? []
+      scList.push({
+        at: jstIso(at),
+        author,
+        amountText: record.msg.sc ?? '',
+        currency: parsed.currency,
+        amount: parsed.amount,
+        message: text,
+        ...(emojiIds.length ? { emojis: emojiIds } : {}),
+      })
       const total = scTotals.get(parsed.currency) ?? { count: 0, amount: 0 }
       total.count += 1
       total.amount += parsed.amount
@@ -593,6 +622,8 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
       wordCounts: wordCountPayload,
       hashtags: Object.fromEntries([...hashtags.entries()].sort((a, b) => b[1] - a[1])),
       emojiKinds: { distinct: emoji.size, top: [...emoji.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([id, count]) => ({ id, count })) },
+      ...(emojiAssets.length ? { emojis: emojiAssets } : {}),
+      ...(ownerChats.length ? { ownerChats } : {}),
     },
     comments: comments
       ? {

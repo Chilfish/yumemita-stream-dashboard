@@ -8,7 +8,7 @@
  * 输出同目录的 `danmaku_<videoId>.jsonl`：`{ seq, video, ts, msg }`，字段与
  * 归档工程的 `scripts/danmaku/from-live-chat.ts` 保持一致。
  */
-import { createWriteStream, readFileSync } from 'node:fs'
+import { createWriteStream, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
@@ -38,9 +38,19 @@ interface BadgeWrapper {
   }
 }
 
+interface RawEmoji {
+  emojiId?: string
+  shortcuts?: string[]
+  isCustomEmoji?: boolean
+  image?: {
+    thumbnails?: { url?: string, width?: number, height?: number }[]
+    accessibility?: { accessibilityData?: { label?: string } }
+  }
+}
+
 interface Run {
   text?: string
-  emoji?: { emojiId?: string }
+  emoji?: RawEmoji
 }
 
 interface ChatItemWrapper {
@@ -77,12 +87,23 @@ export interface ChatRecord {
   }
 }
 
+/** 频道专属表情：id 形如 `<channelId>/<hash>`，url 是 InnerTube 给的图片地址。 */
+export interface ChatEmoji {
+  id: string
+  name: string | null
+  url: string
+}
+
+export const CHAT_EMOJI_SCHEMA = 'yumemita.chat-emoji/v1'
+
 export interface NormalizeResult {
   total: number
   counts: Record<ChatRecord['msg']['kind'], number>
   skipped: number
   /** 被丢弃的 renderer 类型 → 条数；用来发现还没收录的事件类型。 */
   skippedKinds: Record<string, number>
+  /** 本场出现过的频道专属表情数（写入 `emoji_<videoId>.json`）。 */
+  emojis: number
 }
 
 const BADGE_SUFFIX_RE = /\s*\(.*\)\s*$/
@@ -115,7 +136,28 @@ function giftCountOf(runs: Run[] | undefined, text: string): number | null {
   return fallback ? Number(fallback[1]!.replace(/,/g, '')) : null
 }
 
-function toRecord(item: ChatItemWrapper | undefined, videoId: string, seq: number): ChatRecord | null {
+/** 只收频道专属表情（Unicode 表情按字符渲染）；取最大尺寸的缩略图。 */
+function toEmojiAsset(emoji: RawEmoji): ChatEmoji | null {
+  const id = emoji.emojiId
+  if (!id || !(emoji.isCustomEmoji || id.includes('/')))
+    return null
+  const thumbs = [...(emoji.image?.thumbnails ?? [])]
+    .filter(thumb => thumb.url)
+    .sort((a, b) => (b.width ?? 0) - (a.width ?? 0))
+  const url = thumbs[0]?.url
+  if (!url)
+    return null
+  const label = emoji.image?.accessibility?.accessibilityData?.label?.trim()
+  const shortcut = emoji.shortcuts?.[0]?.replace(/^:/, '').replace(/:$/, '').replace(/^_/, '').trim()
+  return { id, name: label || shortcut || null, url }
+}
+
+function toRecord(
+  item: ChatItemWrapper | undefined,
+  videoId: string,
+  seq: number,
+  emojis?: Map<string, ChatEmoji>,
+): ChatRecord | null {
   if (!item)
     return null
 
@@ -153,10 +195,17 @@ function toRecord(item: ChatItemWrapper | undefined, videoId: string, seq: numbe
   let text = ''
   const emoji: { id: string }[] = []
   for (const run of runs ?? []) {
-    if (typeof run.text === 'string')
+    if (typeof run.text === 'string') {
       text += run.text
-    else if (run.emoji?.emojiId)
+    }
+    else if (run.emoji?.emojiId) {
       emoji.push({ id: run.emoji.emojiId })
+      if (emojis) {
+        const asset = toEmojiAsset(run.emoji)
+        if (asset && !emojis.has(asset.id))
+          emojis.set(asset.id, asset)
+      }
+    }
   }
 
   const timestampUs = renderer.timestampUsec
@@ -214,6 +263,7 @@ export async function normalizeLiveChat(
     giftRedemption: 0,
   }
   const skippedKinds: Record<string, number> = {}
+  const emojis = new Map<string, ChatEmoji>()
   let seq = 0
   let skipped = 0
   const noteSkipped = (kind: string) => {
@@ -235,7 +285,7 @@ export async function normalizeLiveChat(
     }
     for (const action of line.replayChatItemAction?.actions ?? []) {
       const item = action.addChatItemAction?.item
-      const record = toRecord(item, videoId, ++seq)
+      const record = toRecord(item, videoId, ++seq, emojis)
       if (!record) {
         if (item)
           noteSkipped(Object.keys(item).find(key => key.endsWith('Renderer')) ?? '(unknown item)')
@@ -250,7 +300,33 @@ export async function normalizeLiveChat(
     stream.end((error?: Error | null) => (error ? fail(error) : done()))
   })
 
-  return { total: Object.values(counts).reduce((sum, n) => sum + n, 0), counts, skipped, skippedKinds }
+  writeEmojiSidecar(output, videoId, emojis)
+
+  return {
+    total: Object.values(counts).reduce((sum, n) => sum + n, 0),
+    counts,
+    skipped,
+    skippedKinds,
+    emojis: emojis.size,
+  }
+}
+
+/**
+ * `emoji_<videoId>.json`：id → 图片地址 + 名称，供 `stream-datapack` 写进 pack、
+ * `fetch:emoji` 镜像到对象存储。没有表情时删掉旧文件，避免重跑后留下过期的表。
+ */
+function writeEmojiSidecar(output: string, videoId: string, emojis: Map<string, ChatEmoji>): void {
+  const path = join(dirname(output), `emoji_${videoId}.json`)
+  if (emojis.size === 0) {
+    if (existsSync(path))
+      unlinkSync(path)
+    return
+  }
+  const payload = {
+    schema: CHAT_EMOJI_SCHEMA,
+    emojis: [...emojis.values()].sort((a, b) => a.id.localeCompare(b.id)),
+  }
+  writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
 }
 
 if (import.meta.main) {
@@ -276,5 +352,5 @@ if (import.meta.main) {
   const skippedDetail = Object.entries(result.skippedKinds)
     .map(([kind, count]) => `${kind.replace(/^liveChat|Renderer$/g, '')} ${count}`)
     .join(' / ')
-  console.log(`[live-chat] ${result.total} 条（SC ${result.counts.superchat} / 贴纸 ${result.counts.sticker} / 会员 ${result.counts.membership} / 赠出会员 ${result.counts.gift} / 领取赠礼 ${result.counts.giftRedemption}；跳过 ${result.skipped}${skippedDetail ? `：${skippedDetail}` : ''}）→ ${outputPath}`)
+  console.log(`[live-chat] ${result.total} 条（SC ${result.counts.superchat} / 贴纸 ${result.counts.sticker} / 会员 ${result.counts.membership} / 赠出会员 ${result.counts.gift} / 领取赠礼 ${result.counts.giftRedemption}；表情 ${result.emojis}；跳过 ${result.skipped}${skippedDetail ? `：${skippedDetail}` : ''}）→ ${outputPath}`)
 }

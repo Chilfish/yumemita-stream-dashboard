@@ -16,7 +16,25 @@ const fixture = [
       timestampUsec: '1774876000000000',
       authorExternalChannelId: 'UCtext',
       authorName: { simpleText: '@viewer' },
-      message: { runs: [{ text: 'hello' }] },
+      message: {
+        runs: [
+          { text: 'hello ' },
+          {
+            emoji: {
+              emojiId: 'UC99kOG6_9RD0mR3OG4EOfxw/54y5aNPZFd-QoPwPxrGNqQk',
+              isCustomEmoji: true,
+              shortcuts: [':_YUNOlove:'],
+              image: {
+                thumbnails: [
+                  { url: 'https://yt3.ggpht.com/x=w24-h24', width: 24 },
+                  { url: 'https://yt3.ggpht.com/x=w48-h48', width: 48 },
+                ],
+                accessibility: { accessibilityData: { label: 'YUNOlove' } },
+              },
+            },
+          },
+        ],
+      },
     },
   }),
   chatLine({
@@ -83,6 +101,7 @@ describe('normalizeLiveChat', () => {
     expect(result.total).toBe(4)
     expect(result.skipped).toBe(1)
     expect(result.skippedKinds).toEqual({ liveChatViewerEngagementMessageRenderer: 1 })
+    expect(result.emojis).toBe(1)
 
     const records = readFileSync(output, 'utf8')
       .trim()
@@ -96,6 +115,7 @@ describe('normalizeLiveChat', () => {
           text?: string
           header?: string
           giftCount?: number
+          emoji?: { id: string }[]
         }
       })
 
@@ -113,5 +133,21 @@ describe('normalizeLiveChat', () => {
     const membership = records.find(record => record.msg.kind === 'membership')!
     expect(membership.msg.text).toBe('')
     expect(membership.msg.header).toBe("Welcome to YUNO's＋!")
+
+    const text = records.find(record => record.msg.kind === 'text')!
+    expect(text.msg.emoji).toEqual([{ id: 'UC99kOG6_9RD0mR3OG4EOfxw/54y5aNPZFd-QoPwPxrGNqQk' }])
+
+    const sidecar = JSON.parse(readFileSync(join(dir, 'emoji_mja4111zqIk.json'), 'utf8')) as {
+      schema: string
+      emojis: { id: string, name: string | null, url: string }[]
+    }
+    expect(sidecar.schema).toBe('yumemita.chat-emoji/v1')
+    expect(sidecar.emojis).toEqual([
+      {
+        id: 'UC99kOG6_9RD0mR3OG4EOfxw/54y5aNPZFd-QoPwPxrGNqQk',
+        name: 'YUNOlove',
+        url: 'https://yt3.ggpht.com/x=w48-h48',
+      },
+    ])
   })
 })

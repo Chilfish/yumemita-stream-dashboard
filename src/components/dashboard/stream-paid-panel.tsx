@@ -1,4 +1,5 @@
 import { ChartFrame } from "@/components/charts/chart-frame";
+import { EmojiImage } from "@/components/dashboard/emoji-image";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
@@ -16,9 +17,11 @@ import {
   formatPercent,
   formatTime,
 } from "@/lib/format";
+import { isCustomEmojiId } from "@/lib/emoji";
 import type { CurrencyTotals, GiftMembership, Membership, Sticker } from "@/types/datapack";
 
 interface StreamPaidPanelProps {
+  datasetId: string;
   row: StreamRow;
 }
 
@@ -26,8 +29,9 @@ function currencyEntries(totals: CurrencyTotals): [string, CurrencyTotals[string
   return Object.entries(totals).sort((a, b) => b[1].amount - a[1].amount);
 }
 
-export function StreamPaidPanel({ row }: StreamPaidPanelProps) {
+export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
   const { pack } = row;
+  const emojiAssets = new Map((pack.chat.emojis ?? []).map(asset => [asset.id, asset]));
   const paid = pack.chat.paid;
   const superchats = [...paid.superchats].sort((a, b) => b.at.localeCompare(a.at));
   const scTotals = currencyEntries(paid.scTotalsByCurrency);
@@ -103,7 +107,19 @@ export function StreamPaidPanel({ row }: StreamPaidPanelProps) {
                         {superchat.amountText}
                       </TableCell>
                       <TableCell className="max-w-[32.5rem] whitespace-normal text-footnote leading-relaxed">
-                        {superchat.message || (
+                        {superchat.message}
+                        {superchat.emojis?.map((emojiId, index) => (
+                          <EmojiImage
+                            key={`${emojiId}-${index}`}
+                            className="mx-0.5 inline-block size-[1.2em] align-[-0.2em]"
+                            datasetId={datasetId}
+                            emojiId={emojiId}
+                            fallback={isCustomEmojiId(emojiId) ? "[表情]" : emojiId}
+                            known={!isCustomEmojiId(emojiId) || emojiAssets.has(emojiId)}
+                            name={emojiAssets.get(emojiId)?.name}
+                          />
+                        ))}
+                        {superchat.message || superchat.emojis?.length ? null : (
                           <span className="text-ink-3">（无留言）</span>
                         )}
                       </TableCell>

@@ -39,6 +39,7 @@ const CHAT_GRACE_HOURS = 24
 /** VSTATS 对新场次的收录更慢；这段时间内缺页面按「还没生成」处理。 */
 const VSTATS_GRACE_HOURS = 24 * 14
 const DATAPACK_SCRIPT = join(APP_ROOT, 'scripts', 'stream-datapack.ts')
+const EMOJI_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-emoji.ts')
 const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
 
 interface DatasetSource {
@@ -809,6 +810,8 @@ async function main(): Promise<void> {
       }
       else {
         try {
+          // 表情先落本地再发布：新 pack 里的 chat.emojis 需要对应的图片对象。
+          await run('bun', [EMOJI_SCRIPT, '--dataset', dataset.id], false)
           logFile(logPath, `publish：bun scripts/publish-data.ts --dataset ${dataset.id}`)
           const output = await run('bun', [PUBLISH_SCRIPT, '--dataset', dataset.id], true, 0)
           for (const line of output.split('\n').map(item => item.trim()).filter(Boolean))

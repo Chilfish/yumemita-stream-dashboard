@@ -1,5 +1,6 @@
 import type { DatasetTotals } from "@/lib/aggregate";
 import type { AuthorIndexFile } from "@/lib/author-index";
+import { emojiFileName } from "@/lib/emoji";
 import { THUMB_VARIANTS, thumbVariantName } from "@/lib/thumb-variants";
 import type { StreamDatapack } from "@/types/datapack";
 import type { BatchManifest, DatasetIndex } from "@/types/dataset";
@@ -37,6 +38,17 @@ export function thumbnailSrcSet(datasetId: string, videoId: string): string {
   return THUMB_VARIANTS.map(
     width => `${thumbAsset(datasetId, thumbVariantName(id, width))} ${width}w`,
   ).join(", ");
+}
+
+/**
+ * 频道专属表情图片：`<dataset>/emoji/<hash>.png`，和封面一样由 fetch:emoji 镜像后
+ * 随 publish:data 上传。id 不是 `<channelId>/<hash>` 时返回 null。
+ */
+export function emojiUrl(datasetId: string, emojiId: string): string | null {
+  const file = emojiFileName(emojiId);
+  if (!file) return null;
+  const path = `${datasetId}/emoji/${file}`;
+  return REMOTE_DATA_BASE ? `${REMOTE_DATA_BASE}/${path}` : `${LOCAL_DATA_BASE}/${path}`;
 }
 
 /**

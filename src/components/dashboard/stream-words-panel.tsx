@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { TopBars } from "@/components/charts/top-bars";
+import { EmojiImage } from "@/components/dashboard/emoji-image";
 import type { StreamRow } from "@/lib/aggregate";
 import { streamTopWords } from "@/lib/aggregate";
-import { formatInteger } from "@/lib/format";
+import { isCustomEmojiId } from "@/lib/emoji";
+import { formatInteger, formatTime } from "@/lib/format";
 
 interface StreamWordsPanelProps {
+  datasetId: string;
   row: StreamRow;
 }
 
@@ -13,13 +16,14 @@ interface KeyValueRow {
   label: string;
   value: ReactNode;
   full?: string;
+  visual?: ReactNode;
 }
 
 function sortCounts(counts: Record<string, number>): [string, number][] {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]);
 }
 
-export function StreamWordsPanel({ row }: StreamWordsPanelProps) {
+export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
   const { pack } = row;
   const chat = pack.chat;
 
@@ -52,13 +56,28 @@ export function StreamWordsPanel({ row }: StreamWordsPanelProps) {
     value: formatInteger(count),
   }));
 
+  const emojiAssets = new Map((chat.emojis ?? []).map(asset => [asset.id, asset]));
+  const ownerChats = chat.ownerChats ?? [];
   const emojiRows: KeyValueRow[] = [
     { label: "表情种类", value: formatInteger(chat.emojiKinds.distinct) },
-    ...chat.emojiKinds.top.slice(0, 6).map(emoji => ({
-      full: emoji.id,
-      label: emoji.id,
-      value: formatInteger(emoji.count),
-    })),
+    ...chat.emojiKinds.top.slice(0, 6).map((emoji) => {
+      const asset = emojiAssets.get(emoji.id);
+      return {
+        full: emoji.id,
+        label: asset?.name ?? emoji.id,
+        value: formatInteger(emoji.count),
+        visual: (
+          <EmojiImage
+            className="size-5 shrink-0"
+            datasetId={datasetId}
+            emojiId={emoji.id}
+            fallback={emoji.id}
+            known={Boolean(asset)}
+            name={asset?.name}
+          />
+        ),
+      };
+    }),
   ];
 
   const hashtagRows: KeyValueRow[] = sortCounts(chat.hashtags).map(([tag, count]) => ({
@@ -116,8 +135,9 @@ function KeyValueGroup({ title, rows, emptyText }: KeyValueGroupProps) {
               className="flex items-baseline justify-between gap-2 py-1"
               key={`${row.full ?? row.label}-${index}`}
             >
-              <dt className="min-w-0 truncate text-footnote text-muted-foreground" title={row.full ?? row.label}>
-                {row.label}
+              <dt className="flex min-w-0 items-center gap-1.5 text-footnote text-muted-foreground" title={row.full ?? row.label}>
+                {row.visual}
+                <span className="truncate">{row.label}</span>
               </dt>
               <dd className="shrink-0 text-footnote font-semibold tabular-nums text-foreground">
                 {row.value}

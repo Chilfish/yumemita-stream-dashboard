@@ -119,6 +119,13 @@ const SuperchatSchema = v.object({
   currency: v.string(),
   amount: v.number(),
   message: v.string(),
+  emojis: v.optional(v.array(v.string())),
+});
+
+const EmojiAssetSchema = v.object({
+  id: v.string(),
+  name: v.nullable(v.string()),
+  url: v.string(),
 });
 
 const GiftMembershipSchema = v.object({
@@ -126,6 +133,13 @@ const GiftMembershipSchema = v.object({
   author: v.string(),
   count: v.number(),
   text: v.string(),
+});
+
+const OwnerChatSchema = v.object({
+  at: v.string(),
+  kind: v.picklist(["text", "superchat", "sticker", "membership", "gift"]),
+  text: v.string(),
+  emojis: v.optional(v.array(v.string())),
 });
 
 const DatapackChatSchema = v.object({
@@ -142,6 +156,10 @@ const DatapackChatSchema = v.object({
   // v2 字段；v1 pack 没有，校验时按可选处理。
   authors: v.optional(v.array(AuthorStatSchema)),
   wordCounts: v.optional(v.record(v.string(), v.number())),
+  // 只有重新抓过弹幕（有 emoji 原始档）的场次才有。
+  emojis: v.optional(v.array(EmojiAssetSchema)),
+  // 主播本人发言明细；旧 pack 没有。
+  ownerChats: v.optional(v.array(OwnerChatSchema)),
 });
 
 const CommentItemSchema = v.object({

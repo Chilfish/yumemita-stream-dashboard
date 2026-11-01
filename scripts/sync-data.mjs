@@ -156,6 +156,13 @@ for (const source of config.datasets) {
     if (existsSync(localAuthorsPath)) {
       copyFileSync(localAuthorsPath, join(destDir, "authors.json"));
     }
+    const localEmojiDir = join(stagingDir, "emoji");
+    if (existsSync(localEmojiDir)) {
+      const destEmoji = join(destDir, "emoji");
+      mkdirSync(destEmoji, { recursive: true });
+      for (const name of readdirSync(localEmojiDir))
+        copyFileSync(join(localEmojiDir, name), join(destEmoji, name));
+    }
   }
 
   if (!Array.isArray(manifest.streams) || manifest.streams.length === 0) {

@@ -48,9 +48,9 @@ function renderSubview(view: StreamSubView, row: StreamRow, datasetId: string): 
     case "timeline":
       return <StreamTimelinePanel row={row} />;
     case "words":
-      return <StreamWordsPanel row={row} />;
+      return <StreamWordsPanel datasetId={datasetId} row={row} />;
     case "paid":
-      return <StreamPaidPanel row={row} />;
+      return <StreamPaidPanel datasetId={datasetId} row={row} />;
     case "comments":
       return <StreamCommentsPanel row={row} />;
     case "transcript":

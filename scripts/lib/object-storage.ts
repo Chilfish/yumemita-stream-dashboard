@@ -55,6 +55,11 @@ export function thumbVariantKey(datasetId: string, videoId: string, width: numbe
   return `${datasetId}/thumbs/${thumbVariantName(videoId, width)}`
 }
 
+/** 频道专属表情：`<dataset>/emoji/<hash>.png`，文件名见 `src/lib/emoji.ts`。 */
+export function emojiKey(datasetId: string, fileName: string): string {
+  return `${datasetId}/emoji/${fileName}`
+}
+
 interface Credentials {
   accountId: string
   accessKeyId: string
