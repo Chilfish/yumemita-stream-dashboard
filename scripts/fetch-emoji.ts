@@ -11,10 +11,11 @@
  * 抓完由 `bun run publish:data` 上传到 `<base>/<datasetId>/emoji/`。
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { emojiFileName } from '../src/lib/emoji.ts'
+import { parseEmojiPicker } from './lib/emoji-picker.ts'
 import { runPool } from './lib/object-storage.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -34,14 +35,18 @@ interface DatasetSource {
 
 interface PackEmoji {
   id?: string
+  name?: string | null
   url?: string
 }
 
 interface Candidate {
   file: string
   emojiId: string
+  name: string | null
   url: string
 }
+
+const EMOJI_INDEX_SCHEMA = 'yumemita.emoji-index/v1'
 
 interface Counts {
   ok: number
@@ -60,8 +65,10 @@ const OPTIONS = {
 
 const USAGE = `用法：bun scripts/fetch-emoji.ts [选项]
 
-把每场 datapack 里的频道专属表情（chat.emojis）镜像到
-data/<datasetId>/emoji/<hash>.png，发布时由 bun run publish:data 一起上传。
+把频道表情镜像到 data/<datasetId>/emoji/<hash>.png，发布时由
+bun run publish:data 一起上传。来源有两处：
+  - data/emoji-<datasetId>.html：频道表情选择器的 HTML（不依赖任何一场的原始回放）
+  - datapack 的 chat.emojis：重新归一化过的场次带上的图片地址
 已存在的图片默认跳过；单张失败只记日志，不阻塞其余表情。
 
 选项：
@@ -72,7 +79,8 @@ data/<datasetId>/emoji/<hash>.png，发布时由 bun run publish:data 一起上�
   --concurrency <n>  并发数，默认 4
   -h, --help         显示本帮助
 
-没有 chat.emojis 的 pack 是旧数据：需要重抓该场弹幕才会带上表情地址。`
+旧 pack 没有 chat.emojis 时，放一份频道表情字典（data/emoji-<datasetId>.html）
+就能补全图片，不需要重抓历史弹幕。`
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf8')) as T
@@ -86,31 +94,51 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** 一个 dataset 的表达式去重表：同一张表情可能出现在几十场里。 */
+/** 频道表情字典：DevTools 里保存的 picker HTML，或手动放进 dataset 目录的 `emoji-picker.html`。 */
+function dictionaryPaths(source: DatasetSource): string[] {
+  return [
+    join(APP_ROOT, 'data', `emoji-${source.id}.html`),
+    join(resolve(APP_ROOT, source.datapackDir), 'emoji-picker.html'),
+  ].filter(path => existsSync(path))
+}
+
+/**
+ * 一个 dataset 的去重表：同一张表情可能出现在几十场里。
+ * 先读频道表情字典（不依赖任何一场的原始回放），再用 pack 里的 `chat.emojis` 补充。
+ */
 function collectCandidates(source: DatasetSource): Candidate[] {
   const dir = resolve(APP_ROOT, source.datapackDir)
-  if (!existsSync(dir))
-    return []
   const seen = new Map<string, Candidate>()
-  for (const name of readdirSync(dir)) {
-    if (!name.endsWith(PACK_SUFFIX))
-      continue
-    let pack: { chat?: { emojis?: PackEmoji[] } }
-    try {
-      pack = JSON.parse(readFileSync(join(dir, name), 'utf8')) as typeof pack
-    }
-    catch {
-      continue
-    }
-    for (const emoji of pack.chat?.emojis ?? []) {
-      if (typeof emoji.id !== 'string' || typeof emoji.url !== 'string')
+  const add = (emojiId: string, url: string, name: string | null) => {
+    const file = emojiFileName(emojiId)
+    if (!file || seen.has(file))
+      return
+    seen.set(file, { file, emojiId, name, url })
+  }
+
+  for (const path of dictionaryPaths(source)) {
+    for (const emoji of parseEmojiPicker(readFileSync(path, 'utf8')))
+      add(emoji.id, emoji.url, emoji.name)
+  }
+
+  if (existsSync(dir)) {
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith(PACK_SUFFIX))
         continue
-      const file = emojiFileName(emoji.id)
-      if (!file || seen.has(file))
+      let pack: { chat?: { emojis?: PackEmoji[] } }
+      try {
+        pack = JSON.parse(readFileSync(join(dir, name), 'utf8')) as typeof pack
+      }
+      catch {
         continue
-      seen.set(file, { file, emojiId: emoji.id, url: emoji.url })
+      }
+      for (const emoji of pack.chat?.emojis ?? []) {
+        if (typeof emoji.id === 'string' && typeof emoji.url === 'string')
+          add(emoji.id, emoji.url, emoji.name ?? null)
+      }
     }
   }
+
   return [...seen.values()].sort((a, b) => a.emojiId.localeCompare(b.emojiId))
 }
 
@@ -178,9 +206,12 @@ async function fetchDataset(
   dryRun: boolean,
 ): Promise<Counts> {
   const outDir = join(resolve(APP_ROOT, source.datapackDir), 'emoji')
+  const dictionaries = dictionaryPaths(source)
+  if (dictionaries.length > 0)
+    console.log(`[fetch-emoji] ${source.id}：表情字典 ${dictionaries.map(path => basename(path)).join(' + ')}`)
   const candidates = collectCandidates(source)
   if (candidates.length === 0) {
-    console.log(`[fetch-emoji] ${source.id}：没有 chat.emojis（旧 pack 需要重抓弹幕）`)
+    console.log(`[fetch-emoji] ${source.id}：没有 chat.emojis，也没有 data/emoji-${source.id}.html`)
     return { ok: 0, skipped: 0, failed: 0 }
   }
 
@@ -195,13 +226,23 @@ async function fetchDataset(
 
   if (dryRun) {
     for (const item of pending)
-      console.log(`  ${source.id}/emoji/${item.file}  ←  ${item.emojiId}`)
+      console.log(`  emojis/${source.id}/${item.file}  ←  ${item.emojiId}`)
     console.log(`[fetch-emoji] ${source.id}：成功 0 / 跳过 ${existing.length} / 失败 0`)
     return { ok: 0, skipped: existing.length, failed: 0 }
   }
 
-  if (pending.length > 0)
-    mkdirSync(outDir, { recursive: true })
+  mkdirSync(outDir, { recursive: true })
+  // 旧 pack 没有名称可读，页面靠这份 id → 名称索引渲染文字标签。
+  const names = Object.fromEntries(
+    candidates
+      .filter(item => item.name)
+      .map(item => [item.emojiId, item.name!]),
+  )
+  writeFileSync(
+    join(outDir, 'index.json'),
+    `${JSON.stringify({ schema: EMOJI_INDEX_SCHEMA, names }, null, 2)}\n`,
+    'utf8',
+  )
 
   const counts: Counts = { ok: 0, skipped: existing.length, failed: 0 }
   await runPool(pending, concurrency, async (item) => {

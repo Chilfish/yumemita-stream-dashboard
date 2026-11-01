@@ -206,6 +206,14 @@ function collectEmoji(source: DatasetSource): ThumbUpload[] {
     return []
   const uploads: ThumbUpload[] = []
   for (const name of readdirSync(dir)) {
+    if (name === 'index.json') {
+      uploads.push({
+        key: emojiKey(source.id, name),
+        body: readFileSync(join(dir, name)),
+        contentType: 'application/json',
+      })
+      continue
+    }
     if (!name.endsWith('.png'))
       continue
     uploads.push({

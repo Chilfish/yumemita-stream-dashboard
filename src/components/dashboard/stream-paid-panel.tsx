@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useEmojiIndex } from "@/hooks/use-emoji-index";
 import type { StreamRow } from "@/lib/aggregate";
 import {
   currencyLabel,
@@ -31,7 +32,12 @@ function currencyEntries(totals: CurrencyTotals): [string, CurrencyTotals[string
 
 export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
   const { pack } = row;
-  const emojiAssets = new Map((pack.chat.emojis ?? []).map(asset => [asset.id, asset]));
+  const emojiIndex = useEmojiIndex(datasetId);
+  const emojiAssets = new Map((pack.chat.emojis ?? []).map(asset => [asset.id, asset] as const));
+  for (const [id, name] of emojiIndex) {
+    if (!emojiAssets.has(id))
+      emojiAssets.set(id, { id, name, url: "" });
+  }
   const paid = pack.chat.paid;
   const superchats = [...paid.superchats].sort((a, b) => b.at.localeCompare(a.at));
   const scTotals = currencyEntries(paid.scTotalsByCurrency);
@@ -115,7 +121,6 @@ export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
                             datasetId={datasetId}
                             emojiId={emojiId}
                             fallback={isCustomEmojiId(emojiId) ? "[表情]" : emojiId}
-                            known={!isCustomEmojiId(emojiId) || emojiAssets.has(emojiId)}
                             name={emojiAssets.get(emojiId)?.name}
                           />
                         ))}

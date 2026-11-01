@@ -55,9 +55,12 @@ export function thumbVariantKey(datasetId: string, videoId: string, width: numbe
   return `${datasetId}/thumbs/${thumbVariantName(videoId, width)}`
 }
 
-/** 频道专属表情：`<dataset>/emoji/<hash>.png`，文件名见 `src/lib/emoji.ts`。 */
+/**
+ * 频道专属表情：`emojis/<dataset>/<hash>.png`。
+ * 静态资源，和场次无关；手动跑一次 fetch:emoji + publish:data 即可，不必每天上传。
+ */
 export function emojiKey(datasetId: string, fileName: string): string {
-  return `${datasetId}/emoji/${fileName}`
+  return `emojis/${datasetId}/${fileName}`
 }
 
 interface Credentials {

@@ -4,7 +4,7 @@
 
 ### 数据
 
-- **频道专属表情入库**：归一化把本场出现过的频道表情（id / 名称 / 图片地址）写成 `danmaku/emoji_<videoId>.json`，pack 新增 `chat.emojis` 与 `paid.superchats[].emojis`；新增 `fetch:emoji` 把图片镜像到 `data/<datasetId>/emoji/<hash>.png`，`publish:data` 与封面一起先于 pack 上传。旧 pack 没有 `chat.emojis`，需要重抓该场弹幕。
+- **频道专属表情入库**：归一化把本场频道表情写成 `danmaku/emoji_<videoId>.json`，pack 新增 `chat.emojis` 与 `paid.superchats[].emojis`。新增 `fetch:emoji`：合并 `data/emoji-<datasetId>.html`（频道表情选择器，覆盖整个频道）与 pack 里的图片地址，镜像到 `data/<datasetId>/emoji/`，并写 `index.json`（id → 名称）。表情是静态资源，手动跑一次 `fetch:emoji` + `publish:data` 即可，不进每日流水线；发布到 `<base>/emojis/<datasetId>/`。旧 pack 不需要重抓弹幕。
 - **SC 币种不再丢**：金额解析改为「第一个数字之前的前缀即币种」，不再维护白名单。此前 `MX$` / `SGD` / `MYR` / `THB` / `IDR` / `ARS` / `R$` / `₱` / `₪` / `CA$` / `₫` 这些格式只会计入 SC 条数、不进 `paid.superchats` 与 `scTotalsByCurrency`（614 份 jsonl 里有 27 笔）。页面补上对应币种名称。
 - 归一化 skipped 按 renderer 类型计数并打印，未收录的事件类型（Q&A、mode change、auto-mod…）不再吞成一个总数。
 - **会员里程碑文案落进 jsonl**：`headerSubtext`（如 `Welcome to …`）现在随归一化写入 `msg.header`，不再依赖原始 `.live_chat.json`；`fetch-danmaku` 默认删原始档后重建也不会丢，旧 jsonl 仍回退原始档。

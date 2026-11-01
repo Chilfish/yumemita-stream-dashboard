@@ -41,13 +41,13 @@ export function thumbnailSrcSet(datasetId: string, videoId: string): string {
 }
 
 /**
- * 频道专属表情图片：`<dataset>/emoji/<hash>.png`，和封面一样由 fetch:emoji 镜像后
- * 随 publish:data 上传。id 不是 `<channelId>/<hash>` 时返回 null。
+ * 频道专属表情图片：`emojis/<dataset>/<hash>.png`，静态资源，手动跑一次 fetch:emoji
+ * 后由 publish:data 上传。id 不是 `<channelId>/<hash>` 时返回 null。
  */
 export function emojiUrl(datasetId: string, emojiId: string): string | null {
   const file = emojiFileName(emojiId);
   if (!file) return null;
-  const path = `${datasetId}/emoji/${file}`;
+  const path = `emojis/${datasetId}/${file}`;
   return REMOTE_DATA_BASE ? `${REMOTE_DATA_BASE}/${path}` : `${LOCAL_DATA_BASE}/${path}`;
 }
 
@@ -333,6 +333,24 @@ export function fetchGroupGallery(signal?: AbortSignal): Promise<GroupGalleryFil
 export function prefetchDataset(datasetId: string): void {
   void fetchManifest(datasetId).catch(() => {});
   void fetchInsights(datasetId).catch(() => {});
+}
+
+/**
+ * 频道表情的 id → 名称索引（`emojis/<dataset>/index.json`）。
+ * 旧 pack 没有 `chat.emojis`，页面靠它给表情补文字标签；只有手动跑过 fetch:emoji 的 dataset 才有。
+ */
+const emojiIndexResource = datasetResource<Record<string, string>>(async datasetId => {
+  const file = await fetchRemoteFirst<{ names?: Record<string, string> }>(
+    `emojis/${datasetId}/index.json`,
+  );
+  return file?.names ?? {};
+});
+
+export function fetchEmojiIndex(
+  datasetId: string,
+  signal?: AbortSignal,
+): Promise<Record<string, string>> {
+  return emojiIndexResource.fetch(datasetId, signal);
 }
 
 /** 作者 → 场次索引；只有 v2 dataset 才会生成，观众重叠等分析页按需加载。 */

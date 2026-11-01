@@ -113,7 +113,7 @@ manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` �
 
 ## 每日增量更新
 
-`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面与表情 → 定点发布」串成一条命令，本地和 GitHub Actions 共用。
+`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面 → 定点发布」串成一条命令，本地和 GitHub Actions 共用。
 定时任务见 [docs/deployment.md](../docs/deployment.md) 的「定时增量更新」。
 
 ```powershell
@@ -239,14 +239,21 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 
 ## 频道表情
 
-原始回放的 emoji run 自带 `yt3.ggpht.com` 图片地址（48×48 PNG）。归一化时把本场出现过的
-频道专属表情写成 `danmaku/emoji_<videoId>.json`，`stream-datapack` 合并进 pack 的
-`chat.emojis`；`fetch-emoji.ts` 按这份清单镜像到本地，发布后页面按 id 渲染，不直连 YouTube。
+表情是静态资源，**手动跑一次就够了**，不进每日增量。来源有两处：
+
+- `data/emoji-<datasetId>.html`：频道表情选择器（`yt-emoji-picker-category-renderer`）的 HTML，
+  一个频道一份。它能覆盖该频道当前的全部表情，旧场次不需要重抓弹幕。
+- 每场原始回放的 emoji run（`yt3.ggpht.com` 48×48）；归一化时写成
+  `danmaku/emoji_<videoId>.json`，`stream-datapack` 合并进 pack 的 `chat.emojis`。
+
+`fetch:emoji` 把两份来源合并，镜像到 `data/<datasetId>/emoji/`，同时写一份
+`index.json`（id → 名称），供旧 pack 渲染文字标签。
 
 ```powershell
 bun run fetch:emoji --dataset yuno                   # 只补缺失
 bun run fetch:emoji --dataset yuno --force           # 重抓全部
 bun run fetch:emoji --dataset yuno --dry-run
+bun run publish:data --dataset yuno                  # 上传表情与 index.json
 ```
 
 | 选项 | 说明 |
@@ -258,7 +265,7 @@ bun run fetch:emoji --dataset yuno --dry-run
 | `--concurrency <n>` | 并发，默认 4 |
 | `-h, --help` | 帮助 |
 
-- 只处理 `chat.emojis` 里有的表情；旧 pack 没有这个字段，需要重抓该场弹幕才会带上地址。
+- 旧 pack 没有 `chat.emojis` 时，靠 `data/emoji-<datasetId>.html` 补图，不需要重抓历史弹幕。
 - id 形如 `<channelId>/<hash>`，文件名固定为 `<hash>.png`；Unicode 表情不镜像，页面直接显示字符。
 - 校验：`content-type` 是 `image/*`、字节数 > 200；非 PNG（少见）用 `Bun.Image` 转码；
   15 秒超时、失败重试 2 次，单张失败只记日志。
@@ -266,8 +273,9 @@ bun run fetch:emoji --dataset yuno --dry-run
 
 ```text
 data/<datasetId>/emoji/<hash>.png        # 本地暂存（gitignore）
-<base>/<datasetId>/emoji/<hash>.png      # 对象存储
-<dataset>/emoji/<hash>                   # 页面由 emojiId 推导，不读清单
+data/<datasetId>/emoji/index.json        # id → 名称，供旧 pack 渲染标签
+<base>/emojis/<datasetId>/<hash>.png     # 对象存储（R2_PREFIX 之后）
+<base>/emojis/<datasetId>/index.json     # 名称索引
 ```
 
 ## 补缺失弹幕（v2 全量升级）
@@ -404,6 +412,7 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 | `hashtags`                                  | `#` / `＃` 标签计数                                                       |
 | `emojiKinds`                                | 表情种类数 ＋ Top 15（频道表情的 id 形如 `<channelId>/<hash>`）           |
 | `emojis`                                    | 本场频道专属表情的 `id` / `name` / `url`，供 `fetch:emoji` 镜像；旧 pack 缺失 |
+| `ownerChats`                                | 主播本人发言明细（徽章 `Owner`），按时间顺序全量：`at` / `kind` / `text` / `emojis`；旧 pack 缺失 |
 
 `derived`：
 

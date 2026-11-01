@@ -29,7 +29,6 @@ const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
 const FETCH_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-streams.ts')
 const THUMB_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-thumbnails.ts')
-const EMOJI_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-emoji.ts')
 const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
 
 const FORCE_RECENT_HOURS = 24
@@ -451,13 +450,6 @@ async function main(): Promise<void> {
         datasetFailed = true
         console.warn(`[update] ${source.id} 封面补抓有失败项（exit ${thumbCode}）`)
       }
-    }
-
-    // 新 pack 里可能带了没镜像过的频道表情；已下载的会跳过，成本很低。
-    const emojiCode = await runScript(EMOJI_SCRIPT, ['--dataset', source.id])
-    if (emojiCode !== 0) {
-      datasetFailed = true
-      console.warn(`[update] ${source.id} 表情补抓有失败项（exit ${emojiCode}）`)
     }
 
     console.log(`[update] ${source.id} 发布…`)

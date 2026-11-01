@@ -158,7 +158,7 @@ for (const source of config.datasets) {
     }
     const localEmojiDir = join(stagingDir, "emoji");
     if (existsSync(localEmojiDir)) {
-      const destEmoji = join(destDir, "emoji");
+      const destEmoji = join(outputRoot, "emojis", id);
       mkdirSync(destEmoji, { recursive: true });
       for (const name of readdirSync(localEmojiDir))
         copyFileSync(join(localEmojiDir, name), join(destEmoji, name));
