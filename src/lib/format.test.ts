@@ -4,6 +4,7 @@ import {
   formatCompact,
   formatCurrency,
   formatDate,
+  formatDateTimeSeconds,
   formatDuration,
   formatDurationLong,
   formatInteger,
@@ -31,6 +32,7 @@ describe("format", () => {
 
   it("formats JST dates and times", () => {
     expect(formatDate("2026-10-13T20:16:46+09:00")).toBe("10/13");
+    expect(formatDateTimeSeconds("2026-03-31T00:33:20+09:00")).toBe("2026/03/31 00:33:20");
   });
 
   it("formats percentages and currencies", () => {

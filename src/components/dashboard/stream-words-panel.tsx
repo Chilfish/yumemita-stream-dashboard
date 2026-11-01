@@ -2,10 +2,23 @@ import type { ReactNode } from "react";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { TopBars } from "@/components/charts/top-bars";
 import { EmojiImage } from "@/components/dashboard/emoji-image";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipCreateHandle,
+  TooltipPopup,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { StreamRow } from "@/lib/aggregate";
 import { streamTopWords } from "@/lib/aggregate";
+import { useEmojiIndex } from "@/hooks/use-emoji-index";
 import { isCustomEmojiId } from "@/lib/emoji";
-import { formatInteger, formatTime } from "@/lib/format";
+import { formatDateTimeSeconds, formatDuration, formatInteger, formatTime } from "@/lib/format";
+import { youtubeTimeUrl } from "@/lib/transcripts";
+import type { EmojiAsset, OwnerChat } from "@/types/datapack";
+
+/** 所有主播发言的时间戳共用一个 tooltip：长列表只挂一个 Portal，相邻条目间也没有打开延迟。 */
+const ownerTimeTooltip = TooltipCreateHandle<{ at: string }>();
 
 interface StreamWordsPanelProps {
   datasetId: string;
@@ -21,6 +34,13 @@ interface KeyValueRow {
 
 function sortCounts(counts: Record<string, number>): [string, number][] {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+}
+
+/** 弹幕时刻 → 开播后秒数，用于跳转到 YouTube 对应位置；缺开播时刻时返回 null。 */
+function offsetSince(at: string, startedAt: string | null): number | null {
+  if (!startedAt) return null;
+  const offset = (Date.parse(at) - Date.parse(startedAt)) / 1000;
+  return Number.isFinite(offset) ? Math.max(0, Math.round(offset)) : null;
 }
 
 export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
@@ -56,26 +76,37 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
     value: formatInteger(count),
   }));
 
-  const emojiAssets = new Map((chat.emojis ?? []).map(asset => [asset.id, asset]));
+  // 旧 pack 没有 chat.emojis：用 dataset 级表情字典补名称（手动跑过 fetch:emoji 才有）。
+  const emojiIndex = useEmojiIndex(datasetId);
+  const emojiAssets = new Map((chat.emojis ?? []).map(asset => [asset.id, asset] as const));
+  for (const [id, name] of emojiIndex) {
+    if (!emojiAssets.has(id))
+      emojiAssets.set(id, { id, name, url: "" });
+  }
   const ownerChats = chat.ownerChats ?? [];
+  const ownerStartedAt = pack.video.startedAt ?? row.summary.startedAt;
   const emojiRows: KeyValueRow[] = [
     { label: "表情种类", value: formatInteger(chat.emojiKinds.distinct) },
-    ...chat.emojiKinds.top.slice(0, 6).map((emoji) => {
+    ...chat.emojiKinds.top.slice(0, 100).map((emoji) => {
       const asset = emojiAssets.get(emoji.id);
+      const custom = isCustomEmojiId(emoji.id);
       return {
         full: emoji.id,
-        label: asset?.name ?? emoji.id,
+        label: custom ? (asset?.name ?? "") : emoji.id,
         value: formatInteger(emoji.count),
-        visual: (
-          <EmojiImage
-            className="size-5 shrink-0"
-            datasetId={datasetId}
-            emojiId={emoji.id}
-            fallback={emoji.id}
-            known={Boolean(asset)}
-            name={asset?.name}
-          />
-        ),
+        ...(custom
+          ? {
+              visual: (
+                <EmojiImage
+                  className="size-5 shrink-0"
+                  datasetId={datasetId}
+                  emojiId={emoji.id}
+                  fallback="[表情]"
+                  name={asset?.name}
+                />
+              ),
+            }
+          : {}),
       };
     }),
   ];
@@ -104,6 +135,38 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
         </ChartFrame>
       </div>
 
+      {ownerChats.length > 0 ? (
+        <section className="border-t border-hairline pt-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-headline text-foreground">主播本人发言</h2>
+            <p className="text-caption text-ink-3">
+              共 {formatInteger(ownerChats.length)} 条
+            </p>
+          </div>
+          {ownerChats.length > 24 ? (
+            <ScrollArea className="mt-2 h-[min(50dvh,26rem)] pe-2">
+              <OwnerChatList
+                chats={ownerChats}
+                datasetId={datasetId}
+                emojiAssets={emojiAssets}
+                startedAt={ownerStartedAt}
+                videoId={pack.video.id}
+              />
+            </ScrollArea>
+          ) : (
+            <div className="mt-2">
+              <OwnerChatList
+                chats={ownerChats}
+                datasetId={datasetId}
+                emojiAssets={emojiAssets}
+                startedAt={ownerStartedAt}
+                videoId={pack.video.id}
+              />
+            </div>
+          )}
+        </section>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-5 border-t border-hairline pt-5 sm:grid-cols-2 lg:grid-cols-4">
         <KeyValueGroup emptyText="本场没有弹幕" rows={kindRows} title="弹幕构成" />
         <KeyValueGroup emptyText="本场弹幕没有携带徽章" rows={badgeRows} title="徽章" />
@@ -113,6 +176,89 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
         ) : null}
       </div>
     </div>
+  );
+}
+
+interface OwnerChatListProps {
+  chats: OwnerChat[];
+  datasetId: string;
+  emojiAssets: Map<string, EmojiAsset>;
+  startedAt: string | null;
+  videoId: string;
+}
+
+function OwnerChatList({
+  chats,
+  datasetId,
+  emojiAssets,
+  startedAt,
+  videoId,
+}: OwnerChatListProps) {
+  return (
+    <>
+      <Tooltip handle={ownerTimeTooltip}>
+        {({ payload }) => (
+          <TooltipPopup align="start" className="max-w-72">
+            <span className="block font-medium text-foreground">在 YouTube 打开</span>
+            {payload ? (
+              <span className="block text-muted-foreground">
+                {formatDateTimeSeconds(payload.at)} JST
+              </span>
+            ) : null}
+          </TooltipPopup>
+        )}
+      </Tooltip>
+      <ol className="flex flex-col divide-y divide-hairline">
+        {chats.map((message, index) => {
+          const offset = offsetSince(message.at, startedAt);
+          return (
+            <li
+              className="flex items-start gap-3 py-2 [contain-intrinsic-size:auto_2.75rem] [content-visibility:auto]"
+              key={`${message.at}-${index}`}
+            >
+              {offset == null ? (
+                <span className="w-16 shrink-0 pt-0.5 text-footnote tabular-nums text-ink-3">
+                  {formatTime(message.at)}
+                </span>
+              ) : (
+                <TooltipTrigger
+                  handle={ownerTimeTooltip}
+                  payload={{ at: message.at }}
+                  render={props => (
+                    <a
+                      {...props}
+                      aria-label={`在 YouTube 打开（开播后 ${formatDuration(offset)}）`}
+                      className="w-16 shrink-0 pt-0.5 text-footnote tabular-nums text-ink-3 underline-offset-2 hover:text-foreground hover:underline"
+                      href={youtubeTimeUrl(videoId, offset)}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {formatDuration(offset)}
+                    </a>
+                  )}
+                />
+              )}
+              <p className="min-w-0 whitespace-pre-wrap break-words text-footnote leading-relaxed text-foreground">
+                {message.text}
+                {message.emojis?.map((emojiId, emojiIndex) => (
+                  <EmojiImage
+                    key={`${emojiId}-${emojiIndex}`}
+                    className="mx-0.5 inline-block size-[1.2em] align-[-0.2em]"
+                    datasetId={datasetId}
+                    emojiId={emojiId}
+                    fallback={isCustomEmojiId(emojiId) ? "[表情]" : emojiId}
+                    name={emojiAssets.get(emojiId)?.name}
+                  />
+                ))}
+                {message.text || message.emojis?.length ? null : (
+                  <span className="text-ink-3">（无内容）</span>
+                )}
+              </p>
+            </li>
+          );
+        })}
+      </ol>
+    </>
   );
 }
 
