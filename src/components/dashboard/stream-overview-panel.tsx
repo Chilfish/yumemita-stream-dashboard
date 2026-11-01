@@ -2,6 +2,7 @@ import { ChatDensity } from "@/components/charts/chat-density";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { TenMinuteBars } from "@/components/charts/ten-minute-bars";
 import { type MetricItem, MetricStrip } from "@/components/dashboard/metric-strip";
+import { StreamDescription } from "@/components/dashboard/stream-description";
 import type { StreamRow } from "@/lib/aggregate";
 import { formatDuration, formatInteger, formatPercent } from "@/lib/format";
 import type { StreamDatapack } from "@/types/datapack";
@@ -102,10 +103,10 @@ interface StreamInfoSectionProps {
 /** description / links / chapters 目前无独立「说明页」，收起在本场概览底部。 */
 function StreamInfoSection({ pack, videoId }: StreamInfoSectionProps) {
   const { chapters, description, links } = pack.video;
-  const hasLinks = links.length > 0;
   const hasChapters = chapters.length > 0;
+  const hasDescription = Boolean(description) || links.length > 0;
 
-  if (!description && !hasLinks && !hasChapters) return null;
+  if (!hasDescription && !hasChapters) return null;
 
   return (
     <details className="border-t border-hairline pt-4">
@@ -114,34 +115,14 @@ function StreamInfoSection({ pack, videoId }: StreamInfoSectionProps) {
         <span className="ms-2 font-normal text-ink-3 tabular-nums">
           {videoId}
           {description ? ` · 简介 ${description.length} 字` : ""}
-          {hasLinks ? ` · 链接 ${links.length}` : ""}
+          {!description && links.length > 0 ? ` · 链接 ${links.length}` : ""}
           {hasChapters ? ` · 章节 ${chapters.length}` : ""}
         </span>
       </summary>
 
-      {description ? (
-        <p className="mt-3 whitespace-pre-wrap text-footnote text-muted-foreground leading-relaxed">
-          {description}
-        </p>
-      ) : null}
-
-      {hasLinks ? (
-        <div className="mt-4">
-          <h3 className="text-caption text-muted-foreground">相关链接</h3>
-          <ul className="mt-1 flex flex-col gap-0.5">
-            {links.map(link => (
-              <li className="min-w-0 truncate text-footnote" key={link}>
-                <a
-                  className="text-member-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
-                  href={link}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {link}
-                </a>
-              </li>
-            ))}
-          </ul>
+      {hasDescription ? (
+        <div className="mt-3">
+          <StreamDescription description={description} links={links} />
         </div>
       ) : null}
 
