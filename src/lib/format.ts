@@ -90,6 +90,13 @@ export function formatDurationLong(seconds: number | null | undefined): string {
   return `${minutes} 分`;
 }
 
+/** 事件时刻 → 开播后秒数，用于跳转 YouTube 对应位置；缺开播时刻时返回 null。 */
+export function streamOffsetSeconds(at: string, startedAt: string | null): number | null {
+  if (!startedAt) return null;
+  const offset = (Date.parse(at) - Date.parse(startedAt)) / 1000;
+  return Number.isFinite(offset) ? Math.max(0, Math.round(offset)) : null;
+}
+
 const CURRENCY_LABELS: Record<string, string> = {
   "¥": "日元",
   "₩": "韩元",

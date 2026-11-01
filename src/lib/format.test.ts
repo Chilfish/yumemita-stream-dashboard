@@ -10,6 +10,7 @@ import {
   formatInteger,
   formatMinuteOffset,
   formatPercent,
+  streamOffsetSeconds,
 } from "./format";
 
 describe("format", () => {
@@ -45,5 +46,11 @@ describe("format", () => {
   it("formats minute offsets", () => {
     expect(formatMinuteOffset(5)).toBe("5 分");
     expect(formatMinuteOffset(125)).toBe("2:05");
+  });
+
+  it("measures offsets since the stream started", () => {
+    expect(streamOffsetSeconds("2026-10-13T20:16:46+09:00", "2026-10-13T20:00:00+09:00")).toBe(1006);
+    expect(streamOffsetSeconds("2026-10-13T19:59:00+09:00", "2026-10-13T20:00:00+09:00")).toBe(0);
+    expect(streamOffsetSeconds("2026-10-13T20:16:46+09:00", null)).toBeNull();
   });
 });

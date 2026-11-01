@@ -9,17 +9,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipCreateHandle,
+  TooltipPopup,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useEmojiIndex } from "@/hooks/use-emoji-index";
 import type { StreamRow } from "@/lib/aggregate";
 import {
   currencyLabel,
   formatCurrency,
+  formatDateTimeSeconds,
+  formatDuration,
   formatInteger,
   formatPercent,
   formatTime,
+  streamOffsetSeconds,
 } from "@/lib/format";
 import { isCustomEmojiId } from "@/lib/emoji";
+import { youtubeTimeUrl } from "@/lib/transcripts";
 import type { CurrencyTotals, GiftMembership, Membership, Sticker } from "@/types/datapack";
+
+/** 所有 SC 的时间戳共用一个 tooltip：几百行明细也只挂一个 Portal，相邻条目间没有打开延迟。 */
+const superchatTimeTooltip = TooltipCreateHandle<{ at: string }>();
 
 interface StreamPaidPanelProps {
   datasetId: string;
@@ -39,7 +52,9 @@ export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
       emojiAssets.set(id, { id, name, url: "" });
   }
   const paid = pack.chat.paid;
-  const superchats = [...paid.superchats].sort((a, b) => b.at.localeCompare(a.at));
+  const superchats = [...paid.superchats].sort((a, b) => a.at.localeCompare(b.at));
+  const startedAt = pack.video.startedAt ?? row.summary.startedAt;
+  const videoId = pack.video.id;
   const scTotals = currencyEntries(paid.scTotalsByCurrency);
   const stickerTotals = currencyEntries(paid.stickerTotalsByCurrency);
   const gifts = paid.gifts ?? [];
@@ -88,6 +103,18 @@ export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
             title="SC 明细"
           >
             <ScrollArea className="h-[min(62dvh,32.5rem)]">
+              <Tooltip handle={superchatTimeTooltip}>
+                {({ payload }) => (
+                  <TooltipPopup align="start" className="max-w-72">
+                    <span className="block font-medium text-foreground">在 YouTube 打开</span>
+                    {payload ? (
+                      <span className="block text-muted-foreground">
+                        {formatDateTimeSeconds(payload.at)} JST
+                      </span>
+                    ) : null}
+                  </TooltipPopup>
+                )}
+              </Tooltip>
               <Table aria-label="SC 明细">
                 <TableHeader>
                   <TableRow>
@@ -98,38 +125,60 @@ export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-hairline">
-                  {superchats.map((superchat, index) => (
-                    <TableRow
-                      className="border-b-0"
-                      key={`${superchat.at}-${superchat.author}-${index}`}
-                    >
-                      <TableCell className="text-footnote tabular-nums text-muted-foreground">
-                        {formatTime(superchat.at)}
-                      </TableCell>
-                      <TableCell className="max-w-40 truncate text-footnote">
-                        {superchat.author}
-                      </TableCell>
-                      <TableCell className="text-right text-footnote font-semibold text-paid tabular-nums">
-                        {superchat.amountText}
-                      </TableCell>
-                      <TableCell className="max-w-[32.5rem] whitespace-normal text-footnote leading-relaxed">
-                        {superchat.message}
-                        {superchat.emojis?.map((emojiId, index) => (
-                          <EmojiImage
-                            key={`${emojiId}-${index}`}
-                            className="mx-0.5 inline-block size-[1.2em] align-[-0.2em]"
-                            datasetId={datasetId}
-                            emojiId={emojiId}
-                            fallback={isCustomEmojiId(emojiId) ? "[表情]" : emojiId}
-                            name={emojiAssets.get(emojiId)?.name}
-                          />
-                        ))}
-                        {superchat.message || superchat.emojis?.length ? null : (
-                          <span className="text-ink-3">（无留言）</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {superchats.map((superchat, index) => {
+                    const offset = streamOffsetSeconds(superchat.at, startedAt);
+                    return (
+                      <TableRow
+                        className="border-b-0"
+                        key={`${superchat.at}-${superchat.author}-${index}`}
+                      >
+                        <TableCell className="text-footnote tabular-nums text-muted-foreground">
+                          {offset == null ? (
+                            formatTime(superchat.at)
+                          ) : (
+                            <TooltipTrigger
+                              handle={superchatTimeTooltip}
+                              payload={{ at: superchat.at }}
+                              render={props => (
+                                <a
+                                  {...props}
+                                  aria-label={`在 YouTube 打开（开播后 ${formatDuration(offset)}）`}
+                                  className="underline-offset-2 hover:text-foreground hover:underline"
+                                  href={youtubeTimeUrl(videoId, offset)}
+                                  rel="noreferrer"
+                                  target="_blank"
+                                >
+                                  {formatDuration(offset)}
+                                </a>
+                              )}
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-40 truncate text-footnote">
+                          {superchat.author}
+                        </TableCell>
+                        <TableCell className="text-right text-footnote font-semibold text-paid tabular-nums">
+                          {superchat.amountText}
+                        </TableCell>
+                        <TableCell className="max-w-[32.5rem] whitespace-normal text-footnote leading-relaxed">
+                          {superchat.message}
+                          {superchat.emojis?.map((emojiId, index) => (
+                            <EmojiImage
+                              key={`${emojiId}-${index}`}
+                              className="mx-0.5 inline-block size-[1.2em] align-[-0.2em]"
+                              datasetId={datasetId}
+                              emojiId={emojiId}
+                              fallback={isCustomEmojiId(emojiId) ? "[表情]" : emojiId}
+                              name={emojiAssets.get(emojiId)?.name}
+                            />
+                          ))}
+                          {superchat.message || superchat.emojis?.length ? null : (
+                            <span className="text-ink-3">（无留言）</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </ScrollArea>

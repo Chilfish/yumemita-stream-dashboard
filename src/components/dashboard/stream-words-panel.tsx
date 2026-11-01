@@ -13,7 +13,13 @@ import type { StreamRow } from "@/lib/aggregate";
 import { streamTopWords } from "@/lib/aggregate";
 import { useEmojiIndex } from "@/hooks/use-emoji-index";
 import { isCustomEmojiId } from "@/lib/emoji";
-import { formatDateTimeSeconds, formatDuration, formatInteger, formatTime } from "@/lib/format";
+import {
+  formatDateTimeSeconds,
+  formatDuration,
+  formatInteger,
+  formatTime,
+  streamOffsetSeconds,
+} from "@/lib/format";
 import { youtubeTimeUrl } from "@/lib/transcripts";
 import type { EmojiAsset, OwnerChat } from "@/types/datapack";
 
@@ -34,13 +40,6 @@ interface KeyValueRow {
 
 function sortCounts(counts: Record<string, number>): [string, number][] {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-}
-
-/** 弹幕时刻 → 开播后秒数，用于跳转到 YouTube 对应位置；缺开播时刻时返回 null。 */
-function offsetSince(at: string, startedAt: string | null): number | null {
-  if (!startedAt) return null;
-  const offset = (Date.parse(at) - Date.parse(startedAt)) / 1000;
-  return Number.isFinite(offset) ? Math.max(0, Math.round(offset)) : null;
 }
 
 export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
@@ -210,7 +209,7 @@ function OwnerChatList({
       </Tooltip>
       <ol className="flex flex-col divide-y divide-hairline">
         {chats.map((message, index) => {
-          const offset = offsetSince(message.at, startedAt);
+          const offset = streamOffsetSeconds(message.at, startedAt);
           return (
             <li
               className="flex items-start gap-3 py-2 [contain-intrinsic-size:auto_2.75rem] [content-visibility:auto]"
