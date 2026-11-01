@@ -6,6 +6,7 @@
 
 - **SC 币种不再丢**：金额解析改为「第一个数字之前的前缀即币种」，不再维护白名单。此前 `MX$` / `SGD` / `MYR` / `THB` / `IDR` / `ARS` / `R$` / `₱` / `₪` / `CA$` / `₫` 这些格式只会计入 SC 条数、不进 `paid.superchats` 与 `scTotalsByCurrency`（614 份 jsonl 里有 27 笔）。页面补上对应币种名称。
 - 归一化 skipped 按 renderer 类型计数并打印，未收录的事件类型（Q&A、mode change、auto-mod…）不再吞成一个总数。
+- **会员里程碑文案落进 jsonl**：`headerSubtext`（如 `Welcome to …`）现在随归一化写入 `msg.header`，不再依赖原始 `.live_chat.json`；`fetch-danmaku` 默认删原始档后重建也不会丢，旧 jsonl 仍回退原始档。
 - **赠送会员入账**：`live_chat` 归一化补上 `liveChatSponsorshipsGiftPurchaseAnnouncementRenderer` / `GiftRedemptionAnnouncementRenderer`，输出 `kind: 'gift'`（带 `giftCount`）与 `kind: 'giftRedemption'`；pack 新增 `chat.byKind.gift` 与 `paid.gifts[]`（赠送方 / 个数 / 原文），领取赠礼并入 `membership` 与 `paid.memberships`（`header` 为 `received a gift membership by …`）。之前这两类事件在归一化阶段就被丢弃，`Sent 50 … gift memberships` 整场都不进库。旧场次需重抓弹幕才会补齐。
 - **datapack schema v2**：新增全量 `chat.authors` / `chat.wordCounts` 与 `topAuthors[].authorId`，跨场词频/发言者由“Top 榜单相加”改为发布时精确重扫；v1 pack 逐场回退，`insights.totals.aggregation` 标明 `full` / `partial` / `top-lists` 与覆盖率。
 - 三种模式并存：全量时显示“精确聚合”，部分重建时显示“精确覆盖 X/Y 场”，全 v1 时提示“榜单相加”。

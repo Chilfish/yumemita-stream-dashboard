@@ -255,7 +255,7 @@
 | `paid.superchats` | SC 全量：`at` / `author` / `amountText` / `currency` / `amount` / `message` |
 | `paid.scTotalsByCurrency` | 分币种合计，不换算汇率 |
 | `paid.stickers` / `stickerTotalsByCurrency` | 贴纸同上 |
-| `paid.memberships` | 会员里程碑（`header` 来自原始 chat 回放；领到赠礼时为 `received a gift membership by …`） |
+| `paid.memberships` | 会员里程碑（`header` 来自归一化弹幕，旧 jsonl 回退原始回放的 `headerSubtext`；领到赠礼时为 `received a gift membership by …`） |
 | `paid.gifts` | 赠送会员公告：`at` / `author`（赠送方）/ `count`（个数）/ `text`（原文） |
 | `paid.paidSharePct` | 付费条目（SC / 贴纸 / 会员 / 赠送）占比 |
 | `topAuthors` | 发言数 Top 20（含 `authorId` / SC / 贴纸 / 会员次数） |

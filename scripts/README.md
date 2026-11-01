@@ -360,7 +360,7 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 | `paid.superchats`                           | 全量 SC：时刻・金额原文・币种・数值・留言                                 |
 | `paid.scTotalsByCurrency`                   | 分币种合计（**不换算汇率**）                                              |
 | `paid.stickers` / `stickerTotalsByCurrency` | 贴纸同上                                                                  |
-| `paid.memberships`                          | 会员里程碑（`header` 取自原始回放的 `headerSubtext`，如「Welcome to …」；领到赠礼时为 `received a gift membership by …`） |
+| `paid.memberships`                          | 会员里程碑（`header` 取自归一化弹幕的 `msg.header`，如「Welcome to …」；旧 jsonl 回退原始回放的 `headerSubtext`。领到赠礼时为 `received a gift membership by …`） |
 | `paid.gifts`                                | 赠送会员公告：`at` / `author`（赠送方）/ `count`（个数）/ `text`（原文） |
 | `paid.paidSharePct`                         | 付费条目占全部条目的比例                                                  |
 | `topAuthors`                                | 发言数 Top 20（含 `authorId` / 各自 SC / 贴纸 / 会员次数）                |
