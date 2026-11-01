@@ -4,6 +4,7 @@
 
 ### 数据
 
+- **赠送会员入账**：`live_chat` 归一化补上 `liveChatSponsorshipsGiftPurchaseAnnouncementRenderer` / `GiftRedemptionAnnouncementRenderer`，输出 `kind: 'gift'`（带 `giftCount`）与 `kind: 'giftRedemption'`；pack 新增 `chat.byKind.gift` 与 `paid.gifts[]`（赠送方 / 个数 / 原文），领取赠礼并入 `membership` 与 `paid.memberships`（`header` 为 `received a gift membership by …`）。之前这两类事件在归一化阶段就被丢弃，`Sent 50 … gift memberships` 整场都不进库。旧场次需重抓弹幕才会补齐。
 - **datapack schema v2**：新增全量 `chat.authors` / `chat.wordCounts` 与 `topAuthors[].authorId`，跨场词频/发言者由“Top 榜单相加”改为发布时精确重扫；v1 pack 逐场回退，`insights.totals.aggregation` 标明 `full` / `partial` / `top-lists` 与覆盖率。
 - 三种模式并存：全量时显示“精确聚合”，部分重建时显示“精确覆盖 X/Y 场”，全 v1 时提示“榜单相加”。
 - `publish:data` 由 v2 pack 额外派生 `<dataset>/authors.json`（作者 → 场次索引），为观众重叠预留；任一场仍是 v1 时跳过并在日志里提示。

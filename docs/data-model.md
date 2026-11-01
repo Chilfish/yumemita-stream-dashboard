@@ -71,12 +71,13 @@
 | `vstatsViews` / `vstatsLikes` | number \| null | VSTATS 快照 |
 | `snapshotViews` / `snapshotLikes` / `snapshotComments` | number \| null | yt-dlp 抓取时点 |
 | `chatTotal` | number | 弹幕全部条目 |
-| `chatByKind` | object | `text` / `superchat` / `sticker` / `membership` |
+| `chatByKind` | object | `text` / `superchat` / `sticker` / `membership` / `gift` |
 | `pureEmojiOnly` | number | 纯表情条数 |
 | `uniqueAuthors` | number | 发言人数（单场去重） |
 | `superchats` | number | SC 笔数 |
 | `scTotalsByCurrency` | object | `{ "¥": { count, amount } }` |
 | `stickers` / `memberships` | number | 贴纸 / 会员里程碑 |
+| `gifts` / `giftedMemberships` | number | 赠送会员公告数 / 赠送会员总数（旧 manifest 没有） |
 | `commentsCaptured` | number \| null | 抓到的评论条数 |
 | `chatPer1000AvgViewers` | number \| null | 每千同接弹幕 |
 | `likesPer1000Views` | number \| null | 千播放点赞 |
@@ -240,7 +241,7 @@
 | 字段 | 说明 |
 | --- | --- |
 | `total` | 全部条目数（含纯表情） |
-| `byKind` | `text` / `superchat` / `sticker` / `membership` |
+| `byKind` | `text` / `superchat` / `sticker` / `membership` / `gift`（赠送会员公告；领到的赠礼会员计入 `membership`） |
 | `pureEmojiOnly` | 只剩频道表情的条目 |
 | `uniqueAuthors` | 发言人数（单场去重） |
 | `ownerMessages` | 主播本人发言数 |
@@ -254,8 +255,9 @@
 | `paid.superchats` | SC 全量：`at` / `author` / `amountText` / `currency` / `amount` / `message` |
 | `paid.scTotalsByCurrency` | 分币种合计，不换算汇率 |
 | `paid.stickers` / `stickerTotalsByCurrency` | 贴纸同上 |
-| `paid.memberships` | 会员里程碑（`header` 来自原始 chat 回放） |
-| `paid.paidSharePct` | 付费条目占比 |
+| `paid.memberships` | 会员里程碑（`header` 来自原始 chat 回放；领到赠礼时为 `received a gift membership by …`） |
+| `paid.gifts` | 赠送会员公告：`at` / `author`（赠送方）/ `count`（个数）/ `text`（原文） |
+| `paid.paidSharePct` | 付费条目（SC / 贴纸 / 会员 / 赠送）占比 |
 | `topAuthors` | 发言数 Top 20（含 `authorId` / SC / 贴纸 / 会员次数） |
 | `topWords` | 分词词频（≥3 次、最多 40 个；已剔除英文虚词与寒暄词） |
 | `authors` | **v2**：全量作者统计，按发言数降序；字段 `author` / `authorId` / `messages` / `superchats` / `stickers` / `memberships` |
@@ -363,7 +365,7 @@
 - **英文虚词与寒暄词不进词频**：`Intl.Segmenter` 会把英文句子切成完整单词，`said` / `hi` / `the` 这类不承载内容的 token 不该挤进高频词。分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表，旧 pack 里残留的这类词在展示时也会被过滤。
 - **跨场精确聚合依赖 v2**：v2 pack 另存全量 `wordCounts` / `authors`，`publish:data` 据此重扫；v1 场次自动回退到该场的 Top 列表相加。`insights.totals.aggregation` 标出 `full` / `partial` / `top-lists` 与覆盖率，页面文案随之切换。
 - **作者身份以 `authorId` 为准**：旧 jsonl 没有该字段（显示名会改、会重名），需要归档侧重跑归一化才能补齐；缺 ID 时只能按显示名匹配，重叠结果仅供参考。
-- **会员里程碑 ≠ 入会人数**：只记录直播中出现的提示。
+- **会员里程碑 ≠ 入会人数**：只记录直播中出现的提示；领取赠礼同样只算直播里看到的领取，没被领走的赠礼只体现在 `paid.gifts` 的 `count` 里。
 - **播放/点赞有两套时点**：`vstats` 是站点快照，`video.snapshot` 是 yt-dlp 抓取时点；差值方向不固定。
 - **纯表情单列**：`chat.total` 含纯表情；正文条数 = `total - pureEmojiOnly` 的近似（还要扣掉 SC/贴纸/会员条目，页面按 `byKind` 分别展示）。
 
@@ -371,6 +373,7 @@
 
 - 当前 schema：`yumemita.stream-datapack/v1` / `/v2` 并存。
 - **v2**：在 v1 上追加 `chat.authors` / `chat.wordCounts`，并给 `topAuthors` 增加可选 `authorId`。字段全部可选，v1 pack 与 v2 pack 可以同时存在。
+- **赠送会员**：`chat.byKind.gift` 与 `paid.gifts` 同样是可选追加字段，旧 pack 缺失时按 0 处理；旧场次要重抓弹幕才会写入。
 - 兼容策略是逐场混合：有全量字段的场次用全量，没有的用该场 Top 列表；`insights.totals.aggregation` 按覆盖场次数标 `full` / `partial` / `top-lists`，并给出 `coverage`。
 - **加字段**：向后兼容，旧 datapack 缺失时用 `?? null`；更新 `src/types/datapack.ts` 与本文档。
 - **改语义 / 删字段**：提升 schema 版本（如 `/v3`），在 `src/lib/aggregate.ts` 做兼容或迁移，不要静默改变旧数据含义。

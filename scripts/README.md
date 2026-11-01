@@ -5,7 +5,7 @@
 | 来源                     | 提供什么                                                                      |
 | ------------------------ | ----------------------------------------------------------------------------- |
 | yt-dlp 元信息            | 开播时刻・时长・标题・简介与简介外链・字幕/弹幕回放有无                       |
-| 弹幕（`live_chat` 全量） | 条数・构成・时间分布・词频・SC / 贴纸 / 会员里程碑・参与人数                  |
+| 弹幕（`live_chat` 全量） | 条数・构成・时间分布・词频・SC / 贴纸 / 会员里程碑 / 赠送会员・参与人数        |
 | 评论区                   | 顶层评论・赞数・置顶・上传者发言                                              |
 | VSTATS 快照              | 平均/最大同接・最大值时刻・视聴时间・播放・点赞（YouTube 自身不提供同接历史） |
 
@@ -347,7 +347,7 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 
 | 字段                                        | 含义                                                                      |
 | ------------------------------------------- | ------------------------------------------------------------------------- |
-| `total` / `byKind`                          | 全部条目数；`text` / `superchat` / `sticker` / `membership` 分项          |
+| `total` / `byKind`                          | 全部条目数；`text` / `superchat` / `sticker` / `membership` / `gift`（赠送会员公告；领到的赠礼会员计入 `membership`） |
 | `pureEmojiOnly`                             | 只有频道表情的条目（与 `danmaku_*.txt` 头部的「已过滤」数一致）           |
 | `uniqueAuthors` / `ownerMessages`           | 发言人数；主播本人发言数（徽章 `Owner`）                                  |
 | `badges`                                    | 徽章分布（`Member` / `New member` / `Owner`…）                            |
@@ -360,7 +360,8 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 | `paid.superchats`                           | 全量 SC：时刻・金额原文・币种・数值・留言                                 |
 | `paid.scTotalsByCurrency`                   | 分币种合计（**不换算汇率**）                                              |
 | `paid.stickers` / `stickerTotalsByCurrency` | 贴纸同上                                                                  |
-| `paid.memberships`                          | 会员里程碑（`header` 取自原始回放的 `headerSubtext`，如「Welcome to …」） |
+| `paid.memberships`                          | 会员里程碑（`header` 取自原始回放的 `headerSubtext`，如「Welcome to …」；领到赠礼时为 `received a gift membership by …`） |
+| `paid.gifts`                                | 赠送会员公告：`at` / `author`（赠送方）/ `count`（个数）/ `text`（原文） |
 | `paid.paidSharePct`                         | 付费条目占全部条目的比例                                                  |
 | `topAuthors`                                | 发言数 Top 20（含 `authorId` / 各自 SC / 贴纸 / 会员次数）                |
 | `topWords`                                  | 分词后词频（`Intl.Segmenter` 日语分词；≥3 次、最多 40 个；剔除英文虚词/寒暄词） |
@@ -385,5 +386,5 @@ YouTube 的 robot 检查会让不带 cookie 的 `yt-dlp -J` 失败；用已登�
 - **作者身份**：归一化弹幕带 `msg.authorId`（来自 `authorExternalChannelId`）。显示名会改、会重名，观众重叠按 ID 合并；旧 jsonl 没有该字段，需要重新归一化。
 - **体积**：v2 每场多约 20–30 KB（全量词表 + 作者），只在单场页按需下载。
 - **没有同接曲线**：VSTATS 只给平均/最大＋最大值时刻，YouTube 也不保存历史同接。
-- **会员里程碑 ≠ 入会人数**：`liveChatMembershipItemRenderer` 只记录直播中出现的那几条。
+- **会员里程碑 ≠ 入会人数**：`liveChatMembershipItemRenderer` 与领取赠礼公告只记录直播中出现的那几条；没被领走的赠礼只在 `paid.gifts[].count` 里。
 - **评论区口径**取决于抓取时的 `--write-comments` 上限，`comments.total` 是**抓到的**条数，不是视频的总评论数（后者看 `video.snapshot.comments`）。
