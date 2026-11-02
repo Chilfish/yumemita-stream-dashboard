@@ -22,6 +22,8 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: read
+  checks: read
 
 # 定时与手动可能撞车；不取消正在跑的那次，排队即可。
 concurrency:
@@ -242,18 +244,44 @@ jobs:
           docker logs bgutil-provider 2>&1 | tail -n 100 || true
 
       # cron 健康通知：失败时开 issue，避免静默断更。
+      # annotation 没有环境变量，只能按本次运行的 check run 反查；写进正文省得每次翻日志。
       - name: Notify on failure
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          set -uo pipefail
+          collect_annotations() {
+            for check_url in $(gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs" --jq '.jobs[].check_run_url' 2>/dev/null || true); do
+              gh api "${check_url}/annotations" \
+                --jq '.[] | select(.annotation_level != "notice") | "- [\(.annotation_level)] `\(.path):\(.start_line)` \(.message)"' \
+                2>/dev/null || true
+            done
+          }
+          annotations=$(collect_annotations | sort -u)
+          if [ -z "$annotations" ]; then
+            sleep 2
+            annotations=$(collect_annotations | sort -u)
+          fi
+          if [ -z "$annotations" ]; then
+            annotations="- （本次没有 failure / warning annotation，失败步骤的日志请看运行页面）"
+          fi
+          {
+            echo "定时数据更新失败：${RUN_URL}"
+            echo
+            echo "## Annotations"
+            printf '%s\n' "$annotations"
+            echo
+            echo "检查顺序：Check YouTube access 那步的日志（cookie / PO token / 出口 IP）、MIHOMO_SUB_URL / mihomo 是否可用、YT_COOKIES 是否过期、R2_* 凭据。"
+          } > /tmp/issue-body.md
           gh issue create \
             --title "Data update failed" \
             --assignee Chilfish \
-            --repo ${{ github.repository }} \
-            --body "定时数据更新失败：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-          检查顺序：Check YouTube access 那步的日志（cookie / PO token / 出口 IP）、MIHOMO_SUB_URL / mihomo 是否可用、YT_COOKIES 是否过期、R2_* 凭据。"
+            --repo "${REPO}" \
+            --body-file /tmp/issue-body.md
 
       - name: Stop proxies
         if: always()

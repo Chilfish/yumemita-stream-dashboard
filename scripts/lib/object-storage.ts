@@ -96,6 +96,45 @@ export interface ObjectStore {
   list: () => Promise<Map<string, number>>
 }
 
+const MAX_UPLOAD_ATTEMPTS = 4
+
+const RETRYABLE_CODES = new Set([
+  'InternalError',
+  'ServiceUnavailable',
+  'SlowDown',
+  'RequestTimeout',
+  'TimeoutError',
+])
+
+/** R2 / S3 的瞬时故障（5xx、限流、网络超时）值得重试；4xx（权限、签名）重试也没用。 */
+function isTransientUploadError(error: unknown): boolean {
+  if (!(error instanceof Error))
+    return false
+  const code = (error as { code?: unknown }).code
+  if (typeof code === 'string' && RETRYABLE_CODES.has(code))
+    return true
+  if (error.name === 'TimeoutError' || error.name === 'ConnectionError')
+    return true
+  return /internal error|please try again|timed? ?out|econnreset|etimedout|socket hang up|fetch failed/i.test(error.message)
+}
+
+async function withUploadRetry(objectKey: string, upload: () => Promise<void>): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await upload()
+      return
+    }
+    catch (error) {
+      if (attempt >= MAX_UPLOAD_ATTEMPTS || !isTransientUploadError(error))
+        throw error
+      const delayMs = 500 * 2 ** (attempt - 1)
+      const detail = error instanceof Error ? error.message : String(error)
+      console.warn(`[object-storage] ${objectKey} 第 ${attempt} 次上传失败，${delayMs}ms 后重试：${detail}`)
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
+  }
+}
+
 export function createObjectStore(credentials: Credentials): ObjectStore {
   const client = new S3Client({
     accessKeyId: credentials.accessKeyId,
@@ -109,7 +148,7 @@ export function createObjectStore(credentials: Credentials): ObjectStore {
   async function put(key: string, body: string): Promise<void> {
     const objectKey = `${prefix}${key}`
     try {
-      await client.file(objectKey).write(body, { type: 'application/json' })
+      await withUploadRetry(objectKey, () => client.file(objectKey).write(body, { type: 'application/json' }))
     }
     catch (error) {
       const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -120,7 +159,7 @@ export function createObjectStore(credentials: Credentials): ObjectStore {
   async function putObject(key: string, body: Uint8Array, contentType: string): Promise<void> {
     const objectKey = `${prefix}${key}`
     try {
-      await client.file(objectKey).write(body, { type: contentType })
+      await withUploadRetry(objectKey, () => client.file(objectKey).write(body, { type: contentType }))
     }
     catch (error) {
       const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
