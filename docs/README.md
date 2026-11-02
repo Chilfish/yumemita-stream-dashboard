@@ -12,6 +12,7 @@
 | [development.md](development.md) | 本地开发、代码规范、coss ui、D3 图表写法、测试 | 日常开发 |
 | [writing-style.md](writing-style.md) | 文档与界面文案的语气、用词、术语、正反例 | 写 README / docs / 界面文案前 |
 | [deployment.md](deployment.md) | 构建、静态托管、子路径、缓存、CI | 上线 |
+| [ssg-research.md](ssg-research.md) | SSG 可行性、SPA + 部分 SSG、每日增量更新与部署触发 | 规划渲染方式或每日更新 |
 | [troubleshooting.md](troubleshooting.md) | 常见报错与数据异常 | 页面空白 / 图表为空 |
 | [ui-refactor.md](ui-refactor.md) | 信息架构、设计系统、coss ui 落地映射、迁移计划 | 规划界面重构 |
 | [product-direction.md](product-direction.md) | 封面图管线、相册、逐字稿、组级页面、推文联动与阶段计划 | 规划下一轮产品迭代 |
