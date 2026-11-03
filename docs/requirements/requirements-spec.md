@@ -66,7 +66,7 @@
 | `FR-KEY-001` | P1 | 快捷键 | `AC-KEY-001`：`j` / `k` 翻场、`1`–`5` 切页、`/` 聚焦搜索、`⌘K` 搜索、`⌘B` 收起侧栏；输入框内不触发（手工） | ✅ | README |
 | `FR-MOBILE-001` | P1 | 移动端可用 | `AC-MOBILE-001`：390 / 320px 无横向溢出；底部标签栏可用；表格自身滚动（手工） | ✅ | README |
 | `FR-AGENT-001` | P2 | 单场 Markdown 视图 | `AC-AGENT-001`：`/{datasetId}/stream/{videoId}.md` 返回 `text/markdown`；frontmatter 含标题 / 日期 / 成员；包含概览、部分指标与逐字稿；未知 id 返回 404 | ✅ | astro-ssr-migration |
-| `FR-ARCH-001` | P1 | Astro + PostgreSQL + Workers 迁移 | `AC-ARCH-001`：全部页面 SSR + 数据库读取；`.md`、sitemap、purge 已实现；全量 ingest 与线上部署待做 | 🚧 | astro-ssr-migration |
+| `FR-ARCH-001` | P1 | Astro + PostgreSQL + Workers 迁移 | `AC-ARCH-001`：全部页面 SSR + 数据库读取；全量 1,897 场已入库、`db:verify` 0 problems；`.md`、sitemap、purge 已实现；线上部署与缓存实测待做 | 🚧 | astro-ssr-migration |
 | `FR-OPS-001` | P1 | 定时任务与失败通知 | `AC-OPS-001`：`.github/workflows/data.yml` 按 cron 运行；失败开 issue；手动 `workflow_dispatch` 可附加 `--force` | ✅ | deployment |
 | `FR-BUILD-001` | P0 | 验证门禁 | `AC-BUILD-001`：`bun run check`、`bun run build`、`bun run db:verify`、`bun run test:smoke` 可运行 | ✅ | CONTRIBUTING |
 
@@ -92,7 +92,7 @@
 | `FR-TREND-001` | `src/components/dashboard/trends-view.tsx`、`src/lib/aggregate.ts` | 聚合与图表 |
 | `FR-GALLERY-*` | `src/components/dashboard/gallery-view.tsx`、`group-gallery-page.tsx` | 相册 |
 | `FR-COMPARE-001` | `src/components/dashboard/compare-view.tsx`、`multi-line-chart.tsx` | 对比 |
-| `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript-view.tsx`、`scripts/publish-transcripts.ts` | 逐字稿 |
+| `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript-view.tsx`、`transcripts-view.tsx`、`src/db/queries/transcripts.ts`、`src/pages/[datasetId]/transcripts.astro`、`scripts/publish-transcripts.ts` | 逐字稿 |
 | `FR-DATA-*` | `scripts/publish-data.ts`、`scripts/daily-update.ts`、`scripts/lib/` | 数据链路 |
 | `FR-SEO-*` | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | SEO |
 | `FR-AGENT-001` / `FR-ARCH-001` | `src/pages/[datasetId]/stream/[videoId].md.ts`、`src/lib/agent-markdown.ts`、`src/db/queries/` | Agent 视图与数据库查询 |

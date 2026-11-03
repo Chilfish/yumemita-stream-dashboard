@@ -7,7 +7,7 @@
 
 | 编号 | 任务 | 优先级 | 前置条件 | 来源 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 阶段 0–4 完成；全量 ingest / 线上部署待做 |
+| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 阶段 0–4 与全量 ingest 完成；线上部署与缓存实测待做 |
 | B2 | 单场 `.md` Agent 路由（`FR-AGENT-001`） | P2 | B1 的数据库查询层 | 迁移 | ✅ 已实现 |
 | B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 缓存 purge 端点 | 已知缺口 | 🚧 端点已实现，线上实测待做 |
 | B4 | 跨成员对比（`FR-COMPARE-002`） | P2 | 统一场次/时间段口径 | roadmap | 📋 |
@@ -16,6 +16,7 @@
 | B7 | 评论增长快照 / 多次抓取对比 | P3 | 抓取侧支持重复快照 | roadmap | 📋 |
 | B8 | IndexNow / sitemap 主动通知 | P3 | B3 | SEO | 📋 |
 | B9 | 200% 缩放复核（320px 已通过） | P3 | 无 | roadmap | 📋 |
+| B10 | 逐字稿索引与「这场有没有稿」改由数据库查询 + SSR（`FR-TRANSCRIPT-001`） | P2 | `transcripts` 元数据 ingest | 迁移 | ✅ 已实现 |
 
 ## 审查承接区
 
@@ -39,8 +40,8 @@
 
 ## 数据
 
-- [x] 五位成员的全频道历史场次：合计 **1891 场**（2023-11-18 – 2026-10-29），见 [data-progress.md](../data/data-progress.md)。
-- [x] 补齐其他成员（`data/<id>/` + `data-sources.json`，不需要改组件）：nonoka 287、arale 505、ritsu 339、miyako 321、yuno 439。
+- [x] 五位成员的全频道历史场次：合计 **1897 场**（2023-11-18 – 2026-10-29），已全部投影到数据库并通过 `db:verify`，见 [data-progress.md](../data/data-progress.md)。
+- [x] 补齐其他成员（`data/<id>/` + `data-sources.json`，不需要改组件）：nonoka 288、arale 506、ritsu 340、miyako 322、yuno 441。
 - [x] 内容标签：`src/lib/classify.ts` 标题规则，首页「内容构成」已使用。
 - [x] 精确词频 / 发言者：v2 pack 已带全量字段；已重建的场次 `insights` 为精确值，未重建的按 `partial` 标注覆盖率。
 - [ ] 同接时间序列：VSTATS 只给平均/最大；若以后有采样源，可加曲线。
@@ -90,7 +91,7 @@
 - [x] CI 从对象存储拉索引；`VITE_DATAPACK_BASE` 缺失时给出明确报错。
 - [x] 定时增量更新：`.github/workflows/data.yml` 每天 14:17 JST 先做频道差集，只抓有变化的成员；安静日不恢复、不发布。`--force` 重抓最近 24 小时，`bun scripts/daily-update.ts` 本地手动同款。
 - [ ] 数据更新后缓存失效：`ingest` 完成后调用 Worker 的 purge 端点，不再触发前端构建；方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
-- [ ] Astro + PostgreSQL + Workers SSR 迁移：单场页请求期 SSR，`.md` 路由供 Agent 读取；替代 ssg-research 里的静态页路线。方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
+- [x] Astro + PostgreSQL + Workers SSR 迁移：单场页请求期 SSR，`.md` 路由供 Agent 读取；全量 1,897 场已入库。线上部署与缓存实测仍待做，方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
 - [x] 在 GitHub 仓库设置 `VITE_DATAPACK_BASE` repository variable（HTTPS 地址）。
 - [x] `ObjectStore` 支持二进制上传与 `Content-Type`；缓存头交给桶侧规则（Bun S3 写接口不支持自定义 Cache-Control）。
 - [x] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。

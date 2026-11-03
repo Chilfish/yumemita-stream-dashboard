@@ -38,7 +38,7 @@ bun run dev
 | `bun run typecheck` | `astro check`（TypeScript 6） |
 | `bun run test` | Vitest 单次 |
 | `bun run test:watch` | Vitest watch |
-| `bun run test:smoke` | agent-browser 路由冒烟（需先起 dev/preview） |
+| `bun run test:smoke` | Worker 路由冒烟（需先起 dev/preview） |
 | `bun run lint` | oxlint |
 | `bun run check` | typecheck + test + lint |
 | `bun run ci` | 全链路（CI 同款） |
@@ -50,13 +50,15 @@ bun run dev
 - 写连接：同文件的 `createWriteDb()`，`drizzle-orm/neon-serverless` 的 WebSocket Pool；只在脚本里用。
 - 不用 `postgres.js` 或 `pg`：Neon 官方方案是 HTTP 读 + WebSocket 事务，Bun 自带 WebSocket。
 - ingest：`scripts/ingest-db.ts`，一场一个事务，`content_hash` 增量；小批量 `--limit` 跳过 insights。
-- 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表。
+  - 全量回填可按 `--dataset <id>` 一个 dataset 一个进程并行；每个进程独立算该成员的 insights，互不覆盖。
+- 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表；`dataset_insights` 用 `scripts/lib/json-equal.ts` 深比较（`jsonb` 不保留键顺序）。
 - `DATABASE_URL` 从 `.env` / `.dev.vars` 读取；本地脚本缺失时直接报错，不静默回退。
 - 查询层：`src/db/queries/`，函数接收 `Db` 作为第一个参数（页面 / 脚本共用）；DTO 在 `src/types/db.ts`。
   - `datasets.ts`：`getDatasets` / `getDataset`
   - `streams.ts`：`listStreams`（`count(*) over()` 一次取总数）/ `getStream` / `getLatestStream` / `getStreamNeighbors` / `getStreamDetail`
   - `insights.ts`：`getDatasetInsights`
   - `group.ts`：`getGroupSummary` / `getGroupGallery`
+  - `transcripts.ts`：`getTranscriptIndex` / `getTranscriptMeta`（索引页与单场可用性）
 - `numeric` 列统一在查询层转成 `number | null`；时间列统一转成 ISO 字符串，不把 `Date` 传给岛屿。
 
 ## 代码组织

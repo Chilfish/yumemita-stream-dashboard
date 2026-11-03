@@ -1,6 +1,6 @@
 # 架构
 
-> **2026-11-03 更新**：运行形态已切到 Astro SSR + Neon PostgreSQL（当前 35 场小批量）。本文前半部分的 React Router / Vite 数据流是迁移前记录，保留作对照；当前入口见 `src/pages/`、`src/layouts/`、`src/db/queries/`、`src/worker.ts`，方案与剩余项见 [astro-ssr-migration.md](./astro-ssr-migration.md)。
+> **2026-11-03 更新**：运行形态已切到 Astro SSR + Neon PostgreSQL（全量 1,897 场）。本文前半部分的 React Router / Vite 数据流是迁移前记录，保留作对照；当前入口见 `src/pages/`、`src/layouts/`、`src/db/queries/`、`src/worker.ts`，方案与剩余项见 [astro-ssr-migration.md](./astro-ssr-migration.md)。
 
 ## 目标与非目标
 
@@ -90,8 +90,8 @@
 ### 逐字稿
 
 1. 源文件是 `content/transcripts/<datasetId>/<videoId>.md`（作者手写、进 git）。
-2. `publish:transcripts` 解析 frontmatter → 先传正文 `<base>/<dataset>/transcripts/<videoId>.json`，最后写 `<base>/transcripts/index.json`；失败只记日志。
-3. `useTranscriptIndex` / `useTranscript` 远端优先；远端不可达时回退到 Vite 的 `import.meta.glob("/content/transcripts/**/*.md")` 构建快照。glob 是懒加载的：路径就是 `datasetId/videoId`，判断「这场有没有稿」不读文件内容；只有打开某篇稿（或离线时的逐字稿索引页）才加载对应 Markdown。
+2. `publish:transcripts` 解析 frontmatter → 先传正文 `<base>/<dataset>/transcripts/<videoId>.json`，最后写 `<base>/transcripts/index.json`（兼容产物）；`ingest-db` 把同一份 frontmatter 写入 `transcripts` 表。失败只记日志。
+3. 索引页与单场「逐字稿」入口查 `src/db/queries/transcripts.ts`，请求期 SSR；正文由 `useTranscript` 按需读取，远端不可达时回退到 Vite 的 `import.meta.glob("/content/transcripts/**/*.md")` 构建快照。
 4. `react-markdown` + `remark-gfm` 渲染；`rewriteTimecodes` 把行首 `[12:34]` 换成 YouTube 深链，`extractToc` 生成目录。原始 HTML 不渲染。
 
 ## 路由与 URL 状态
@@ -324,12 +324,12 @@ src/components/charts/
 - **理由**：成员与观众都在日本时区；汇率随时变化，换算会引入不可追溯的口径。
 - **后果**：跨币种不能直接相加；页面必须按币种分列；旧数据缺时区时按 JST 解释。
 
-### ADR-006：迁移到 Astro + PostgreSQL + Workers（规划，未实施）
+### ADR-006：迁移到 Astro + PostgreSQL + Workers（已实施）
 
-- **状态**：📋 规划中。
+- **状态**：✅ 页面、查询层、`.md` 路由与缓存已切到数据库；剩余线上部署与缓存实测。
 - **决策**：Astro 7 + Cloudflare Workers，数据页请求期 SSR，datapack 投影到 PostgreSQL，R2 只存逐字稿 / 封面 / 表情 / 归档；单场页提供 `.md` 路由。
 - **理由**：新场次入库即生效，不需要每日构建；SQL 支持检索与聚合；Workers 与 R2、缓存、cron 同平台。
-- **后果**：需要数据库 schema、ingest、查询层、缓存失效与页面迁移；当前 React Router / R2 JSON 实现在切换前仍是事实来源。
+- **后果**：旧的 React Router / R2 JSON 读取路径已删除；数据新鲜度取决于 ingest 与 cache purge。
 - **方案**：[astro-ssr-migration.md](./astro-ssr-migration.md)。
 
 ## 性能与限制

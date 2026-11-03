@@ -1,6 +1,6 @@
 # Astro + Cloudflare 迁移方案
 
-> 状态：实施中。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），当前用 35 场小批量数据验证。剩余：全量 1892 场 ingest 与 `dataset_insights` 重算、Cloudflare 线上部署与缓存实测。调研日期 2026-11-03（JST）。
+> 状态：实施中。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），全量 1,897 场已入库、`dataset_insights` 已重算、`db:verify` 0 problems；逐字稿索引与可用性已改为数据库查询 + SSR。剩余：Cloudflare 线上部署与缓存实测。调研日期 2026-11-03（JST）。
 > 目标：把当前的 React Router 8 + Vite 静态站迁到 Astro 7 + Cloudflare Workers，数据从「R2 上的 JSON + 浏览器运行时拉取」改为「PostgreSQL 查询 + R2 存对象」，单场页改为请求期 SSR，并为 Agent 提供 `{videoId}.md` 的 Markdown 视图。
 > 本文只描述已经验证过 API 的方案，不把未验证的平台行为写成事实。
 
@@ -98,7 +98,7 @@
 | 子请求 / 请求 | 50 | 10,000 |
 | 同时打开连接 / 请求 | 6 | 6 |
 
-SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Markdown 渲染会算。按当前 1,892 场、500 行/成员的规模，单页查询和渲染都在可控范围；上线前用 Workers 日志记录 CPU 与 wall time。
+SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Markdown 渲染会算。按当前 1,897 场、500 行/成员的规模，单页查询和渲染都在可控范围；上线前用 Workers 日志记录 CPU 与 wall time。
 
 ### 数据库驱动
 
@@ -134,7 +134,7 @@ SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Mar
                  │
                  ▼
              Cloudflare R2
-               transcripts/<datasetId>/<videoId>.json
+               <datasetId>/transcripts/<videoId>.json
                <datasetId>/thumbs/*
                emojis/*
                archive/<datasetId>/<videoId>.datapack.json
@@ -236,7 +236,7 @@ SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Mar
 | 项 | 数值 |
 | --- | --- |
 | 成员 | 5 |
-| 场次 | 1,892（nonoka 287 / arale 505 / ritsu 339 / miyako 322 / yuno 439） |
+| 场次 | 1,897（nonoka 288 / arale 506 / ritsu 340 / miyako 322 / yuno 441） |
 | 本地 datapack | 约 151 MB，平均约 80 KB/场，最大约 467 KB |
 | manifest | 约 2.5 MB（5 份） |
 | 弹幕总量 | 约 691 万条（当前只在聚合层使用，未逐条入库） |
@@ -384,7 +384,7 @@ index (title gin_trgm_ops)          -- 可选，用于标题搜索
 | `aggregation` | `jsonb` | `full` / `partial` / `top-lists` + coverage |
 | `generated_at` | `timestamptz` | — |
 
-由 ingest 预聚合，页面直接读，不在请求期重算 1,892 场。
+由 ingest 预聚合，页面直接读，不在请求期重算 1,897 场。
 
 #### `transcripts`
 
@@ -392,7 +392,7 @@ index (title gin_trgm_ops)          -- 可选，用于标题搜索
 | --- | --- | --- |
 | `dataset_id` | `text` | — |
 | `video_id` | `text` | — |
-| `r2_key` | `text` | `transcripts/<datasetId>/<videoId>.json` |
+| `r2_key` | `text` | `<datasetId>/transcripts/<videoId>.json` |
 | `title` / `date` / `summary` | — | 索引与列表用 |
 | `tags` | `text[]` | — |
 | `updated_at` | `timestamptz` | — |
@@ -582,12 +582,12 @@ src/db/queries/
 
 实现约定：
 
-- **聚合在 SQL 里做**：月度、Top、覆盖率、日期桶用 `GROUP BY` / 窗口函数 / `FILTER`，不要把 1,892 行拉到 Worker 再算。
+- **聚合在 SQL 里做**：月度、Top、覆盖率、日期桶用 `GROUP BY` / 窗口函数 / `FILTER`，不要把 1,897 行拉到 Worker 再算。
 - **避免 N+1**：子表用 `inArray` 一次取回，或在一条查询里 `json_agg`。
 - **numeric 返回字符串**：Drizzle 的 `numeric` 在 JS 里是 string；查询层统一 `Number()` / `null` 转换，不要漏到组件。
 - **时间**：返回 ISO 字符串；格式化在 `src/lib/format.ts`，按 JST 显示。
 - **rank**：用 `row_number() over (partition by dataset_id order by started_at desc)`；不要落库。
-- **分页**：列表页首屏最多 500 行；超过时用 `limit/offset` 或 cursor。当前 1,892 场、单成员最多 505 场，首版可以不分页。
+- **分页**：列表页首屏最多 500 行；超过时用 `limit/offset` 或 cursor。当前 1,897 场、单成员最多 506 场；表格与相册首屏只渲染 100 / 60 行，其余由「显示更多」接管。
 - **缓存**：查询层不做模块级长期缓存；依赖 Workers Cache 和 `dataset_insights` 预聚合。需要时可以在 isolate 内做 30–60 秒的短缓存，但不要把新鲜度寄托在 isolate 复用上。
 
 ### 错误与降级
@@ -661,7 +661,7 @@ src/db/queries/
   - 查 `datasets` + `streams`，生成组首页、全组相册、每位成员的 6 个栏目页、全部单场页。
   - `lastmod` 用 `streams.source_generated_at`；成员页/组页用 `dataset_insights.generated_at`。
   - 不收录 `compare`、`.md`、`/api/*`。
-  - 条数公式：`2 + 6 × 成员数 + 单场数`；当前应是 `2 + 30 + 1892 = 1924`。
+  - 条数公式：`2 + 6 × 成员数 + 单场数`；当前是 `2 + 30 + 1897 = 1929`。
 - `robots.txt` 指向 `/sitemap.xml`；`.md` 不写进 sitemap，用 `X-Robots-Tag: noindex` 防止重复收录。
 - `llms.txt`：列出成员、最近场次、`.md` 链接和站点说明，方便 Agent 发现。
 
@@ -1067,10 +1067,10 @@ CI
   <datasetId>/thumbs/<videoId>.<width>.webp     # 480 / 960 / 1280
   emojis/<datasetId>/<hash>.png
   emojis/youtube/<hash>.png
-  transcripts/<datasetId>/<videoId>.json        # 正文
+  <datasetId>/transcripts/<videoId>.json        # 正文
 ```
 
-索引不再写 R2；`manifest` / `insights` / `group-*` 由数据库生成。
+`manifest` / `insights` / `group-*` 不再写 R2；逐字稿的 `transcripts/index.json` 仅作兼容产物，页面改查 `transcripts` 表。
 
 ### 回滚
 
@@ -1121,7 +1121,7 @@ CI
 验收：
 
 - `/`、`/nonoka`、`/nonoka/streams` 返回 200，HTML 里有 title / description / canonical。
-- `/sitemap.xml` 条数为 `2 + 6 × 5 + 1892 = 1924`（以实际 ingest 结果为准）。
+- `/sitemap.xml` 条数为 `2 + 6 × 5 + 1897 = 1929`（以实际 ingest 结果为准）。
 - 未知路径返回 404；未知单场页返回 404 而不是首页。
 - 主题切换无闪烁；移动端 390 / 320px 无横向溢出。
 
@@ -1191,13 +1191,13 @@ CI
 
 ### 数据
 
-- [ ] 5 个成员的 `streams` 行数与本地 manifest 一致（1,892 场）。
-- [ ] 每场 `chat_total` / `superchats` / `sc_totals_by_currency` 与 pack 一致。
-- [ ] `stream_authors.messages` 之和等于 `chat.total`。
-- [ ] `dataset_insights.totals` 与 `aggregateDataset()` 一致。
-- [ ] `paid_events` / `comments` 条数与 pack 一致。
-- [ ] `transcripts.r2_key` 在 R2 上存在。
-- [ ] 全量 ingest 可重跑，结果幂等。
+- [x] 5 个成员的 `streams` 行数与本地 manifest 一致（1,897 场；`db:verify` 0 problems）。
+- [x] 每场 `chat_total` / `superchats` / `sc_totals_by_currency` 与 pack 一致。
+- [x] `stream_authors.messages` 之和等于 `chat.total`。
+- [x] `dataset_insights.totals` 与 `aggregateDataset()` 一致。
+- [x] `paid_events` / `comments` 条数与 pack 一致。
+- [ ] `transcripts.r2_key` 在 R2 上存在（线上 R2 实测待做）。
+- [x] 全量 ingest 可重跑，结果幂等（重跑 `processed 0 / skipped N`）。
 - [ ] 单场失败不影响同成员其他场次；报告可定位。
 
 ### 页面

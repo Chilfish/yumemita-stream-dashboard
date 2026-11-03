@@ -333,29 +333,13 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 
 ## 7. 逐字稿
 
-逐字稿是作者手写的 Markdown，源文件在 `content/transcripts/<datasetId>/<videoId>.md`（进 git）。发布后页面读两份 JSON：
+逐字稿是作者手写的 Markdown，源文件在 `content/transcripts/<datasetId>/<videoId>.md`（进 git）。
 
-`<base>/transcripts/index.json`：
+- **正文**：`publish:transcripts` 上传到 R2 `<base>/<datasetId>/transcripts/<videoId>.json`，Worker 通过 R2 binding 读取。
+- **索引与可用性**：`ingest-db` 把 frontmatter 投影到 `transcripts` 表；索引页与「这场有没有稿」都由 `src/db/queries/transcripts.ts` 查库，请求期 SSR。
+- `<base>/transcripts/index.json` 仍由发布脚本维护为兼容产物，页面不再读取。
 
-```json
-{
-  "schema": "yumemita.transcripts/v1",
-  "generatedAt": "2026-10-29T23:00:00+09:00",
-  "entries": [
-    {
-      "datasetId": "nonoka",
-      "videoId": "0Oom7elwKMo",
-      "date": "2026-10-13",
-      "title": "【ライブ振り返り】バンドリ！13thライブをふりかえる！",
-      "tags": ["杂谈", "13th live"],
-      "summary": "一句话摘要",
-      "updatedAt": "2026-10-29T22:55:00.000Z"
-    }
-  ]
-}
-```
-
-`<base>/<datasetId>/transcripts/<videoId>.json`：
+正文 JSON（`<base>/<datasetId>/transcripts/<videoId>.json`）：
 
 ```json
 {
@@ -376,10 +360,9 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 }
 ```
 
-- 索引最后写；单篇失败只记日志，不阻塞其余稿件。
+- 单篇发布失败只记日志，不阻塞其余稿件。
 - `videoId` 是关联场次的唯一键；`markdown` 保留原始时间码，渲染时再改写成深链。
-- `sync:data` 从 `content/transcripts/` 的 frontmatter 生成同结构的 `public/data/transcripts/index.json`，离线时列表页只读这一份索引。
-- 远端不可达时正文回退到构建期的 Markdown 快照（Vite `import.meta.glob`，懒加载：打开哪篇读哪篇），所以本地不发布也能预览。
+- 索引页与可用性查 `transcripts` 表；正文不可达时页面显示加载失败，不把整页变成错误。
 
 ## 口径与限制
 

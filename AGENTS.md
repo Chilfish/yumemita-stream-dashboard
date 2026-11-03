@@ -5,18 +5,18 @@
 
 ## 当前事实与目标形态
 
-**当前是 Astro SSR + Neon 查询形态（2026-11-03）。** 所有页面已迁到 `src/pages/*.astro`，旧 React Router 页面与依赖已删除；数据库目前只有 35 场小批量数据，全量 ingest 尚未执行。
+**当前是 Astro SSR + Neon 查询形态（2026-11-03）。** 所有页面已迁到 `src/pages/*.astro`，旧 React Router 页面与依赖已删除；全量 1,897 场已入库并通过对账，剩余线上部署与缓存实测。
 
 | 项 | 当前 | 目标 |
 | --- | --- | --- |
 | 框架 | Astro 7 + `@astrojs/cloudflare` | 同左 |
-| 数据 | PostgreSQL（35 场小批量）+ R2 对象 | 全量 ingest + R2 对象 |
+| 数据 | PostgreSQL（全量 1,897 场）+ R2 对象 | 同左 |
 | 路由 | `src/pages/` 文件路由 + 请求期 SSR | 同左 |
 | 单场页 | 请求期 SSR（DB 还原 pack） | 同左 |
 | Agent 视图 | `/{datasetId}/stream/{videoId}.md` 已实现 | 同左 |
 | 部署 | `wrangler.jsonc` 已配置，未正式部署 | Cloudflare Workers |
 
-已完成：Astro 脚手架、DB schema / ingest / 对账 / 查询层、全部页面与岛屿、sitemap / llms.txt / robots、`.md` 端点、内部 purge 端点、`astro check` / `test` / `build` / `preview`。剩余：全量 ingest、线上部署与缓存实测。详见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md)。
+已完成：Astro 脚手架、DB schema / ingest / 对账 / 查询层、全量 ingest（1,897 场，`db:verify` 0 problems）、全部页面与岛屿、sitemap / llms.txt / robots、`.md` 端点、内部 purge 端点、`astro check` / `test` / `build` / `preview`。剩余：Cloudflare 线上部署与缓存实测。详见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md)。
 
 ## 意图 → 文件映射（当前实现）
 

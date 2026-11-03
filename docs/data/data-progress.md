@@ -3,14 +3,14 @@
 目标是补齐五位成员（`nonoka` / `arale` / `ritsu` / `miyako` / `yuno`）的全频道历史直播。本页记录
 **每位成员抓到哪里了、哪些场次判定跳过、下一批从哪开始**；字段口径见 [data-model.md](data-model.md)。
 
-最后更新：**2026-10-30**
+最后更新：**2026-11-03**
 
 ## 总览
 
 | 项 | 值 |
 | --- | --- |
 | 成员 | **5**（`nonoka` / `arale` / `ritsu` / `miyako` / `yuno`） |
-| 已入库 datapack | **1891** |
+| 已入库 datapack | **1897**（已全部投影到数据库，`db:verify` 0 problems） |
 | 待抓场次 | **0** |
 | 已覆盖时间范围 | 2023-11-18 – 2026-10-29 |
 | 有 VSTATS 快照的场次 | **118**（越往前越可能缺失） |
@@ -18,14 +18,15 @@
 
 | dataset | 成员 | 频道 | 场次 | 时间范围 | VSTATS |
 | --- | --- | --- | ---: | --- | ---: |
-| `nonoka` | 宮永ののか | `UCGeCnpimiSN5rgiKbJzHd3A` | 287 | 2023-11-19 – 2026-10-29 | 16 |
-| `arale` | 仲町あられ | `UCWfF0DB6m_t2CE3KcOOOX7g` | 505 | 2023-11-19 – 2026-10-29 | 27 |
-| `ritsu` | 峰月律 | `UCxc0MrPoACKTFlV24GqX2sg` | 339 | 2023-11-19 – 2026-10-27 | 28 |
-| `miyako` | 藤都子 | `UCZXxRYaP7mfuglPnptnBBCA` | 321 | 2023-11-18 – 2026-10-28 | 21 |
-| `yuno` | 千石ユノ | `UC99kOG6_9RD0mR3OG4EOfxw` | 439 | 2023-11-19 – 2026-10-29 | 26 |
+| `nonoka` | 宮永ののか | `UCGeCnpimiSN5rgiKbJzHd3A` | 288 | 2023-11-19 – 2026-10-29 | 16 |
+| `arale` | 仲町あられ | `UCWfF0DB6m_t2CE3KcOOOX7g` | 506 | 2023-11-19 – 2026-10-29 | 27 |
+| `ritsu` | 峰月律 | `UCxc0MrPoACKTFlV24GqX2sg` | 340 | 2023-11-19 – 2026-10-27 | 28 |
+| `miyako` | 藤都子 | `UCZXxRYaP7mfuglPnptnBBCA` | 322 | 2023-11-18 – 2026-10-28 | 21 |
+| `yuno` | 千石ユノ | `UC99kOG6_9RD0mR3OG4EOfxw` | 441 | 2023-11-19 – 2026-10-29 | 26 |
 
-数字取自远端 `manifest.json`（2026-10-30 快照）。本地 `data/` 可能只暂存部分 pack，
-`fetch-streams` 会先从对象存储恢复缺失的 manifest 与 datapack，再按同样规则跳过已抓场次。
+数字取自本地 `data/` 的 pack（2026-11-03），并已用 `bun run db:verify` 与数据库逐场对账。
+本地 `data/` 只是暂存区；换设备时 `fetch-streams` 会先从对象存储恢复缺失的 manifest 与 datapack，
+再按同样规则跳过已抓场次。
 
 ## nonoka 抓取批次
 
