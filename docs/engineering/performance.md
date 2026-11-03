@@ -24,26 +24,41 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 
 `perf:smoke` 每个 URL 请求 5 次，输出响应体中位数、耗时中位数、`cache-tag` 与 `content-type`。
 
-### 实测（35 场小批量数据，本机 → ap-southeast-1 Neon）
+### 实测（全量 1,897 场，本机 → ap-southeast-1 Neon）
 
 | 路由 | HTML 中位数 | 耗时中位数 | cache tag |
 | --- | ---: | ---: | --- |
-| `/` | 80.8 KB | 697 ms | `group` |
-| `/gallery` | 161.7 KB | 684 ms | `group,gallery` |
-| `/nonoka` | 408.8 KB | 1684 ms | `datasets,dataset-nonoka` |
-| `/nonoka/streams` | 322.3 KB | 2049 ms | `datasets,dataset-nonoka` |
-| `/nonoka/trends` | 279.6 KB | 1569 ms | `datasets,dataset-nonoka` |
-| `/nonoka/gallery` | 186.3 KB | 1298 ms | `datasets,dataset-nonoka` |
-| `/nonoka/transcripts` | 129.9 KB | 1757 ms | `transcripts,dataset-nonoka` |
-| `/nonoka/compare` | 331.3 KB | 2504 ms | `dataset-nonoka,compare` |
-| `/nonoka/stream/<id>` | 219.7 KB | 2097 ms | `streams,stream-<id>,dataset-nonoka` |
-| `.../<id>.md` | 14.3 KB | 969 ms | `streams,stream-<id>,dataset-nonoka` |
-| `/sitemap.xml` | 5.0 KB | 637 ms | `sitemap` |
-| `/llms.txt` | 3.5 KB | 561 ms | `llms` |
+| `/` | 98.6 KB | 410 ms | `group` |
+| `/gallery` | 1.65 MB | 402 ms | `group,gallery` |
+| `/nonoka` | 894 KB | 181 ms | `datasets,dataset-nonoka` |
+| `/nonoka/streams` | 1.16 MB | 178 ms | `datasets,dataset-nonoka` |
+| `/nonoka/trends` | 828 KB | 165 ms | `datasets,dataset-nonoka` |
+| `/nonoka/gallery` | 695 KB | 178 ms | `datasets,dataset-nonoka` |
+| `/nonoka/transcripts` | 618 KB | 164 ms | `transcripts,dataset-nonoka` |
+| `/nonoka/compare` | 1.22 MB | 475 ms | `dataset-nonoka,compare` |
+| `/nonoka/stream/<id>` | 696 KB | 402 ms | `streams,stream-<id>,dataset-nonoka` |
+| `.../<id>.md` | 14.0 KB | 359 ms | `streams,stream-<id>,dataset-nonoka` |
+| `/sitemap.xml` | 192 KB（1,929 条 URL） | 301 ms | `sitemap` |
+| `/llms.txt` | 5.3 KB | 257 ms | `llms` |
 
 - 响应头带 `cloudflare-cdn-cache-control` 与 `Cache-Tag`；middleware 同步一份 `Cache-Control`，让 `<link rel=prefetch>` 的预取能被浏览器复用。
-- 耗时是**本机跨区**访问 Neon 的数字（每轮 3 个并行查询 ≈ 1 个 RTT）。同区 Worker + Neon 会低一个量级；线上以 `Cf-Cache-Status` 与 `x-response-time` 为准。
+- 耗时是**本机跨区**访问 Neon 的数字（每轮并行查询 ≈ 1 个 RTT）。同区 Worker + Neon 会低一个量级；线上以 `Cf-Cache-Status` 与 `x-response-time` 为准。
+- `bun run db:query`（列表 + insights，全量 1,897 场）：p50 122.5 ms / p95 247.6 ms。
 - 首次请求冷，后续命中 Workers Cache 后只付边缘响应；本地 `wrangler dev` 不复现 Cache HIT，需线上观察。
+
+### 长列表首屏上限（2026-11-03）
+
+成员最多 506 场、全组 1,897 场。此前 SSR 把所有行/封面都写进 HTML，页面体积随场次线性膨胀。现在：
+
+| 路由 | 上限前 | 上限后 | 变化 |
+| --- | ---: | ---: | ---: |
+| `/gallery` | 4,995,990 B | 1,729,031 B | -65% |
+| `/nonoka/streams` | 2,245,374 B | 1,211,104 B | -46% |
+| `/nonoka/gallery` | 1,050,355 B | 712,086 B | -32% |
+
+- `StreamsView` 首屏只渲染 100 行，`GalleryView` 只渲染 60 张封面，其余用「显示更多」由已水合的岛屿就地追加，不再重新请求 SSR。
+- 筛选 / 排序变化时回到首批，避免旧上限让结果看起来是空的；CSV 导出仍然基于完整筛选结果。
+- 剩余体积主要是岛屿 props（完整 `rows` / `streams`）与正文；再往下需要按路由裁剪 props 或改成 `/api/streams` 分页。
 
 ### 交互实测（生产构建，agent-browser）
 
@@ -66,7 +81,7 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 ### 仍待优化
 
 - **壳层流式输出**：目前整个页面（侧栏 + 页头 + 内容）是一个岛屿，Astro 必须等它 SSR 完才开始输出。把壳层拆成 Astro 布局 + `transition:persist` 的独立岛屿，内容区用 `server:defer` / 流式渲染，首字节可以更早到达。参考 [Astro streaming recipe](https://docs.astro.build/en/recipes/streaming-improve-page-performance/)。
-- **长列表 SSR 上限**：成员页与文本列表目前一次 SSR 全部行；全量 287–505 场时应改为首批 50–100 行 + “加载更多”，或客户端表格。
+- **岛屿 props 体积**：列表首屏已限 100 / 60 行，但完整 `rows` 仍作为 props 序列化进 HTML；下一步按路由裁剪字段，或改成 `/api/streams` 分页。
 - **客户端数据缓存**：路由切换只依赖 Workers Cache；可以在 `sessionStorage` 缓存最近一次 `DatasetPageData`，返回时先渲染旧数据再校验。
 - **Worker 同区**：生产必须让 Worker 与 Neon 区域接近，否则每个请求固定多一个 RTT。
 
