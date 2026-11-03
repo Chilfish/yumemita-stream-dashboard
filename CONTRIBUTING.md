@@ -1,5 +1,7 @@
 # 贡献指南
 
+文档入口见 [docs/README.md](docs/README.md)；AI 协作规范见 [AGENTS.md](AGENTS.md)。
+
 ## 开发
 
 ```bash
@@ -38,7 +40,7 @@ bun run build
 - 新组件遵循现有分层：`dashboard/`（页面）、`charts/`（D3）、`ui/`（coss 生成）。
 - 不修改 `src/components/ui/` 里的业务逻辑；需要定制时用 props / `render` / `className`。
 - 新图表必须处理空数据与 `null`，并加 `aria-label` / `<title>`。
-- 改字段/口径时同步更新 `docs/data-model.md`。
+- 改字段/口径时同步更新 `docs/data/data-model.md`。
 
 ## 文案与文档
 

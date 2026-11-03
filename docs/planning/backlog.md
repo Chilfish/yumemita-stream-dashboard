@@ -1,8 +1,33 @@
-# 路线图
+# 任务清单（Backlog）
+
+> 未决任务与阶段计划索引。已完成的路线图条目保留在下方作为历史；未完成项按优先级排列。
+> 方向与验收标准见 [product-direction.md](product-direction.md)。
+
+## 候选（未排期）
+
+| 编号 | 任务 | 优先级 | 前置条件 | 来源 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 📋 |
+| B2 | 单场 `.md` Agent 路由（`FR-AGENT-001`） | P2 | B1 的数据库查询层 | 迁移 | 📋 |
+| B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 当前可先用 Deploy Hook；迁移后走 purge | 已知缺口 | 📋 |
+| B4 | 跨成员对比（`FR-COMPARE-002`） | P2 | 统一场次/时间段口径 | roadmap | 📋 |
+| B5 | 观众重叠页面（`authors.json` 已有数据） | P2 | 确认重叠算法与最小样本 | roadmap | 📋 |
+| B6 | 全量弹幕入库与检索 | P2 | B1；`chat_events` 分区方案 | 迁移 | 📋 |
+| B7 | 评论增长快照 / 多次抓取对比 | P3 | 抓取侧支持重复快照 | roadmap | 📋 |
+| B8 | IndexNow / sitemap 主动通知 | P3 | B3 | SEO | 📋 |
+| B9 | 200% 缩放复核（320px 已通过） | P3 | 无 | roadmap | 📋 |
+
+## 审查承接区
+
+> 来自 `docs/reviews/` 的问题按 Z（安全/授权）/ R（资源）/ E（工程）/ U（UI）编号登记，承接时新建阶段方案。
+
+| # | 问题 | 优先级 | 状态 |
+| --- | --- | --- | --- |
+| （暂无） | | | |
 
 ## 近期（下一步）
 
-方向与验收标准见 [product-direction.md](product-direction.md)。
+> 以下为旧路线图，保留历史与已完成项；新任务以「候选（未排期）」为准。
 
 1. [x] **封面图**：`fetch:thumbs` 镜像 `video.thumbnail`，发布到对象存储，单场页、首页与相册展示；缺图走成员色兜底。
 2. [x] **相册页（成员）**：`/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
@@ -14,7 +39,7 @@
 
 ## 数据
 
-- [x] 五位成员的全频道历史场次：合计 **1891 场**（2023-11-18 – 2026-10-29），见 [data-progress.md](data-progress.md)。
+- [x] 五位成员的全频道历史场次：合计 **1891 场**（2023-11-18 – 2026-10-29），见 [data-progress.md](../data/data-progress.md)。
 - [x] 补齐其他成员（`data/<id>/` + `data-sources.json`，不需要改组件）：nonoka 287、arale 505、ritsu 339、miyako 321、yuno 439。
 - [x] 内容标签：`src/lib/classify.ts` 标题规则，首页「内容构成」已使用。
 - [x] 精确词频 / 发言者：v2 pack 已带全量字段；已重建的场次 `insights` 为精确值，未重建的按 `partial` 标注覆盖率。
@@ -64,8 +89,8 @@
 - [x] 索引与明细拆分：首屏只拉 `index.json` + 当前 dataset 的 manifest/insights，单场按需拉 datapack。
 - [x] CI 从对象存储拉索引；`VITE_DATAPACK_BASE` 缺失时给出明确报错。
 - [x] 定时增量更新：`.github/workflows/data.yml` 每天 14:17 JST 先做频道差集，只抓有变化的成员；安静日不恢复、不发布。`--force` 重抓最近 24 小时，`bun scripts/daily-update.ts` 本地手动同款。
-- [ ] 每日数据更新后触发前端重建：`daily-update` 写 `update-report`，有变化才调用 Vercel Deploy Hook；方案见 [ssg-research.md](ssg-research.md)。
-- [ ] 渲染方案落地：先做 R2 托管单场页的 PoC（稳定入口 + Vercel rewrite 反代 + sitemap），验证缓存、404 与代码部署兼容；全站 SSG 作为后续选项。方案见 [ssg-research.md](ssg-research.md)。
+- [ ] 数据更新后缓存失效：`ingest` 完成后调用 Worker 的 purge 端点，不再触发前端构建；方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
+- [ ] Astro + PostgreSQL + Workers SSR 迁移：单场页请求期 SSR，`.md` 路由供 Agent 读取；替代 ssg-research 里的静态页路线。方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
 - [x] 在 GitHub 仓库设置 `VITE_DATAPACK_BASE` repository variable（HTTPS 地址）。
 - [x] `ObjectStore` 支持二进制上传与 `Content-Type`；缓存头交给桶侧规则（Bun S3 写接口不支持自定义 Cache-Control）。
 - [x] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。
@@ -79,3 +104,18 @@
 - 不做用户系统、评论、收藏。
 - 不做内容正文的翻译或字幕编辑（那是归档 pipeline 的职责）。
 - 不做逐字稿编辑器 / CMS（独立项目，见 [product-direction.md](product-direction.md) §6.5）。
+
+## 质量门槛
+
+每个任务交付前必须通过（见 [engineering/git-workflow.md](../engineering/git-workflow.md)）：
+
+```bash
+bun run check
+bun run build
+bun run validate:data   # 改数据时
+bun run verify:seo      # 改路由 / SEO / 构建时
+```
+
+- 涉及页面的改动必须手工走查并记录路径与结果。
+- 未执行的检查标注「未验证」，不能把构建通过当作功能已验证。
+- 不接受已知红灯作为基线；先修或移除再合并。

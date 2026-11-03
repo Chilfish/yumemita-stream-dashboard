@@ -155,7 +155,7 @@ bun run publish:data
 
 逐字稿：`bun run transcript:new <videoId> --dataset nonoka` 建模板，写完执行 `bun run publish:transcripts`。
 
-字段和步骤的细节见 [docs/adding-data.md](docs/adding-data.md)。
+字段和步骤的细节见 [docs/data/adding-data.md](docs/data/adding-data.md)。
 
 ## 部署
 
@@ -166,7 +166,7 @@ VITE_DATAPACK_BASE=https://s3.example.com/stream-dashboard \
 VITE_SITE_URL=https://ymmt.example.com bun run build
 ```
 
-构建会为每个路由生成带 head 的静态 HTML，并输出 `sitemap.xml` / `robots.txt`。数据更新只需要 `bun run publish:data`，逐字稿更新 `bun run publish:transcripts`，都不用重新构建；新场次的静态分享卡片要等下次构建，客户端 meta 立即生效。部署在子路径时设 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
+构建会为每个路由生成带 head 的静态 HTML，并输出 `sitemap.xml` / `robots.txt`。数据更新只需要 `bun run publish:data`，逐字稿更新 `bun run publish:transcripts`，都不用重新构建；新场次的静态分享卡片要等下次构建，客户端 meta 立即生效。部署在子路径时设 `VITE_BASE`。详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。
 
 ## 项目结构
 
@@ -189,15 +189,20 @@ data-sources.json  # 成员注册表
 
 ## 文档
 
-- [docs/README.md](docs/README.md) 文档索引
-- [docs/architecture.md](docs/architecture.md) 分层、数据流、路由
-- [docs/performance.md](docs/performance.md) 首屏数据流、缓存、图片与实测数字
-- [docs/data-model.md](docs/data-model.md) manifest / datapack 字段与口径
-- [docs/adding-data.md](docs/adding-data.md) 加场次、成员、数据集
-- [docs/development.md](docs/development.md) 本地开发、代码规范、图表写法
-- [docs/deployment.md](docs/deployment.md) 构建与静态托管
-- [docs/troubleshooting.md](docs/troubleshooting.md) 常见问题
-- [docs/roadmap.md](docs/roadmap.md) 后续计划
+- [docs/README.md](docs/README.md) 文档唯一入口
+- [docs/requirements/](docs/requirements/) 需求规格与用户故事
+- [docs/planning/architecture.md](docs/planning/architecture.md) 分层、数据流、路由
+- [docs/planning/astro-ssr-migration.md](docs/planning/astro-ssr-migration.md) Astro + Workers + PostgreSQL 迁移方案
+- [docs/planning/backlog.md](docs/planning/backlog.md) 任务清单
+- [docs/data/data-model.md](docs/data/data-model.md) manifest / datapack 字段与口径
+- [docs/data/adding-data.md](docs/data/adding-data.md) 加场次、成员、数据集
+- [docs/engineering/development.md](docs/engineering/development.md) 本地开发与代码规范
+- [docs/engineering/deployment.md](docs/engineering/deployment.md) 构建与部署
+- [docs/engineering/performance.md](docs/engineering/performance.md) 性能记录
+- [docs/engineering/troubleshooting.md](docs/engineering/troubleshooting.md) 常见问题
+- [docs/ui-design/README.md](docs/ui-design/README.md) 设计系统
+- [docs/development-log/](docs/development-log/) 开发日志
+- [AGENTS.md](AGENTS.md) AI 协作指南
 
 ## 说明
 

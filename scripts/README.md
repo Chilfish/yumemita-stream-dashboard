@@ -114,7 +114,7 @@ manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` �
 ## 每日增量更新
 
 `daily-update.ts` 把「频道列表 → 定点抓取 → 补封面 → 定点发布」串成一条命令，本地和 GitHub Actions 共用。
-定时任务见 [docs/deployment.md](../docs/deployment.md) 的「定时增量更新」。
+定时任务见 [docs/engineering/deployment.md](../docs/engineering/deployment.md) 的「定时增量更新」。
 
 ```powershell
 bun scripts/daily-update.ts                 # 增量；本地默认用 Firefox cookie
@@ -169,7 +169,7 @@ GitHub runner 是云厂商 IP，YouTube 除了认 cookie 还要 PO token。工�
 - `Check YouTube access` 先用 cookie 读一场已知视频的元信息，日志里打出出口 IP/地区、加载到的 PO token 提供者和 `cookies are no longer valid`；读不到直接报错停下；
 - `fetch-streams` 不再吞掉元信息失败：bot 检查、会员限定分别归类，前者计入失败并让工作流开 issue。
 
-排查顺序写在 [docs/deployment.md](../docs/deployment.md) 的「定时增量更新」。
+排查顺序写在 [docs/engineering/deployment.md](../docs/engineering/deployment.md) 的「定时增量更新」。
 
 ### CI 代理（可选）
 

@@ -258,22 +258,22 @@ src/components/charts/
 2. 用 D3 算比例尺和 path；渲染普通 SVG。
 3. 处理空数据（`EmptyChart`）和 `null` 值。
 4. 给每个数据点加 `<title>`，给 SVG 加 `aria-label`。
-5. 在 `docs/development.md` 的图表清单里补一行。
+5. 在 `docs/engineering/development.md` 的图表清单里补一行。
 
 ### 加一个 dataset
 
-见 [adding-data.md](adding-data.md)。页面不需要改代码；`AppHeader` 在 dataset 数 > 1 时自动显示选择器。
+见 [adding-data.md](../data/adding-data.md)。页面不需要改代码；`AppHeader` 在 dataset 数 > 1 时自动显示选择器。
 
 ### 加一篇逐字稿
 
-见 [adding-data.md](adding-data.md) 的「加逐字稿」。稿件只影响 `/:datasetId/transcripts` 与单场页的「逐字稿」分段，不改路由或组件。
+见 [adding-data.md](../data/adding-data.md) 的「加逐字稿」。稿件只影响 `/:datasetId/transcripts` 与单场页的「逐字稿」分段，不改路由或组件。
 
 ### 加一个字段
 
 1. 确认 JSON 里已存在该字段。
 2. 更新 `src/types/datapack.ts` 或 `src/types/dataset.ts`。
 3. 如需聚合，更新 `src/lib/aggregate.ts` 与测试。
-4. 更新 `docs/data-model.md`。
+4. 更新 `docs/data/data-model.md`。
 5. 兼容旧数据：字段可能缺失时用 `?? null`，不要假设一定存在。
 
 ## 关键设计决策
@@ -290,9 +290,49 @@ src/components/charts/
 | 逐字稿 | git 存 Markdown，发布成 JSON，运行时渲染 | 作者可版本管理；发布即生效，不重构建 |
 | 精确词频 / 发言者 | 全量字段写进 v2 datapack，发布时聚合 | 只保留一份真源；页面不重扫，换机器恢复 pack 后仍可精确重算 |
 
+## 架构决策记录（ADR）
+
+### ADR-001：React Router path 路由 + 静态托管
+
+- **决策**：使用 React Router 8 的 path 路由与 `createBrowserRouter`，产物是纯静态文件，靠宿主 SPA 回退支持深链刷新。
+- **理由**：每个页面有真实 URL，可分享、可爬取；不需要后端即可部署；与现有组件和 `Link` 生态一致。
+- **后果**：托管必须配置回退；旧 `#/...` 链接要在应用启动前改写；没有服务端 404，未知单场仍返回 200，需要 `noindex` 兜底。
+
+### ADR-002：D3 只算数学，React 拥有 DOM
+
+- **决策**：图表用 D3 的比例尺、形状生成函数计算，SVG 节点由 React 渲染；不使用 `d3-selection`。
+- **理由**：避免 D3 与 React 争抢节点；新增指标只改比例尺与 path；体积可控。
+- **后果**：图表组件需要 `ChartCanvas` 提供响应式宽度；空数据与 `null` 必须显式处理；可访问性由 React 输出 `aria-label` / `<title>`。
+
+### ADR-003：coss UI + Tailwind Token
+
+- **决策**：基础组件来自 `src/components/ui/` 的 coss-ui；颜色、圆角、间距通过 CSS 变量与 Tailwind `@theme inline` 表达。
+- **理由**：Base UI 提供可访问性，coss 统一风格；Token 让浅色 / 深色同时成立。
+- **后果**：不手写基础组件；不改生成文件里的业务逻辑；新增颜色要同时写 `:root` 与 `.dark`。
+
+### ADR-004：R2 JSON + 浏览器运行时读取
+
+- **决策**：`data/<id>/*.datapack.json` 是唯一真源；`publish:data` 派生 manifest / insights / 组级文件并上传 R2；页面运行时读取，`public/data/` 只做兜底。
+- **理由**：数据与代码部署解耦；大文件不进 git；发布后刷新即生效。
+- **后果**：首屏依赖对象存储可达性；需要 CORS 与缓存规则；静态 SEO 产物与数据新鲜度可能不同步（见 ADR-006）。
+
+### ADR-005：时间一律 JST，金额不换算汇率
+
+- **决策**：所有时间按 JST（UTC+9）展示；`startedAt` 取开播时刻。SC / 贴纸金额按原始币种分组，不做汇率换算。
+- **理由**：成员与观众都在日本时区；汇率随时变化，换算会引入不可追溯的口径。
+- **后果**：跨币种不能直接相加；页面必须按币种分列；旧数据缺时区时按 JST 解释。
+
+### ADR-006：迁移到 Astro + PostgreSQL + Workers（规划，未实施）
+
+- **状态**：📋 规划中。
+- **决策**：Astro 7 + Cloudflare Workers，数据页请求期 SSR，datapack 投影到 PostgreSQL，R2 只存逐字稿 / 封面 / 表情 / 归档；单场页提供 `.md` 路由。
+- **理由**：新场次入库即生效，不需要每日构建；SQL 支持检索与聚合；Workers 与 R2、缓存、cron 同平台。
+- **后果**：需要数据库 schema、ingest、查询层、缓存失效与页面迁移；当前 React Router / R2 JSON 实现在切换前仍是事实来源。
+- **方案**：[astro-ssr-migration.md](./astro-ssr-migration.md)。
+
 ## 性能与限制
 
-完整记录见 [performance.md](performance.md)。当前关键数字与约束：
+完整记录见 [performance.md](../engineering/performance.md)。当前关键数字与约束：
 
 - 组首页只加载 `index.json` + `group-summary.json`（约 17 KB raw / 3.6 KB gzip），不再拉 5 份 manifest（约 2.7 MB raw / 293 KB gzip）；`group-gallery.json`（约 829 KB raw / 149 KB gzip）只在 `/gallery` 加载。
 - 成员页首屏是 `index.json` + 当前 dataset 的 manifest / insights；manifest / insights 有 5 分钟内存缓存与 in-flight 去重，索引与组首页摘要走 sessionStorage（10 分钟、按索引版本校验）。

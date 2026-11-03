@@ -53,7 +53,7 @@ bun run validate:data -- --remote  # 逐条 HEAD 确认可达
 
 ## 数字看起来不对
 
-先确认口径（见 [data-model.md](data-model.md)）：
+先确认口径（见 [data-model.md](../data/data-model.md)）：
 
 - 播放/点赞有 **VSTATS 快照** 和 **yt-dlp 抓取时点** 两套值，差值方向不固定。
 - 币种金额不换算汇率，不能直接相加。
