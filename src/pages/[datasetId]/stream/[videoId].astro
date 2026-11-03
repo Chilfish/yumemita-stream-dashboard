@@ -3,21 +3,30 @@ import Layout from '@/layouts/Layout.astro'
 import ErrorState from '@/components/shared/ErrorState.astro'
 import { DatasetPage } from '@/components/app/dataset-page'
 import { db } from '@/db/client'
-import { getDatasetPageData } from '@/db/queries/view-data'
 import { getStreamPack } from '@/db/queries/packs'
+import { getTranscriptMeta } from '@/db/queries/transcripts'
+import { getDatasetPageData } from '@/db/queries/view-data'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 
 export const prerender = false
 
 const datasetId = Astro.params.datasetId!
 const videoId = Astro.params.videoId!
-const data = await getDatasetPageData(db, datasetId).catch(error => {
-  console.error('[page] stream failed', error)
-  return null
-})
+// 第三个状态是查询失败：交给客户端索引兜底，而不是当作「没有稿」。
+const [data, transcript] = await Promise.all([
+  getDatasetPageData(db, datasetId).catch(error => {
+    console.error('[page] stream failed', error)
+    return null
+  }),
+  getTranscriptMeta(db, datasetId, videoId).catch(error => {
+    console.error('[page] stream transcript lookup failed', error)
+    return undefined
+  }),
+])
 
 const summary = data?.rows.find(row => row.videoId === videoId) ?? null
 const pack = summary ? await getStreamPack(db, datasetId, videoId).catch(() => null) : null
+const hasTranscript = transcript ? true : transcript === null ? false : undefined
 
 if (!data || !summary) Astro.response.status = 404
 else Astro.cache.set({ maxAge: 300, swr: 600, tags: [`stream-${videoId}`, `dataset-${datasetId}`] })
@@ -62,6 +71,7 @@ const meta = data && summary
           comparePacks={{}}
           dataset={data.dataset}
           datasets={data.datasets}
+          hasTranscript={hasTranscript}
           pack={pack}
           params={requestParams(Astro)}
           pathname={Astro.url.pathname}

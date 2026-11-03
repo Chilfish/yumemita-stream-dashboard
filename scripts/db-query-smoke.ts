@@ -8,6 +8,7 @@ import {
   getStreamNeighbors,
   listStreams,
 } from '../src/db/queries/streams.ts'
+import { getTranscriptIndex, getTranscriptMeta } from '../src/db/queries/transcripts.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 
 const failures: string[] = []
@@ -54,6 +55,18 @@ async function main(): Promise<void> {
   const insights = await getDatasetInsights(db, 'nonoka')
   check(insights === null || insights.totals.streamCount > 0, 'dataset_insights 数据异常')
 
+  const transcriptEntries = await getTranscriptIndex(db, 'nonoka')
+  for (let index = 1; index < transcriptEntries.length; index += 1) {
+    const previous = transcriptEntries[index - 1]?.date ?? ''
+    const current = transcriptEntries[index]?.date ?? ''
+    check(previous >= current, `getTranscriptIndex 未按日期倒序: ${previous} < ${current}`)
+    if (failures.length > 5) break
+  }
+  if (transcriptEntries[0]) {
+    const meta = await getTranscriptMeta(db, 'nonoka', transcriptEntries[0].videoId)
+    check(Boolean(meta?.r2Key), 'getTranscriptMeta 缺少 r2Key')
+  }
+
   const summary = await getGroupSummary(db)
   check(summary.members.length > 0, 'group summary 没有成员')
   check(summary.recent.length > 0, 'group summary 没有 recent')
@@ -76,6 +89,7 @@ async function main(): Promise<void> {
       total: list.total,
       latest: latest?.videoId ?? null,
       insights: insights ? insights.totals.streamCount : null,
+      transcripts: transcriptEntries.length,
     },
     group: {
       members: summary.members.length,

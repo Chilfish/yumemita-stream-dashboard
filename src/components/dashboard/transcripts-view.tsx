@@ -1,12 +1,9 @@
-import { RotateCcw, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "@/lib/router-compat";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useTranscriptIndex } from "@/hooks/use-transcript";
 import { formatDate, formatInteger } from "@/lib/format";
 import { streamPath } from "@/lib/routes";
 import {
@@ -57,29 +54,19 @@ function TranscriptsEmpty() {
   );
 }
 
-function TranscriptsSkeleton() {
-  return (
-    <div aria-busy="true" aria-live="polite" className="flex flex-col gap-3">
-      <Skeleton className="h-4 w-28" />
-      {Array.from({ length: 5 }, (_, index) => (
-        <div className="flex flex-col gap-2 border-t border-hairline pt-3" key={index}>
-          <Skeleton className="h-3 w-16" />
-          <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-3 w-full max-w-[60ch]" />
-        </div>
-      ))}
-      <span className="sr-only">正在加载逐字稿索引</span>
-    </div>
-  );
-}
-
 export interface TranscriptsViewProps {
   datasetId: string;
   datasetLabel?: string;
+  entries: TranscriptIndexEntry[];
+  error?: string | null;
 }
 
-export function TranscriptsView({ datasetId, datasetLabel }: TranscriptsViewProps) {
-  const { entries, status, error, retry } = useTranscriptIndex(datasetId);
+export function TranscriptsView({
+  datasetId,
+  datasetLabel,
+  entries,
+  error,
+}: TranscriptsViewProps) {
   const groups = useMemo(() => groupTranscriptsByMonth(entries), [entries]);
 
   return (
@@ -93,51 +80,35 @@ export function TranscriptsView({ datasetId, datasetLabel }: TranscriptsViewProp
         title={datasetLabel ?? "逐字稿索引"}
       />
 
-      {status === "loading" || status === "idle" ? <TranscriptsSkeleton /> : null}
-
-      {status === "error" ? (
-        <div className="flex flex-col items-start gap-3">
-          <Alert variant="error">
-            <TriangleAlert aria-hidden="true" />
-            <AlertTitle>逐字稿索引加载失败</AlertTitle>
-            <AlertDescription>{error ?? "未知错误"}</AlertDescription>
-          </Alert>
-          <Button onClick={retry} size="sm" type="button" variant="outline">
-            <RotateCcw aria-hidden="true" />
-            重试
-          </Button>
-        </div>
+      {error ? (
+        <Alert variant="error">
+          <TriangleAlert aria-hidden="true" />
+          <AlertTitle>逐字稿索引加载失败</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
 
-      {status === "ready" && entries.length === 0 ? <TranscriptsEmpty /> : null}
+      {entries.length === 0 && !error ? <TranscriptsEmpty /> : null}
 
-      {status === "ready" && entries.length > 0 ? (
-        <>
-          {error ? (
-            <p className="text-caption text-ink-3">
-              暂时无法获取最新列表（{error}），以下是本地缓存。
-            </p>
-          ) : null}
-          <div className="flex flex-col gap-6">
-            {groups.map(group => (
-              <section className="flex flex-col gap-1" key={group.key || "undated"}>
-                <div className="flex items-baseline gap-2">
-                  <h2 className="text-headline text-foreground">{group.label}</h2>
-                  <span className="text-caption text-ink-3 tabular-nums">
-                    {formatInteger(group.entries.length)} 篇
-                  </span>
-                </div>
-                <ul className="flex flex-col">
-                  {group.entries.map(entry => (
-                    <EntryRow datasetId={datasetId} entry={entry} key={entry.videoId} />
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </>
+      {entries.length > 0 ? (
+        <div className="flex flex-col gap-6">
+          {groups.map(group => (
+            <section className="flex flex-col gap-1" key={group.key || "undated"}>
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-headline text-foreground">{group.label}</h2>
+                <span className="text-caption text-ink-3 tabular-nums">
+                  {formatInteger(group.entries.length)} 篇
+                </span>
+              </div>
+              <ul className="flex flex-col">
+                {group.entries.map(entry => (
+                  <EntryRow datasetId={datasetId} entry={entry} key={entry.videoId} />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       ) : null}
     </div>
   );
 }
-

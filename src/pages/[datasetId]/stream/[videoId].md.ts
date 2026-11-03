@@ -1,11 +1,10 @@
 import type { APIRoute } from 'astro'
 import { env } from 'cloudflare:workers'
-import { and, eq } from 'drizzle-orm'
 import { db } from '@/db/client'
-import { transcripts } from '@/db/schema'
 import { getDataset } from '@/db/queries/datasets'
 import { getStreamPack } from '@/db/queries/packs'
 import { getStream } from '@/db/queries/streams'
+import { getTranscriptMeta } from '@/db/queries/transcripts'
 import { renderStreamMarkdown } from '@/lib/agent-markdown'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
 
@@ -82,17 +81,12 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
   const summary = await getStream(db, datasetId, videoId)
   if (!summary) return notFound()
 
-  const [dataset, pack, transcriptRows] = await Promise.all([
+  const [dataset, pack, transcriptMeta] = await Promise.all([
     getDataset(db, datasetId),
     getStreamPack(db, datasetId, videoId),
-    db
-      .select()
-      .from(transcripts)
-      .where(and(eq(transcripts.datasetId, datasetId), eq(transcripts.videoId, videoId)))
-      .limit(1),
+    getTranscriptMeta(db, datasetId, videoId),
   ])
 
-  const transcriptMeta = transcriptRows[0]
   const transcript = await readTranscriptBody(transcriptMeta?.r2Key)
 
   const origin = context.site?.origin ?? DEFAULT_SITE_URL

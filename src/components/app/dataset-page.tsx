@@ -30,6 +30,7 @@ import {
   type ViewKey,
 } from '@/lib/routes'
 import { RouterProvider, useNavigate, useSearchParams } from '@/lib/router-compat'
+import type { TranscriptIndexEntry } from '@/lib/transcripts'
 import type { StreamDatapack } from '@/types/datapack'
 import type { BatchManifest, DatasetIndexEntry, StreamSummary } from '@/types/dataset'
 import { useShellTheme } from './shell-theme'
@@ -57,6 +58,9 @@ export interface DatasetPageProps {
   stream: StreamSummary | null
   pack: StreamDatapack | null
   comparePacks: Record<string, StreamDatapack>
+  transcripts?: TranscriptIndexEntry[]
+  transcriptError?: string | null
+  hasTranscript?: boolean
 }
 
 export function DatasetPage(props: DatasetPageProps) {
@@ -173,7 +177,12 @@ function DatasetBody(props: DatasetPageProps) {
     case 'gallery':
       return <GalleryPage />
     case 'transcripts':
-      return <TranscriptsPage />
+      return (
+        <TranscriptsPage
+          error={props.transcriptError ?? null}
+          transcripts={props.transcripts ?? []}
+        />
+      )
     case 'about':
       return <AboutPage />
     case 'compare':
@@ -183,7 +192,7 @@ function DatasetBody(props: DatasetPageProps) {
   }
 }
 
-function StreamBody({ dataset, rows, stream, pack }: DatasetPageProps) {
+function StreamBody({ dataset, rows, stream, pack, hasTranscript }: DatasetPageProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const view = parseStreamSubView(searchParams.get('view'))
@@ -201,6 +210,7 @@ function StreamBody({ dataset, rows, stream, pack }: DatasetPageProps) {
   return (
     <StreamDetailView
       datasetId={dataset.id}
+      hasTranscript={hasTranscript}
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
       onViewChange={(next) => {
         const params = new URLSearchParams(searchParams)

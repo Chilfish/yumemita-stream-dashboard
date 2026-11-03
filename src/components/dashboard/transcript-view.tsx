@@ -312,14 +312,21 @@ export interface TranscriptViewProps {
   datasetId: string;
   videoId: string;
   className?: string;
+  hasTranscript?: boolean;
 }
 
-export function TranscriptView({ datasetId, videoId, className }: TranscriptViewProps) {
+export function TranscriptView({
+  datasetId,
+  videoId,
+  className,
+  hasTranscript: hasTranscriptProp,
+}: TranscriptViewProps) {
   const { file, status, error, retry } = useTranscript(datasetId, videoId);
   // 远端对象不存在时 R2 的 404 可能不带 CORS 头，fetch 会变成网络错误。
-  // 索引说这场没有稿，就按「还没有逐字稿」处理，而不是报错。
-  const { hasTranscript, status: indexStatus } = useTranscriptAvailability(datasetId);
-  const missing = indexStatus === "ready" && !hasTranscript(videoId);
+  // 页面已从数据库带出可用性时不再发客户端索引请求。
+  const availability = useTranscriptAvailability(datasetId, hasTranscriptProp == null);
+  const missing = hasTranscriptProp === false
+    || (availability.status === "ready" && !availability.hasTranscript(videoId));
 
 
   const toc = file?.toc ?? EMPTY_TOC;

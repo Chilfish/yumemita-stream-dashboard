@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LOCAL_DATA_BASE, REMOTE_DATA_BASE } from "@/lib/data";
 import {
   TRANSCRIPT_INDEX_SCHEMA,
@@ -286,93 +286,6 @@ function loadTranscript(datasetId: string, videoId: string, force = false): Prom
 // hooks
 // ---------------------------------------------------------------------------
 
-interface IndexState {
-  scope: string;
-  entries: TranscriptIndexEntry[];
-  status: TranscriptStatus;
-  error: string | null;
-  source: "remote" | "local";
-}
-
-const EMPTY_ENTRIES: TranscriptIndexEntry[] = [];
-
-function idleIndexState(): IndexState {
-  return { scope: "", entries: EMPTY_ENTRIES, status: "idle", error: null, source: "local" };
-}
-
-export interface TranscriptIndexResult {
-  entries: TranscriptIndexEntry[];
-  status: TranscriptStatus;
-  error: string | null;
-  source: "remote" | "local";
-  /** 当前 dataset 是否已经有这一场的稿；索引还没回来时先看构建快照。 */
-  hasTranscript: (videoId: string) => boolean;
-  retry: () => void;
-}
-
-export function useTranscriptIndex(datasetId: string | null): TranscriptIndexResult {
-  const [state, setState] = useState<IndexState>(idleIndexState);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    if (!datasetId) return;
-    const controller = new AbortController();
-    // oxlint-disable-next-line react/set-state-in-effect -- dataset 变化时必须重置加载状态
-    setState({ scope: datasetId, entries: EMPTY_ENTRIES, status: "loading", error: null, source: "local" });
-
-    guard(loadIndex(attempt > 0), controller.signal)
-      .then(result => {
-        if (controller.signal.aborted) return;
-        setState({
-          scope: datasetId,
-          entries: result.entries.filter(entry => entry.datasetId === datasetId),
-          status: "ready",
-          error: result.error,
-          source: result.source,
-        });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        if (error instanceof Error && error.name === "AbortError") return;
-        setState({
-          scope: datasetId,
-          entries: EMPTY_ENTRIES,
-          status: "error",
-          error: errorMessage(error),
-          source: "local",
-        });
-      });
-
-    return () => controller.abort();
-  }, [datasetId, attempt]);
-
-  const current: IndexState =
-    !datasetId || state.scope !== datasetId
-      ? { scope: datasetId ?? "", entries: EMPTY_ENTRIES, status: datasetId ? "loading" : "idle", error: null, source: "local" }
-      : state;
-
-  const videoIds = useMemo(() => new Set(current.entries.map(entry => entry.videoId)), [current.entries]);
-
-  const hasTranscript = useCallback(
-    (videoId: string) => {
-      if (videoIds.has(videoId)) return true;
-      return datasetId ? hasLocalTranscript(datasetId, videoId) : false;
-    },
-    [datasetId, videoIds],
-  );
-
-  const retry = useCallback(() => setAttempt(value => value + 1), []);
-
-  return {
-    entries: current.entries,
-    status: current.status,
-    error: current.error,
-    source: current.source,
-    hasTranscript,
-    retry,
-  };
-}
-
 const EMPTY_VIDEO_IDS: ReadonlySet<string> = new Set();
 
 interface AvailabilityState {
@@ -391,7 +304,10 @@ export interface TranscriptAvailability {
  * 只回答「要不要显示逐字稿入口」：本地模式下直接看 glob 的路径，一次 Markdown 都不读；
  * 远端模式下只取索引（一个小 JSON），不会为了显示标签把本地快照全量载入。
  */
-export function useTranscriptAvailability(datasetId: string | null): TranscriptAvailability {
+export function useTranscriptAvailability(
+  datasetId: string | null,
+  enabled = true,
+): TranscriptAvailability {
   const localOnly = REMOTE_DATA_BASE === "";
   const [state, setState] = useState<AvailabilityState>({
     scope: "",
@@ -400,7 +316,7 @@ export function useTranscriptAvailability(datasetId: string | null): TranscriptA
   });
 
   useEffect(() => {
-    if (!datasetId || localOnly) return;
+    if (!datasetId || localOnly || !enabled) return;
     const controller = new AbortController();
     // oxlint-disable-next-line react/set-state-in-effect -- dataset 变化时必须重置加载状态
     setState({ scope: datasetId, videoIds: EMPTY_VIDEO_IDS, status: "loading" });
@@ -425,10 +341,11 @@ export function useTranscriptAvailability(datasetId: string | null): TranscriptA
       });
 
     return () => controller.abort();
-  }, [datasetId, localOnly]);
+  }, [datasetId, enabled, localOnly]);
 
-  const videoIds = !datasetId || state.scope !== datasetId ? EMPTY_VIDEO_IDS : state.videoIds;
-  const status: TranscriptStatus = !datasetId
+  const videoIds =
+    !datasetId || !enabled || state.scope !== datasetId ? EMPTY_VIDEO_IDS : state.videoIds;
+  const status: TranscriptStatus = !datasetId || !enabled
     ? "idle"
     : localOnly
       ? "ready"
