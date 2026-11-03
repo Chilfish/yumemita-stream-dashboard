@@ -15,6 +15,7 @@ import {
 import type { CurrencyTotals, StreamDatapack } from '../src/types/datapack.ts'
 import { buildStreamSummary } from './lib/dataset-manifest.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
+import { jsonEqual } from './lib/json-equal.ts'
 
 interface Args {
   dataset?: string
@@ -218,7 +219,7 @@ async function main(): Promise<void> {
       if (!insight) {
         problems.push({ scope: source.id, message: '缺少 dataset_insights' })
       }
-      else if (JSON.stringify(insight.totals) !== JSON.stringify(expected)) {
+      else if (!jsonEqual(insight.totals, expected)) {
         problems.push({ scope: source.id, message: 'dataset_insights.totals 与重算结果不一致' })
       }
     }
