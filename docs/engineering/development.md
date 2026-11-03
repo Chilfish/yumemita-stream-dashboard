@@ -29,6 +29,7 @@ bun run dev
 | `bun run db:migrate` | 应用 `drizzle/` 迁移（读 `.env` 或 `.dev.vars`） |
 | `bun run db:ingest` | 本地 pack → PostgreSQL；支持 `--dataset` / `--ids` / `--limit` / `--all` / `--dry-run` |
 | `bun run db:verify` | 数据库与本地 pack 字段级对账 |
+| `bun run db:query` | 查询层冒烟：列表 / insights / 组首页 / 相册 + 本地延迟 |
 | `bun run sync:data` | 旧链路：生成 `public/data/` 兜底快照 |
 | `bun run publish:data` | 旧链路：由 pack 重建 index + manifest + insights，增量上传对象存储 |
 | `bun run validate:data` | 校验旧数据引用链（`--remote` 检查对象存储） |
@@ -50,6 +51,12 @@ bun run dev
 - ingest：`scripts/ingest-db.ts`，一场一个事务，`content_hash` 增量；小批量 `--limit` 跳过 insights。
 - 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表。
 - `DATABASE_URL` 从 `.env` / `.dev.vars` 读取；本地脚本缺失时直接报错，不静默回退。
+- 查询层：`src/db/queries/`，函数接收 `Db` 作为第一个参数（页面 / 脚本共用）；DTO 在 `src/types/db.ts`。
+  - `datasets.ts`：`getDatasets` / `getDataset`
+  - `streams.ts`：`listStreams`（`count(*) over()` 一次取总数）/ `getStream` / `getLatestStream` / `getStreamNeighbors` / `getStreamDetail`
+  - `insights.ts`：`getDatasetInsights`
+  - `group.ts`：`getGroupSummary` / `getGroupGallery`
+- `numeric` 列统一在查询层转成 `number | null`；时间列统一转成 ISO 字符串，不把 `Date` 传给岛屿。
 
 ## 代码组织
 

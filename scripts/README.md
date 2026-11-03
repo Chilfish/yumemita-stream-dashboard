@@ -34,6 +34,9 @@ bun run db:ingest -- --all
 
 # 对账：行数、chat_total、SC、评论、作者、insights
 bun run db:verify -- --dataset nonoka --limit 30
+
+# 查询层冒烟 + 本地延迟（成员列表 / insights / 组首页 / 相册）
+bun run db:query
 ```
 
 - 事务边界：一场一个事务；子表按 `stream_id` 删除后重插。

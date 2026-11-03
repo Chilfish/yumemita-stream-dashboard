@@ -29,6 +29,7 @@
     "db:studio": "drizzle-kit studio",
     "db:ingest": "bun scripts/ingest-db.ts",
     "db:verify": "bun scripts/verify-db.ts",
+    "db:query": "bun scripts/db-query-smoke.ts",
     "sync:data": "bun scripts/sync-data.mjs",
     "icons": "bun scripts/generate-icons.ts",
     "seo": "bun scripts/generate-seo.ts",
