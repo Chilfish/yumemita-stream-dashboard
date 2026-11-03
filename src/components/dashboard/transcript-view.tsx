@@ -2,7 +2,7 @@ import { ExternalLink, ListTree, RotateCcw, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import Markdown, { type Components } from "react-markdown";
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -396,3 +396,4 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
     </div>
   );
 }
+

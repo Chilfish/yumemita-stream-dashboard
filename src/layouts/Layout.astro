@@ -39,6 +39,11 @@ const { meta, lang = 'zh-CN', alternateMarkdown } = Astro.props
 
     <script is:inline>
       ;(function () {
+        // 旧版本的 `#/nonoka/...` 链接在启动前改写成真实路径。
+        if (location.hash.startsWith('#/')) {
+          location.replace(location.hash.slice(1))
+          return
+        }
         try {
           const raw = localStorage.getItem('app-config-store')
           const theme = raw ? JSON.parse(raw).state.theme : 'system'

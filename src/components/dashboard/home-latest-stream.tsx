@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { Sparkline } from "@/components/charts/sparkline";
 import { StreamCover } from "@/components/dashboard/stream-cover";
 import { Badge } from "@/components/ui/badge";
@@ -143,3 +143,4 @@ export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamPr
     </div>
   );
 }
+

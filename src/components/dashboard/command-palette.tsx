@@ -1,7 +1,7 @@
 import { CornerDownLeft, Search } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "@/lib/router-compat";
 import { CommandDialog, CommandDialogPopup } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
@@ -215,3 +215,4 @@ export function CommandPalette({
     </CommandDialog>
   );
 }
+

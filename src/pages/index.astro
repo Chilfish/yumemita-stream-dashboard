@@ -1,51 +1,45 @@
 ---
 import Layout from '@/layouts/Layout.astro'
-import { buildSeo } from '@/lib/seo'
-import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
-import dataSources from '../../data-sources.json'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { GroupPage } from '@/components/app/group-page'
+import { db } from '@/db/client'
+import { getGroupPageData, type GroupPageData } from '@/db/queries/view-data'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 
 export const prerender = false
 
-const origin = Astro.site?.origin ?? DEFAULT_SITE_URL
-const basePath = import.meta.env.BASE_URL.replace(/\/+$/, '')
-const datasets = dataSources.datasets
+let data: GroupPageData | null = null
+try {
+  data = await getGroupPageData(db, 'home')
+}
+catch (error) {
+  console.error('[page] group home failed', error)
+  Astro.response.status = 500
+}
 
-const meta = buildSeo({
-  origin,
-  basePath,
-  pathname: Astro.url.pathname,
+const latest = data?.data.rows[0] ?? null
+const meta = pageSeo(Astro, {
   section: 'home',
-  memberCount: datasets.length,
+  memberCount: data?.datasets.length ?? null,
+  streamCount: data?.data.totals.streamCount ?? null,
+  updatedAt: latest?.startedAt ?? null,
+  imageStream: latest ? { datasetId: latest.datasetId, videoId: latest.videoId } : null,
 })
 ---
 
 <Layout meta={meta}>
-  <main class="mx-auto flex min-h-dvh max-w-4xl flex-col gap-10 px-6 py-16">
-    <header class="space-y-2">
-      <p class="text-footnote text-muted-foreground">夢限大みゅーたいぷ</p>
-      <h1 class="text-display">ゆめみた 配信数据台</h1>
-      <p class="max-w-prose text-body text-muted-foreground">
-        同接、弹幕、SC、评论与逐字稿，按成员、场次与趋势浏览。
-      </p>
-    </header>
-
-    <nav aria-label="成员" class="grid gap-2 sm:grid-cols-2">
-      {datasets.map(dataset => (
-        <a
-          class="press flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 hover:bg-accent"
-          href={`/${dataset.id}`}
-        >
-          <img
-            alt=""
-            class="size-9 rounded-full object-cover"
-            height="36"
-            src={`/${dataset.avatar}`}
-            style={`box-shadow: 0 0 0 2px ${dataset.color}`}
-            width="36"
-          />
-          <span class="font-medium">{dataset.label}</span>
-        </a>
-      ))}
-    </nav>
-  </main>
+  {data
+    ? (
+        <GroupPage
+          client:load
+          data={data.data}
+          datasets={data.datasets}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          search={requestSearch(Astro)}
+          section="home"
+          view="home"
+        />
+      )
+    : <ErrorState code="500" />}
 </Layout>

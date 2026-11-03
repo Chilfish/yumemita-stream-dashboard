@@ -1,6 +1,6 @@
 import { RotateCcw, TriangleAlert } from "lucide-react";
 import { useMemo } from "react";
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -140,3 +140,4 @@ export function TranscriptsView({ datasetId, datasetLabel }: TranscriptsViewProp
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "@/lib/router-compat";
 import { StreamCover } from "@/components/dashboard/stream-cover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { memberAccent } from "@/lib/color";
@@ -245,3 +245,4 @@ export function GalleryView({
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import {
   Table,
   TableBody,
@@ -188,3 +188,4 @@ function SortIcon({ active, dir }: { active: boolean; dir?: SortDir }) {
     />
   );
 }
+

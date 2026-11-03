@@ -1,0 +1,22 @@
+---
+interface Props {
+  title?: string
+  detail?: string
+  code?: string
+}
+
+const {
+  title = '页面出错了',
+  detail = '数据暂时读不到。可以重试一次，或者回到首页继续浏览。',
+  code = 'ERROR',
+} = Astro.props
+---
+
+<main class="mx-auto flex min-h-[60dvh] max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+  <p class="text-caption text-muted-foreground">{code}</p>
+  <h1 class="text-title">{title}</h1>
+  <p class="text-body text-muted-foreground">{detail}</p>
+  <a class="press rounded-lg border border-input bg-card px-4 py-2 text-headline" href="/">
+    返回首页
+  </a>
+</main>

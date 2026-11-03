@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -56,3 +56,4 @@ export function GroupHeader({
     </header>
   );
 }
+

@@ -1,0 +1,52 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { DatasetPage } from '@/components/app/dataset-page'
+import { db } from '@/db/client'
+import { getDatasetPageData } from '@/db/queries/view-data'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+
+export const prerender = false
+
+const datasetId = Astro.params.datasetId!
+const data = await getDatasetPageData(db, datasetId).catch(error => {
+  console.error('[page] trends failed', error)
+  return null
+})
+if (!data) Astro.response.status = 404
+
+const latest = data?.rows[0] ?? null
+const meta = data
+  ? pageSeo(Astro, {
+      section: 'trends',
+      dataset: { id: data.dataset.id, label: data.dataset.label, count: data.dataset.count },
+      streamCount: data.rows.length,
+      memberCount: data.datasets.length,
+      updatedAt: latest?.startedAt ?? null,
+      imageStream: latest ? { datasetId: data.dataset.id, videoId: latest.videoId } : null,
+    })
+  : pageSeo(Astro, { section: 'trends', dataset: null, notFound: true })
+---
+
+<Layout meta={meta}>
+  {data
+    ? (
+        <DatasetPage
+          client:load
+          comparePacks={{}}
+          dataset={data.dataset}
+          datasets={data.datasets}
+          manifest={data.manifest}
+          pack={null}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          rows={data.rows}
+          search={requestSearch(Astro)}
+          section="trends"
+          stream={null}
+          totals={data.totals}
+          view="trends"
+        />
+      )
+    : <ErrorState code="404" title="找不到这位成员" detail="成员 id 可能写错了，或者还没有导入数据。" />}
+</Layout>

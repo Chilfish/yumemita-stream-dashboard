@@ -1,0 +1,13 @@
+---
+import { db } from '@/db/client'
+import { getLatestStream } from '@/db/queries/streams'
+
+export const prerender = false
+
+const datasetId = Astro.params.datasetId!
+const latest = await getLatestStream(db, datasetId).catch(() => null)
+return Astro.redirect(
+  latest ? `/${datasetId}/stream/${latest.videoId}` : `/${datasetId}/streams`,
+  302,
+)
+---

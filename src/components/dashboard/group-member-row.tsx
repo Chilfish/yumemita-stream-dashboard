@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { MemberAvatar, MemberDot } from "@/components/dashboard/member-avatar";
 import { StreamCover } from "@/components/dashboard/stream-cover";
 import { formatDate, formatInteger, formatTime } from "@/lib/format";
@@ -102,3 +102,4 @@ export function GroupMemberRow({ member }: GroupMemberRowProps) {
     </li>
   );
 }
+

@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { CONTENT_TYPE_LABELS, classifyTitle } from "@/lib/classify";
 import { formatDate, formatDuration, formatInteger, formatTime } from "@/lib/format";
 import { streamPath } from "@/lib/routes";
@@ -76,3 +76,4 @@ export function StreamList({ datasetId, rows, empty, className }: StreamListProp
     </ul>
   );
 }
+

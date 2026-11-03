@@ -1,5 +1,8 @@
 /** `yumemita.stream-datapack/v1` / `/v2` 的 TypeScript 镜像。字段口径见 docs/data/data-model.md。 */
 
+/** datapack 的加载状态；现在由页面传入，作为视图的 props 类型。 */
+export type PackStatus = 'idle' | 'loading' | 'ready' | 'error'
+
 /** v2 起新增全量聚合字段；v1 datapack 只有截断后的 Top 列表。 */
 export type DatapackSchema =
   | "yumemita.stream-datapack/v1"

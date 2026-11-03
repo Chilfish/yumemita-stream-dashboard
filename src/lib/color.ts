@@ -1,4 +1,4 @@
-import type { Theme } from "@/hooks/use-theme";
+import type { Theme } from "@/types/theme";
 
 const LIGHT_BACKGROUND = "#f4f4f6";
 const DARK_BACKGROUND = "#161617";
