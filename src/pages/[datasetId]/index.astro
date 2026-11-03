@@ -16,6 +16,7 @@ const data = await getDatasetPageData(db, datasetId).catch(error => {
 
 const latest = data?.rows[0] ?? null
 if (!data) Astro.response.status = 404
+else Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`] })
 
 const meta = data
   ? pageSeo(Astro, {
@@ -33,11 +34,10 @@ const meta = data
   {data
     ? (
         <DatasetPage
-          client:load
+          client:idle
           comparePacks={{}}
           dataset={data.dataset}
           datasets={data.datasets}
-          manifest={data.manifest}
           pack={null}
           params={requestParams(Astro)}
           pathname={Astro.url.pathname}

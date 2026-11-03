@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:smoke": "bun scripts/smoke-routes.mjs",
+    "perf:smoke": "bun scripts/perf-smoke.ts",
     "lint": "oxlint src scripts",
     "check": "bun run typecheck && bun run test && bun run lint",
     "ci": "bun run check && bun run build",

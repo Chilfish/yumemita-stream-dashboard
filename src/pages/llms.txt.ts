@@ -7,6 +7,7 @@ import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
 export const prerender = false
 
 export const GET: APIRoute = async (context) => {
+  context.cache.set({ maxAge: 300, swr: 600, tags: ['llms'] })
   const origin = context.site?.origin ?? DEFAULT_SITE_URL
   const datasets = await getDatasets(db)
 

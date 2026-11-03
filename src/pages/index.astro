@@ -8,6 +8,8 @@ import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 
 export const prerender = false
 
+Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group'] })
+
 let data: GroupPageData | null = null
 try {
   data = await getGroupPageData(db, 'home')
@@ -31,7 +33,7 @@ const meta = pageSeo(Astro, {
   {data
     ? (
         <GroupPage
-          client:load
+          client:idle
           data={data.data}
           datasets={data.datasets}
           params={requestParams(Astro)}

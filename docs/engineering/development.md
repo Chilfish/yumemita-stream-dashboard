@@ -30,6 +30,7 @@ bun run dev
 | `bun run db:ingest` | 本地 pack → PostgreSQL；支持 `--dataset` / `--ids` / `--limit` / `--all` / `--dry-run` |
 | `bun run db:verify` | 数据库与本地 pack 字段级对账 |
 | `bun run db:query` | 查询层冒烟：列表 / insights / 组首页 / 相册 + 本地延迟 |
+| `bun run perf:smoke` | 页面级性能冒烟：响应体大小 / 耗时中位数 / cache tag（先启动 preview 或 wrangler dev） |
 | `bun run sync:data` | 旧链路：生成 `public/data/` 兜底快照 |
 | `bun run publish:data` | 旧链路：由 pack 重建 index + manifest + insights，增量上传对象存储 |
 | `bun run validate:data` | 校验旧数据引用链（`--remote` 检查对象存储） |

@@ -33,6 +33,10 @@ export default defineConfig({
     '/sitemap.xml': { maxAge: 300, swr: 600, tags: ['sitemap'] },
     '/llms.txt': { maxAge: 300, swr: 600, tags: ['llms'] },
   },
+  build: {
+    // 字体与 Tailwind 的 CSS 体积较大；外链后由浏览器跨路由复用并长期缓存。
+    inlineStylesheets: 'never',
+  },
   prefetch: {
     prefetchAll: true,
     defaultStrategy: 'hover',

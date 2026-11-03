@@ -15,6 +15,7 @@ const data = await getDatasetPageData(db, datasetId).catch(error => {
   return null
 })
 if (!data) Astro.response.status = 404
+else Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`, 'compare'] })
 
 const urlIds = parseCompareIds(Astro.url.searchParams.get('ids'))
 const validIds = urlIds.filter(id => data?.rows.some(row => row.videoId === id))
@@ -42,11 +43,10 @@ const meta = data
   {data
     ? (
         <DatasetPage
-          client:load
+          client:idle
           comparePacks={comparePacks}
           dataset={data.dataset}
           datasets={data.datasets}
-          manifest={data.manifest}
           pack={null}
           params={requestParams(Astro)}
           pathname={Astro.url.pathname}

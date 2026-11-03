@@ -14,6 +14,7 @@ const data = await getDatasetPageData(db, datasetId).catch(error => {
   return null
 })
 if (!data) Astro.response.status = 404
+else Astro.cache.set({ maxAge: 300, swr: 600, tags: [`dataset-${datasetId}`, 'transcripts'] })
 
 const latest = data?.rows[0] ?? null
 const meta = data
@@ -32,11 +33,10 @@ const meta = data
   {data
     ? (
         <DatasetPage
-          client:load
+          client:idle
           comparePacks={{}}
           dataset={data.dataset}
           datasets={data.datasets}
-          manifest={data.manifest}
           pack={null}
           params={requestParams(Astro)}
           pathname={Astro.url.pathname}

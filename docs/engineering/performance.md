@@ -10,6 +10,70 @@
 4. **缓存分层**：内存去重 → sessionStorage → HTTP / 对象存储，不同层解决不同问题。
 5. **先量再改**：入口 chunk、数据文件、字体、LCP 都有实测数字；没有数字的“优化”不进文档。
 
+## Astro SSR（2026-11-03）
+
+当前形态是 Astro SSR + Neon PostgreSQL + Cloudflare Workers。下面的数字来自**生产构建**，用 `wrangler dev` 跑 `dist/server/entry.mjs`，不是 `astro preview`（后者是开发模式：CSS 内联、cache no-op，数字会显著偏差）。
+
+### 复现
+
+```bash
+bun run build
+bunx wrangler dev --config dist/server/wrangler.json --port 8787 --ip 127.0.0.1
+bun run perf:smoke -- --url http://127.0.0.1:8787
+```
+
+`perf:smoke` 每个 URL 请求 5 次，输出响应体中位数、耗时中位数、`cache-tag` 与 `content-type`。
+
+### 实测（35 场小批量数据，本机 → ap-southeast-1 Neon）
+
+| 路由 | HTML 中位数 | 耗时中位数 | cache tag |
+| --- | ---: | ---: | --- |
+| `/` | 80.8 KB | 697 ms | `group` |
+| `/gallery` | 161.7 KB | 684 ms | `group,gallery` |
+| `/nonoka` | 408.8 KB | 1684 ms | `datasets,dataset-nonoka` |
+| `/nonoka/streams` | 322.3 KB | 2049 ms | `datasets,dataset-nonoka` |
+| `/nonoka/trends` | 279.6 KB | 1569 ms | `datasets,dataset-nonoka` |
+| `/nonoka/gallery` | 186.3 KB | 1298 ms | `datasets,dataset-nonoka` |
+| `/nonoka/transcripts` | 129.9 KB | 1757 ms | `transcripts,dataset-nonoka` |
+| `/nonoka/compare` | 331.3 KB | 2504 ms | `dataset-nonoka,compare` |
+| `/nonoka/stream/<id>` | 219.7 KB | 2097 ms | `streams,stream-<id>,dataset-nonoka` |
+| `.../<id>.md` | 14.3 KB | 969 ms | `streams,stream-<id>,dataset-nonoka` |
+| `/sitemap.xml` | 5.0 KB | 637 ms | `sitemap` |
+| `/llms.txt` | 3.5 KB | 561 ms | `llms` |
+
+- 响应头带 `cloudflare-cdn-cache-control` 与 `Cache-Tag`；middleware 同步一份 `Cache-Control`，让 `<link rel=prefetch>` 的预取能被浏览器复用。
+- 耗时是**本机跨区**访问 Neon 的数字（每轮 3 个并行查询 ≈ 1 个 RTT）。同区 Worker + Neon 会低一个量级；线上以 `Cf-Cache-Status` 与 `x-response-time` 为准。
+- 首次请求冷，后续命中 Workers Cache 后只付边缘响应；本地 `wrangler dev` 不复现 Cache HIT，需线上观察。
+
+### 交互实测（生产构建，agent-browser）
+
+| 场景 | 结果 |
+| --- | --- |
+| 单场 `?view=` 分段切换 | 27 ms，`history.replaceState`，没有新的 navigation entry |
+| 侧栏路由切换（未预热） | 约 1.5–2.1 s，主要花在 SSR + Neon 跨区等待 |
+| hover 预取 | 发出 `<link rel=prefetch>`；本地 `wrangler dev` 的第二次 fetch 仍走网络 |
+| 水合 | `astro-island[ssr]` 归零，无 console/page error |
+| 390px 布局 | 无横向溢出 |
+
+### 本轮改动
+
+- **CSS 外链**：`build.inlineStylesheets: 'never'`。之前 384 KB 字体/Tailwind CSS 内联在每个 HTML，生产构建下 HTML 体积约减半（如 `/nonoka` 从约 793 KB 到 409 KB）。
+- **去掉重复 props**：`manifest` 不再作为岛屿 props，由 `rows` 在壳层组装；单场 / 对比的 pack 去掉全量 `authors` / `wordCounts`（视图只用 Top 列表）。
+- **查询**：成员页的 datasets / streams / insights 三个查询并行；`listStreams` 用 `count(*) over()` 一次取总数。
+- **缓存意图**：每个数据页显式 `Astro.cache.set`，tag 覆盖 `dataset-<id>` / `stream-<videoId>`；sitemap / llms / `.md` 同样带 tag。
+- **岛屿水合**：页面岛屿改为 `client:idle`，先完成 HTML 替换，交互在水合后接管。
+
+### 仍待优化
+
+- **壳层流式输出**：目前整个页面（侧栏 + 页头 + 内容）是一个岛屿，Astro 必须等它 SSR 完才开始输出。把壳层拆成 Astro 布局 + `transition:persist` 的独立岛屿，内容区用 `server:defer` / 流式渲染，首字节可以更早到达。参考 [Astro streaming recipe](https://docs.astro.build/en/recipes/streaming-improve-page-performance/)。
+- **长列表 SSR 上限**：成员页与文本列表目前一次 SSR 全部行；全量 287–505 场时应改为首批 50–100 行 + “加载更多”，或客户端表格。
+- **客户端数据缓存**：路由切换只依赖 Workers Cache；可以在 `sessionStorage` 缓存最近一次 `DatasetPageData`，返回时先渲染旧数据再校验。
+- **Worker 同区**：生产必须让 Worker 与 Neon 区域接近，否则每个请求固定多一个 RTT。
+
+## 旧实现（迁移前记录）
+
+下面几节是 React Router + Vite 静态站的首屏数据流、缓存与实测，保留作对照。
+
 ## 首屏数据流
 
 ### 组首页 `/`

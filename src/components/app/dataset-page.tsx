@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { PackStatus } from '@/types/datapack'
 import { TriangleAlert } from 'lucide-react'
 import { AppHeader } from '@/components/dashboard/app-header'
 import { AppSidebar } from '@/components/dashboard/app-sidebar'
@@ -21,6 +22,7 @@ import type { DatasetTotals } from '@/lib/aggregate'
 import { memberAccent } from '@/lib/color'
 import { rememberMember } from '@/lib/preferences'
 import {
+  DEFAULT_STREAM_SUBVIEW,
   parseCompareIds,
   parseStreamSubView,
   streamPath,
@@ -45,7 +47,6 @@ export type DatasetView =
 export interface DatasetPageProps {
   datasets: DatasetIndexEntry[]
   dataset: DatasetIndexEntry
-  manifest: BatchManifest
   rows: StreamSummary[]
   totals: DatasetTotals
   view: DatasetView
@@ -74,6 +75,18 @@ function DatasetShell(props: DatasetPageProps) {
 
   const memberColor = dataset.color ?? '#b8461f'
   const memberInk = memberAccent(memberColor, theme)
+
+  // manifest 与 rows 是同一份数据，放进岛屿只会让 HTML 翻倍；这里从 rows 就地组装。
+  const manifest = useMemo<BatchManifest>(() => ({
+    schema: 'yumemita.stream-datapack.batch/v1',
+    generatedAt: dataset.generatedAt ?? rows[0]?.generatedAt ?? '',
+    subject: dataset.id,
+    channelId: dataset.channelId,
+    scope: '',
+    count: rows.length,
+    note: '',
+    streams: rows,
+  }), [dataset, rows])
 
   useKeyboardShortcuts({
     datasetId: dataset.id,
@@ -121,7 +134,7 @@ function DatasetShell(props: DatasetPageProps) {
         />
 
         <div className="mx-auto w-full max-w-[82.5rem] px-4 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
-          <DatasetViewContext.Provider value={{ dataset, manifest: props.manifest, rows, totals }}>
+          <DatasetViewContext.Provider value={{ dataset, manifest, rows, totals }}>
             <div className="motion-view" key={`${dataset.id}/${section}`}>
               <DatasetBody {...props} />
             </div>
@@ -172,7 +185,7 @@ function DatasetBody(props: DatasetPageProps) {
 
 function StreamBody({ dataset, rows, stream, pack }: DatasetPageProps) {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const view = parseStreamSubView(searchParams.get('view'))
 
   if (!stream || !pack) {
@@ -189,7 +202,12 @@ function StreamBody({ dataset, rows, stream, pack }: DatasetPageProps) {
     <StreamDetailView
       datasetId={dataset.id}
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
-      onViewChange={next => navigate(streamPath(dataset.id, stream.videoId, next))}
+      onViewChange={(next) => {
+        const params = new URLSearchParams(searchParams)
+        if (next === DEFAULT_STREAM_SUBVIEW) params.delete('view')
+        else params.set('view', next)
+        setSearchParams(params, { replace: true })
+      }}
       row={{ summary: stream, pack }}
       rows={rows}
       view={view}
@@ -199,10 +217,15 @@ function StreamBody({ dataset, rows, stream, pack }: DatasetPageProps) {
 
 function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
+  const [packs, setPacks] = useState(() => new Map(Object.entries(comparePacks)))
+  const [status, setStatus] = useState<PackStatus>('ready')
+  const [packError, setPackError] = useState<string | null>(null)
+
   const hasParam = searchParams.has('ids')
   const urlIds = parseCompareIds(searchParams.get('ids'))
   const validIds = urlIds.filter(id => rows.some(row => row.videoId === id))
   const selectedIds = hasParam ? validIds : rows.slice(0, 3).map(row => row.videoId)
+  const selectedKey = selectedIds.join(',')
 
   const writeIds = useCallback((ids: string[]) => {
     const params = new URLSearchParams(searchParams)
@@ -210,16 +233,55 @@ function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
     setSearchParams(params, { replace: true })
   }, [searchParams, setSearchParams])
 
+  // 切换对比场次时只按需拉缺失的 pack，首屏已经带上的不再请求。
+  useEffect(() => {
+    const missing = (selectedKey ? selectedKey.split(',') : []).filter(id => !packs.has(id))
+    if (missing.length === 0) return
+
+    let cancelled = false
+    // oxlint-disable-next-line react/set-state-in-effect -- 选择变化后要立刻显示加载态
+    setStatus('loading')
+    setPackError(null)
+
+    Promise.all(
+      missing.map(async videoId => {
+        const response = await fetch(
+          `/api/packs/${encodeURIComponent(dataset.id)}/${encodeURIComponent(videoId)}`,
+        )
+        if (!response.ok) throw new Error(`加载 ${videoId} 失败`)
+        return [videoId, (await response.json()) as StreamDatapack] as const
+      }),
+    )
+      .then((entries) => {
+        if (cancelled) return
+        setPacks((previous) => {
+          const next = new Map(previous)
+          for (const [videoId, pack] of entries) next.set(videoId, pack)
+          return next
+        })
+        setStatus('ready')
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setPackError(error instanceof Error ? error.message : String(error))
+        setStatus('error')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [dataset.id, packs, selectedKey])
+
   return (
     <CompareView
       datasetLabel={dataset.label}
       onReset={() => writeIds([])}
       onToggle={videoId => writeIds(toggleCompareId(selectedIds, videoId))}
-      packError={null}
-      packStatus="ready"
-      packs={new Map(Object.entries(comparePacks))}
+      packError={packError}
+      packStatus={status}
+      packs={packs}
       rows={rows}
-      selectedIds={selectedIds.filter(id => id in comparePacks)}
+      selectedIds={selectedIds}
     />
   )
 }

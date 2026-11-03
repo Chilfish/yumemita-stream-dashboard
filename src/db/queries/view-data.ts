@@ -1,9 +1,9 @@
 import type { Db } from '@/db/connection'
 import { aggregateDataset, type DatasetTotals, type StreamRow as AggregateStreamRow } from '@/lib/aggregate'
 import { buildGroupDataFromStreams, buildGroupDataFromSummary, type GroupData } from '@/lib/group'
-import type { BatchManifest, DatasetIndexEntry, StreamSummary } from '@/types/dataset'
+import type { DatasetIndexEntry, StreamSummary } from '@/types/dataset'
 import type { StreamDatapack } from '@/types/datapack'
-import { getDataset, getDatasets } from './datasets'
+import { getDatasets } from './datasets'
 import { getGroupGallery, getGroupSummary } from './group'
 import { getDatasetInsights } from './insights'
 import { getDatasetPacks, getStreamPack } from './packs'
@@ -12,7 +12,6 @@ import { listStreams } from './streams'
 export interface DatasetPageData {
   datasets: DatasetIndexEntry[]
   dataset: DatasetIndexEntry
-  manifest: BatchManifest
   rows: StreamSummary[]
   totals: DatasetTotals
 }
@@ -21,8 +20,6 @@ export interface GroupPageData {
   datasets: DatasetIndexEntry[]
   data: GroupData
 }
-
-const MANIFEST_SCHEMA = 'yumemita.stream-datapack.batch/v1'
 
 function toIndex(rows: Awaited<ReturnType<typeof getDatasets>>): DatasetIndexEntry[] {
   return rows.map(row => ({
@@ -38,29 +35,13 @@ function toIndex(rows: Awaited<ReturnType<typeof getDatasets>>): DatasetIndexEnt
   }))
 }
 
-function buildManifest(
-  dataset: DatasetIndexEntry,
-  rows: StreamSummary[],
-): BatchManifest {
-  return {
-    schema: MANIFEST_SCHEMA,
-    generatedAt: dataset.generatedAt ?? rows[0]?.generatedAt ?? '',
-    subject: dataset.id,
-    channelId: dataset.channelId,
-    scope: '',
-    count: rows.length,
-    note: '',
-    streams: rows,
-  }
-}
-
 async function resolveTotals(
   db: Db,
   datasetId: string,
   rows: StreamSummary[],
+  insightTotals: DatasetTotals | null,
 ): Promise<DatasetTotals> {
-  const insight = await getDatasetInsights(db, datasetId)
-  if (insight) return insight.totals
+  if (insightTotals) return insightTotals
 
   // 迁移期兜底：insights 还没 ingest 时，从已入库的场次重算。
   const packs = await getDatasetPacks(db, datasetId)
@@ -78,23 +59,22 @@ export async function getDatasetPageData(
   db: Db,
   datasetId: string,
 ): Promise<DatasetPageData | null> {
-  const datasetRow = await getDataset(db, datasetId)
-  if (!datasetRow) return null
-
-  const [all, list] = await Promise.all([
+  // 三个查询并行发出；Neon HTTP 每个查询一次往返，并行能把等待压到一轮。
+  const [all, list, insight] = await Promise.all([
     getDatasets(db),
     listStreams(db, datasetId, { limit: 2000 }),
+    getDatasetInsights(db, datasetId),
   ])
+
   const datasets = toIndex(all)
   const dataset = datasets.find(item => item.id === datasetId)
   if (!dataset) return null
 
-  const totals = await resolveTotals(db, datasetId, list.streams)
+  const totals = await resolveTotals(db, datasetId, list.streams, insight?.totals ?? null)
 
   return {
     datasets,
     dataset,
-    manifest: buildManifest(dataset, list.streams),
     rows: list.streams,
     totals,
   }

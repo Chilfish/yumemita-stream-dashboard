@@ -20,6 +20,7 @@ const summary = data?.rows.find(row => row.videoId === videoId) ?? null
 const pack = summary ? await getStreamPack(db, datasetId, videoId).catch(() => null) : null
 
 if (!data || !summary) Astro.response.status = 404
+else Astro.cache.set({ maxAge: 300, swr: 600, tags: [`stream-${videoId}`, `dataset-${datasetId}`] })
 
 const meta = data && summary
   ? pageSeo(Astro, {
@@ -57,11 +58,10 @@ const meta = data && summary
   {data && summary
     ? (
         <DatasetPage
-          client:load
+          client:idle
           comparePacks={{}}
           dataset={data.dataset}
           datasets={data.datasets}
-          manifest={data.manifest}
           pack={pack}
           params={requestParams(Astro)}
           pathname={Astro.url.pathname}

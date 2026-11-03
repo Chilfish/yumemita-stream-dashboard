@@ -10,7 +10,6 @@ import {
   streamWords,
 } from '@/db/schema'
 import type {
-  AuthorStat,
   ChatDensity,
   ChatInfo,
   CommentsInfo,
@@ -169,21 +168,11 @@ function buildChat(
       badges: [],
     }))
 
-  const authorsFull: AuthorStat[] = authorRows.map(author => ({
-    author: author.name ?? author.authorId,
-    authorId: author.authorId,
-    messages: author.messages,
-    superchats: author.superchats,
-    stickers: author.stickers,
-    memberships: author.memberships,
-  }))
-
   const sortedWords = words.slice().sort((a, b) => b.count - a.count)
   const topWords: TopWord[] = sortedWords.slice(0, 40).map(word => ({
     word: word.word,
     count: word.count,
   }))
-  const wordCounts = Object.fromEntries(sortedWords.map(word => [word.word, word.count]))
 
   void commentItems
 
@@ -200,8 +189,6 @@ function buildChat(
     paid: paidInfo,
     topAuthors,
     topWords,
-    authors: authorsFull,
-    wordCounts,
     hashtags: asRecord(detail?.hashtags),
     emojiKinds,
     emojis: asArray<EmojiAsset>(detail?.emojis),
