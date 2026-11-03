@@ -6,7 +6,7 @@
 | 原型 | `.commandcode/design/prototype-v2.html`（可直接用浏览器打开） |
 | 数据快照 | 提案时 2026-10-28，宮永ののか 90 场；当前 5 位成员 1891 场 |
 | 适用 | 桌面优先，移动端重排；不改变数据层与抓取流程 |
-| 关联文档 | [architecture.md](architecture.md)、[development.md](development.md)、[data-model.md](data-model.md) |
+| 关联文档 | [architecture.md](architecture.md)、[development.md](../engineering/development.md)、[data-model.md](../data/data-model.md) |
 
 ## 1. 结论摘要
 

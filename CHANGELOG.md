@@ -2,6 +2,13 @@
 
 ## 未发布
 
+### 文档
+
+- 按模板 `starter-astro-react` 的文档规范重组 `docs/`：拆成 `requirements/`、`planning/`、`engineering/`、`data/`、`ui-design/`、`postmortem/`、`reviews/`、`development-log/`、`archive/`；根目录只保留 `README.md` 与 `writing-style.md`，`docs/README.md` 作为唯一入口。
+- 新增 [docs/planning/astro-ssr-migration.md](docs/planning/astro-ssr-migration.md)：Astro 7 + Cloudflare Workers + PostgreSQL + R2 的完整迁移方案，含数据模型、ingest、`.md` Agent 路由、缓存失效与发布流程。
+- 新增需求规格、用户故事、工程规范、设计系统、postmortem / reviews 模板、开发日志与归档索引；移动 `architecture` / `data-model` / `deployment` 等旧文档并更新全仓链接。
+- 新增根目录 `AGENTS.md` 与 `.github/PULL_REQUEST_TEMPLATE.md`。
+
 ### 数据
 
 - **频道专属表情入库**：归一化把本场频道表情写成 `danmaku/emoji_<videoId>.json`，pack 新增 `chat.emojis` 与 `paid.superchats[].emojis`。新增 `fetch:emoji`：合并 `data/emoji-<datasetId>.html`（频道）、`data/emoji-youtube.html`（YouTube 全局）与 pack 里的图片地址，镜像到 `data/<datasetId>/emoji/`，并写 `index.json`（id → 名称）。表情是静态资源，手动跑一次 `fetch:emoji` + `publish:data` 即可，不进每日流水线；频道表情发布到 `<base>/emojis/<datasetId>/`，`UCksz…` 全局表情按 scope 单独放 `<base>/emojis/youtube/`，不重复复制。旧 pack 不需要重抓弹幕。
@@ -18,7 +25,7 @@
 - 新增 `scripts/backfill-author-id.ts` + `scripts/enrich-chat.ts --force`：用原始 `live_chat.json` 给 1242 份旧 jsonl 补 `authorId`，修复同一发言人被拆成 `id:` / `name:` 两行；修复后 4 个全量 dataset 的同名拆分从 410/639/635/1258 降到 0。
 - 数据集扩展为 5 位成员：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1891 场**（2023-11-18 – 2026-10-29）：nonoka 287、arale 505、ritsu 339、miyako 321、yuno 439。
 - 五位成员都按频道顺序补齐历史场次（同名去重、保留正片）；当前 manifest 没有待抓场次。
-- 新增 [docs/data-progress.md](docs/data-progress.md)：五位成员的抓取进度、nonoka 批次记录、跳过判定、下一批候选。
+- 新增 [docs/data/data-progress.md](docs/data/data-progress.md)：五位成员的抓取进度、nonoka 批次记录、跳过判定、下一批候选。
 - 词频剔除英文虚词与寒暄词（`said` / `hi` / `the` …）：分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表；旧 pack 里残留的这类词在单场页与跨场聚合展示时也会过滤。
 
 ### 界面
@@ -64,7 +71,7 @@
 - **定时任务抗 bot 检查**：`data.yml` 增加 `bgutil-ytdlp-pot-provider` 插件 + 本地 `4416` 令牌容器，cookie 与 PO token 同时具备；新增 `Check YouTube access` 预检（出口 IP/地区、PO token 提供者、cookie 是否失效，读不到直接在报错处停下）。`fetch-streams` 不再吞掉元信息失败——bot 检查计入失败并触发 `Data update failed` issue，会员限定降级为跳过；同时去掉 `--no-warnings`，失败时能看到 cookie / PO token 的真实提示。
 
 - **封面管线**：新增 `fetch:thumbs`（`maxresdefault` → `mqdefault`、并发、重试、单张失败跳过），`publish:data` 按 thumbs → pack → manifest/insights → index 上传，沿用增量发布进度。
-- **封面变体**：`fetch:thumbs` 用 `Bun.Image` 额外编码 480 / 960 / 1280w 的 WebP（480w 约 24 KB，原图约 144 KB），已有原图时自动补齐；`StreamCover` 用 `srcset` + `sizes` 由浏览器选档，变体缺失时退回原图。发布脚本把变体与 `Content-Type: image/webp` 一起上传，缺变体只警告。对象存储侧的长缓存规则见 [docs/deployment.md](docs/deployment.md) 的「封面与变体」。
+- **封面变体**：`fetch:thumbs` 用 `Bun.Image` 额外编码 480 / 960 / 1280w 的 WebP（480w 约 24 KB，原图约 144 KB），已有原图时自动补齐；`StreamCover` 用 `srcset` + `sizes` 由浏览器选档，变体缺失时退回原图。发布脚本把变体与 `Content-Type: image/webp` 一起上传，缺变体只警告。对象存储侧的长缓存规则见 [docs/engineering/deployment.md](docs/engineering/deployment.md) 的「封面与变体」。
 - **逐字稿管线**：新增 `transcript:new` / `transcript:import` / `publish:transcripts`；正文先传、索引最后写，单篇失败不阻塞；离线回退到构建期 Markdown 快照。
 - **数据发布即生效**：`publish:data` 现在同时生成并最后上传根 `index.json`；页面启动时直接从对象存储读
   `index.json` / `manifest.json` / `insights.json` / datapack，发布后刷新即可，不需要重新构建前端。

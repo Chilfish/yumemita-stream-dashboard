@@ -1,4 +1,4 @@
-/** `yumemita.stream-datapack/v1` / `/v2` 的 TypeScript 镜像。字段口径见 docs/data-model.md。 */
+/** `yumemita.stream-datapack/v1` / `/v2` 的 TypeScript 镜像。字段口径见 docs/data/data-model.md。 */
 
 /** v2 起新增全量聚合字段；v1 datapack 只有截断后的 Top 列表。 */
 export type DatapackSchema =

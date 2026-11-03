@@ -1,5 +1,7 @@
 # 开发
 
+> 代码规范摘要见 [code-style.md](./code-style.md)；本文保留环境、脚本、coss ui、D3 与测试的详细说明。
+
 ## 环境
 
 - **Bun ≥ 1.4**（推荐，仓库带 `bun.lock`）
@@ -201,5 +203,5 @@ bun run build
 ```
 
 - 不要提交 `public/data/`、`dist/`、`node_modules/`。
-- 改了数据/字段：同时更新 `docs/data-model.md`。
+- 改了数据/字段：同时更新 `docs/data/data-model.md`。
 - 改了流程/脚本：同时更新 `README.md` 与相关 docs。

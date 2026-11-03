@@ -1,7 +1,7 @@
 # 产品方向：封面、相册与逐字稿
 
 > 状态：P1 封面与相册、P2 逐字稿、P3 组首页与全组相册已实施（2026-10-30）；跨成员对比待做。
-> 关联：[roadmap.md](roadmap.md)、[architecture.md](architecture.md)、[data-model.md](data-model.md)。
+> 关联：[backlog.md](backlog.md)、[architecture.md](architecture.md)、[data-model.md](../data/data-model.md)。
 
 ## 1. 定位
 
@@ -77,7 +77,7 @@ bun run fetch:thumbs --dataset nonoka --limit 20 --dry-run
 - manifest 的 `streams[]` 增加可选字段 `thumbnail: string | null`，用于「有没有封面」与相册索引；旧 pack 缺失时为 `null`。
 - 上传顺序：`thumbs → pack → manifest / insights → index`。索引仍然最后写，任何中途失败都不会让索引指向不存在的文件。
 - 增量发布复用 `data/.publish-state.json`：内容摘要一致且远端大小对得上就跳过。
-- 缓存：封面按 `public, max-age=31536000, immutable` 处理。`ObjectStore.putObject` 负责二进制上传与 `Content-Type`；Bun 的 S3 写入不支持自定义 `Cache-Control`，缓存规则配在桶 / CDN 侧（见 [deployment.md](deployment.md) 的「封面与变体」）。
+- 缓存：封面按 `public, max-age=31536000, immutable` 处理。`ObjectStore.putObject` 负责二进制上传与 `Content-Type`；Bun 的 S3 写入不支持自定义 `Cache-Control`，缓存规则配在桶 / CDN 侧（见 [deployment.md](../engineering/deployment.md) 的「封面与变体」）。
 - 体积预算：1600 场 ×（144 KB 原图 + 约 158 KB 变体）≈ 480 MB，只存在对象存储；列表页按 `srcset` 只下 480w（约 24 KB）。
 
 ### 4.3 渲染规范
@@ -240,7 +240,7 @@ bun run transcript:import "D:/messages/archives/…/2026-10-13_ライブ振り�
 | P4 | 推文联动（手动 pin 优先） | 外部服务不可用时页面无变化 |
 | 独立项目 | 逐字稿编辑器 | 不阻塞本站迭代 |
 
-每阶段完成时同步更新：`data-model.md`（新增字段 / 文件布局）、`architecture.md`（路由与目录）、`adding-data.md`（作者工作流）、`README.md`、`CHANGELOG.md`。
+每阶段完成时同步更新：`docs/data/data-model.md`（新增字段 / 文件布局）、`docs/planning/architecture.md`（路由与目录）、`docs/data/adding-data.md`（作者工作流）、`README.md`、`CHANGELOG.md`。
 
 ## 9. 维护性约束
 

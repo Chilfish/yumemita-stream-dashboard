@@ -117,7 +117,7 @@ summary: 一场把 13th live 从头聊到尾的复盘。
 - 行首 `[12:34]` / `[1:02:03]` 自动变成 YouTube 深链，可见文本仍是时间码。
 - `##` / `###` 生成目录；原始 HTML 不渲染（`react-markdown` 默认安全模式）。
 
-完整字段、命令与常见问题见 [content/transcripts/README.md](../content/transcripts/README.md)。
+完整字段、命令与常见问题见 [content/transcripts/README.md](../../content/transcripts/README.md)。
 
 ### 3. 发布
 
@@ -180,5 +180,5 @@ bun run dev
 ## 隐私与版权
 
 - 会员限定 / 会限内容可能不适合公开部署；上线前确认范围。
-- 原始内容版权归权利人，详见 [NOTICE.md](../NOTICE.md)。
+- 原始内容版权归权利人，详见 [NOTICE.md](../../NOTICE.md)。
 - 不要把包含个人隐私的原始抓取（cookie、邮箱、付款信息）放进仓库；datapack 只应包含聚合后的公开字段。

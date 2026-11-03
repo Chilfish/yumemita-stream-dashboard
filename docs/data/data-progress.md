@@ -32,7 +32,7 @@
 以下是 `nonoka` 的历史抓取记录，保留用于回顾跳过判定与口径；其余成员按同一流程补齐，
 逐场清单以远端 manifest 为准。
 
-抓取来源与命令见 [scripts/README.md](../scripts/README.md)。原始会话留在归档工程
+抓取来源与命令见 [scripts/README.md](../../scripts/README.md)。原始会话留在归档工程
 `claude-messages/temp/youtube-live/`，本仓库只接收 datapack。
 
 ### 批次一：2026-10-28（+8）
@@ -107,7 +107,7 @@ bun scripts/daily-update.ts --dry-run       # 只列候选
 ```
 
 定时任务在 `.github/workflows/data.yml`，按 14:17 JST 的 cron 跑（GitHub 调度延迟常见几小时）；配置与 cookie 导出见
-[deployment.md](deployment.md) 的「定时增量更新」。
+[deployment.md](../engineering/deployment.md) 的「定时增量更新」。
 
 下面的 `fetch-streams` 是底层命令，用于首次建档、强制返工或需要手动控制批次的场景：
 

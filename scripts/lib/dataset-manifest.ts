@@ -1,7 +1,7 @@
 /**
  * manifest 摘要的单一来源：`add-datapack.mjs` 与 `stream-datapack.ts` 共用。
  *
- * 摘要字段与 `src/types/dataset.ts` 的 `StreamSummary`、`docs/data-model.md` 对齐；
+ * 摘要字段与 `src/types/dataset.ts` 的 `StreamSummary`、`docs/data/data-model.md` 对齐；
  * 新增字段时只改这里，避免两个入口各写一份后漂移。
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
