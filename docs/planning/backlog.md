@@ -7,7 +7,7 @@
 
 | 编号 | 任务 | 优先级 | 前置条件 | 来源 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 阶段 0 完成，阶段 1 待开始 |
+| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 阶段 0 完成；阶段 1 小批量验证通过 |
 | B2 | 单场 `.md` Agent 路由（`FR-AGENT-001`） | P2 | B1 的数据库查询层 | 迁移 | 📋 |
 | B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 当前可先用 Deploy Hook；迁移后走 purge | 已知缺口 | 📋 |
 | B4 | 跨成员对比（`FR-COMPARE-002`） | P2 | 统一场次/时间段口径 | roadmap | 📋 |

@@ -25,7 +25,10 @@ bun run dev
 | `bun run preview` | 本地预览构建产物（workerd） |
 | `bun run cf:preview` | 构建后预览，部署前检查 |
 | `bun run cf:deploy` | `astro build` + `wrangler deploy` |
-| `bun run db:generate` / `db:push` / `db:studio` | Drizzle 迁移工具（阶段 1 使用） |
+| `bun run db:generate` / `db:push` / `db:studio` | Drizzle 迁移工具 |
+| `bun run db:migrate` | 应用 `drizzle/` 迁移（读 `.env` 或 `.dev.vars`） |
+| `bun run db:ingest` | 本地 pack → PostgreSQL；支持 `--dataset` / `--ids` / `--limit` / `--all` / `--dry-run` |
+| `bun run db:verify` | 数据库与本地 pack 字段级对账 |
 | `bun run sync:data` | 旧链路：生成 `public/data/` 兜底快照 |
 | `bun run publish:data` | 旧链路：由 pack 重建 index + manifest + insights，增量上传对象存储 |
 | `bun run validate:data` | 校验旧数据引用链（`--remote` 检查对象存储） |
@@ -37,6 +40,16 @@ bun run dev
 | `bun run lint` | oxlint |
 | `bun run check` | typecheck + test + lint |
 | `bun run ci` | 全链路（CI 同款） |
+
+## 数据库（阶段 1）
+
+- Schema：`src/db/schema.ts`；迁移产物在 `drizzle/`，用 `bun run db:migrate` 应用。
+- 读连接：`src/db/connection.ts` 的 `createDb()`，`drizzle-orm/neon-http`；Worker 用 `src/db/client.ts`。
+- 写连接：同文件的 `createWriteDb()`，`drizzle-orm/neon-serverless` 的 WebSocket Pool；只在脚本里用。
+- 不用 `postgres.js` 或 `pg`：Neon 官方方案是 HTTP 读 + WebSocket 事务，Bun 自带 WebSocket。
+- ingest：`scripts/ingest-db.ts`，一场一个事务，`content_hash` 增量；小批量 `--limit` 跳过 insights。
+- 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表。
+- `DATABASE_URL` 从 `.env` / `.dev.vars` 读取；本地脚本缺失时直接报错，不静默回退。
 
 ## 代码组织
 

@@ -13,6 +13,34 @@
 本地 `manifest.json` 摘要。正式发布用 `bun run publish:data` 重建 manifest + insights 并上传对象存储。
 原始素材（视频/音频/弹幕回放/评论原文）不进本仓库。
 
+## 数据库 ingest（迁移阶段 1）
+
+本地 pack 仍是唯一真源；`ingest-db.ts` 把 pack 投影到 Neon PostgreSQL。读路径走 `neon-http`，
+写入 / 事务走 `neon-serverless` 的 WebSocket Pool，不用 `postgres.js`。
+
+```powershell
+# 建表 / 升级（读取 .env 或 .dev.vars 的 DATABASE_URL）
+bun run db:migrate
+
+# 增量：内容哈希没变的场次跳过
+bun run db:ingest
+
+# 小批量试跑
+bun run db:ingest -- --dataset nonoka --limit 30
+bun run db:ingest -- --dataset arale --ids ids.txt --limit 5
+
+# 全量重投影
+bun run db:ingest -- --all
+
+# 对账：行数、chat_total、SC、评论、作者、insights
+bun run db:verify -- --dataset nonoka --limit 30
+```
+
+- 事务边界：一场一个事务；子表按 `stream_id` 删除后重插。
+- 增量判断：`streams.content_hash`（pack 的 sha256）。
+- 小批量模式（`--limit`）跳过 `dataset_insights` 重算，避免用不完整场次覆盖汇总。
+- `--dry-run` 只解析与校验，不连数据库写入。
+
 ## 用法
 
 ```powershell
