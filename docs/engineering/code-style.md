@@ -1,13 +1,14 @@
 # 代码规范
 
 **项目**：yumemita-stream-dashboard | **最后更新**：2026-11-03
-**当前实现**：React Router 8 + Vite 8 + TypeScript 7。Astro / PostgreSQL 是迁移目标，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。
+**当前实现**：Astro 7 + Cloudflare Workers + TypeScript 6（迁移阶段 0）。PostgreSQL 查询与页面迁移尚未完成，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。旧 React Router 页面只保留在 `src/legacy/pages/`。
 
 ## 文件与命名
 
 | 类型 | 风格 | 示例 |
 | --- | --- | --- |
-| 路由页面 | kebab-case | `src/pages/stream-page.tsx`、`group-home-page.tsx` |
+| Astro 页面 | kebab-case | `src/pages/index.astro`、`[...].astro` |
+| 旧路由页面（迁移参考） | kebab-case | `src/legacy/pages/stream-page.tsx` |
 | React 组件 | PascalCase | `StreamDetailView.tsx`、`GroupHero.tsx` |
 | coss UI 组件 | kebab-case | `src/components/ui/button.tsx` |
 | hooks | kebab-case，`use-` 前缀 | `use-dataset.ts`、`use-stream-packs.ts` |
@@ -23,7 +24,7 @@
 
 ## 代码风格基线
 
-当前仓库使用 **分号 + 双引号 + 2 空格缩进**。新代码跟随同目录文件，不引入新的格式化风格。
+旧代码使用 **分号 + 双引号 + 2 空格缩进**；迁移阶段 0 新增的 Astro 文件沿用模板的 **无分号 + 单引号 + 2 空格缩进**。两种风格暂并存，阶段 3 页面迁移完成后用一次独立 commit 统一，不要在功能提交里混入全文件格式化。
 
 ```ts
 import { useEffect, useState } from "react";
@@ -40,7 +41,7 @@ import type { BatchManifest } from "@/types/dataset";
 
 ## TypeScript
 
-- 继承仓库 `tsconfig.app.json` 的严格配置；不新增 `// @ts-ignore`。
+- 继承 `tsconfig.json`（`astro/tsconfigs/strict`）的严格配置；不新增 `// @ts-ignore`。
 - 外部 JSON 先按 `src/types/*` 断言，再由 `validate:data` / `validate-schema` 兜底。
 - 可空字段用 `?? null`，不要假设一定存在。
 - 对外函数写出返回类型；内部回调可依赖推断。
@@ -60,10 +61,10 @@ import type { BatchManifest } from "@/types/dataset";
 
 ## 路由与 URL
 
-- 当前使用 React Router 8 的 path 路由，`basename` 来自 `import.meta.env.BASE_URL`。
-- 新增页面：`src/pages/` 包装 + `src/router.tsx` 注册 + `src/lib/routes.ts` 的 `VIEWS` + 侧栏导航。
-- 表格参数用 `parseTableParams` / `writeTableParams`，默认值不写进 URL，更新用 `replace`。
-- 导航用 `<Link>` / `navigate`；不要手写 `window.location.href` 做站内跳转。
+- 当前使用 Astro 文件路由；数据页 `prerender = false`，稳定页 `prerender = true`。
+- 新增页面：`src/pages/` 下新建 `.astro` + `src/lib/routes.ts` 的 `VIEWS` + 侧栏导航。
+- 表格参数用 `parseTableParams` / `writeTableParams`，默认值不写进 URL；岛屿内更新用 `history.replaceState`。
+- 导航用 `<a href>`（`ClientRouter` 接管站内导航）；脚本内跳转用 `navigate()`，不要手写 `window.location.href`。
 - 链接必须可分享、可刷新、可前进后退。
 
 ## 数据边界与三态
@@ -127,14 +128,12 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 
 - 当前门禁：`bun run check`（typecheck + test + lint）与 `bun run build`。
 - 数据改动：`bun run validate:data`；发布后 `--remote` 确认可达。
-- 涉及页面：在 `bun run dev` 或 `vite preview` 下手工走查，写清路径与结果。
+- 涉及页面：在 `bun run dev` 或 `bun run preview` 下手工走查，写清路径与结果。
 - 不把「构建通过」当作功能已验证；未执行的检查标注「未验证」。
 - 不接受「既有红灯」作为基线；已知失败先修或移除。
 - 报告时写清命令、结果、未跑项与原因。
 
-## Astro 迁移后的补充
-
-迁移实施时，以下规则追加到本文件，并在同一个 PR 更新 `AGENTS.md` 与 `docs/README.md`：
+## Astro 约定（当前生效）
 
 - 每个页面显式声明 `export const prerender`；静态页写 `true`，数据页写 `false`。
 - `.astro` frontmatter 只跑在服务端 / 构建期；不读 `window` / `localStorage`。
@@ -142,3 +141,4 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 - 导航用 `<a href>` + `ClientRouter`；脚本内跳转用 `navigate()`。
 - 服务端密钥（`DATABASE_URL`）只从 `astro:env/server` 读；R2 凭据只在脚本 / 构建期使用。
 - 数据页三态与缓存指令（`Astro.cache.set`）一起交付。
+- 页面用 `<Layout meta={buildSeo(...)}>` 输出 head；不要手写重复的 meta 标签。

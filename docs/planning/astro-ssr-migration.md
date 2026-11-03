@@ -1,6 +1,6 @@
 # Astro + Cloudflare 迁移方案
 
-> 状态：方案，待实施。调研日期 2026-11-03（JST）。
+> 状态：实施中。阶段 0（Astro 脚手架）于 2026-11-03 完成；阶段 1（数据库与 ingest）未开始。调研日期 2026-11-03（JST）。
 > 目标：把当前的 React Router 8 + Vite 静态站迁到 Astro 7 + Cloudflare Workers，数据从「R2 上的 JSON + 浏览器运行时拉取」改为「PostgreSQL 查询 + R2 存对象」，单场页改为请求期 SSR，并为 Agent 提供 `{videoId}.md` 的 Markdown 视图。
 > 本文只描述已经验证过 API 的方案，不把未验证的平台行为写成事实。
 

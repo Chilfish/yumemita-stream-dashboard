@@ -2,7 +2,7 @@
 
 > **本文档是项目文档的唯一入口。** 处理任务前先读本页，再按「按任务导航」读取对应文档，不要一次性全读。
 >
-> 当前主线是 React Router 8 + Vite 8 静态站；下一阶段迁移到 Astro 7 + Cloudflare Workers + PostgreSQL。迁移方案见 [planning/astro-ssr-migration.md](./planning/astro-ssr-migration.md)。迁移完成前，代码与命令仍以当前 React Router 实现为准。
+> 当前处于 **Astro 7 + Cloudflare Workers 迁移阶段 0**：脚手架、Layout / SEO / 主题、首页与 404 / 500 已跑通；旧 React Router 页面暂存在 `src/legacy/pages/`，按阶段迁移。方案见 [planning/astro-ssr-migration.md](./planning/astro-ssr-migration.md)。PostgreSQL 查询与 `.md` 路由尚未实现。
 
 ## 一、文档目录
 
@@ -109,16 +109,16 @@ requirements/ planning/ → engineering/ → 代码 → postmortem/ reviews/ dev
 当前仓库的验证命令（以 `package.json` 为准）：
 
 ```bash
-bun run check          # typecheck + test + lint
-bun run build          # sync:data + icons + tsc + vite build
-bun run validate:data  # 校验 index / manifest / insights / group-*
-bun run verify:seo     # 校验静态 head、canonical、sitemap 与 robots
+bun run check          # astro check + vitest + oxlint
+bun run build          # astro build（Worker + 预渲染 404/500）
+bun run preview        # Cloudflare workerd 预览
+bun run validate:data  # 校验旧数据链路的 index / manifest / insights / group-*
 ```
 
-- 涉及页面的改动必须在 `bun run dev` 或 `vite preview` 下手工走查相关路径。
+- 涉及页面的改动必须在 `bun run dev` 或 `bun run preview` 下手工走查相关路径。
 - 数据改动要跑 `validate:data`；发布后加 `--remote` 确认对象存储可达。
 - 不把「构建通过」当作功能已验证；未执行的检查标注「未验证」。
-- 迁移到 Astro 后，验证命令会改为 `astro check` / `wrangler deploy` / `.md` 端点检查，届时同步更新本页与 `engineering/release-checklist.md`。
+- 阶段 1 接入 PostgreSQL 后，验证会补上 `scripts/verify-db.ts` 与 `.md` 端点检查。
 
 ## 六、根目录文档
 

@@ -1,13 +1,35 @@
 # 部署
 
-## 构建
+> **迁移阶段 0（2026-11-03）**：构建与运行已切到 Astro + Cloudflare Workers。`bun run build` 产出 `dist/`（Worker + 静态资源），`bun run preview` 走 workerd，部署用 `bun run cf:deploy`。下文「静态托管 / generate-seo / Vercel」描述旧实现，阶段 5 删除。
+
+## 构建（当前）
 
 ```bash
 bun install --frozen-lockfile
 bun run build
 ```
 
-产物：
+- `astro build` 只预渲染 `/404`、`/500`；`/` 与其他数据页请求期渲染。
+- `dist/` 包含 Worker 入口与静态资源，由 `wrangler.jsonc` 的 `assets.directory` 指向。
+- `wrangler.jsonc` 已声明 `nodejs_compat`、`R2` binding 与 Workers Cache（`cross_version_cache: false`）。
+
+## 本地预览（当前）
+
+```bash
+bun run preview
+# http://localhost:4321
+
+# 部署前完整检查
+bun run cf:preview
+```
+
+预览使用 Cloudflare workerd；响应里应能看到 `cache-tag`、`cloudflare-cdn-cache-control`、`x-request-id` 与 `x-response-time`。
+
+## 旧实现：静态托管
+
+以下内容对应迁移前的 React Router + Vite 静态站，保留用于迁移对照；阶段 5 清理。
+
+### 静态产物
 
 ```text
 dist/
@@ -23,20 +45,6 @@ dist/
 ```
 
 `generate-seo` 会为每个路由写一份 `dist/<path>/index.html`（约 1900 个），并生成 `sitemap.xml` / `robots.txt`。
-`build` 里的 `bun run icons` 会先从 `public/favicon.jpg` 生成 32×32 / 180×180 / 192×192 / 512×512 的不透明 PNG。
-
-> `generate-seo` 挂在 Vite build 的 `closeBundle` 上，所以 `vite build` 也会生成逐路由 HTML；
-> 但它不会自动跑 `sync:data` / 生成图标，完整构建仍然用 `bun run build`（或 `bun run ci`）。
-> `vercel.json` 已经用 `buildCommand` 固定了这条命令，部署平台的项目设置不要覆盖它。
-
-`dist/` 是纯静态文件，不需要 Node 运行时。页面启动时直接向对象存储请求数据；`dist/data/` 只在远端不可达时兜底（例如离线预览）。逐场 datapack 不在 `dist/` 里。
-
-## 本地预览
-
-```bash
-bun run preview
-# 默认 http://localhost:4173
-```
 
 ## 静态托管
 

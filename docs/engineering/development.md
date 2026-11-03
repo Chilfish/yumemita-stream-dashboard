@@ -1,30 +1,36 @@
 # 开发
 
 > 代码规范摘要见 [code-style.md](./code-style.md)；本文保留环境、脚本、coss ui、D3 与测试的详细说明。
+>
+> **迁移阶段 0（2026-11-03）**：运行命令已经切到 Astro，界面壳层在 `src/`，旧 React Router 页面只保留在 `src/legacy/pages/` 供迁移参考。下文涉及 `router.tsx`、`pages/*-page.tsx`、`generate-seo` 的段落描述旧实现，阶段 3 逐页替换后删除。
 
 ## 环境
 
 - **Bun ≥ 1.4**（推荐，仓库带 `bun.lock`）
-- Node.js ≥ 22.22（React Router v8 / Vite 工具链需要）
-- 不需要后端或数据库；连对象存储时在 `.env` 填 `VITE_DATAPACK_BASE`（留空则走本地 `data/`）
+- Node.js ≥ 22.22（Astro / Cloudflare 工具链需要）
+- 阶段 0 不需要数据库；`.env.example` 已预留 `DATABASE_URL` 与 R2 变量
 
 ```bash
 bun install
 bun run dev
+# http://localhost:4321
 ```
 
 ## 脚本
 
 | 命令 | 作用 |
 | --- | --- |
-| `bun run dev` | `sync:data` → `vite` |
-| `bun run build` | `sync:data` → `tsc -b` → `vite build` |
-| `bun run preview` | 预览 `dist/` |
-| `bun run sync:data` | 生成 `public/data/` 兜底快照（远端优先），含逐字稿索引 |
-| `bun run publish:data` | 由 pack 重建 index + manifest + insights，增量上传对象存储 |
-| `bun run validate:data` | 校验数据引用链（`--remote` 检查对象存储） |
+| `bun run dev` | Astro 开发服务器（Cloudflare workerd） |
+| `bun run build` | `astro build`，输出 Worker + 预渲染的 404 / 500 |
+| `bun run preview` | 本地预览构建产物（workerd） |
+| `bun run cf:preview` | 构建后预览，部署前检查 |
+| `bun run cf:deploy` | `astro build` + `wrangler deploy` |
+| `bun run db:generate` / `db:push` / `db:studio` | Drizzle 迁移工具（阶段 1 使用） |
+| `bun run sync:data` | 旧链路：生成 `public/data/` 兜底快照 |
+| `bun run publish:data` | 旧链路：由 pack 重建 index + manifest + insights，增量上传对象存储 |
+| `bun run validate:data` | 校验旧数据引用链（`--remote` 检查对象存储） |
 | `bun run add:datapack` | 加一份 datapack 并更新 manifest |
-| `bun run typecheck` | `tsc -b` |
+| `bun run typecheck` | `astro check`（TypeScript 6） |
 | `bun run test` | Vitest 单次 |
 | `bun run test:watch` | Vitest watch |
 | `bun run test:smoke` | agent-browser 路由冒烟（需先起 dev/preview） |
@@ -38,21 +44,26 @@ bun run dev
 src/
 ├─ types/           JSON schema 的 TS 镜像，不放逻辑
 ├─ lib/             纯函数，不 import React
-│  ├─ data.ts       fetch / 并发加载
+│  ├─ data.ts       fetch / 并发加载（旧页面入口，阶段 1 后由查询层替换）
 │  ├─ aggregate.ts  合并、聚合、找极值
 │  ├─ routes.ts     URL 构造与对比 id 解析
 │  ├─ table-params.ts 数据表 URL 参数解析/序列化
 │  ├─ keyboard.ts   快捷键纯函数
 │  └─ format.ts     数字 / 时间 / 币种格式化
-├─ hooks/           异步状态、主题、尺寸
-├─ pages/           路由页面（数据 ↔ 视图 ↔ navigate）
+├─ hooks/           异步状态、主题、尺寸、水合判定
+├─ layouts/         Layout.astro：SEO、主题、ClientRouter、全局岛屿
+├─ pages/           Astro 文件路由（.astro）；404 / 500 预渲染
 ├─ components/
 │  ├─ charts/       D3 + SVG 图表
-│  ├─ dashboard/    视图、Sidebar、Header、布局与 context
+│  ├─ dashboard/    视图、Sidebar、Header、布局与 context（旧页面复用）
+│  ├─ shared/       SEO.astro、ThemeProvider、ProgressBar、Spinner、ThemeToggle
 │  └─ ui/           coss ui primitives（生成物）
-├─ router.tsx       createBrowserRouter 路由表
-├─ App.tsx          RouterProvider
-└─ index.css        Tailwind v4 + coss token
+├─ stores/          Zustand：主题等全局状态
+├─ styles/app.css   Tailwind v4 + coss token + 动效
+├─ legacy/pages/    旧 React Router 页面，仅迁移参考
+├─ middleware.ts    请求 id、安全头
+├─ worker.ts        Cloudflare Worker 入口
+└─ env.d.ts         Astro App.Locals 类型
 ```
 
 ### 约定
@@ -96,15 +107,11 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 ## 路由
 
-- 使用 React Router v8 的 **path 路由**（`createBrowserRouter`），`basename` 来自 `import.meta.env.BASE_URL`；静态托管需要 SPA 回退（`vercel.json` 已配置），旧 `#/...` 链接由 `index.html` 的内联脚本改写成真实路径。
-- URL 形态：`/:id` 成员首页、`/:id/streams?q=&type=&sort=&dir=&vstats=` 场次页、`/:id/trends` 趋势页、`/:id/stream/:videoId?view=` 单场、`/:id/compare?ids=a,b,c` 对比、`/:id/about` 说明；旧地址 `/:id/overview`、`/:id/table` 自动重定向。
-- 每个页面的 title / description / canonical / OG 由 `src/lib/seo.ts` 生成、`useSeo` 写入；构建期的静态 head 由 `scripts/generate-seo.ts` 生成。新增路由时记得在 `buildSeo` 的 `sectionCopy` 与 `scripts/generate-seo.ts` 的路由清单里各加一条。
-- 表格参数用 `parseTableParams` / `writeTableParams`（`lib/table-params.ts`），默认值不写入 URL，更新用 `replace: true`。
-- 根路由与 `:datasetId` 有 `errorElement`（`route-error.tsx`）；新页面不需要单独加错误兜底。
-- `DatasetLayout` 只加载 manifest + `insights.json`；列表页不下载 datapack。单场和对比用 `useStreamPacks` 按需拉取，缓存由 `lib/data.ts` 负责。
-- 全局快捷键在 `hooks/use-keyboard-shortcuts.ts`：`j` / `k` 翻场、`1`–`5` 切页面、`/` 聚焦搜索、`⌘K` 搜索场次与成员、`⌘B` 收起/展开侧栏；除 `⌘K` 外，输入框内自动忽略。
-- `src/pages/` 只做三件事：取 `useDatasetView()` 数据、调用 `navigate`、渲染 `dashboard/` 里的视图。
-- 页面按路由 `lazy()`（`src/pages/lazy-pages.tsx`），`DatasetLayout` 用 `Suspense` 包住 `Outlet`。
+- 当前用 Astro 文件路由：`src/pages/index.astro`（组首页）、`404.astro`、`500.astro`；稳定页面显式 `export const prerender = true`。
+- 页面从 `src/lib/seo.ts` 的 `buildSeo()` 生成 `SeoMeta`，交给 `<Layout meta={meta}>` 输出 title / description / canonical / OG / JSON-LD。
+- 旧 React Router 路由表已删除；URL 形态与旧页面逻辑保留在 `src/legacy/pages/`，迁移时逐页改写成 `.astro` + 岛屿。
+- 目标 URL 形态（阶段 3 实现）：`/:id` 成员首页、`/:id/streams?q=&type=&sort=&dir=&vstats=`、`/:id/trends`、`/:id/stream/:videoId?view=`、`/:id/compare?ids=a,b,c`、`/:id/about`；旧地址 `/:id/overview`、`/:id/table` 用 `Astro.redirect()`。
+- 表格参数继续用 `parseTableParams` / `writeTableParams`（`lib/table-params.ts`）；岛屿内更新用 `history.replaceState`。
 
 ## D3 图表写法
 
@@ -156,14 +163,14 @@ bunx --bun shadcn@latest add @coss/ui -y
 | `calendar-heatmap.tsx` | 按日热力图：场次 / 弹幕 / SC，横向滚动 + 原生 tooltip |
 | `trend-line.tsx` | 月度趋势折线：单指标、空值断线、原生 tooltip |
 
-## 加一个路由页面
+## 加一个页面（Astro）
 
 1. 在 `src/components/dashboard/` 新建视图组件，props 只接收 `StreamRow[]` / `DatasetTotals` / 单场 `StreamRow`。
-2. 在 `src/pages/` 新建页面，从 `useDatasetView()` 取数据，把跳转接到 `navigate`。
-3. 在 `src/pages/lazy-pages.tsx` 用 `lazy()` 导出页面。
-4. 在 `src/router.tsx` 的 `:datasetId` children 加 route。
-5. 在 `src/lib/routes.ts` 的 `VIEWS` 加 key，并在 `app-sidebar.tsx` 的 `NAV_ITEMS` 加导航项。
-6. 如果新视图需要新聚合，先在 `lib/aggregate.ts` 加函数和测试。
+2. 在 `src/pages/` 新建 `.astro`，用 `buildSeo()` 生成 meta，`<Layout meta={meta}>` 包住内容；数据页写 `export const prerender = false`。
+3. 交互部分拆成岛屿（`client:visible` / `client:load`），props 只传可序列化数据；首屏正文由 `.astro` 输出。
+4. 在 `src/lib/routes.ts` 的 `VIEWS` 加 key，并在 `app-sidebar.tsx` 的 `NAV_ITEMS` 加导航项。
+5. 如果新视图需要新聚合，先在 `lib/aggregate.ts` 加函数和测试。
+6. 迁移旧页面时从 `src/legacy/pages/` 对照，不要继续修改旧文件。
 
 ## 加一个聚合指标
 
@@ -190,10 +197,11 @@ bun run test:watch
 
 ## 类型与构建
 
-- `tsc -b` 使用 project references：`tsconfig.app.json`（src）+ `tsconfig.node.json`（vite.config）。
-- TypeScript 7 已移除 `baseUrl`；路径别名只写在 `paths`，相对于 tsconfig 解析。
-- 构建产物：`dist/`；`dist/data/` 只含兜底快照（`index.json`、`manifest.json`、`insights.json`），页面运行时直接向对象存储请求。
-- 当前主包约 349 KB（gzip ~112 KB），主要来自 D3 + Base UI；视图已按路由 `lazy()` 拆包。
+- `astro check` 是当前 typecheck 入口；它暂不支持 TypeScript 7，仓库锁定 TypeScript 6（与模板一致）。
+- 路径别名只写在 `tsconfig.json` 的 `paths`（`@/*` → `./src/*`）；`astro.config.mjs` 与 `vitest.config.ts` 使用同一别名。
+- `scripts/` 与 `src/legacy/` 暂不进入 `astro check`（旧链路沿用原有类型边界），接入 ingest 后会单独补类型检查。
+- 构建产物：`dist/` 是 Cloudflare Worker + 静态资源；`astro build` 只预渲染 404 / 500，数据页请求期渲染。
+- 本地预览 `bun run preview` 走 workerd，与线上响应头（`cache-tag` / `cloudflare-cdn-cache-control`）一致。
 
 ## 提交前
 

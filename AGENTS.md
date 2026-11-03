@@ -5,22 +5,24 @@
 
 ## 当前事实与目标形态
 
+**当前处于迁移阶段 0（2026-11-03）：Astro 脚手架已跑通，旧 React Router 页面暂存在 `src/legacy/pages/`，尚未迁移。** 新代码按 Astro 结构写；旧页面改造时逐页搬回 `src/pages/`。
+
 | 项 | 当前 | 目标 |
 | --- | --- | --- |
-| 框架 | React Router 8 + Vite 8 | Astro 7 + `@astrojs/cloudflare` |
-| 数据 | R2 上的 JSON，浏览器运行时读取 | PostgreSQL 查询 + R2 对象 |
-| 路由 | `src/router.tsx` 的 `createBrowserRouter` | `src/pages/` 文件路由 + 按需 SSR |
-| 单场页 | 构建期静态 head + 客户端渲染 | 请求期 SSR |
+| 框架 | Astro 7 + `@astrojs/cloudflare`（阶段 0 脚手架） | Astro 7 + `@astrojs/cloudflare` |
+| 数据 | R2 上的 JSON，浏览器运行时读取（旧页面） | PostgreSQL 查询 + R2 对象 |
+| 路由 | `src/pages/` 文件路由；旧 `src/router.tsx` 已删除 | `src/pages/` 文件路由 + 按需 SSR |
+| 单场页 | 旧实现待迁移（`src/legacy/pages/stream-page.tsx`） | 请求期 SSR |
 | Agent 视图 | 无 | `/{datasetId}/stream/{videoId}.md` |
-| 部署 | 静态托管（Vercel 等） | Cloudflare Workers |
+| 部署 | 静态托管（Vercel 等）；`wrangler.jsonc` 已配置 | Cloudflare Workers |
 
-**迁移方案是规划，不是现状。** 未迁移前，代码、命令、文件名以当前 React Router 实现为准；不要按 Astro 结构改代码，也不要把目标形态写进 `docs/` 的「当前实现」段落。方案见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md)。
+阶段 0 已完成：Astro 配置、Cloudflare adapter / 缓存、Worker 入口、中间件、Layout / SEO / 主题、首页与 404 / 500、`astro check` / `build` / `preview` 可运行。下一阶段见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md) 第 13 节。
 
 ## 意图 → 文件映射（当前实现）
 
 | 任务意图 | 关键文件 | 操作 |
 | --- | --- | --- |
-| 新增 / 修改页面 | `src/pages/*-page.tsx`、`src/router.tsx`、`src/lib/routes.ts` | 注册路由 + 页面包装 + 导航 |
+| 新增 / 修改页面 | `src/pages/*.astro`、`src/layouts/`、`src/lib/routes.ts` | 文件路由 + 布局 + 导航 |
 | 新增视图组件 | `src/components/dashboard/` | 接收 `StreamRow[]` / `DatasetTotals` |
 | 新增图表 | `src/components/charts/` | D3 算数学，React 渲染 SVG |
 | 新增 coss 组件 | `src/components/ui/` | 用 shadcn CLI + `@coss` registry，不手写业务 |
@@ -68,10 +70,10 @@
 
 ### 🧭 当前运行模型
 
-- React Router 8 path 路由，`createBrowserRouter`；`basename` 来自 `import.meta.env.BASE_URL`。
-- 静态托管需要 SPA 回退（`vercel.json` 已配置）；旧 `#/...` 链接由 `index.html` 内联脚本改写。
-- 页面按路由 `React.lazy()` 拆包；`DatasetLayout` / `GroupLayout` 负责数据加载与壳层。
-- 单场 / 对比的 datapack 按需加载；列表页只消费 manifest + insights。
+- Astro 7 `output: 'server'` + `@astrojs/cloudflare`；页面在 `src/pages/`，稳定页显式 `prerender = true`。
+- `src/layouts/Layout.astro` 负责 SEO、主题内联脚本、ClientRouter 与全局岛屿。
+- 旧 React Router 页面在 `src/legacy/pages/`，只作迁移参考，不进 Astro 路由；不要继续在旧页面上加功能。
+- 单场 / 对比的 datapack 仍按需加载；列表页只消费 manifest + insights（迁移阶段 1 后改查数据库）。
 
 ### 📊 数据流
 
@@ -121,7 +123,7 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 ```
 
 - 表格筛选、单场分段、对比 ids 写进 URL，默认值不写。
-- 新增路由：`src/router.tsx` + `src/lib/routes.ts` + `app-sidebar.tsx` 的 `NAV_ITEMS`。
+- 新增路由：`src/pages/` 下新建 `.astro` + `src/lib/routes.ts` + `app-sidebar.tsx` 的 `NAV_ITEMS`。
 - 旧地址 `/:id/overview`、`/:id/table` 自动重定向。
 
 ### 🧪 测试与验证

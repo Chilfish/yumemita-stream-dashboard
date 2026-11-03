@@ -26,7 +26,7 @@
 
 ## 2. 颜色
 
-颜色在 `src/index.css` 的 `:root` 与 `.dark` 中成对定义，经 Tailwind v4 `@theme inline` 映射为 Token。
+颜色在 `src/styles/app.css` 的 `:root` 与 `.dark` 中成对定义，经 Tailwind v4 `@theme inline` 映射为 Token。
 
 | Token | 用途 |
 | --- | --- |

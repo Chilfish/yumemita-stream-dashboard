@@ -1,0 +1,29 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import { buildSeo } from '@/lib/seo'
+import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
+
+export const prerender = true
+
+const origin = Astro.site?.origin ?? DEFAULT_SITE_URL
+const basePath = import.meta.env.BASE_URL.replace(/\/+$/, '')
+
+const meta = buildSeo({
+  origin,
+  basePath,
+  pathname: Astro.url.pathname,
+  section: 'home',
+  notFound: true,
+})
+---
+
+<Layout meta={meta}>
+  <main class="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+    <p class="text-caption text-muted-foreground">404</p>
+    <h1 class="text-title">找不到这个页面</h1>
+    <p class="text-body text-muted-foreground">地址可能已经变更，或者这场直播从未被收录。</p>
+    <a class="press rounded-lg border border-input bg-card px-4 py-2 text-headline" href="/">
+      返回首页
+    </a>
+  </main>
+</Layout>

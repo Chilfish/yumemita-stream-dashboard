@@ -11,7 +11,7 @@
    没有就先跑 `bun run publish:data`。
 
 2. 浏览器 Network 面板看 `<base>/index.json` 是否 404；远端不可达时页面会回退到同源 `data/index.json`，本地快照可用 `bun run sync:data` 生成。
-3. 如果部署在子路径，确认 `vite.config.ts` 的 `base` 与访问路径一致。
+3. Astro 阶段部署在域名根路径；如以后做子路径，确认 `astro.config.mjs` 的 `base` 与访问路径一致。
 4. 硬刷新（Ctrl/Cmd + Shift + R）排除旧缓存。
 
 ## “index.json 里没有可用的 dataset”
@@ -63,7 +63,8 @@ bun run validate:data -- --remote  # 逐条 HEAD 确认可达
 
 ## 类型检查报错
 
-- TypeScript 7 移除了 `baseUrl`；路径别名只写在 `paths`：
+- `astro check` 暂不支持 TypeScript 7；仓库锁定 `typescript@6`，不要单独升级。
+- 路径别名只写在 `tsconfig.json` 的 `paths`：
 
   ```json
   "paths": { "@/*": ["./src/*"] }
@@ -74,16 +75,14 @@ bun run validate:data -- --remote  # 逐条 HEAD 确认可达
 
 ## 构建报 CSS / 字体错误
 
-- 本项目用 `@fontsource-variable/inter` 与 `@fontsource-variable/geist-mono`，不要 import `geist`（那是 Next.js 专用包）。
-- `src/index.css` 的 `@import` 必须排在 Tailwind 之后、其他规则之前。
-- coss ui 的 token 在 `index.css` 的 `@theme inline` / `:root` / `.dark` 里；不要删。
+- 本项目用 `@fontsource-variable/noto-sans` 与 `@fontsource-variable/noto-sans-sc`，在 `src/styles/app.css` 顶部导入。
+- `src/styles/app.css` 的 `@import`（字体、Tailwind）必须排在其他规则之前。
+- coss ui 的 token 在 `app.css` 的 `@theme inline` / `:root` / `.dark` 里；不要删。
 
 ## 开发端口被占用
 
 ```bash
-bunx vite --port 5174
-# 或
-bun run dev -- --port 5174
+bun run dev -- --port 4322
 ```
 
 ## 新增 coss 组件后类型报错

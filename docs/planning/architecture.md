@@ -1,5 +1,7 @@
 # 架构
 
+> **迁移阶段 0（2026-11-03）**：本文描述迁移前的 React Router + Vite 静态站架构，作为现状与迁移对照保留。运行入口已切到 Astro（`src/layouts/`、`src/pages/`、`src/worker.ts`），页面迁移进度见 [astro-ssr-migration.md](./astro-ssr-migration.md)；本文的「路由 / 页面 / 构建」段落在阶段 3 重写。
+
 ## 目标与非目标
 
 **目标**

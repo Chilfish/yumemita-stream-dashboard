@@ -33,10 +33,10 @@
 
 | 规则 | 自查点 | 对策 |
 | --- | --- | --- |
-| 真实路径可刷新 | 新增路由是否在 `src/router.tsx` 注册，托管是否配 SPA 回退 | 直接访问、刷新深链验证 |
+| 真实路径可刷新 | 新增页面是否在 `src/pages/` 有对应 `.astro`，Worker 是否正确返回 404 / 200 | 直接访问、刷新深链验证 |
 | URL 状态可分享 | 表格筛选 / 单场分段 / 对比 ids 是否写进 URL | 用 `parseTableParams` / `writeTableParams` |
-| 旧链接兼容 | `#/...` 与旧 `overview` / `table` 是否有重定向 | `index.html` 内联脚本 + redirect 路由 |
-| 错误边界 | 根路由与 `:datasetId` 是否有 `errorElement` | 渲染 / 懒加载异常显示兜底页 |
+| 旧链接兼容 | `#/...` 与旧 `overview` / `table` 是否有重定向 | Astro `redirect` + 客户端 hash 兼容脚本（阶段 3） |
+| 错误边界 | 页面是否有三态与 500 兜底 | 错误态视图 / `500.astro` |
 | 子路径部署 | `VITE_BASE` 与 `basename` 是否一致 | 子路径下验证链接与数据地址 |
 
 ### 2. 数据与对象存储

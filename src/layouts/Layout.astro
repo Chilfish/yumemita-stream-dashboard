@@ -1,0 +1,61 @@
+---
+import type { SeoMeta } from '@/lib/seo'
+import { ClientRouter } from 'astro:transitions'
+import { ProgressBar } from '@/components/shared/progress-bar'
+import SEO from '@/components/shared/SEO.astro'
+import { ThemeProvider } from '@/components/shared/ThemeProvider'
+import '@/styles/app.css'
+
+interface Props {
+  meta: SeoMeta
+  lang?: string
+  alternateMarkdown?: string
+}
+
+const { meta, lang = 'zh-CN', alternateMarkdown } = Astro.props
+---
+
+<!doctype html>
+<html lang={lang} class="touch-manipulation overflow-x-hidden">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="color-scheme" content="light dark" />
+    <meta content="#f5f2f4" media="(prefers-color-scheme: light)" name="theme-color" />
+    <meta content="#0b0b0c" media="(prefers-color-scheme: dark)" name="theme-color" />
+    <meta name="application-name" content="ゆめみた 配信数据台" />
+
+    <link rel="icon" type="image/jpeg" href="/favicon.jpg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    {alternateMarkdown && (
+      <link rel="alternate" type="text/markdown" href={alternateMarkdown} />
+    )}
+
+    <SEO meta={meta} />
+    <ClientRouter />
+
+    <script is:inline>
+      ;(function () {
+        try {
+          const raw = localStorage.getItem('app-config-store')
+          const theme = raw ? JSON.parse(raw).state.theme : 'system'
+          const resolved = theme === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : theme
+          document.documentElement.classList.add(resolved)
+        }
+        catch {
+          document.documentElement.classList.add('light')
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <ProgressBar client:load transition:persist />
+    <ThemeProvider client:load transition:persist />
+    <slot />
+  </body>
+</html>

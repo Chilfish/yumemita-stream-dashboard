@@ -58,8 +58,8 @@
 
 ## 技术栈
 
-- **前端**：React 19、Vite、TypeScript
-- **路由**：React Router v8，path 路由（兼容子路径），路由级懒加载
+- **框架**：Astro 7（`output: 'server'`）+ `@astrojs/cloudflare`；迁移阶段 0，页面逐步从旧 React Router 实现搬入 `src/pages/`
+- **前端**：React 19 岛屿、TypeScript
 - **UI**：Tailwind CSS v4、coss ui（Base UI + shadcn 风格组件）
 - **图表**：D3，只算比例尺与路径，DOM 交给 React
 - **测试**：Vitest、oxlint
@@ -76,7 +76,7 @@ bun install
 bun run dev
 ```
 
-打开 <http://localhost:5173>。
+打开 <http://localhost:4321>。构建与本地预览用 `bun run build` / `bun run preview`（Cloudflare workerd）。
 
 ### 配置
 

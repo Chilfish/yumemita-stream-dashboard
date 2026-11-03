@@ -45,13 +45,13 @@ describe("fetchManifest", () => {
   it("shares one request between concurrent consumers", async () => {
     const originalFetch = globalThis.fetch;
     let calls = 0;
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       calls += 1;
       return new Response(
         JSON.stringify({ streams: [{ videoId: "concurrent-test" }] }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
-    };
+    }) as unknown as typeof fetch;
 
     try {
       const [first, second] = await Promise.all([
