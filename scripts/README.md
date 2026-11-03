@@ -362,6 +362,31 @@ bun run verify:data --remote
 - `scripts/backfill-author-id.ts` 只重写缺少 `authorId` 的 jsonl，已有 ID 的默认跳过；条数应与原文件一致。
 - `scripts/enrich-chat.ts --force` 会把已是 v2 的 pack 也用新 jsonl 重新聚合。
 
+## 补主播本人发言（一次性）
+
+`scripts/backfill-owner-chats.ts` 只抓 `live_chat`，把 Owner 徽章发言补成 `chat.ownerChats`，不重抓 meta / 评论 / VSTATS；默认只处理「`ownerMessages > 0` 且还没有 `ownerChats`」的场次。pack 先尝试从对象存储读，读不到再回退本地；改完写回本地 `data/<id>/` 并同步上传。
+
+```bash
+bun scripts/backfill-owner-chats.ts --dry-run
+bun scripts/backfill-owner-chats.ts --dataset yuno
+bun scripts/backfill-owner-chats.ts --dataset arale --ids ids.txt --concurrency 3
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dataset <id>` | 只处理指定 dataset |
+| `--ids <文件>` | 指定 videoId 列表（每行一个），需同时指定 `--dataset` |
+| `--concurrency <n>` | yt-dlp 并发，默认 3 |
+| `--limit <n>` | 本次最多处理 n 场，0 = 全部 |
+| `--work-dir <目录>` | 临时下载目录，默认 `./temp/owner-chats` |
+| `--cookies <文件>` / `--cookies-from-browser <b>` | 登录态来源 |
+| `--force` | 已有 `ownerChats` 的场次也重抓 |
+| `--no-upload` | 只更新本地 pack，不上传对象存储 |
+| `--keep-raw` | 保留 `live_chat` 与归一化 jsonl |
+| `--dry-run` | 只列出目标 |
+
+补完后重新 `bun run publish:data`（或直接 `bun run db:ingest --dataset <id>`）让页面读到新字段。
+
 ## 校验 v2 数据
 
 `validate:data` 只检查文件存在与场次数；`verify:data` 检查内容是否自洽、发布是否真的生效。
