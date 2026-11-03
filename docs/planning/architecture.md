@@ -1,6 +1,6 @@
 # 架构
 
-> **迁移阶段 0（2026-11-03）**：本文描述迁移前的 React Router + Vite 静态站架构，作为现状与迁移对照保留。运行入口已切到 Astro（`src/layouts/`、`src/pages/`、`src/worker.ts`），页面迁移进度见 [astro-ssr-migration.md](./astro-ssr-migration.md)；本文的「路由 / 页面 / 构建」段落在阶段 3 重写。
+> **2026-11-03 更新**：运行形态已切到 Astro SSR + Neon PostgreSQL（当前 35 场小批量）。本文前半部分的 React Router / Vite 数据流是迁移前记录，保留作对照；当前入口见 `src/pages/`、`src/layouts/`、`src/db/queries/`、`src/worker.ts`，方案与剩余项见 [astro-ssr-migration.md](./astro-ssr-migration.md)。
 
 ## 目标与非目标
 

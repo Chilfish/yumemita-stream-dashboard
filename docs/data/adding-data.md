@@ -4,10 +4,10 @@
 
 页面消费的是 `stream-datapack` 生成的归一化 JSON。生产这些 JSON 的 pipeline（yt-dlp 元信息 / 弹幕 / 评论区 / VSTATS 快照）不在本仓库内。
 
-- **dataset 索引与预聚合**（`index.json` / `manifest.json` / `insights.json`）由 `publish:data` 从 pack 派生，和 datapack 一起上传对象存储，不进 git。
-- **逐场 datapack** 上传到对象存储（Cloudflare R2 等），不进 git；浏览器按 `VITE_DATAPACK_BASE/<datasetId>/<videoId>.datapack.json` 拉取。
-- 页面运行时直接读对象存储，发布后刷新即可，不需要重新构建前端。
-- `data/<datasetId>/` 下的 pack、manifest、insights 都是上传前的本地暂存/派生物。
+- **当前页面读 PostgreSQL**：`db:ingest` 把 `data/<datasetId>/*.datapack.json` 投影到 Neon，页面请求期查库。
+- **本地 pack 是唯一真源**：`data/<datasetId>/` 不进 git；manifest / insights 仍是本地派生物。
+- **R2 只保留对象**：封面、表情、逐字稿正文、原始 pack 归档。`publish:data` 写 index / manifest / insights 的旧链路暂时保留，但页面不再读取。
+- 数据更新后不需要重新构建前端；需要让缓存失效时调内部 purge 端点。
 
 ## 目录约定
 
@@ -30,17 +30,16 @@ data/
 # 1. 放进暂存区，顺带更新本地 manifest
 bun run add:datapack nonoka /path/to/abc123XYZ.datapack.json
 
-# 2. 由全部 pack 重建 index + manifest + insights，并增量上传到 R2
-bun run publish:data
+# 2. 投影到 PostgreSQL（增量，按 content_hash 跳过未变化场次）
+bun run db:ingest -- --dataset nonoka
 
-# 3. 本地看效果（sync 只生成 public/data/ 兜底快照）
-bun run sync:data
-bun run validate:data
+# 3. 对账 + 本地看效果
+bun run db:verify -- --dataset nonoka
 bun run dev
 ```
 
 `add:datapack` 会校验 `schema` / `video.id`，复制到 `data/nonoka/`，并按开播时间重排本地 manifest 的 `rank`。
-真正的 manifest 与 insights 以 `publish:data` 的重算结果为准。
+数据库里的 `streams` / `dataset_insights` 以 `db:ingest` 的结果为准。
 
 ### 手工加（不用脚本）
 
@@ -71,8 +70,8 @@ bun run dev
 }
 ```
 
-3. `bun run publish:data --dataset arare` 生成并上传该 dataset 的 manifest / insights，并在最后刷新根 `index.json`。
-4. 刷新页面，成员入口自动出现；不需要重新构建。离线开发时再跑 `bun run sync:data` 更新兜底快照。
+3. `bun run db:ingest -- --dataset arare` 写入成员与场次；成员入口由数据库查询生成。
+4. 刷新页面即可；不需要重新构建。
 
 不需要改 React 组件。
 
@@ -164,8 +163,8 @@ bun run publish:transcripts --force       # 忽略 data/.publish-state.json，�
 跑一遍：
 
 ```bash
-bun run sync:data
-bun run validate:data
+bun run db:ingest -- --dataset <id>
+bun run db:verify -- --dataset <id>
 bun run dev
 ```
 

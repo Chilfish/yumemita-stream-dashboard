@@ -2,7 +2,7 @@
 
 > 代码规范摘要见 [code-style.md](./code-style.md)；本文保留环境、脚本、coss ui、D3 与测试的详细说明。
 >
-> **迁移阶段 0（2026-11-03）**：运行命令已经切到 Astro，界面壳层在 `src/`，旧 React Router 页面只保留在 `src/legacy/pages/` 供迁移参考。下文涉及 `router.tsx`、`pages/*-page.tsx`、`generate-seo` 的段落描述旧实现，阶段 3 逐页替换后删除。
+> **2026-11-03**：全部页面已迁到 Astro（`src/pages/*.astro` + `src/components/app/` 岛屿），旧 React Router 页面与 `generate-seo` / `sync-data` 已删除。下文的历史段落只作迁移对照。
 
 ## 环境
 

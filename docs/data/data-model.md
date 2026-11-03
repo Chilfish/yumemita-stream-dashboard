@@ -1,6 +1,8 @@
 # 数据模型
 
-成员页消费四层 JSON：**dataset 索引 → manifest → insights → datapack**；组首页与全组相册另有 **group-summary / group-gallery** 两份精简派生文件（见第 3 节）。它们都是纯 JSON，没有数据库，全部放在对象存储（R2 等），页面运行时直接读取。`public/data/` 里的同源副本由 `sync:data` 生成，只在远端不可达时兜底。
+> **2026-11-03 更新**：当前页面读 **PostgreSQL**（`src/db/schema.ts`、`src/db/queries/`），不再在运行时请求这些 JSON。本文保留 manifest / datapack 的字段口径与派生规则，供 ingest 与旧链路参考；`publish:data` 写 index / manifest / insights 的路径暂时保留，但页面不再消费。
+
+成员页消费四层 JSON：**dataset 索引 → manifest → insights → datapack**；组首页与全组相册另有 **group-summary / group-gallery** 两份精简派生文件（见第 3 节）。这些格式现在用于本地派生与归档；页面数据由 `db:ingest` 投影到数据库。
 
 所有数据由 `bun run publish:data` 从本地 pack 派生并上传；git 里只有 `data-sources.json`。
 

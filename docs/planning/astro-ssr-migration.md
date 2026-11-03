@@ -1,6 +1,6 @@
 # Astro + Cloudflare 迁移方案
 
-> 状态：实施中。阶段 0（Astro 脚手架）于 2026-11-03 完成；阶段 1 的 schema / ingest / 对账 / 查询层已用 35 场小批量数据跑通（nonoka 30 + 富数据 arale 5），全量 ingest 与 `dataset_insights` 重算待继续。调研日期 2026-11-03（JST）。
+> 状态：实施中。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），当前用 35 场小批量数据验证。剩余：全量 1892 场 ingest 与 `dataset_insights` 重算、Cloudflare 线上部署与缓存实测。调研日期 2026-11-03（JST）。
 > 目标：把当前的 React Router 8 + Vite 静态站迁到 Astro 7 + Cloudflare Workers，数据从「R2 上的 JSON + 浏览器运行时拉取」改为「PostgreSQL 查询 + R2 存对象」，单场页改为请求期 SSR，并为 Agent 提供 `{videoId}.md` 的 Markdown 视图。
 > 本文只描述已经验证过 API 的方案，不把未验证的平台行为写成事实。
 

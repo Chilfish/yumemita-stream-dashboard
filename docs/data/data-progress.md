@@ -124,9 +124,9 @@ Get-Content "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch-pr
 # 单场返工：清掉该场本地素材重抓，datapack 更新后自动增量发布
 bun scripts/fetch-streams.ts --dataset <id> --force <videoId>
 
-# 最后同步/校验
-bun run sync:data
-bun run validate:data
+# 最后投影到数据库并校验
+bun run db:ingest
+bun run db:verify
 ```
 
 `--root` 是**原始会话目录**，不是 `data/`；datapack 仍按 `data-sources.json` 写到 `data/<id>/`。

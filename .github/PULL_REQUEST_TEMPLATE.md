@@ -15,8 +15,9 @@
 
 - [ ] `bun run check` 通过
 - [ ] `bun run build` 通过
-- [ ] `bun run validate:data` 通过（改数据时）
-- [ ] `bun run verify:seo` 通过（改路由 / SEO / 构建时）
+- [ ] `bun run db:verify` 通过（改 ingest / 数据时）
+- [ ] `bun run db:query` 通过（改查询层时）
+- [ ] `bun run test:smoke` 通过（改路由时，先启动 preview）
 - [ ] 相关页面已手工走查，路径与结果：
 
 ```text
@@ -28,9 +29,9 @@
 ## 数据与迁移
 
 - [ ] 未手改 `manifest.json` / `insights.json`
-- [ ] 新增 / 修改数据已跑 `validate:data`；发布后跑过 `--remote`
+- [ ] 新增 / 修改数据已跑 `db:ingest` 与 `db:verify`
 - [ ] 会员限定内容公开范围已确认
-- [ ] 如涉及 Astro / PostgreSQL 迁移：当前实现与目标形态分开写，未实现项标 `📋`
+- [ ] 如涉及未完成能力：文档标 `📋`，不写成现状
 
 ## UI
 

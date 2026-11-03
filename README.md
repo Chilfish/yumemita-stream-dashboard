@@ -125,18 +125,21 @@ data/<id>/*.datapack.json            本地暂存
 ## 常用命令
 
 ```bash
-bun run dev                  # 同步数据 + 开发服务器
-bun run build                # 同步数据 + 类型检查 + 生产构建
-bun run check                # typecheck + test + lint
-bun run ci                   # CI 同款：sync + validate + check + build + verify:seo
-bun run verify:seo           # 校验静态 head、canonical、sitemap 与 robots
+bun run dev                  # Astro 开发服务器（Cloudflare workerd）
+bun run build                # astro build：Worker + 预渲染 404/500
+bun run preview              # 本地预览构建产物
+bun run check                # astro check + test + lint
+bun run ci                   # check + build
 
-bun run publish:data         # 重建索引并上传对象存储
+bun run db:migrate           # 应用 Drizzle 迁移
+bun run db:ingest            # 本地 pack → PostgreSQL（增量）
+bun run db:verify            # 数据库与 pack 字段级对账
+bun run db:query             # 查询层冒烟 + 本地延迟
+
+bun run publish:data         # 旧链路：重建 R2 索引并上传
 bun scripts/daily-update.ts  # 每日增量：频道差集 → 抓取 → 补封面 → 定点发布
 bun run publish:transcripts  # 增量上传逐字稿
-bun run add:datapack         # 加一份 datapack，自动更新 manifest
 bun run fetch:thumbs         # 镜像封面到本地
-bun run validate:data        # 校验 index → manifest → insights
 ```
 
 补缺失弹幕、回填 `authorId` 这类一次性修复脚本没有注册到 `package.json`，用法见 [scripts/README.md](scripts/README.md)。
@@ -159,29 +162,39 @@ bun run publish:data
 
 ## 部署
 
-构建产物在 `dist/`，交给任意静态托管即可，`vercel.json` 里已经配好 SPA 重写和缓存头。
+目标是 Cloudflare Workers + Neon PostgreSQL + R2。`wrangler.jsonc` 已声明 Worker 入口、`nodejs_compat`、静态资源、R2 binding 与 Workers Cache。
 
 ```bash
-VITE_DATAPACK_BASE=https://s3.example.com/stream-dashboard \
-VITE_SITE_URL=https://ymmt.example.com bun run build
+bun run build          # astro build
+bun run cf:deploy      # astro build + wrangler deploy
 ```
 
-构建会为每个路由生成带 head 的静态 HTML，并输出 `sitemap.xml` / `robots.txt`。数据更新只需要 `bun run publish:data`，逐字稿更新 `bun run publish:transcripts`，都不用重新构建；新场次的静态分享卡片要等下次构建，客户端 meta 立即生效。部署在子路径时设 `VITE_BASE`。详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。
+- 数据页请求期查 Neon；`/`、成员页、场次、单场、趋势、相册、对比都由数据库驱动。
+- 单场 Markdown：`/{datasetId}/stream/{videoId}.md`，返回 `text/markdown` 并带逐字稿。
+- `sitemap.xml` / `llms.txt` 由 endpoint 生成；`robots.txt` 是静态文件。
+- 数据更新后调内部 `POST /api/internal/cache/purge`（Bearer `PURGE_TOKEN`）按 tag 失效。
+- 当前数据库只有小批量数据；全量 ingest 与线上部署尚未执行。详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。
 
 ## 项目结构
 
 ```text
 src/
-├─ pages/          # 路由页面：数据 ↔ 视图 ↔ 导航
+├─ pages/          # Astro 文件路由与 endpoint（含 .md、sitemap、purge）
+├─ layouts/        # Layout.astro：SEO、主题、ClientRouter
 ├─ components/
+│  ├─ app/         # 岛屿壳层：DatasetPage / GroupPage
+│  ├─ pages/       # 页面视图（沿用迁移前的 dashboard 视图）
 │  ├─ dashboard/   # 页面级组件
 │  ├─ charts/      # D3 图表
+│  ├─ shared/      # SEO、主题、进度条、错误态
 │  └─ ui/          # coss ui 生成物，不手写业务逻辑
-├─ hooks/          # 数据加载、主题、尺寸测量
-├─ lib/            # 纯函数：聚合、格式化、路由、SEO
-├─ types/          # datapack / dataset 的 TS 镜像
-└─ router.tsx
-scripts/           # 同步、发布、校验、封面、逐字稿
+├─ db/             # schema、连接、查询层
+├─ hooks/          # 水合、快捷键、逐字稿
+├─ lib/            # 纯函数：聚合、格式化、路由兼容、SEO、Markdown
+├─ stores/         # Zustand：主题
+├─ types/          # datapack / dataset / db DTO
+└─ middleware.ts / worker.ts
+scripts/           # 抓取、ingest、对账、发布、封面、逐字稿
 content/transcripts/  # 手写逐字稿
 docs/              # 架构、数据模型、开发、部署
 data-sources.json  # 成员注册表

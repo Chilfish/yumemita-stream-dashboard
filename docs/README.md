@@ -2,7 +2,7 @@
 
 > **本文档是项目文档的唯一入口。** 处理任务前先读本页，再按「按任务导航」读取对应文档，不要一次性全读。
 >
-> 当前处于 **Astro 7 + Cloudflare Workers 迁移阶段 0**：脚手架、Layout / SEO / 主题、首页与 404 / 500 已跑通；旧 React Router 页面暂存在 `src/legacy/pages/`，按阶段迁移。方案见 [planning/astro-ssr-migration.md](./planning/astro-ssr-migration.md)。PostgreSQL 查询与 `.md` 路由尚未实现。
+> 当前是 **Astro 7 + Cloudflare Workers + Neon PostgreSQL** 形态：全部页面请求期查库，`.md`、sitemap、llms、purge 端点已实现。数据库目前只有 35 场小批量数据，全量 ingest 与线上部署尚未完成。方案与剩余项见 [planning/astro-ssr-migration.md](./planning/astro-ssr-migration.md)。
 
 ## 一、文档目录
 

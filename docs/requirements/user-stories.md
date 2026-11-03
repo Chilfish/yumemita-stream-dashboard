@@ -127,7 +127,7 @@
 - **验收标准**：
   - [x] `bun run check` 覆盖 typecheck、test、lint
   - [x] `bun run build` 能完成数据同步、类型检查与构建
-  - [x] `bun run validate:data` 与 `bun run verify:seo` 可独立运行
+  - [x] `bun run check`、`bun run build`、`bun run db:verify` 可独立运行
 
 ### US-12：让 Agent 读取单场数据
 

@@ -58,17 +58,17 @@
 | `FR-DATA-001` | P0 | 由 pack 派生 manifest / insights | `AC-DATA-001`：`bun run publish:data` 重建 manifest + insights 并上传；manifest 不手改；`video.id` 与文件名不一致时中止（手工） | ✅ | data-model |
 | `FR-DATA-002` | P0 | 索引与数据发布到 R2 | `AC-DATA-002`：上传顺序为 thumbs → pack → manifest / insights → index；`validate:data --remote` 逐条可达（手工） | ✅ | deployment |
 | `FR-DATA-003` | P0 | 每日增量抓取与发布 | `AC-DATA-003`：`daily-update.ts` 先做频道差集；安静日不恢复、不发布；失败开 issue（手工 / Actions 日志） | ✅ | deployment |
-| `FR-DATA-004` | P1 | 数据更新后刷新静态 SEO 产物 | `AC-DATA-004`：新场次出现在 sitemap 与静态 head；当前需完整构建，尚未自动触发 | 📋 | ssg-research |
-| `FR-SEO-001` | P0 | 每页输出 metadata 与 sitemap | `AC-SEO-001`：构建期生成每路由 HTML、`sitemap.xml`、`robots.txt`；`bun run verify:seo` 通过 | ✅ | architecture |
+| `FR-DATA-004` | P1 | 数据更新后刷新缓存与 SEO 产物 | `AC-DATA-004`：`POST /api/internal/cache/purge` 按 tag 失效；sitemap 请求期生成；线上缓存实测待做 | 🚧 | astro-ssr-migration |
+| `FR-SEO-001` | P0 | 每页输出 metadata 与 sitemap | `AC-SEO-001`：请求期输出 title / canonical / OG；`sitemap.xml`、`llms.txt`、`robots.txt` 可访问 | ✅ | architecture |
 | `FR-SEO-002` | P1 | 新场次的静态分享卡片及时更新 | `AC-SEO-002`：新场次发布后，静态 head 与 sitemap 在可接受时间内更新；当前要等下一次构建 | 📋 | ssg-research |
 | `FR-A11Y-001` | P1 | 键盘与可访问性 | `AC-A11Y-001`：焦点可见；图标按钮有可访问名称；图表有 `aria-label`；首页 / 场次 / 单场 / 对比 axe 0 violations（手工） | ✅ | roadmap |
 | `FR-THEME-001` | P0 | 深浅色主题且首屏无闪烁 | `AC-THEME-001`：切换后刷新，`<html>` 类在首屏即为正确值；图表与界面同时适配（手工） | ✅ | README |
 | `FR-KEY-001` | P1 | 快捷键 | `AC-KEY-001`：`j` / `k` 翻场、`1`–`5` 切页、`/` 聚焦搜索、`⌘K` 搜索、`⌘B` 收起侧栏；输入框内不触发（手工） | ✅ | README |
 | `FR-MOBILE-001` | P1 | 移动端可用 | `AC-MOBILE-001`：390 / 320px 无横向溢出；底部标签栏可用；表格自身滚动（手工） | ✅ | README |
-| `FR-AGENT-001` | P2 | 单场 Markdown 视图 | `AC-AGENT-001`：`/{datasetId}/stream/{videoId}.md` 返回 `text/markdown`；frontmatter 含标题 / 日期 / 成员；包含概览、部分指标与逐字稿；未知 id 返回 404（手工） | 📋 | astro-ssr-migration |
-| `FR-ARCH-001` | P1 | Astro + PostgreSQL + Workers 迁移 | `AC-ARCH-001`：方案文档完成；PoC 通过数据库读取、SSR、缓存与 `.md` 端点验收；切换后旧 URL 与 SEO 保持（手工） | 📋 | astro-ssr-migration |
+| `FR-AGENT-001` | P2 | 单场 Markdown 视图 | `AC-AGENT-001`：`/{datasetId}/stream/{videoId}.md` 返回 `text/markdown`；frontmatter 含标题 / 日期 / 成员；包含概览、部分指标与逐字稿；未知 id 返回 404 | ✅ | astro-ssr-migration |
+| `FR-ARCH-001` | P1 | Astro + PostgreSQL + Workers 迁移 | `AC-ARCH-001`：全部页面 SSR + 数据库读取；`.md`、sitemap、purge 已实现；全量 ingest 与线上部署待做 | 🚧 | astro-ssr-migration |
 | `FR-OPS-001` | P1 | 定时任务与失败通知 | `AC-OPS-001`：`.github/workflows/data.yml` 按 cron 运行；失败开 issue；手动 `workflow_dispatch` 可附加 `--force` | ✅ | deployment |
-| `FR-BUILD-001` | P0 | 验证门禁 | `AC-BUILD-001`：`bun run check`、`bun run build`、`bun run validate:data`、`bun run verify:seo` 在干净环境通过 | ✅ | CONTRIBUTING |
+| `FR-BUILD-001` | P0 | 验证门禁 | `AC-BUILD-001`：`bun run check`、`bun run build`、`bun run db:verify`、`bun run test:smoke` 可运行 | ✅ | CONTRIBUTING |
 
 ## 非功能需求
 
@@ -94,8 +94,8 @@
 | `FR-COMPARE-001` | `src/components/dashboard/compare-view.tsx`、`multi-line-chart.tsx` | 对比 |
 | `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript-view.tsx`、`scripts/publish-transcripts.ts` | 逐字稿 |
 | `FR-DATA-*` | `scripts/publish-data.ts`、`scripts/daily-update.ts`、`scripts/lib/` | 数据链路 |
-| `FR-SEO-*` | `src/lib/seo.ts`、`scripts/generate-seo.ts`、`scripts/verify-seo.ts` | SEO |
-| `FR-AGENT-001` / `FR-ARCH-001` | `docs/planning/astro-ssr-migration.md` | 规划中，尚未实现 |
+| `FR-SEO-*` | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | SEO |
+| `FR-AGENT-001` / `FR-ARCH-001` | `src/pages/[datasetId]/stream/[videoId].md.ts`、`src/lib/agent-markdown.ts`、`src/db/queries/` | Agent 视图与数据库查询 |
 
 ## 变更记录
 

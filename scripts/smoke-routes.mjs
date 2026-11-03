@@ -1,398 +1,77 @@
-#!/usr/bin/env bun
 /**
- * 路由冒烟测试：用 agent-browser CLI 驱动真实浏览器，覆盖首页重定向、单场深链刷新、
- * 无效 id 兜底、对比 ?ids= 深链、前进后退五个场景。
- *
- * 只依赖 Node 内置模块；不负责起停服务器，可对 dev / preview / CI 任意 base URL 运行：
- *   bun scripts/smoke-routes.mjs --url http://localhost:5173
- *   BASE_URL=http://localhost:4173 bun scripts/smoke-routes.mjs
+ * Workerd / 线上路由冒烟。
+ * 用法：先 `bun run preview` 或 `bun run cf:preview`，再 `bun run test:smoke`。
+ * 可通过 `BASE_URL` 或 `--url <base>` 指向其他环境。
  */
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { get as httpGet } from "node:http";
-import { get as httpsGet } from "node:https";
-import { delimiter, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import process from 'node:process'
 
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const publicRoot = join(appRoot, "public");
-const DEFAULT_URL = "http://localhost:5173";
+const args = process.argv.slice(2)
+const urlIndex = args.indexOf('--url')
+const baseUrl = (
+  urlIndex >= 0 ? args[urlIndex + 1] : process.env.BASE_URL ?? 'http://localhost:4321'
+).replace(/\/+$/, '')
 
-function readJson(path) {
-  return JSON.parse(readFileSync(path, "utf8"));
+const routes = [
+  { path: '/', status: 200 },
+  { path: '/gallery', status: 200 },
+  { path: '/sitemap.xml', status: 200, type: 'xml' },
+  { path: '/llms.txt', status: 200 },
+  { path: '/robots.txt', status: 200 },
+  { path: '/nonoka', status: 200 },
+  { path: '/nonoka/streams', status: 200 },
+  { path: '/nonoka/trends', status: 200 },
+  { path: '/nonoka/gallery', status: 200 },
+  { path: '/nonoka/transcripts', status: 200 },
+  { path: '/nonoka/about', status: 200 },
+  { path: '/nonoka/compare', status: 200 },
+  { path: '/nonoka/overview', status: 302 },
+  { path: '/nonoka/table', status: 302 },
+  { path: '/nonoka/stream', status: 302 },
+  { path: '/nonoka/stream/nope', status: 404 },
+  { path: '/nope', status: 404 },
+  { path: '/nonoka/stream/nope.md', status: 404 },
+]
+
+let failures = 0
+
+for (const route of routes) {
+  const response = await fetch(`${baseUrl}${route.path}`, { redirect: 'manual' })
+  const type = response.headers.get('content-type') ?? ''
+  const statusOk = response.status === route.status
+  const typeOk = !route.type || type.includes(route.type)
+  if (!statusOk || !typeOk) {
+    failures += 1
+    console.error(`✗ ${route.path}: ${response.status}${typeOk ? '' : ` (content-type ${type})`}`)
+  }
+  else {
+    console.log(`✓ ${route.path}: ${response.status}`)
+  }
 }
 
-function fail(message) {
-  console.error(`✗ ${message}`);
-  process.exit(1);
-}
-
-function parseArgs(argv) {
-  let url = process.env.BASE_URL ?? DEFAULT_URL;
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === "--url") {
-      const next = argv[i + 1];
-      if (!next) fail("--url 需要一个地址");
-      url = next;
-      i += 1;
-    } else if (arg.startsWith("--url=")) {
-      url = arg.slice("--url=".length);
-    } else if (arg === "--help" || arg === "-h") {
-      console.log("用法: bun scripts/smoke-routes.mjs [--url http://localhost:5173]");
-      process.exit(0);
+// 从 llms.txt 里取一条 Markdown 链接，确认端点可用。
+const llms = await fetch(`${baseUrl}/llms.txt`)
+if (llms.ok) {
+  const text = await llms.text()
+  const markdownUrl = text.match(/https?:\/\/\S+\/stream\/[^\s]+\.md/)?.[0]
+  if (markdownUrl) {
+    // llms.txt 里是生产绝对地址；冒烟时换成当前 baseUrl 再请求。
+    const path = new URL(markdownUrl).pathname
+    const md = await fetch(`${baseUrl}${path}`)
+    const contentType = md.headers.get('content-type') ?? ''
+    if (!md.ok || !contentType.includes('text/markdown')) {
+      failures += 1
+      console.error(`✗ ${path}: ${md.status} (${contentType})`)
+    }
+    else {
+      console.log(`✓ ${path}: ${md.status} text/markdown`)
     }
   }
-  return { baseUrl: url.replace(/\/+$/, "") };
 }
 
-const { baseUrl } = parseArgs(process.argv.slice(2));
-
-function loadFixture() {
-  const index = readJson(join(publicRoot, "data", "index.json"));
-  const firstDataset = index.datasets?.[0];
-  if (!firstDataset?.id) fail("public/data/index.json 里没有 datasets");
-
-  const manifestPath = firstDataset.manifest
-    ? join(publicRoot, firstDataset.manifest)
-    : join(publicRoot, "data", firstDataset.id, "manifest.json");
-  if (!existsSync(manifestPath)) {
-    fail(`找不到 manifest：${manifestPath}（先运行 bun run sync:data）`);
-  }
-
-  const streams = readJson(manifestPath).streams ?? [];
-  if (streams.length === 0) fail(`manifest 里没有 streams：${manifestPath}`);
-
-  return {
-    datasetId: firstDataset.id,
-    videoId: streams[0].videoId,
-    streamTitle: streams[0].title ?? "",
-    compareIds: streams.slice(0, 2).map(stream => stream.videoId),
-    compareTitle: streams[0].title ?? "",
-  };
+if (failures > 0) {
+  console.error(`\n${failures} route(s) failed`)
+  process.exitCode = 1
 }
-
-const { datasetId, videoId, streamTitle, compareIds, compareTitle } = loadFixture();
-
-const streamUrl = `${baseUrl}/${datasetId}/stream/${videoId}`;
-const invalidUrl = `${baseUrl}/${datasetId}/stream/not-a-real-id`;
-const compareUrl = `${baseUrl}/${datasetId}/compare?ids=${compareIds.join(",")}`;
-const trendsUrl = `${baseUrl}/${datasetId}/trends`;
-/** 页面文本会把连续空白折叠成一个空格，等待文本前先对齐。 */
-function normalizeText(value) {
-  return String(value).replace(/\s+/g, " ").trim();
-}
-
-const streamMarker = normalizeText(streamTitle || videoId);
-const NOT_FOUND_TEXT = "找不到这场直播";
-const STREAMS_LINK = "场次";
-
-/**
- * Windows 上 npm 的全局包装是 .cmd，Bun 无法把含双引号的参数安全传进去，
- * 稳妥起见直接定位真正的 JS 入口并用 node.exe 运行（Unix 上直接用 agent-browser）。
- */
-function resolveCli() {
-  if (process.platform !== "win32") return { command: "agent-browser", prefix: [] };
-  for (const dir of (process.env.PATH ?? "").split(delimiter).filter(Boolean)) {
-    if (!existsSync(join(dir, "agent-browser.cmd"))) continue;
-    const bin = join(dir, "node_modules", "agent-browser", "bin", "agent-browser.js");
-    const nodeExe = join(dir, "node.exe");
-    if (existsSync(bin) && existsSync(nodeExe)) return { command: nodeExe, prefix: [bin] };
-  }
-  return { command: "agent-browser", prefix: [] };
-}
-
-const CLI = resolveCli();
-const session = `smoke-${process.pid}`;
-
-function sleep(ms) {
-  return new Promise(resolveSleep => setTimeout(resolveSleep, ms));
-}
-
-function cliArgs(args) {
-  return [...CLI.prefix, "--session", session, ...args];
-}
-
-function execCli(args, timeout) {
-  return execFileSync(CLI.command, cliArgs(args), {
-    encoding: "utf8",
-    timeout,
-    stdio: ["ignore", "pipe", "pipe"],
-    maxBuffer: 32 * 1024 * 1024,
-  }).trim();
-}
-
-function ab(args, timeout = 90_000) {
-  try {
-    return execCli(args, timeout);
-  } catch (error) {
-    const stderr = error.stderr ? String(error.stderr).trim() : "";
-    const stdout = error.stdout ? String(error.stdout).trim() : "";
-    const status = error.status ?? error.signal ?? error.code;
-    throw new Error(`agent-browser ${args.join(" ")} 失败（${status}）：${stderr || stdout || error.message}`);
-  }
-}
-
-function warmup() {
-  // 首次 open 会拉起浏览器守护进程，它继承子进程的 stderr 管道导致 execFileSync 挂住，
-  // 因此先用 stdio:ignore 无输出地预热一次；之后每条命令都能正常拿到输出。
-  const result = spawnSync(CLI.command, cliArgs(["open"]), { stdio: "ignore", timeout: 120_000 });
-  if (result.error && result.error.code === "ENOENT") throw result.error;
-}
-
-function parseValue(raw) {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-}
-
-const page = {
-  open: url => ab(["open", url]),
-  reload: () => ab(["reload"]),
-  back: () => ab(["back"]),
-  forward: () => ab(["forward"]),
-  url: () => ab(["get", "url"]),
-  waitLoad: () => ab(["wait", "--load", "networkidle"]),
-  waitText: text => ab(["wait", "--text", normalizeText(text)]),
-  text: (selector = "body") => ab(["get", "text", selector]),
-  clickLink: name => ab(["find", "role", "link", "click", "--name", name]),
-  eval: js => parseValue(ab(["eval", js])),
-  close: () => ab(["close"], 30_000),
-};
-
-async function pathname() {
-  return String((await page.eval("new URL(location.href).pathname")) ?? "");
-}
-
-async function metaContent(name) {
-  return String(
-    (await page.eval(`document.querySelector('meta[name="${name}"]')?.content ?? ''`)) ?? "",
-  );
-}
-
-async function bodyText() {
-  return page.text("body");
-}
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-async function waitFor(label, check, timeout = 20_000, interval = 250) {
-  const startedAt = Date.now();
-  let lastError = "";
-  for (;;) {
-    try {
-      const value = await check();
-      if (value) return value;
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-    }
-    if (Date.now() - startedAt > timeout) {
-      throw new Error(`${label} 超时（${timeout}ms）${lastError ? `：${lastError}` : ""}`);
-    }
-    await sleep(interval);
-  }
-}
-
-function probe(url, timeout = 5000) {
-  return new Promise(resolveProbe => {
-    const client = url.startsWith("https:") ? httpsGet : httpGet;
-    const req = client(url, res => {
-      res.resume();
-      resolveProbe({ ok: true, status: res.statusCode ?? 0 });
-    });
-    req.on("error", error => resolveProbe({ ok: false, error }));
-    req.setTimeout(timeout, () => {
-      req.destroy(new Error(`请求超时（${timeout}ms）`));
-    });
-  });
-}
-
-const scenarios = [
-  {
-    name: "组首页 /",
-    async run() {
-      await page.open(`${baseUrl}/`);
-      await page.waitLoad();
-      await page.waitText("全组");
-      const current = await pathname();
-      assert(current === "/", `期望 /，实际 ${current || "(空)"}`);
-      const title = String((await page.eval("document.title")) ?? "");
-      assert(title.includes("夢限大みゅーたいぷ"), `首页 title 不对：${title}`);
-    },
-  },
-  {
-    name: `单场深链刷新 ${streamUrl.replace(baseUrl, "")}`,
-    async run() {
-      await page.open(streamUrl);
-      await page.waitLoad();
-      await page.waitText(streamMarker);
-
-      const before = await pathname();
-      assert(before.includes(videoId), `路径里没有 ${videoId}：${before}`);
-
-      const text = await bodyText();
-      assert(text.includes(streamMarker), "单场页面没有渲染标题文本");
-      assert((await metaContent("robots")) === "index,follow", "单场页 robots 不是 index,follow");
-      const canonical = String((await page.eval(`document.querySelector('link[rel="canonical"]')?.href ?? ''`)));
-      assert(canonical.endsWith(`/${datasetId}/stream/${videoId}`), `canonical 不对：${canonical}`);
-
-      await page.reload();
-      await page.waitLoad();
-      await page.waitText(streamMarker);
-
-      const after = await pathname();
-      assert(after === before, `刷新后路径变了：${before} → ${after}`);
-      const reloadedText = await bodyText();
-      assert(reloadedText.includes(streamMarker), "刷新后单场内容消失");
-    },
-  },
-  {
-    name: `无效 id ${invalidUrl.replace(baseUrl, "")}`,
-    async run() {
-      await page.open(invalidUrl);
-      await page.waitLoad();
-      await page.waitText(NOT_FOUND_TEXT);
-      const text = await bodyText();
-      assert(text.includes(NOT_FOUND_TEXT), `页面缺少「${NOT_FOUND_TEXT}」`);
-      assert((await metaContent("robots")) === "noindex,follow", "无效单场页应 noindex");
-    },
-  },
-  {
-    name: `对比深链 ids=${compareIds.join(",")}`,
-    async run() {
-      await page.open(compareUrl);
-      await page.waitLoad();
-      await page.waitText(compareTitle);
-
-      const route = String((await page.eval("location.search")) ?? "");
-      const decoded = decodeURIComponent(route);
-      assert(decoded.includes("ids="), `URL 里没有 ids 参数：${route}`);
-      for (const id of compareIds) {
-        assert(decoded.includes(id), `URL 里没有 id ${id}：${route}`);
-      }
-
-      const text = await bodyText();
-      assert(text.includes(normalizeText(compareTitle)), "对比页面没有渲染所选场次");
-    },
-  },
-  {
-    name: `趋势深链 ${trendsUrl.replace(baseUrl, "")}`,
-    async run() {
-      await page.open(trendsUrl);
-      await page.waitLoad();
-      await page.waitText("内容类型对比");
-      const route = await pathname();
-      assert(route.endsWith("/trends"), `路径没有落在 /trends：${route}`);
-      const text = await bodyText();
-      assert(text.includes("月度趋势"), "趋势页没有渲染月度趋势");
-      assert(text.includes("内容类型对比"), "趋势页没有渲染内容类型对比");
-    },
-  },
-  {
-    name: "前进后退 单场 → 场次 → back → forward",
-    async run() {
-      await page.open(streamUrl);
-      await page.waitLoad();
-      await page.waitText(streamMarker);
-      const streamPath = await pathname();
-
-      await page.clickLink(STREAMS_LINK);
-      await waitFor("等待进入场次页", async () => {
-        const value = await pathname();
-        return value.endsWith("/streams") ? value : null;
-      });
-
-      await page.back();
-      await waitFor("等待 back 回到单场", async () => {
-        const value = await pathname();
-        return value === streamPath ? value : null;
-      });
-
-      await page.forward();
-      await waitFor("等待 forward 回到场次页", async () => {
-        const value = await pathname();
-        return value.endsWith("/streams") ? value : null;
-      });
-    },
-  },
-  {
-    name: "旧 hash 链接自动改写",
-    async run() {
-      await page.open(`${baseUrl}/#/${datasetId}/trends`);
-      await page.waitLoad();
-      await waitFor("等待 hash 改写为真实路径", async () => {
-        const value = await pathname();
-        return value.endsWith("/trends") ? value : null;
-      });
-      const current = await pathname();
-      assert(current === `/${datasetId}/trends`, `旧链接没有落地到 /${datasetId}/trends：${current}`);
-      assert(!(await page.url()).includes("#/"), "旧链接跳转后仍带 hash");
-    },
-  },
-];
-
-let closed = false;
-
-try {
-  try {
-    execCli(["--version"], 30_000);
-  } catch (error) {
-    fail(
-      `未找到可用的 agent-browser（${error instanceof Error ? error.message : String(error)}）。\n` +
-        "  安装：npm install -g agent-browser && agent-browser install\n" +
-        "  提示：请用 Bun 运行本脚本（bun scripts/smoke-routes.mjs）。",
-    );
-  }
-
-  const health = await probe(baseUrl);
-  if (!health.ok) {
-    const reason = health.error?.message || health.error?.code || "未知错误";
-    console.error(`✗ 无法访问 ${baseUrl}：${reason}`);
-    console.error(
-      "  本脚本不会自行起停服务器，请先启动一个（数据已在 public/data 里生成）：\n" +
-        "    bunx vite --port 5173 --strictPort\n" +
-        "    bunx vite preview --port 4173 --strictPort\n" +
-        "  再用 --url 或 BASE_URL 指向它。",
-    );
-    process.exit(1);
-  }
-
-  console.log(`smoke ${baseUrl} · dataset=${datasetId} · stream=${videoId} · session=${session}`);
-
-  try {
-    warmup();
-  } catch (error) {
-    fail(`无法启动浏览器：${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  let failed = 0;
-  for (const scenario of scenarios) {
-    try {
-      await scenario.run();
-      console.log(`✓ ${scenario.name}`);
-    } catch (error) {
-      failed += 1;
-      console.error(`✗ ${scenario.name}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  if (failed > 0) {
-    console.error(`\n${failed}/${scenarios.length} 个场景失败`);
-    process.exitCode = 1;
-  } else {
-    console.log(`\n${scenarios.length}/${scenarios.length} 个场景通过`);
-  }
-} finally {
-  if (!closed) {
-    closed = true;
-    try {
-      page.close();
-    } catch {
-      /* 浏览器可能从未成功启动 */
-    }
-  }
+else {
+  console.log('\nall routes ok')
 }

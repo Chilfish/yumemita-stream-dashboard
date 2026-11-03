@@ -49,16 +49,16 @@ data/
 # 单场：放进暂存区并更新本地 manifest
 bun run add:datapack nonoka /path/to/<videoId>.datapack.json
 
-# 从全部 pack 重建 index + manifest + insights，并增量上传到 R2
-bun run publish:data
+# 投影到 Neon PostgreSQL（增量；先 --limit 小批量验证）
+bun run db:ingest
+bun run db:verify
 
-# 生成 public/data/ 兜底快照并校验
-bun run sync:data
+# 旧链路：重建 index + manifest + insights，并增量上传到 R2
+bun run publish:data
 bun run validate:data
 ```
 
-页面运行时直接读对象存储，发布后刷新即可。`sync:data` 在配了 `VITE_DATAPACK_BASE` 时从远端拉
-index/manifest/insights（带本地缓存）写进 `public/data/`，没配时直接用这里的本地文件，离线也能开发。
+页面请求期查数据库；本地 pack 仍是唯一真源。R2 只保留封面、表情、逐字稿正文与原始 pack 归档。
 
 ## 不要放什么
 
