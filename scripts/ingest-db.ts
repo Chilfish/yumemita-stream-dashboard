@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { eq, sql } from 'drizzle-orm'
-import { basename, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
 import { isStopword } from '../src/lib/stopwords.ts'
@@ -17,6 +17,7 @@ import {
   streamDetails,
   streams,
   streamWords,
+  transcripts,
 } from '../src/db/schema.ts'
 import type { StreamDatapack } from '../src/types/datapack.ts'
 import { buildStreamSummary } from './lib/dataset-manifest.ts'
@@ -173,6 +174,77 @@ function collectWords(pack: StreamDatapack): { word: string, count: number }[] {
   return source
     .filter(entry => entry.count >= 3 && !isStopword(entry.word))
     .sort((a, b) => b.count - a.count)
+}
+
+function parseFrontmatter(raw: string): Record<string, string | string[]> {
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+  if (!match?.[1]) return {}
+  const result: Record<string, string | string[]> = {}
+  for (const line of match[1].split(/\r?\n/)) {
+    const separator = line.indexOf(':')
+    if (separator === -1) continue
+    const key = line.slice(0, separator).trim()
+    let value = line.slice(separator + 1).trim()
+    if (!key) continue
+    if (value.startsWith('[') && value.endsWith(']')) {
+      result[key] = value.slice(1, -1).split(',').map(item => item.trim()).filter(Boolean)
+      continue
+    }
+    if (
+      (value.startsWith('"') && value.endsWith('"'))
+      || (value.startsWith('\'') && value.endsWith('\''))
+    ) {
+      value = value.slice(1, -1)
+    }
+    result[key] = value
+  }
+  return result
+}
+
+async function syncTranscripts(
+  db: NonNullable<ReturnType<typeof createWriteDb>['db']>,
+  datasetId: string,
+): Promise<number> {
+  const dir = resolve('content', 'transcripts', datasetId)
+  if (!existsSync(dir)) return 0
+
+  let count = 0
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.md') || name.startsWith('_') || name.startsWith('.')) continue
+    const file = join(dir, name)
+    const raw = readFileSync(file, 'utf8')
+    const meta = parseFrontmatter(raw)
+    const videoId = typeof meta.videoId === 'string' && meta.videoId
+      ? meta.videoId
+      : basename(name, '.md')
+    const tags = Array.isArray(meta.tags) ? meta.tags : []
+    const dateValue = typeof meta.date === 'string' ? meta.date.slice(0, 10) : null
+
+    await db.insert(transcripts).values({
+      datasetId,
+      videoId,
+      r2Key: `${datasetId}/transcripts/${videoId}.json`,
+      title: typeof meta.title === 'string' ? meta.title : null,
+      date: dateValue && /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : null,
+      summary: typeof meta.summary === 'string' ? meta.summary : null,
+      tags,
+      contentHash: contentHash(raw),
+      updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: [transcripts.datasetId, transcripts.videoId],
+      set: {
+        r2Key: `${datasetId}/transcripts/${videoId}.json`,
+        title: typeof meta.title === 'string' ? meta.title : null,
+        date: dateValue && /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : null,
+        summary: typeof meta.summary === 'string' ? meta.summary : null,
+        tags,
+        contentHash: contentHash(raw),
+        updatedAt: new Date(),
+      },
+    })
+    count += 1
+  }
+  return count
 }
 
 function buildInsights(packs: { pack: StreamDatapack, rel: string }[]) {
@@ -347,6 +419,11 @@ async function main(): Promise<void> {
           set: { totals, aggregation: totals.aggregation ?? null, generatedAt: new Date() },
         })
         console.log(`[ingest] ${source.id}: insights 已更新（${all.length} 场）`)
+      }
+
+      const transcriptCount = await syncTranscripts(db, source.id)
+      if (transcriptCount > 0) {
+        console.log(`[ingest] ${source.id}: 逐字稿元数据 ${transcriptCount} 篇`)
       }
     }
 

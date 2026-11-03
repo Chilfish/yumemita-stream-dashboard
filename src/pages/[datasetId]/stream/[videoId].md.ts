@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro'
+import { env } from 'cloudflare:workers'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db/client'
 import { transcripts } from '@/db/schema'
@@ -18,13 +19,9 @@ interface R2BucketLike {
   get: (key: string) => Promise<R2Object | null>
 }
 
-async function readTranscriptBody(
-  locals: App.Locals,
-  key: string | null | undefined,
-): Promise<string | null> {
+async function readTranscriptBody(key: string | null | undefined): Promise<string | null> {
   if (!key) return null
-  const bucket = (locals as unknown as { runtime?: { env?: { R2?: R2BucketLike } } })
-    .runtime?.env?.R2
+  const bucket = (env as unknown as { R2?: R2BucketLike }).R2
   if (!bucket) return null
 
   try {
@@ -58,6 +55,25 @@ function notFound(): Response {
 }
 
 export const GET: APIRoute = async (context) => {
+  try {
+    return await handleGet(context)
+  }
+  catch (error) {
+    console.error('[md] failed', error)
+    const detail = import.meta.env.DEV && error instanceof Error
+      ? `\n\n${error.stack ?? error.message}`
+      : ''
+    return new Response(`# 500\n\nMarkdown 视图生成失败。${detail}\n`, {
+      status: 500,
+      headers: {
+        'content-type': 'text/markdown; charset=utf-8',
+        'cache-control': 'no-store',
+      },
+    })
+  }
+}
+
+async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
   const datasetId = context.params.datasetId
   const rawVideoId = context.params.videoId ?? ''
   const videoId = rawVideoId.replace(/\.md$/, '')
@@ -77,7 +93,7 @@ export const GET: APIRoute = async (context) => {
   ])
 
   const transcriptMeta = transcriptRows[0]
-  const transcript = await readTranscriptBody(context.locals, transcriptMeta?.r2Key)
+  const transcript = await readTranscriptBody(transcriptMeta?.r2Key)
 
   const origin = context.site?.origin ?? DEFAULT_SITE_URL
   const includeTranscript = context.url.searchParams.get('transcript') !== '0'
@@ -89,6 +105,7 @@ export const GET: APIRoute = async (context) => {
     summary,
     pack,
     transcript,
+    hasTranscript: Boolean(transcriptMeta),
     origin,
     includeTranscript,
     full,

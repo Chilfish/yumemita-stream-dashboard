@@ -8,6 +8,7 @@ export interface AgentMarkdownInput {
   summary: StreamSummary
   pack: StreamDatapack | null
   transcript: string | null
+  hasTranscript: boolean
   origin: string
   includeTranscript: boolean
   full: boolean
@@ -48,7 +49,17 @@ function money(amount: number | null | undefined): string {
 }
 
 export function renderStreamMarkdown(input: AgentMarkdownInput): string {
-  const { summary, pack, datasetId, datasetLabel, transcript, origin, includeTranscript, full } = input
+  const {
+    summary,
+    pack,
+    datasetId,
+    datasetLabel,
+    transcript,
+    hasTranscript,
+    origin,
+    includeTranscript,
+    full,
+  } = input
   const pageUrl = `${origin}/${datasetId}/stream/${summary.videoId}`
   const markdownUrl = `${pageUrl}.md`
   const image = summary.thumbnail ? `${origin}/${datasetId}/${summary.thumbnail}` : null
@@ -93,10 +104,12 @@ export function renderStreamMarkdown(input: AgentMarkdownInput): string {
   const tenMinute = pack?.chat.density.perTenMinute ?? []
   if (tenMinute.length > 0) {
     lines.push('## 时间轴', '', '| 区间 | 弹幕 | SC |', '| --- | ---: | ---: |')
+    const offsetLabel = (minutes: number) => {
+      const hours = Math.floor(minutes / 60)
+      return `${String(hours).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+    }
     for (const bucket of tenMinute) {
-      const start = Math.floor(bucket.offsetMin / 60)
-      const end = Math.floor((bucket.offsetMin + 10) / 60)
-      lines.push(`| ${String(start).padStart(2, '0')}:00–${String(end).padStart(2, '0')}:00 | ${num(bucket.messages)} | ${num(bucket.superchats)} |`)
+      lines.push(`| ${offsetLabel(bucket.offsetMin)}–${offsetLabel(bucket.offsetMin + 10)} | ${num(bucket.messages)} | ${num(bucket.superchats)} |`)
     }
     const peak = pack?.chat.density.peakMinute
     if (peak) {
@@ -164,6 +177,9 @@ export function renderStreamMarkdown(input: AgentMarkdownInput): string {
   }
   else if (transcript) {
     lines.push(transcript.trim(), '')
+  }
+  else if (hasTranscript) {
+    lines.push('逐字稿暂时不可用。', '')
   }
   else {
     lines.push('这场直播还没有逐字稿。', '')
