@@ -19,6 +19,7 @@ docs/
 │   ├── architecture.md
 │   ├── backlog.md
 │   ├── astro-ssr-migration.md
+│   ├── live-calendar.md
 │   ├── product-direction.md
 │   ├── ui-refactor.md
 │   └── ui-refactor-progress.md
@@ -65,6 +66,7 @@ docs/
 | 架构级变更 | [architecture.md](./planning/architecture.md) | 分层、数据流、路由与关键决策 |
 | 规划下一阶段 | [backlog.md](./planning/backlog.md) | 未决任务、优先级、前置条件 |
 | 迁移到 Astro / PostgreSQL | [astro-ssr-migration.md](./planning/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 目标架构、数据模型、`.md` 路由、缓存与发布 |
+| 规划 / 实现直播日历 | [live-calendar.md](./planning/live-calendar.md) | 未来场次、手工日程、月历与议程视图、缓存与验收 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
 | 本地开发 / 测试 | [development.md](./engineering/development.md) | 环境、脚本、D3、测试 |
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |

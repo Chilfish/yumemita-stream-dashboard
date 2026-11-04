@@ -8,6 +8,7 @@ planning/（规划与执行：怎么做、做到哪了）
   ├── architecture.md            ← 分层、数据流、路由、关键决策
   ├── backlog.md                 ← 任务清单与优先级
   ├── astro-ssr-migration.md     ← 当前阶段方案：Astro + Workers + PostgreSQL
+  ├── live-calendar.md           ← 直播日历：未来场次、手工日程与月历视图
   ├── product-direction.md       ← 产品方向与阶段计划
   ├── ui-refactor.md             ← UI 重构方案（已实施）
   └── ui-refactor-progress.md    ← UI 重构实施状态
@@ -20,6 +21,7 @@ planning/（规划与执行：怎么做、做到哪了）
 | [architecture.md](./architecture.md) | 当前 React Router + Vite 的分层、数据流、路由、状态与图表策略 | 任何架构级变更前 |
 | [backlog.md](./backlog.md) | 任务清单：未完成项、已完成历史、审查承接区 | 规划下一阶段任务 |
 | [astro-ssr-migration.md](./astro-ssr-migration.md) | Astro 7 + Cloudflare Workers + PostgreSQL + R2 迁移方案；SSR、数据模型、`.md` 路由、缓存与发布 | 规划或执行迁移 |
+| [live-calendar.md](./live-calendar.md) | 直播日历：`scheduled_streams`、手工日程、每日同步、月历与议程视图、缓存与验收 | 规划或实现日历页 |
 | [product-direction.md](./product-direction.md) | 封面、相册、逐字稿、组首页、推文联动的产品方向与阶段验收 | 规划产品迭代 |
 | [ui-refactor.md](./ui-refactor.md) | 信息架构、设计系统、coss ui 落地映射与迁移计划（已实施） | 改 UI 结构或设计系统前 |
 | [ui-refactor-progress.md](./ui-refactor-progress.md) | UI 重构的实施状态与文件归属 | 查看重构是否已完成 |

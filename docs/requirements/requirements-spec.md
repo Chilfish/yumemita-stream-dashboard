@@ -21,6 +21,7 @@
 
 - 组首页：近 7 天 / 本月脉冲、全组最新一场、最近更新、成员入口
 - 成员页：规模指标、最近一场、本月变化、更新日历、内容构成
+- 日历：全组与成员月历 / 议程，展示未来场次与状态；手工日程与每日自动同步
 - 场次页：搜索、内容类型筛选、排序、CSV 导出、URL 状态
 - 单场页：概览、时间轴、弹幕与词、付费、评论、逐字稿
 - 趋势页：月度趋势与明细、内容类型对比、典型节奏曲线、全期高频词与发言者
@@ -34,7 +35,7 @@
 
 **不做：**
 
-- 实时看板 / 直播中展示（归档侧可用 `fetch:live-chat` 采集等待室与直播中弹幕，页面仍只读已入库场次）
+- 实时看板 / 直播中数据（日历只显示预定与状态标记，不展示直播中指标；归档侧可用 `fetch:live-chat` 采集等待室与直播中弹幕，页面仍只读已入库场次）
 - 用户系统、评论发布、收藏
 - 逐字稿在线编辑器 / CMS（独立项目）
 - 内容正文的翻译或字幕编辑（归档 pipeline 职责）
@@ -48,6 +49,15 @@
 | `FR-HOME-001` | P0 | 组首页回答「最近谁播了」 | `AC-HOME-001`：`/` 展示近 7 天 / 本月脉冲、最新一场、最近更新与成员入口；单个成员加载失败不阻塞其余成员（手工） | ✅ | README / product-direction |
 | `FR-HOME-002` | P2 | 组首页展示成员出勤、成员对比与近 20 场趋势 | `AC-HOME-002`：`/` 展示近 100 天出勤日历（JST，按周分列、周一在上、每 4 周日期标签，颜色深浅 = 当天场次；窄屏按成员换行）、可切换场次 / 时长 / 弹幕 / SC / 平均同接的成员榜；最近更新可展开到 20 条并显示每分钟弹幕趋势；空值显示「—」；复用已加载的 group summary，不新增请求（单测 + 手工） | ✅ | 2026-11-04 讨论 |
 | `FR-MEMBER-001` | P0 | 成员首页提供近况与规模 | `AC-MEMBER-001`：`/:datasetId` 展示规模指标、最近一场、本月变化、更新日历；数据缺失时显示「—」或空状态（手工） | ✅ | README |
+| `FR-CAL-001` | P2 | 提供全组与成员日历页 | `AC-CAL-001`：`/calendar` 与 `/{datasetId}/calendar` 可访问；`?month=` / `?day=` / `?members=` / `?view=` 可分享并保持状态（手工） | ✅ | 2026-11-04 需求 |
+| `FR-CAL-002` | P2 | 展示未来场次与派生状态 | `AC-CAL-002`：未来场次来自 `scheduled_streams`；状态按 `now` 派生为预定 / 直播中 / 已结束 / 已取消 / 待补录；同 `video_id` 命中 `streams` 时显示已结束；不往 `streams` 写占位行（单测 + 手工） | ✅ | 2026-11-04 需求 |
+| `FR-CAL-003` | P2 | 手工维护日程 | `AC-CAL-003`：`content/schedule/<datasetId>.json` 经 `schedule:sync` 入库；重复同步幂等；删除文件条目会删除对应手工行；非法格式非 0 退出（脚本 + 手工） | ⏸️ 暂缓 | 2026-11-04 需求 |
+| `FR-CAL-004` | P2 | 每日任务自动同步未来场 | `AC-CAL-004`：`daily-update` 把 `is_upcoming` 场次 upsert 为 `source='youtube'`；重跑幂等；同步后 purge `schedule` tag（脚本 + 手工） | 🚧 已接入，未在真实频道验证 | 2026-11-04 需求 |
+| `FR-CAL-005` | P2 | 月历与议程视图 | `AC-CAL-005`：桌面月网格列出当天全部场次，格子随内容长高；移动默认议程；今天、选中日、非本月日期区分明确；390 / 320px 无横向溢出（手工） | ✅ | 2026-11-04 需求 |
+| `FR-CAL-006` | P2 | 会员限定日程展示 | `AC-CAL-006`：会限场次显示标题、时间、成员与锁标记；不显示派生指标；锁标记有可访问名称（手工） | ✅ | 2026-11-04 需求 |
+| `FR-CAL-007` | P3 | 日历与现有页面联动 | `AC-CAL-007`：组首页显示本周剩余场次并可跳转；成员首页与场次页有「接下来」入口；搜索面板可找到日历页（手工） | 🚧 侧栏与搜索面板已接 | 2026-11-04 需求 |
+| `FR-CAL-008` | P2 | 日历缓存与失效 | `AC-CAL-008`：两个日历路由 `maxAge: 60, swr: 300`；tag 含 `schedule`；日程同步与每日任务完成后 purge（手工 + 线上） | ✅ | 2026-11-04 需求 |
+| `FR-CAL-009` | P3 | 日历 ICS 订阅 | `AC-CAL-009`：`/calendar.ics` 与 `/{datasetId}/calendar.ics` 返回 `text/calendar`；只含未来 90 天且未取消的事件；会限事件标题前缀 `[会限]`（手工） | 📋 | 2026-11-04 需求 |
 | `FR-STREAM-001` | P0 | 场次列表可搜索、筛选、排序、导出 | `AC-STREAM-001`：`q` / `type` / `sort` / `dir` / `vstats` 写入 URL；刷新与前进后退保持状态；可导出 CSV（手工） | ✅ | README / architecture |
 | `FR-STREAM-002` | P0 | 单场页提供分段详情 | `AC-STREAM-002`：概览、时间轴、弹幕与词、付费、评论可切换；`?view=` 可分享；有稿时出现逐字稿分段（手工） | ✅ | README / ui-refactor |
 | `FR-TREND-001` | P1 | 趋势页提供月度与类型分析 | `AC-TREND-001`：`/:datasetId/trends` 展示月度趋势、月度明细、内容类型对比、典型节奏曲线、全期榜单（手工） | ✅ | README / roadmap |
@@ -88,6 +98,7 @@
 | 需求 | 实现位置 | 说明 |
 | --- | --- | --- |
 | `FR-HOME-001` / `FR-MEMBER-001` | `src/pages/`、`src/components/dashboard/group-*`、`member-home-view.tsx` | 组级与成员级页面 |
+| `FR-CAL-001`–`FR-CAL-009` | `src/pages/calendar.astro`、`src/pages/[datasetId]/calendar.astro`、`src/db/queries/calendar.ts`、`src/lib/calendar.ts`、`src/components/dashboard/calendar-view.tsx`、`scripts/lib/schedule-sync.ts` | 读取、月历 / 议程、自动同步已落地；手工维护与 ICS 暂缓，方案见 [live-calendar.md](../planning/live-calendar.md) |
 | `FR-STREAM-001` | `src/components/dashboard/streams-view.tsx`、`src/lib/table-params.ts` | 表格与 URL 状态 |
 | `FR-STREAM-002` | `src/components/dashboard/stream-detail-view.tsx` 等 | 单场分段 |
 | `FR-TREND-001` | `src/components/dashboard/trends-view.tsx`、`src/lib/aggregate.ts` | 聚合与图表 |
@@ -105,3 +116,5 @@
 | --- | --- | --- |
 | 2026-11-03 | 建立需求规格，登记首页、成员、场次、单场、趋势、相册、对比、逐字稿、数据、SEO、迁移等 FR | v1.0 |
 | 2026-11-04 | `FR-COMPARE-002` 组级全员对比上线；`FR-DATA-004` 线上实测通过；同步当前运行形态与数据链路表述 | v1.1 |
+| 2026-11-04 | 登记直播日历需求 `FR-CAL-001`–`FR-CAL-009`，方案见 [live-calendar.md](../planning/live-calendar.md)；明确「不做实时看板」仅指直播中指标 | v1.2 |
+| 2026-11-04 | 直播日历读取路径、月历 / 议程、自动同步与缓存落地；`FR-CAL-003` 手工维护按用户要求暂缓，`FR-CAL-009` ICS 未做 | v1.3 |
