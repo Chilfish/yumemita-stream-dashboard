@@ -3,12 +3,14 @@
  *
  * yt-dlp 的 `live_chat` 字幕只在直播结束后才有；等待室与直播中的弹幕只能走
  * `youtubei/v1/live_chat/get_live_chat`。本模块只做纯函数解析与外发请求所需常量，
- * 网络调用留给 `scripts/fetch-live-chat.ts`。
+ * 网络调用留给 `scripts/fetch-live-chat.ts` 与 `scripts/lib/live-chat-collect.ts`。
  *
  * 关键差异（与 `live-chat.ts` 的回放路径）：
  * - watch 页必须带浏览器 UA + `hl=en`，否则 YouTube 会回剥离版页面（没有 `liveChatRenderer`）。
  * - 等待室只给 `reloadContinuationData`，所以要按 reload → timed → invalidation → replay 的优先级取。
  * - `LIVE_STREAM_OFFLINE` 只是「播放器还不能播」，等待室弹幕此时已经可用，不能当终态。
+ * - 已结束的场次（`isReplay: true`）watch 页同样只给一个 `reloadContinuationData`，
+ *   拿它请求 `get_live_chat_replay` 即可从头翻完整个回放；续页在 `liveChatReplayContinuationData`。
  */
 import type { ChatEmoji, ChatItemWrapper, ChatRecord } from './live-chat.ts'
 import { readFileSync } from 'node:fs'
@@ -19,6 +21,10 @@ export const WATCH_URL = (videoId: string): string =>
 
 export const LIVE_CHAT_API_URL
   = 'https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?prettyPrint=false'
+
+/** 已结束直播的回放聊天。等待室 / 直播中的 token 打这个端点会 400。 */
+export const LIVE_CHAT_REPLAY_API_URL
+  = 'https://www.youtube.com/youtubei/v1/live_chat/get_live_chat_replay?prettyPrint=false'
 
 /**
  * 完整 Chrome UA + `hl=en`：徽章文案与现有 pack 的英文口径一致（`Member` / `New member`），
@@ -295,6 +301,29 @@ export function extractPollContinuation(payload: unknown): Continuation | null {
 }
 
 /**
+ * 回放响应 → 下一段 continuation。只认 `liveChatReplayContinuationData`：
+ * 同一页还会带 `playerSeekContinuationData`（用于跳到指定播放进度），
+ * 它不是「下一段」，拿来继续翻会重复取同一窗口。
+ * `waitMs` 是平台建议的下一段间隔（`timeUntilLastMessageMsec`），回放可以不等。
+ */
+export function extractReplayContinuation(
+  payload: unknown,
+): { token: string, waitMs: number | null } | null {
+  const continuation = asRecord(asRecord(payload)?.continuationContents)?.liveChatContinuation
+  for (const item of asArray(asRecord(continuation)?.continuations)) {
+    const data = asRecord(asRecord(item)?.liveChatReplayContinuationData)
+    const token = data?.continuation
+    if (typeof token === 'string' && token) {
+      const waitMs = typeof data?.timeUntilLastMessageMsec === 'number'
+        ? data.timeUntilLastMessageMsec
+        : null
+      return { token, waitMs }
+    }
+  }
+  return null
+}
+
+/**
  * 轮询间隔：取最后一条带 `timeoutMs` 的 continuation，夹取到 [minMs, maxMs]。
  * YouTube 在等待室与直播态给出的 timeout 不同，按平台建议走，避免被限流。
  */
@@ -383,22 +412,33 @@ export function extractChatItems(
 /**
  * Netscape cookie jar → `Cookie` 请求头。只保留 youtube / google 域，
  * 会员限定场次需要登录态。
+ *
+ * 手工请求 watch 页时建议只发 youtube.com 的 cookie：把 google.com 的
+ * `NID` / `SIDCC` 一起塞进 youtube.com 的请求头会触发降级页（没有
+ * `ytInitialData`），反而拿不到 `liveChatRenderer`。
  */
-export function netscapeCookieHeader(path: string): string | null {
+export function netscapeCookieHeader(
+  path: string,
+  options: { domains?: string[] } = {},
+): string | null {
+  const domains = options.domains ?? ['youtube.com', 'google.com']
   const pairs: string[] = []
   for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const trimmed = line.trim()
+    // `#HttpOnly_` 是前缀标记，不是注释；SID / __Secure-* 全是 HttpOnly，不能漏。
+    const trimmed = line.startsWith('#HttpOnly_')
+      ? line.slice('#HttpOnly_'.length).trim()
+      : line.trim()
     if (!trimmed || trimmed.startsWith('#'))
       continue
     const fields = trimmed.split('\t')
     if (fields.length < 7)
       continue
-    const domain = fields[0] ?? ''
+    const domain = (fields[0] ?? '').replace(/^\./, '')
     const name = fields[5]
     const value = fields[6]
     if (!name || !value)
       continue
-    if (!/(^|\.)(youtube\.com|google\.com)$/.test(domain))
+    if (!domains.some(item => domain === item || domain.endsWith(`.${item}`)))
       continue
     pairs.push(`${name}=${value}`)
   }

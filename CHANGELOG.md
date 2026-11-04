@@ -27,6 +27,7 @@
 - 五位成员都按频道顺序补齐历史场次（同名去重、保留正片）；当前 manifest 没有待抓场次。
 - 新增 [docs/data/data-progress.md](docs/data/data-progress.md)：五位成员的抓取进度、nonoka 批次记录、跳过判定、下一批候选。
 - 词频剔除英文虚词与寒暄词（`said` / `hi` / `the` …）：分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表；旧 pack 里残留的这类词在单场页与跨场聚合展示时也会过滤。
+- **归档弹幕改走 InnerTube 回放**：新增 `scripts/lib/live-chat-collect.ts`，用 watch 页 token 翻 `get_live_chat_replay`，消息 / 事件 / 频道表情与实时采集同一套字段；`fetch:danmaku` 新增 `--video` 与 `--engine`（默认 InnerTube，无回放时回退 yt-dlp），`fetch:live-chat` 对已结束场次自动抓完整回放。回放支持断点续跑，并与旧 yt-dlp jsonl 按 `rendererId` / 内容双键合并；被删除 / 封禁账号的历史消息只在 yt-dlp 字幕档里。
 
 ### 界面
 
@@ -68,6 +69,7 @@
 - **SEO**：路由从 hash 改为真实路径（`createBrowserRouter` + `basename`），旧 `#/...` 链接由 `index.html` 内联脚本改写；`vercel.json` 增加 SPA rewrite。新增 `src/lib/seo.ts`（`buildSeo` / `buildSitemap` 纯函数）与 `useSeo`，统一每页 title / description / canonical / OG / JSON-LD；`scripts/generate-seo.ts` 在构建时为组首页、全组相册、每位成员的 6 个栏目页与 1891 个单场页生成静态 head 和 `<noscript>` 摘要，并输出 `sitemap.xml` / `robots.txt`；`verify:seo` 进 CI。对比页与未知路径 noindex，canonical 丢弃 query。
 - **代理出口改为日本优先**：`mihomo-config.ts` 不再写死只留香港节点，按 `MIHOMO_REGION`（默认 `日本,香港`）挑选地区，工作流显式设 `日本,香港`。出口地区要跟 `YT_COOKIES` 的签发地区一致，日本 cookie 配香港出口正是这次 100% 撞 bot 检查的原因。
 - **`export-yt-cookies` 只导 YouTube**：新增 `--domains`（默认 `youtube.com,google.com`），浏览器 profile 里 bilibili / pixiv / tiktok 等站的会话不再被塞进 CI secret；导出体积从 28 KB 降到 8 KB。导出前会删掉旧文件，避免上次裁剪坏了导致 yt-dlp 拒绝读写。
+- **cookie 缓存统一到 `~/yt-cookies.txt`**：新增 `scripts/lib/yt-cookies.ts`，`fetch-streams` / `fetch-danmaku` / `fetch-live-chat` / `daily-update` / `backfill-owner-chats` 默认复用缓存，缺失时自动从 Firefox 导出；`--refresh-cookies` 强制刷新、`--no-cookies` 匿名、`--cookie-cache` 换路径。顺带修掉两处解析问题：`#HttpOnly_` 被当注释导致 SID 丢失；把 google.com cookie 发给 watch 页会触发没有 `ytInitialData` 的降级页，现只发 youtube.com。
 - **定时任务抗 bot 检查**：`data.yml` 增加 `bgutil-ytdlp-pot-provider` 插件 + 本地 `4416` 令牌容器，cookie 与 PO token 同时具备；新增 `Check YouTube access` 预检（出口 IP/地区、PO token 提供者、cookie 是否失效，读不到直接在报错处停下）。`fetch-streams` 不再吞掉元信息失败——bot 检查计入失败并触发 `Data update failed` issue，会员限定降级为跳过；同时去掉 `--no-warnings`，失败时能看到 cookie / PO token 的真实提示。
 
 - **封面管线**：新增 `fetch:thumbs`（`maxresdefault` → `mqdefault`、并发、重试、单张失败跳过），`publish:data` 按 thumbs → pack → manifest/insights → index 上传，沿用增量发布进度。

@@ -7,6 +7,7 @@ import {
   classifyWatchStatus,
   extractChatItems,
   extractPollContinuation,
+  extractReplayContinuation,
   extractWatchPage,
   netscapeCookieHeader,
   parseWatchStatus,
@@ -52,6 +53,25 @@ describe('continuation', () => {
         },
       },
     })).toEqual({ token: 'NEXT', kind: 'timed' })
+  })
+
+  it('回放只认 liveChatReplayContinuationData，不拿 playerSeek 当续页', () => {
+    const payload = {
+      continuationContents: {
+        liveChatContinuation: {
+          continuations: [
+            { playerSeekContinuationData: { continuation: 'SEEK' } },
+            { liveChatReplayContinuationData: { continuation: 'REPLAY', timeUntilLastMessageMsec: 5000 } },
+          ],
+        },
+      },
+    }
+    expect(extractReplayContinuation(payload)).toEqual({ token: 'REPLAY', waitMs: 5000 })
+    expect(extractReplayContinuation({
+      continuationContents: {
+        liveChatContinuation: { continuations: [{ playerSeekContinuationData: { continuation: 'SEEK' } }] },
+      },
+    })).toBeNull()
   })
 
   it('轮询间隔按 timeoutMs 夹取', () => {
@@ -408,6 +428,8 @@ describe('错误分类与 cookie', () => {
       '.example.com\tTRUE\t/\tTRUE\t0\tOTHER\tnope',
     ].join('\n'), 'utf8')
     expect(netscapeCookieHeader(path)).toBe('SID=secret; SAPISID=abc')
+    // 手工请求 watch 页只发 youtube.com，避免 google.com cookie 触发降级页。
+    expect(netscapeCookieHeader(path, { domains: ['youtube.com'] })).toBe('SID=secret')
     rmSync(dir, { recursive: true, force: true })
   })
 })

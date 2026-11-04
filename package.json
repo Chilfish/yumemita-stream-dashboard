@@ -39,6 +39,7 @@
     "verify:data": "bun scripts/verify-data.ts",
     "add:datapack": "bun scripts/add-datapack.mjs",
     "fetch:streams": "bun scripts/fetch-streams.ts",
+    "fetch:danmaku": "bun scripts/fetch-danmaku.ts",
     "fetch:thumbs": "bun scripts/fetch-thumbnails.ts",
     "fetch:emoji": "bun scripts/fetch-emoji.ts",
     "fetch:live-chat": "bun scripts/fetch-live-chat.ts",

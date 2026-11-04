@@ -15,8 +15,10 @@
  *   danmaku/emoji_<videoId>.json           本场出现过的频道表情
  *   work/live-chat-state.json              continuation / 计数 / 停止原因，可续跑
  *
- * 与回放的合并由 `fetch-streams` / `fetch-danmaku` 在抓到回放后自动完成
- * （`scripts/lib/danmaku-merge.ts`，按 `rendererId` 去重）。
+ * 直播结束后再加 `--video` 运行一次会自动改走 InnerTube 回放
+ * （`scripts/lib/live-chat-collect.ts`）：写 `danmaku_<videoId>.jsonl`、
+ * `events_<videoId>.jsonl` 与 `emoji_<videoId>.json`，并合并已有的实时采集。
+ * 加 `--once` 时只取一页，不会触发完整回放。
  *
  * 注意：默认跟随到直播结束（Ctrl-C 可随时停，状态会保存）。加 `--once` 只拉一页，
  * 适合定时任务或开播前先把等待室历史落盘。
@@ -27,6 +29,8 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { danmakuKey, loadDanmakuFile, writeDanmakuFile } from './lib/danmaku-merge.ts'
 import { loadEnvFiles } from './lib/env.ts'
+import { collectReplay, chatHeaders, datasetForVideo } from './lib/live-chat-collect.ts'
+import { resolveCookies } from './lib/yt-cookies.ts'
 import {
   classifyChatError,
   classifyWatchStatus,
@@ -36,10 +40,8 @@ import {
   hasApiError,
   LIVE_CHAT_API_URL,
   INNERTUBE_CONTEXT,
-  netscapeCookieHeader,
   pollDelayMs,
   WATCH_URL,
-  WEB_HEADERS,
   type WatchDisposition,
   type WatchPage,
   type WatchStatus,
@@ -88,7 +90,14 @@ const OPTIONS = {
   'max-hours': { type: 'string', default: '0' },
   'min-interval': { type: 'string', default: '1000' },
   'max-interval': { type: 'string', default: '15000' },
+  'page-delay': { type: 'string', default: '150' },
+  'max-pages': { type: 'string', default: '0' },
   once: { type: 'boolean' },
+  'no-replay': { type: 'boolean' },
+  'cookies-from-browser': { type: 'string', default: 'firefox' },
+  'cookie-cache': { type: 'string' },
+  'refresh-cookies': { type: 'boolean' },
+  'no-cookies': { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
 } as const
@@ -96,7 +105,7 @@ const OPTIONS = {
 const USAGE = `用法：bun scripts/fetch-live-chat.ts --video <id> [选项]
 
 开播前 / 直播中通过 InnerTube 采集弹幕，写 danmaku_live_<videoId>.jsonl。
-结束后由 fetch:streams / fetch:danmaku 抓回放并按消息 id 自动合并。
+直播已结束时自动改走 InnerTube 回放，写 danmaku_<videoId>.jsonl + events_<videoId>.jsonl。
 
 选项：
   --video <id>          单个视频 ID
@@ -105,10 +114,17 @@ const USAGE = `用法：bun scripts/fetch-live-chat.ts --video <id> [选项]
   --root <目录>         会话根目录（默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live）
   --cookie <字符串>     Cookie 请求头（会员限定需要）；也可用环境变量 YT_COOKIE
   --cookies <文件>      Netscape cookie jar（yt-dlp 导出的 cookies.txt）
+  --cookies-from-browser <b> 导出缓存时用哪个浏览器，默认 firefox
+  --cookie-cache <文件> cookie 缓存路径，默认 ~/yt-cookies.txt
+  --refresh-cookies     强制重新从浏览器导出 cookie
+  --no-cookies          不使用 cookie 缓存，以匿名状态抓取
   --max-hours <n>       最长跟随小时数，0 = 不限（默认 0）
   --min-interval <ms>   轮询间隔下限，默认 1000
   --max-interval <ms>   轮询间隔上限，默认 15000
-  --once                只取一页（等待室历史 / 定时任务），不进入跟随循环
+  --page-delay <ms>     回放每页间隔，默认 150
+  --max-pages <n>       回放最多翻多少页，0 = 不限
+  --once                只取一页（等待室历史 / 定时任务），不触发完整回放
+  --no-replay           已结束时只报告，不自动抓回放
   --dry-run             只打印统计，不写文件
   -h, --help            显示本帮助
 
@@ -139,10 +155,6 @@ function videoIdOf(raw: string): string | null {
     return trimmed
   const match = /(?:v=|youtu\.be\/|\/live\/)([A-Za-z0-9_-]{11})/.exec(trimmed)
   return match?.[1] ?? null
-}
-
-function buildHeaders(cookie: string | null): Record<string, string> {
-  return cookie ? { ...WEB_HEADERS, Cookie: cookie } : { ...WEB_HEADERS }
 }
 
 class ChatHttpError extends Error {
@@ -251,14 +263,49 @@ interface CollectOptions {
   dryRun: boolean
   maxHours: number
   datasetId: string | undefined
+  /** 已结束时自动抓完整回放；`--once` / `--no-replay` 关闭。 */
+  replay: boolean
+  pageDelayMs: number
+  maxPages: number
 }
 
 function log(line: string): void {
   console.log(`[live-chat] ${line}`)
 }
 
+/** 默认复用 `~/yt-cookies.txt`；缺失时从浏览器导出一次。 */
+async function resolveChatCookie(
+  videoId: string,
+  cli: {
+    cookie?: string
+    cookies?: string
+    browser?: string
+    cachePath?: string
+    refresh?: boolean
+    disable?: boolean
+  },
+): Promise<string | null> {
+  const resolved = await resolveCookies({
+    cookie: cli.cookie,
+    cookies: cli.cookies,
+    envCookie: process.env.YT_COOKIE,
+    browser: cli.browser,
+    cachePath: cli.cachePath,
+    refresh: cli.refresh,
+    disable: cli.disable,
+    url: `https://www.youtube.com/watch?v=${videoId}`,
+    appRoot: APP_ROOT,
+    log,
+  })
+  if (resolved.source === 'cache' && resolved.jarPath)
+    log(`cookie：复用缓存 ${resolved.jarPath}`)
+  else if (resolved.source === 'none' && resolved.note)
+    log(resolved.note)
+  return resolved.header
+}
+
 async function collectVideo(videoId: string, options: CollectOptions, sources: DatasetSource[]): Promise<void> {
-  const headers = buildHeaders(options.cookie)
+  const headers = chatHeaders(options.cookie)
 
   let watch: WatchPage | null = null
   let watchError: string | null = null
@@ -269,7 +316,17 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
     watchError = describe(error)
   }
 
-  const resolved = resolveDataset(sources, watch?.channelId ?? null, options.datasetId)
+  let resolved = resolveDataset(sources, watch?.channelId ?? null, options.datasetId)
+  if (!resolved.dataset && !options.datasetId) {
+    // 已结束 / 受限场次的 watch 页可能没有 videoDetails；用本地 pack 反查成员。
+    const guess = datasetForVideo(APP_ROOT, videoId)
+    if (guess) {
+      resolved = {
+        dataset: sources.find(source => source.id === guess.id) ?? null,
+        label: guess.label,
+      }
+    }
+  }
   if (options.datasetId && !resolved.dataset) {
     console.error(`[live-chat] data-sources.json 里没有 dataset：${options.datasetId}`)
     process.exitCode = 1
@@ -415,7 +472,34 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
   }
 
   if (disposition === 'ended') {
-    log(`${videoId} 直播已结束，实时采集跳过；回放由 fetch:streams / fetch:danmaku 处理`)
+    if (options.replay && !options.once) {
+      log(`${videoId} 直播已结束，改走 InnerTube 回放`)
+      state.stopReason = 'replay'
+      persist()
+      const replay = await collectReplay({
+        videoId,
+        session,
+        cookie: options.cookie,
+        pageDelayMs: options.pageDelayMs,
+        maxPages: options.maxPages,
+        dryRun: options.dryRun,
+        log,
+      })
+      state.stopReason = replay.status === 'done' ? 'replay' : `replay:${replay.status}`
+      state.lastError = replay.error ?? null
+      state.stored = replay.total
+      state.eventsStored = replay.events
+      state.duplicates = replay.duplicates
+      persist()
+      if (replay.status === 'done') {
+        log(`${videoId} 回放完成：${replay.total} 条消息、${replay.events} 个事件、${replay.emojis} 个表情 → ${replay.output}`)
+      }
+      else {
+        log(`${videoId} 回放未完成（${replay.status}）${replay.error ? `：${replay.error}` : ''}；重跑会从断点续翻`)
+      }
+      return
+    }
+    log(`${videoId} 直播已结束，实时采集跳过${options.once ? '（--once 不抓回放；去掉 --once 或先跑 fetch:danmaku）' : '（--no-replay）'}`)
     state.stopReason = 'ended'
     persist()
     return
@@ -670,10 +754,14 @@ async function main(): Promise<void> {
       writeFileSync(join(root, '.gitignore'), '*\n', 'utf8')
   }
 
-  const cookie = values.cookie
-    ?? (values.cookies ? netscapeCookieHeader(resolve(values.cookies)) : null)
-    ?? process.env.YT_COOKIE
-    ?? null
+  const cookie = await resolveChatCookie(ids[0]!, {
+    cookie: values.cookie,
+    cookies: values.cookies,
+    browser: values['cookies-from-browser'],
+    cachePath: values['cookie-cache'],
+    refresh: values['refresh-cookies'],
+    disable: values['no-cookies'],
+  })
 
   const options: CollectOptions = {
     root,
@@ -684,6 +772,9 @@ async function main(): Promise<void> {
     dryRun: Boolean(values['dry-run']),
     maxHours: Math.max(0, Number(values['max-hours']) || 0),
     datasetId: values.dataset,
+    replay: !values['no-replay'],
+    pageDelayMs: Math.max(0, Number(values['page-delay']) || 0),
+    maxPages: Math.max(0, Number(values['max-pages']) || 0),
   }
   if (options.maxInterval < options.minInterval) {
     console.error('[live-chat] --max-interval 不能小于 --min-interval')

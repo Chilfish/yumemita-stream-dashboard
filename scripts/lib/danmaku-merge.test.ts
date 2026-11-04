@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   danmakuKey,
+  danmakuKeys,
   loadDanmakuFile,
   mergeDanmakuFiles,
   mergeDanmakuRecords,
@@ -67,6 +68,34 @@ describe('mergeDanmakuRecords', () => {
     const { records, duplicates } = mergeDanmakuRecords([[a], [b]])
     expect(records).toHaveLength(1)
     expect(duplicates).toBe(1)
+  })
+
+  it('旧档没有 id、新回放有 id 时也能按内容键去重', () => {
+    const old = { ts: 10, msg: { timestampUs: '777', author: '@a', kind: 'text', text: 'hello' } }
+    const fresh = { ts: 10, rendererId: 'NEW1', msg: { timestampUs: '777', author: '@a', kind: 'text', text: 'hello' } }
+    const { records, duplicates } = mergeDanmakuRecords([[old], [fresh]])
+    expect(records).toHaveLength(1)
+    expect(records[0]).toBe(old)
+    expect(duplicates).toBe(1)
+  })
+
+  it('danmakuKeys 同时给出 id 与内容键', () => {
+    expect(danmakuKeys({
+      ts: 10,
+      rendererId: 'R1',
+      msg: { timestampUs: '777', author: '@a', kind: 'text', text: 'hello' },
+    })).toEqual([
+      'id:R1',
+      'raw:777||@a|text|hello|',
+    ])
+  })
+
+  it('同秒同作者同正文但 id 不同，不算重复', () => {
+    const a = { ts: 10, rendererId: 'A', msg: { author: '@a', kind: 'text', text: '' } }
+    const b = { ts: 10, rendererId: 'B', msg: { author: '@a', kind: 'text', text: '' } }
+    const { records, duplicates } = mergeDanmakuRecords([[a], [b]])
+    expect(records).toHaveLength(2)
+    expect(duplicates).toBe(0)
   })
 })
 

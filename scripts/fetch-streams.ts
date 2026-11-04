@@ -31,6 +31,7 @@ import { normalizeLiveChat } from './lib/live-chat.ts'
 import { mergeDanmakuFiles } from './lib/danmaku-merge.ts'
 import { readCredentials } from './lib/object-storage.ts'
 import { restoreDataset } from './lib/restore-datapacks.ts'
+import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
@@ -96,6 +97,9 @@ const OPTIONS = {
   limit: { type: 'string', default: '0' },
   cookies: { type: 'string' },
   'cookies-from-browser': { type: 'string', default: 'firefox' },
+  'cookie-cache': { type: 'string' },
+  'refresh-cookies': { type: 'boolean' },
+  'no-cookies': { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   'no-build': { type: 'boolean' },
   restore: { type: 'boolean' },
@@ -120,8 +124,11 @@ const USAGE = `用法：bun scripts/fetch-streams.ts --dataset <id> --root <会�
   --meta-concurrency <n>     元信息并发，默认 6
   --build-every <n>          每 n 场构建一次，默认 5；0 = 全部抓完再构建
   --limit <n>                本次最多处理 n 场（含元信息阶段），0 = 全部
-  --cookies <文件>           Netscape cookie jar；不传则用 --cookies-from-browser
-  --cookies-from-browser <b> 默认 firefox
+  --cookies <文件>           Netscape cookie jar；不传则复用 ~/yt-cookies.txt（缺失时从浏览器导出）
+  --cookies-from-browser <b> 导出缓存时用哪个浏览器，默认 firefox
+  --cookie-cache <文件>      cookie 缓存路径，默认 ~/yt-cookies.txt
+  --refresh-cookies          强制重新从浏览器导出 cookie
+  --no-cookies               不使用 cookie 缓存
   --dry-run                  只列出候选，不抓取
   --no-build                 只抓素材，不生成 datapack
   --restore                  从对象存储恢复 manifest 与缺失的 datapack 后再规划
@@ -336,9 +343,18 @@ async function main(): Promise<void> {
   const concurrency = Number(values.concurrency)
   const metaConcurrency = Number(values['meta-concurrency'])
   const buildEvery = Number(values['build-every'])
-  const cookieArgs = values.cookies
-    ? ['--cookies', resolve(values.cookies)]
-    : ['--cookies-from-browser', values['cookies-from-browser'] ?? 'firefox']
+  // cookie 默认复用 ~/yt-cookies.txt；缺失时从浏览器导出一次，所有 yt-dlp 调用共用。
+  const resolvedCookies = await resolveCookies({
+    cookies: values.cookies,
+    envCookie: process.env.YT_COOKIE,
+    browser: values['cookies-from-browser'],
+    cachePath: values['cookie-cache'],
+    refresh: values['refresh-cookies'],
+    disable: values['no-cookies'],
+    appRoot: APP_ROOT,
+    log: line => console.log(`[fetch:streams] ${line}`),
+  })
+  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: values['cookies-from-browser'] })
   // CI 里 GitHub runner 的出口 IP 更容易被 YouTube 的 bot 检查拦；
   // 配了 YTDLP_PROXY（mihomo）就让所有 yt-dlp 请求走代理，没配就直连。
   const proxy = process.env.YTDLP_PROXY

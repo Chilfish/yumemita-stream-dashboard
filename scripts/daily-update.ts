@@ -28,6 +28,7 @@ import { datasetInsights, streams } from '../src/db/schema.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 import { purgeCache } from './lib/purge.ts'
 import { planDataset, type ChannelEntry, type PlanStream } from './lib/update-plan.ts'
+import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
@@ -62,6 +63,9 @@ const OPTIONS = {
   concurrency: { type: 'string', default: '3' },
   cookies: { type: 'string' },
   'cookies-from-browser': { type: 'string', default: 'firefox' },
+  'cookie-cache': { type: 'string' },
+  'refresh-cookies': { type: 'boolean' },
+  'no-cookies': { type: 'boolean' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   'no-publish': { type: 'boolean' },
@@ -80,7 +84,10 @@ const USAGE = `用法：bun scripts/daily-update.ts [选项]
   --state-dir <目录>          进度/频道缓存（默认 <root>/.fetch-state）
   --concurrency <n>           抓取并发，默认 3
   --cookies <文件>            Netscape cookie jar；CI 用这个
-  --cookies-from-browser <b>  本地默认 firefox
+  --cookies-from-browser <b>  导出缓存时用哪个浏览器，默认 firefox
+  --cookie-cache <文件>       cookie 缓存路径，默认 ~/yt-cookies.txt
+  --refresh-cookies           强制重新从浏览器导出 cookie
+  --no-cookies                不使用 cookie 缓存
   --force                     额外重抓最近 ${FORCE_RECENT_HOURS} 小时结束的场次
   --dry-run                   只列候选，不抓取、不写库、不发布
   --no-publish                只写本地，不写库、不上传对象存储
@@ -296,9 +303,18 @@ async function main(): Promise<void> {
     console.error('[update] --concurrency 需要是 >= 1 的整数')
     process.exit(1)
   }
-  const cookieArgs = values.cookies
-    ? ['--cookies', resolve(values.cookies)]
-    : ['--cookies-from-browser', values['cookies-from-browser'] ?? 'firefox']
+  // cookie 默认复用 ~/yt-cookies.txt；缺失时从浏览器导出一次。
+  const resolvedCookies = await resolveCookies({
+    cookies: values.cookies,
+    envCookie: process.env.YT_COOKIE,
+    browser: values['cookies-from-browser'],
+    cachePath: values['cookie-cache'],
+    refresh: values['refresh-cookies'],
+    disable: values['no-cookies'],
+    appRoot: APP_ROOT,
+    log: line => console.log(`[update] ${line}`),
+  })
+  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: values['cookies-from-browser'] })
   const dryRun = Boolean(values['dry-run'])
   const noPublish = Boolean(values['no-publish'])
 

@@ -34,7 +34,7 @@
 | Agent 视图 | `src/lib/agent-markdown.ts`、`src/pages/[datasetId]/stream/[videoId].md.ts` | `text/markdown` + 逐字稿 |
 | 数据发布 | `scripts/publish-data.ts`、`scripts/publish-transcripts.ts` | `--assets-only`：thumbs / emoji / archive；逐字稿单独发 |
 | 每日增量 | `scripts/daily-update.ts`、`.github/workflows/data.yml` | 频道差集，安静日不发布 |
-| 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
+| 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-danmaku.ts`、`fetch-live-chat.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts` | 手写 Markdown，发布到 R2 |
 | 数据字段 / 口径 | `docs/data/data-model.md`、`src/types/` | 改字段同步文档与类型 |
 | 部署 / 缓存 | `docs/engineering/deployment.md`、`wrangler.jsonc`、`astro.config.mjs` | Cloudflare Workers + R2 |
