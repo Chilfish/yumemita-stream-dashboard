@@ -140,11 +140,11 @@ Get-Content "<root>/.fetch-state/fetch-progress.json"
 manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` 可关闭）：
 
 1. 先试 `DATAPACK_BASE` 公开地址，读 `archive/<id>/<videoId>.datapack.json`；
-2. 拉不到的 pack 再从 `R2_*` 凭据读（需要 `R2_BUCKET`，可选 `R2_PREFIX`）；
+2. 拉不到的 pack 再从 `R2_*` 凭据读（需要 `R2_BUCKET`，桶内无前缀）；
 3. 只下载本地缺失的 pack，已存在的不重复下载。
 
 恢复后再按正常的「已入库 + 已有素材」逻辑跳过。没有 manifest 时也可以列桶 `archive/` 前缀。
-公开地址要带桶内前缀，例如 `https://s3.example.com/stream-dashboard`。
+公开地址要指向新桶的公开域名，例如 `https://data.example.com`（对象在桶根，无公共前缀）。
 
 ## 每日增量更新
 
@@ -324,7 +324,7 @@ bun run publish:assets --dataset yuno                # 上传表情与封面 / a
 data/<datasetId>/emoji/<hash>.png        # 成员表情（gitignore）
 data/<datasetId>/emoji/index.json        # id → 名称，供旧 pack 渲染标签
 data/youtube/emoji/<hash>.png            # YouTube 全局表情（只存一份）
-<base>/emojis/<datasetId>/<hash>.png     # 对象存储（R2_PREFIX 之后）
+<base>/emojis/<datasetId>/<hash>.png     # 对象存储（桶根）
 <base>/emojis/<datasetId>/index.json     # 名称索引
 <base>/emojis/youtube/<hash>.png         # 全局表情
 ```
