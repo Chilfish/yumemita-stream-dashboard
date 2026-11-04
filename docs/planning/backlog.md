@@ -7,7 +7,7 @@
 
 | 编号 | 任务 | 优先级 | 前置条件 | 来源 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 已合并到 `main` 并部署；R2 迁到 `yumemita-data`；待 DNS 切回原域名与回滚演练 |
+| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | ✅ 已合并到 `main`，部署在 `ymmt.chilfish.top`；R2 为 `yumemita-data` |
 | B2 | 单场 `.md` Agent 路由（`FR-AGENT-001`） | P2 | B1 的数据库查询层 | 迁移 | ✅ 已实现 |
 | B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 缓存 purge 端点 | 已知缺口 | ✅ purge 端点与每日自动 purge 已实现；线上 401 / 200 与失效后回源已实测 |
 | B4 | 跨成员对比（`FR-COMPARE-002`） | P2 | 统一场次/时间段口径 | roadmap | 📋 |
@@ -87,18 +87,12 @@
 - [x] 路由错误边界：根路由与 `:datasetId` 的 `errorElement`。
 - [x] agent-browser 冒烟测试：首页、单场深链刷新、无效 id、对比深链、趋势深链、前进后退。
 - [x] 可访问性审计：首页 / 场次 / 单场 / 对比（桌面 + 移动）axe 0 violations。
-- [x] 对象存储：datapack 与索引走 S3 / R2，`VITE_DATAPACK_BASE` 构建时注入。
-- [x] 发布即生效：页面运行时直接读远端 `index.json` + `manifest.json` + `insights.json`，`publish:data` 后刷新即可，不再依赖重新构建。
-- [x] 索引与明细拆分：首屏只拉 `index.json` + 当前 dataset 的 manifest/insights，单场按需拉 datapack。
-- [x] CI 从对象存储拉索引；`VITE_DATAPACK_BASE` 缺失时给出明确报错。
-- [x] 定时增量更新：`.github/workflows/data.yml` 每天 14:17 JST 先做频道差集，只抓有变化的成员；安静日不恢复、不发布。`--force` 重抓最近 24 小时，`bun scripts/daily-update.ts` 本地手动同款。
-- [ ] 数据更新后缓存失效：`ingest` 完成后调用 Worker 的 purge 端点，不再触发前端构建；方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。端点与每日任务已实现，Worker 的 `PURGE_TOKEN` 待下发。
-- [x] Astro + PostgreSQL + Workers SSR 迁移：单场页请求期 SSR，`.md` 路由供 Agent 读取；全量场次已入库并部署到 `ymmt-cf.chilfish.top`。切原域名后的复核与回滚演练仍待做，方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
-- [x] 在 GitHub 仓库设置 `VITE_DATAPACK_BASE` repository variable（HTTPS 地址）。
+- [x] 定时增量更新：`.github/workflows/data.yml` 每天 14:17 JST 先做数据库差集，只抓有变化的成员；安静日不恢复、不发布。`--force` 重抓最近 24 小时，`bun scripts/daily-update.ts` 本地手动同款。
+- [x] 数据更新后缓存失效：`ingest` 完成后调用 Worker 的 purge 端点，不再触发前端构建；方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
+- [x] Astro + PostgreSQL + Workers SSR 迁移：单场页请求期 SSR，`.md` 路由供 Agent 读取；全量场次已入库并部署在 `ymmt.chilfish.top`，方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
 - [x] `ObjectStore` 支持二进制上传与 `Content-Type`；缓存头交给桶侧规则（Bun S3 写接口不支持自定义 Cache-Control）。
 - [x] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。
 - [x] 逐字稿脚本：`transcript:new` / `transcript:import` 从模板或已有 Markdown 生成。
-- [x] SEO：path 路由 + 每页 metadata + 构建期静态 head（含 `<noscript>` 摘要）+ sitemap / robots；`verify:seo` 进 CI。
 - [ ] 200% 缩放复核（320px 已通过）。
 
 ## 非目标

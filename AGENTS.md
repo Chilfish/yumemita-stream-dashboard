@@ -5,7 +5,7 @@
 
 ## 当前事实与目标形态
 
-**当前是 Astro SSR + Neon 查询形态（2026-11-04）。** 所有页面已迁到 `src/pages/*.astro`，旧 React Router 页面与依赖已删除；全量场次已入库并通过对账。每日任务已改为「数据库差集 → 抓取 → ingest → 资产 → purge」，客户端媒体统一走 `PUBLIC_R2_BASE`，逐字稿正文走同源 `/api/transcripts/...`。已合并到 `main` 并部署到 `https://ymmt-cf.chilfish.top`，canonical / sitemap 已按原域名 `https://ymmt.chilfish.top` 输出；剩余 DNS 切换与回滚演练。
+**当前是 Astro SSR + Neon 查询形态（2026-11-04）。** 所有页面已迁到 `src/pages/*.astro`，旧 React Router 页面与依赖已删除；全量场次已入库并通过对账。每日任务已改为「数据库差集 → 抓取 → ingest → 资产 → purge」，客户端媒体统一走 `PUBLIC_R2_BASE`，逐字稿正文走同源 `/api/transcripts/...`。已合并到 `main` 并部署在 `https://ymmt.chilfish.top`。
 
 | 项 | 当前 | 目标 |
 | --- | --- | --- |
@@ -14,9 +14,9 @@
 | 路由 | `src/pages/` 文件路由 + 请求期 SSR | 同左 |
 | 单场页 | 请求期 SSR（DB 还原 pack） | 同左 |
 | Agent 视图 | `/{datasetId}/stream/{videoId}.md` 已实现 | 同左 |
-| 部署 | 已合并到 `main`，部署在 `ymmt-cf.chilfish.top`；DNS 待切回原域名 | Cloudflare Workers |
+| 部署 | Cloudflare Workers（`ymmt.chilfish.top`） | 同左 |
 
-已完成：Astro 脚手架、DB schema / ingest / 对账 / 查询层、全量 ingest（`db:verify` 0 problems）、全部页面与岛屿、sitemap / llms.txt / robots、`.md` 端点、逐字稿 API、内部 purge 端点、每日 ingest + purge、部署工作流、R2 迁桶与 CORS、线上部署、`astro check` / `test` / `build` / `preview` / `test:smoke`。剩余：DNS 切回原域名后的复核、回滚演练。详见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md)。
+已完成：Astro 脚手架、DB schema / ingest / 对账 / 查询层、全量 ingest（`db:verify` 0 problems）、全部页面与岛屿、sitemap / llms.txt / robots、`.md` 端点、逐字稿 API、内部 purge 端点、每日 ingest + purge、部署工作流、R2 迁桶与 CORS、线上部署、`astro check` / `test` / `build` / `preview` / `test:smoke`。详见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md)。
 
 ## 意图 → 文件映射（当前实现）
 

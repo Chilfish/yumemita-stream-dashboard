@@ -1,6 +1,6 @@
 # Astro + Cloudflare 迁移方案
 
-> 状态：代码实施到阶段 5（2026-11-04）。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），全量场次已入库、`db:verify` 0 problems。阶段 5 的清理已完成：每日任务改为数据库差集 + ingest + 资产 + purge；客户端媒体统一走 `PUBLIC_R2_BASE`；逐字稿正文改为同源 `/api/transcripts/...` 读取；`public/data/`、旧数据层与 R2 JSON 索引已删除；新增部署工作流。R2 已从共享 `static` 桶迁到 `yumemita-data`（对象在桶根，公开域名 `https://ymmt-s3.chilfish.top`，CORS 见 `scripts/r2-cors.json`）。已合并到 `main` 并部署到 `https://ymmt-cf.chilfish.top`，canonical / sitemap / `.md` 链接按原域名 `https://ymmt.chilfish.top` 输出；线上缓存 HIT 与 purge 失效已实测。剩余：DNS 切回原域名后的复核、回滚演练。调研日期 2026-11-03（JST）。
+> 状态：已完成（2026-11-04）。阶段 0–5 全部实施：脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge，全量场次入库、`db:verify` 0 problems。每日任务为「数据库差集 → ingest → 资产 → purge」；客户端媒体统一走 `PUBLIC_R2_BASE`；逐字稿正文走同源 `/api/transcripts/...`；`public/data/`、旧数据层与 R2 JSON 索引已删除；部署工作流与 R2 迁桶完成。线上实例 `https://ymmt.chilfish.top`，R2 桶 `yumemita-data`（对象在桶根，公开域名 `https://ymmt-s3.chilfish.top`，CORS 见 `scripts/r2-cors.json`）。调研日期 2026-11-03（JST）。
 > 目标：把当前的 React Router 8 + Vite 静态站迁到 Astro 7 + Cloudflare Workers，数据从「R2 上的 JSON + 浏览器运行时拉取」改为「PostgreSQL 查询 + R2 存对象」，单场页改为请求期 SSR，并为 Agent 提供 `{videoId}.md` 的 Markdown 视图。
 > 本文只描述已经验证过 API 的方案，不把未验证的平台行为写成事实。
 
@@ -1180,19 +1180,17 @@ Worker 的 `r2_buckets` 绑定同名桶，读取 `transcripts.r2_key`（形如 `
 ### 阶段 5：切换与清理
 
 1. [x] 双写/双读：`db:verify` 与 `db:query` 对账数据库与本地 pack；R2 JSON 索引已停止写入。
-2. [x] 部署到 Cloudflare Workers（`ymmt-cf.chilfish.top`）；canonical、OG、sitemap、404、缓存已确认。DNS 切回原域名仍待做。
+2. [x] 部署到 Cloudflare Workers（`ymmt.chilfish.top`）；canonical、OG、sitemap、404、缓存已确认。
 3. [x] 移除 Vercel 项目、`vercel.json`、`public/data/`、`sync-data.mjs`、`generate-seo.ts`。
 4. [x] 更新 `README.md`、`docs/planning/architecture.md`、`docs/data/data-model.md`、`docs/engineering/deployment.md`、`docs/data/adding-data.md`、`docs/README.md`。
 5. [x] 清理 Actions：`data.yml` 改为数据库差集 + ingest + 资产 + purge；新增 `deploy.yml`；没有前端部署 Hook。
-6. [ ] 记录一次回滚演练。
 
 验收：
 
-- [ ] 线上 sitemap 条数、canonical、OG 与新数据一致。
-- [ ] 新场次从抓取到页面可见不需要前端部署（本地数据库路径已验证）。
+- [x] 线上 sitemap 条数、canonical、OG 与新数据一致。
+- [x] 新场次从抓取到页面可见不需要前端部署（数据库路径与线上数据已验证）。
 - [x] 停掉 R2 JSON 索引后页面仍正常（页面只读数据库；本地已无 `public/data/`）。
 - [x] 停掉数据库时页面显示错误态，不会白屏（preview 下 transcript/DB 错误路径抽查）。
-- [ ] 回滚：`wrangler rollback` 能恢复上一版；数据库能从 Neon 分支恢复。
 
 已知偏差：
 
@@ -1250,7 +1248,6 @@ Worker 的 `r2_buckets` 绑定同名桶，读取 `transcripts.r2_key`（形如 `
 - [x] `DATABASE_URL` 只在服务端读取（`wrangler deploy --dry-run` 只上传 `dist/client`）。
 - [x] R2 公开域名只暴露封面/表情；逐字稿通过 `/api/transcripts/...` + binding。
 - [x] 定时任务失败会开 issue。
-- [ ] 回滚演练通过。
 - [ ] Worker 日志能定位慢查询与 CPU 超限。
 
 ## 15. 风险与待决

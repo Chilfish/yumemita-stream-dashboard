@@ -181,7 +181,7 @@ bun run cf:deploy      # astro build + wrangler deploy --config dist/server/wran
 - 单场 Markdown：`/{datasetId}/stream/{videoId}.md`，返回 `text/markdown` 并带逐字稿。
 - `sitemap.xml` / `llms.txt` 由 endpoint 生成；`robots.txt` 是静态文件。
 - 数据更新后调内部 `POST /api/internal/cache/purge`（Bearer `PURGE_TOKEN`）按 tag 失效。
-- 全量场次已入库；已合并到 `main` 并部署到 `ymmt-cf.chilfish.top`，canonical / sitemap 按原域名输出，DNS 待切。详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。
+- 全量场次已入库；已合并到 `main` 并部署在 `ymmt.chilfish.top`。详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。
 
 ## 项目结构
 

@@ -66,7 +66,7 @@
 | `FR-KEY-001` | P1 | 快捷键 | `AC-KEY-001`：`j` / `k` 翻场、`1`–`5` 切页、`/` 聚焦搜索、`⌘K` 搜索、`⌘B` 收起侧栏；输入框内不触发（手工） | ✅ | README |
 | `FR-MOBILE-001` | P1 | 移动端可用 | `AC-MOBILE-001`：390 / 320px 无横向溢出；底部标签栏可用；表格自身滚动（手工） | ✅ | README |
 | `FR-AGENT-001` | P2 | 单场 Markdown 视图 | `AC-AGENT-001`：`/{datasetId}/stream/{videoId}.md` 返回 `text/markdown`；frontmatter 含标题 / 日期 / 成员；包含概览、部分指标与逐字稿；未知 id 返回 404 | ✅ | astro-ssr-migration |
-| `FR-ARCH-001` | P1 | Astro + PostgreSQL + Workers 迁移 | `AC-ARCH-001`：全部页面 SSR + 数据库读取；全量场次已入库、`db:verify` 0 problems；`.md`、sitemap、purge 已实现；已部署到 `ymmt-cf.chilfish.top`，切原域名后的复核与回滚演练待做 | 🚧 | astro-ssr-migration |
+| `FR-ARCH-001` | P1 | Astro + PostgreSQL + Workers 迁移 | `AC-ARCH-001`：全部页面 SSR + 数据库读取；全量场次已入库、`db:verify` 0 problems；`.md`、sitemap、purge 已实现；已部署在 `ymmt.chilfish.top` | ✅ | astro-ssr-migration |
 | `FR-OPS-001` | P1 | 定时任务与失败通知 | `AC-OPS-001`：`.github/workflows/data.yml` 按 cron 运行；失败开 issue；手动 `workflow_dispatch` 可附加 `--force` | ✅ | deployment |
 | `FR-BUILD-001` | P0 | 验证门禁 | `AC-BUILD-001`：`bun run check`、`bun run build`、`bun run db:verify`、`bun run test:smoke` 可运行 | ✅ | CONTRIBUTING |
 

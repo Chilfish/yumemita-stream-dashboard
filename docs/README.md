@@ -2,7 +2,7 @@
 
 > **本文档是项目文档的唯一入口。** 处理任务前先读本页，再按「按任务导航」读取对应文档，不要一次性全读。
 >
-> 当前是 **Astro 7 + Cloudflare Workers + Neon PostgreSQL** 形态：全部页面请求期查库，`.md`、sitemap、llms、purge 端点已实现。已合并到 `main` 并部署到 `ymmt-cf.chilfish.top`，canonical / sitemap 按原域名输出；剩余 DNS 切换与回滚演练。方案与剩余项见 [planning/astro-ssr-migration.md](./planning/astro-ssr-migration.md)。
+> 当前是 **Astro 7 + Cloudflare Workers + Neon PostgreSQL** 形态：全部页面请求期查库，`.md`、sitemap、llms、purge 端点已实现。已合并到 `main` 并部署在 `ymmt.chilfish.top`。方案与实现说明见 [planning/astro-ssr-migration.md](./planning/astro-ssr-migration.md)。
 
 ## 一、文档目录
 
