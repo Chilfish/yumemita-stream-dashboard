@@ -150,4 +150,25 @@ describe('normalizeLiveChat', () => {
       },
     ])
   })
+
+  it('does not drop emoji assets already collected from live chat', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'live-chat-merge-'))
+    const input = join(dir, 'merge.live_chat.json')
+    const output = join(dir, 'danmaku_merge.jsonl')
+    writeFileSync(input, fixture.join('\n'), 'utf8')
+    writeFileSync(join(dir, 'emoji_merge.json'), JSON.stringify({
+      schema: 'yumemita.chat-emoji/v1',
+      emojis: [{ id: 'UC99kOG6_9RD0mR3OG4EOfxw/preRoll', name: 'preRoll', url: 'https://example/pre.png' }],
+    }), 'utf8')
+
+    await normalizeLiveChat(input, output, 'merge')
+
+    const sidecar = JSON.parse(readFileSync(join(dir, 'emoji_merge.json'), 'utf8')) as {
+      emojis: { id: string }[]
+    }
+    expect(sidecar.emojis.map(emoji => emoji.id)).toEqual([
+      'UC99kOG6_9RD0mR3OG4EOfxw/54y5aNPZFd-QoPwPxrGNqQk',
+      'UC99kOG6_9RD0mR3OG4EOfxw/preRoll',
+    ])
+  })
 })

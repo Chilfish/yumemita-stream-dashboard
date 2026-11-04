@@ -53,7 +53,7 @@ interface Run {
   emoji?: RawEmoji
 }
 
-interface ChatItemWrapper {
+export interface ChatItemWrapper {
   liveChatTextMessageRenderer?: Renderer
   liveChatPaidMessageRenderer?: Renderer
   liveChatPaidStickerRenderer?: Renderer
@@ -70,6 +70,11 @@ export interface ChatRecord {
   seq: number
   video: string
   ts: number
+  /**
+   * 聊天项 id（`renderer.id`）。实时采集与回放是同一条消息时 id 相同，
+   * 合并两份 jsonl 时用它去重；旧档或结构变化时可能缺失。
+   */
+  rendererId?: string
   msg: {
     author?: string
     /** 稳定的频道 ID（`authorExternalChannelId`）；显示名会改、会重名，重叠分析要用它。 */
@@ -152,7 +157,7 @@ function toEmojiAsset(emoji: RawEmoji): ChatEmoji | null {
   return { id, name: label || shortcut || null, url }
 }
 
-function toRecord(
+export function toRecord(
   item: ChatItemWrapper | undefined,
   videoId: string,
   seq: number,
@@ -235,6 +240,9 @@ function toRecord(
     msg.badges = badges
 
   const record: ChatRecord = { seq, video: videoId, ts: 0, msg }
+  const rendererId = (renderer as unknown as { id?: unknown }).id
+  if (typeof rendererId === 'string' && rendererId)
+    record.rendererId = rendererId
   if (timestampUs) {
     const seconds = Number(timestampUs) / 1_000_000
     if (Number.isFinite(seconds))
@@ -300,7 +308,7 @@ export async function normalizeLiveChat(
     stream.end((error?: Error | null) => (error ? fail(error) : done()))
   })
 
-  writeEmojiSidecar(output, videoId, emojis)
+  mergeEmojiSidecar(output, videoId, emojis)
 
   return {
     total: Object.values(counts).reduce((sum, n) => sum + n, 0),
@@ -315,7 +323,7 @@ export async function normalizeLiveChat(
  * `emoji_<videoId>.json`：id → 图片地址 + 名称，供 `stream-datapack` 写进 pack、
  * `fetch:emoji` 镜像到对象存储。没有表情时删掉旧文件，避免重跑后留下过期的表。
  */
-function writeEmojiSidecar(output: string, videoId: string, emojis: Map<string, ChatEmoji>): void {
+export function writeEmojiSidecar(output: string, videoId: string, emojis: Map<string, ChatEmoji>): void {
   const path = join(dirname(output), `emoji_${videoId}.json`)
   if (emojis.size === 0) {
     if (existsSync(path))
@@ -327,6 +335,27 @@ function writeEmojiSidecar(output: string, videoId: string, emojis: Map<string, 
     emojis: [...emojis.values()].sort((a, b) => a.id.localeCompare(b.id)),
   }
   writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+}
+
+/**
+ * 合并已有 sidecar 再写：实时采集可能已经镜像了等待室出现的表情，
+ * 回放归一化不能把它们覆盖掉。
+ */
+export function mergeEmojiSidecar(output: string, videoId: string, emojis: Map<string, ChatEmoji>): void {
+  const path = join(dirname(output), `emoji_${videoId}.json`)
+  if (existsSync(path)) {
+    try {
+      const payload = JSON.parse(readFileSync(path, 'utf8')) as { emojis?: ChatEmoji[] }
+      for (const asset of payload.emojis ?? []) {
+        if (asset?.id && asset.url && !emojis.has(asset.id))
+          emojis.set(asset.id, asset)
+      }
+    }
+    catch {
+      // 坏档按不存在处理，下面会覆写成新表
+    }
+  }
+  writeEmojiSidecar(output, videoId, emojis)
 }
 
 if (import.meta.main) {

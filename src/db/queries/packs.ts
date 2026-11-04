@@ -11,6 +11,7 @@ import {
 } from '@/db/schema'
 import type {
   ChatDensity,
+  ChatEvent,
   ChatInfo,
   CommentsInfo,
   CurrencyTotals,
@@ -141,6 +142,7 @@ function buildChat(
   authorRows: AuthorRow[],
 ): ChatInfo {
   const ownerChats = asArray<OwnerChat>(detail?.ownerChats)
+  const events = asArray<ChatEvent>(detail?.events)
   const emojiKinds = (detail?.emojiKinds ?? { distinct: 0, top: [] }) as EmojiKinds
   const density = (detail?.density ?? {
     perMinuteMean: null,
@@ -181,7 +183,7 @@ function buildChat(
     byKind: (row.chatByKind ?? {}) as ChatInfo['byKind'],
     pureEmojiOnly: row.pureEmojiOnly,
     uniqueAuthors: row.uniqueAuthors,
-    ownerMessages: ownerChats.length,
+    ownerMessages: ownerChats.filter(chat => chat.kind !== 'event').length,
     badges: asRecord(detail?.badges),
     timeRange: (detail?.timeRange ?? { firstAt: null, lastAt: null, preRollSec: null }) as ChatInfo['timeRange'],
     coveragePct: toNumber(detail?.coveragePct),
@@ -193,6 +195,7 @@ function buildChat(
     emojiKinds,
     emojis: asArray<EmojiAsset>(detail?.emojis),
     ownerChats,
+    events,
   }
 }
 

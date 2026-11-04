@@ -188,13 +188,40 @@ export interface EmojiKinds {
   top: EmojiCount[];
 }
 
-/** 主播本人（徽章 `Owner`）的一条发言；按时间顺序存全量。 */
+/** 主播本人（徽章 `Owner`）的一条发言；按时间顺序存全量。`event` 为置顶/投票/Q&A 等主播操作。 */
 export interface OwnerChat {
   at: string;
-  kind: "text" | "superchat" | "sticker" | "membership" | "gift";
+  kind: "text" | "superchat" | "sticker" | "membership" | "gift" | "event";
   text: string;
   /** 留言里的表情 id（按出现顺序）；纯 Unicode 表情不会出现在这里。 */
   emojis?: string[];
+}
+
+/** 直播中的非消息事件（置顶、投票、系统提示、删除等）；来自实时采集的 events jsonl。 */
+export interface ChatEvent {
+  /** JST ISO 时间；没有原生时间戳的事件用采集时刻。 */
+  at: string;
+  type:
+    | "banner"
+    | "bannerRemoved"
+    | "poll"
+    | "pollUpdate"
+    | "qna"
+    | "product"
+    | "system"
+    | "modeChange"
+    | "deleted"
+    | "deletedAuthor"
+    | "replaced"
+    | "panel"
+    | "other";
+  /** 是否由主播（或主播操作）产生。 */
+  owner: boolean;
+  author?: string;
+  authorId?: string;
+  text: string | null;
+  /** 结构化细节：投票选项 / 票数、置顶消息作者、删除目标等。 */
+  data?: Record<string, unknown>;
 }
 
 export interface ChatInfo {
@@ -220,6 +247,8 @@ export interface ChatInfo {
   emojis?: EmojiAsset[];
   /** 主播本人发言明细（全量，按时间顺序）；旧 pack 没有这个字段。 */
   ownerChats?: OwnerChat[];
+  /** 非消息事件（置顶 / 投票 / Q&A / 商品 / 系统 / 删除）；旧 pack 或没跑实时采集时缺失。 */
+  events?: ChatEvent[];
 }
 
 export interface CommentItem {

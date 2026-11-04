@@ -20,6 +20,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat } from './lib/live-chat.ts'
+import { mergeDanmakuFiles } from './lib/danmaku-merge.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
@@ -267,6 +268,16 @@ await runPool(todo, concurrency, async ({ source, videoId }) => {
     }
 
     await normalizeLiveChat(rawPath, jsonlPath, videoId)
+    const livePath = join(danmakuDir, `danmaku_live_${videoId}.jsonl`)
+    if (existsSync(livePath)) {
+      try {
+        const merged = mergeDanmakuFiles([jsonlPath, livePath], jsonlPath)
+        console.log(`[fetch:danmaku] ${videoId} 合并实时采集：${merged.before} + ${merged.added} → ${merged.after}（重复 ${merged.duplicates}）`)
+      }
+      catch (error) {
+        console.error(`[fetch:danmaku] ${videoId} 合并实时采集失败，保留回放：${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
     if (!values['keep-raw'])
       unlinkSync(rawPath)
     if (existsSync(unavailablePath))

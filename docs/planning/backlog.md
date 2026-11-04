@@ -17,6 +17,7 @@
 | B8 | IndexNow / sitemap 主动通知 | P3 | B3 | SEO | 📋 |
 | B9 | 200% 缩放复核（320px 已通过） | P3 | 无 | roadmap | 📋 |
 | B10 | 逐字稿索引与「这场有没有稿」改由数据库查询 + SSR（`FR-TRANSCRIPT-001`） | P2 | `transcripts` 元数据 ingest | 迁移 | ✅ 已实现 |
+| B11 | 开播前 / 直播中弹幕采集（InnerTube live chat，补齐 yt-dlp 只能拿回放的空档） | P2 | 无 | 2026-11-04 需求 | 🚧 `fetch:live-chat` 与回放合并已实现；每日任务尚未接入 |
 
 ## 审查承接区
 
@@ -101,7 +102,7 @@
 
 ## 非目标
 
-- 不做实时抓取 / 直播中数据。
+- 不做实时看板 / 直播中展示；归档侧可用 `fetch:live-chat` 采集等待室与直播中弹幕，页面仍只读已入库场次。
 - 不做用户系统、评论、收藏。
 - 不做内容正文的翻译或字幕编辑（那是归档 pipeline 的职责）。
 - 不做逐字稿编辑器 / CMS（独立项目，见 [product-direction.md](product-direction.md) §6.5）。

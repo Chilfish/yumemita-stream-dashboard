@@ -316,8 +316,9 @@ index (title gin_trgm_ops)          -- 可选，用于标题搜索
 | `badges` | `jsonb` | 徽章分布 |
 | `hashtags` | `jsonb` | 标签计数 |
 | `emoji_kinds` | `jsonb` | 表情种类与 Top |
-| `owner_chats` | `jsonb` | 主播本人发言明细 |
+| `owner_chats` | `jsonb` | 主播本人发言与操作（`kind: "event"` 为置顶 / 投票等） |
 | `emojis` | `jsonb` | 本场频道表情 |
+| `events` | `jsonb` | 实时采集的非消息事件（置顶 / 投票 / 系统 / 删除等） |
 | `video_extra` | `jsonb` | 简介、外链、章节、字幕/回放标记 |
 | `raw_detail` | `jsonb` | 可选：未投影字段，便于 schema 演进 |
 

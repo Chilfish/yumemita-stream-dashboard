@@ -375,6 +375,27 @@ bun run db:verify
 - `scripts/backfill-author-id.ts` 只重写缺少 `authorId` 的 jsonl，已有 ID 的默认跳过；条数应与原文件一致。
 - `scripts/enrich-chat.ts --force` 会把已是 v2 的 pack 也用新 jsonl 重新聚合。
 
+## 开播前 / 直播中采集（实时通道）
+
+`fetch-live-chat.ts` 走 InnerTube 实时聊天，补 yt-dlp 只能拿回放的盲区：等待室与直播中也能落弹幕。
+
+```powershell
+# 跟随到结束；Ctrl-C 保存状态退出
+bun run fetch:live-chat --video fmjJNbzcr3g
+
+# 只拉一页（等待室历史 / 定时任务）
+bun run fetch:live-chat --video fmjJNbzcr3g --once
+bun run fetch:live-chat --dataset yuno --ids ids.txt --once
+```
+
+- watch 页必须带浏览器 UA + `hl=en`；continuation 优先级 reload → timed → invalidation → replay，
+  等待室只给 reload。`LIVE_STREAM_OFFLINE` 不是终态。
+- 输出 `danmaku_live_<videoId>.jsonl` 与 `events_<videoId>.jsonl`；抓回放后
+  `fetch-streams` / `fetch-danmaku` 自动按 `rendererId` 合并成 `danmaku_<videoId>.jsonl`。
+- `events` 覆盖置顶 / 投票（含票数快照）/ Q&A / 商品 / 系统 / 模式变更 / 删除 / 替换；
+  ticker 是消息的滚动副本，忽略并计入 `skipped`。主播操作标 `owner: true`。
+- 会员限定场次需要 `--cookie` / `--cookies`（Netscape jar）/ `YT_COOKIE`。
+
 ## 补主播本人发言（一次性）
 
 `scripts/backfill-owner-chats.ts` 只抓 `live_chat`，把 Owner 徽章发言补成 `chat.ownerChats`，不重抓 meta / 评论 / VSTATS；默认只处理「`ownerMessages > 0` 且还没有 `ownerChats`」的场次。pack 先尝试从对象存储读，读不到再回退本地；改完写回本地 `data/<id>/` 并同步上传。

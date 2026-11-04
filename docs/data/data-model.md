@@ -274,8 +274,9 @@
 | `wordCounts` | **v2**：全量分词词频 `{ 词: 次数 }`，不截断；同样已剔除英文虚词与寒暄词 |
 | `hashtags` | `#` / `＃` 标签计数 |
 | `emojiKinds` | 表情种类数 + Top 15 |
-| `ownerChats` | 主播本人发言明细（徽章 `Owner`），按时间顺序全量：`at` / `kind` / `text` / `emojis`；旧 pack 缺失 |
+| `ownerChats` | 主播本人发言与操作，按时间顺序全量：`at` / `kind` / `text` / `emojis`；`kind: "event"` 表示置顶 / 投票 / Q&A 等主播操作。旧 pack 缺失 |
 | `emojis` | 本场出现过的频道专属表情：`id`（`<channelId>/<hash>`）/ `name` / `url`（InnerTube 原图）；旧 pack 缺失 |
+| `events` | 非消息事件：`at` / `type` / `owner` / `author` / `text` / `data`。`type` 取 `banner` / `bannerRemoved` / `poll` / `pollUpdate` / `qna` / `product` / `system` / `modeChange` / `deleted` / `deletedAuthor` / `replaced` / `panel` / `other`；投票的 `data.choices` 是最后一次快照。没有实时采集时缺失 |
 
 `authorId` 是 YouTube 的稳定频道 ID（原始回放里的 `authorExternalChannelId`）。显示名会改、也会重名，**观众重叠必须按 `authorId` 合并**；没有 ID 的旧数据才退回显示名。
 
@@ -363,6 +364,27 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 - 单篇发布失败只记日志，不阻塞其余稿件。
 - `videoId` 是关联场次的唯一键；`markdown` 保留原始时间码，渲染时再改写成深链。
 - 索引页与可用性查 `transcripts` 表；正文不可达时页面显示加载失败，不把整页变成错误。
+
+## 8. 开播前 / 直播中采集
+
+yt-dlp 的 `live_chat` 字幕只在直播结束后才存在；等待室与直播中的弹幕走 InnerTube：
+
+```bash
+bun run fetch:live-chat --video <videoId>          # 跟随到结束，Ctrl-C 保存状态退出
+bun run fetch:live-chat --video <videoId> --once   # 只拉一页（等待室历史 / 定时任务）
+```
+
+- watch 页必须带浏览器 UA + `hl=en`；continuation 优先级 **reload → timed → invalidation → replay**。
+  等待室只给 `reloadContinuationData`，只认 timed 会拿不到历史。`LIVE_STREAM_OFFLINE` 不是终态。
+- 产出 `danmaku/danmaku_live_<videoId>.jsonl`，记录形状与回放 jsonl 相同，额外带 `rendererId`
+  （同一条消息在实时与回放里 id 相同，合并时按它去重；旧档缺失时退回 `timestampUs + 作者 + kind + text`）。
+- 非消息事件写 `danmaku/events_<videoId>.jsonl`（原始 renderer 也保留），置顶 / 投票 / Q&A / 商品标
+  `owner: true`；ticker 是消息的滚动副本，忽略并计入 `skipped`。
+- `fetch:streams` / `fetch:danmaku` 抓到回放后自动合并两份 jsonl，输出仍是 `danmaku_<videoId>.jsonl`；
+  合并按 `ts` 排序并重编 `seq`。只有实时采集、没有回放时，`stream-datapack` 会回退读 `danmaku_live_`
+  （仍需 `fetch:streams` 抓到 `meta/info.json`）。
+- 词频只统计消息正文，不含系统提示；主播操作通过 `chat.ownerChats`（`kind: "event"`）进入 `?view=words`，
+  全部事件保留在 `chat.events`。
 
 ## 口径与限制
 

@@ -137,9 +137,33 @@ const GiftMembershipSchema = v.object({
 
 const OwnerChatSchema = v.object({
   at: v.string(),
-  kind: v.picklist(["text", "superchat", "sticker", "membership", "gift"]),
+  kind: v.picklist(["text", "superchat", "sticker", "membership", "gift", "event"]),
   text: v.string(),
   emojis: v.optional(v.array(v.string())),
+});
+
+const ChatEventSchema = v.object({
+  at: v.string(),
+  type: v.picklist([
+    "banner",
+    "bannerRemoved",
+    "poll",
+    "pollUpdate",
+    "qna",
+    "product",
+    "system",
+    "modeChange",
+    "deleted",
+    "deletedAuthor",
+    "replaced",
+    "panel",
+    "other",
+  ]),
+  owner: v.boolean(),
+  author: v.optional(v.string()),
+  authorId: v.optional(v.string()),
+  text: v.nullable(v.string()),
+  data: v.optional(v.record(v.string(), v.unknown())),
 });
 
 const DatapackChatSchema = v.object({
@@ -160,6 +184,8 @@ const DatapackChatSchema = v.object({
   emojis: v.optional(v.array(EmojiAssetSchema)),
   // 主播本人发言明细；旧 pack 没有。
   ownerChats: v.optional(v.array(OwnerChatSchema)),
+  // 非消息事件（置顶 / 投票 / 系统 / 删除等）；只有实时采集过的场次才有。
+  events: v.optional(v.array(ChatEventSchema)),
 });
 
 const CommentItemSchema = v.object({

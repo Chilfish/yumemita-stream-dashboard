@@ -144,4 +144,4 @@ bun run db:verify
 - **会员限定**：`availability: "subscriber_only"` 的场次需要已登录 Firefox cookie 才能取到 chat replay。
 - **评论区是抓取上限**：`commentsCaptured` 是 yt-dlp `--write-comments` 抓到的条数，不是视频总评论数。
 - **VSTATS 没有历史曲线**：只有平均/最大同接与最大值时刻，且 2026-08 之前大概率没有条目。
-- **未来场不要抓**：`live_status` 为 `is_upcoming` / 提示 days until premiere 的直接跳过。
+- **未来场不要走 yt-dlp**：`live_status` 为 `is_upcoming` / 提示 days until premiere 的，`fetch-streams` 直接跳过；需要等待室 / 直播中数据时用 `bun run fetch:live-chat --video <id>`（InnerTube 实时通道）。

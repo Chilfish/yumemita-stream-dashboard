@@ -28,6 +28,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat } from './lib/live-chat.ts'
+import { mergeDanmakuFiles } from './lib/danmaku-merge.ts'
 import { readCredentials } from './lib/object-storage.ts'
 import { restoreDataset } from './lib/restore-datapacks.ts'
 
@@ -632,6 +633,17 @@ async function main(): Promise<void> {
           if (existsSync(chatFile)) {
             try {
               await normalizeLiveChat(chatFile, jsonlPath, id)
+              // 等待室 / 直播中已经采过：回放到手后按 rendererId 合并，补齐开播段。
+              const livePath = join(session, 'danmaku', `danmaku_live_${id}.jsonl`)
+              if (existsSync(livePath)) {
+                try {
+                  const merged = mergeDanmakuFiles([jsonlPath, livePath], jsonlPath)
+                  logFile(logPath, `${id} 合并实时采集弹幕：${merged.before} + ${merged.added} → ${merged.after}（重复 ${merged.duplicates}）`)
+                }
+                catch (error) {
+                  logFile(logPath, `${id} 合并实时采集弹幕失败，保留回放：${error instanceof Error ? error.message : String(error)}`)
+                }
+              }
               media.chat += 1
             }
             catch (error) {

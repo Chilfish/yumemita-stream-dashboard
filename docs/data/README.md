@@ -54,6 +54,7 @@ bun run db:verify --dataset <id>   # 与 pack 字段级对账
 bun run publish:assets --dataset <id>  # 封面 / 表情 / archive → R2
 bun run fetch:thumbs --dataset <id>
 bun run fetch:emoji --dataset <id>
+bun run fetch:live-chat --video <videoId>  # 开播前 / 直播中弹幕
 bun run publish:transcripts
 bun run purge:cache --dataset <id> # 失效 Workers Cache
 ```
