@@ -84,6 +84,7 @@ export default defineConfig({
     '/[datasetId]/streams': { maxAge: 60, swr: 300, tags: ['datasets'] },
     '/[datasetId]/trends': { maxAge: 300, swr: 600, tags: ['datasets'] },
     '/[datasetId]/gallery': { maxAge: 300, swr: 600, tags: ['datasets'] },
+    '/about': { maxAge: 3600, swr: 86400, tags: ['group'] },
     '/[datasetId]/transcripts': { maxAge: 300, swr: 600, tags: ['transcripts'] },
     '/[datasetId]/stream/[videoId]': { maxAge: 300, swr: 600, tags: ['streams'] },
     '/[datasetId]/stream/[videoId].md': { maxAge: 300, swr: 600, tags: ['streams'] },
@@ -131,6 +132,11 @@ export default defineConfig({
         optional: true,
       }),
       PURGE_TOKEN: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+      MEMBER_ONLY_KEY: envField.string({
         context: 'server',
         access: 'secret',
         optional: true,

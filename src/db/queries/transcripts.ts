@@ -1,6 +1,7 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, getTableColumns, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
-import { transcripts } from '@/db/schema'
+import { streams, transcripts } from '@/db/schema'
+import { MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
 import type { TranscriptIndexEntry } from '@/lib/transcripts'
 import { toIso } from './shared'
 
@@ -45,11 +46,25 @@ function toIndexEntry(row: typeof transcripts.$inferSelect): TranscriptIndexEntr
 export async function getTranscriptIndex(
   db: Db,
   datasetId: string,
+  options: { includeMemberOnly?: boolean } = {},
 ): Promise<TranscriptIndexEntry[]> {
+  // 逐字稿跟着场次的公开范围走：会员限定场即使有稿也不出现在公开索引。
   const rows = await db
-    .select()
+    .select(getTableColumns(transcripts))
     .from(transcripts)
-    .where(eq(transcripts.datasetId, datasetId))
+    .innerJoin(
+      streams,
+      and(
+        eq(streams.datasetId, transcripts.datasetId),
+        eq(streams.videoId, transcripts.videoId),
+      ),
+    )
+    .where(and(
+      eq(transcripts.datasetId, datasetId),
+      options.includeMemberOnly
+        ? undefined
+        : sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`,
+    ))
     .orderBy(NEWEST_FIRST, transcripts.title)
   return rows.map(toIndexEntry)
 }

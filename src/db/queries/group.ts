@@ -1,7 +1,8 @@
-import { sql } from 'drizzle-orm'
+import { and, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
 import { streams } from '@/db/schema'
 import { shiftDateKey } from '@/lib/group'
+import { MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
 import {
   GROUP_GALLERY_SCHEMA,
   GROUP_RECENT_LIMIT,
@@ -16,6 +17,16 @@ import { toIso, toNumber } from './shared'
 
 const DAY_WINDOW = 40
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
+
+interface GroupQueryOptions {
+  /** 默认 `false`：组级统计与相册都不含会员限定场次。 */
+  includeMemberOnly?: boolean
+}
+
+function visibilityFilter(includeMemberOnly: boolean | undefined) {
+  if (includeMemberOnly) return undefined
+  return sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`
+}
 
 type StreamRow = typeof streams.$inferSelect
 
@@ -38,7 +49,7 @@ function toGroupStream(row: StreamRow): GroupStreamSummary {
   }
 }
 
-async function memberStats(db: Db): Promise<GroupMemberStat[]> {
+async function memberStats(db: Db, options: GroupQueryOptions): Promise<GroupMemberStat[]> {
   const rows = await db
     .select({
       datasetId: streams.datasetId,
@@ -50,6 +61,7 @@ async function memberStats(db: Db): Promise<GroupMemberStat[]> {
       concurrentDuration: sql<string>`coalesce(sum(case when ${streams.avgConcurrent} is not null then ${streams.durationSec} else 0 end), 0)`,
     })
     .from(streams)
+    .where(visibilityFilter(options.includeMemberOnly))
     .groupBy(streams.datasetId)
 
   return rows.map(row => {
@@ -65,7 +77,7 @@ async function memberStats(db: Db): Promise<GroupMemberStat[]> {
   })
 }
 
-async function dayStats(db: Db): Promise<GroupDayStat[]> {
+async function dayStats(db: Db, options: GroupQueryOptions): Promise<GroupDayStat[]> {
   const rows = await db
     .select({
       datasetId: streams.datasetId,
@@ -75,7 +87,10 @@ async function dayStats(db: Db): Promise<GroupDayStat[]> {
       latest: sql<string>`max(${streams.date})`,
     })
     .from(streams)
-    .where(sql`${streams.date} is not null`)
+    .where(and(
+      sql`${streams.date} is not null`,
+      visibilityFilter(options.includeMemberOnly),
+    ))
     .groupBy(streams.datasetId, streams.date)
 
   return rows
@@ -90,29 +105,34 @@ async function dayStats(db: Db): Promise<GroupDayStat[]> {
     .sort((a, b) => b.date.localeCompare(a.date) || a.datasetId.localeCompare(b.datasetId))
 }
 
-async function latestStreams(db: Db): Promise<GroupStreamSummary[]> {
+async function latestStreams(db: Db, options: GroupQueryOptions): Promise<GroupStreamSummary[]> {
   const rows = await db
     .selectDistinctOn([streams.datasetId])
     .from(streams)
+    .where(visibilityFilter(options.includeMemberOnly))
     .orderBy(streams.datasetId, NEWEST_FIRST)
   return rows.map(toGroupStream)
 }
 
-async function recentStreams(db: Db): Promise<GroupStreamSummary[]> {
+async function recentStreams(db: Db, options: GroupQueryOptions): Promise<GroupStreamSummary[]> {
   const rows = await db
     .select()
     .from(streams)
+    .where(visibilityFilter(options.includeMemberOnly))
     .orderBy(NEWEST_FIRST)
     .limit(GROUP_RECENT_LIMIT)
   return rows.map(toGroupStream)
 }
 
-export async function getGroupSummary(db: Db): Promise<GroupSummaryFile> {
+export async function getGroupSummary(
+  db: Db,
+  options: GroupQueryOptions = {},
+): Promise<GroupSummaryFile> {
   const [members, days, latest, recent] = await Promise.all([
-    memberStats(db),
-    dayStats(db),
-    latestStreams(db),
-    recentStreams(db),
+    memberStats(db, options),
+    dayStats(db, options),
+    latestStreams(db, options),
+    recentStreams(db, options),
   ])
 
   const generatedAt = recent
@@ -131,8 +151,15 @@ export async function getGroupSummary(db: Db): Promise<GroupSummaryFile> {
   }
 }
 
-export async function getGroupGallery(db: Db): Promise<GroupGalleryFile> {
-  const rows = await db.select().from(streams).orderBy(NEWEST_FIRST)
+export async function getGroupGallery(
+  db: Db,
+  options: GroupQueryOptions = {},
+): Promise<GroupGalleryFile> {
+  const rows = await db
+    .select()
+    .from(streams)
+    .where(visibilityFilter(options.includeMemberOnly))
+    .orderBy(NEWEST_FIRST)
   return {
     schema: GROUP_GALLERY_SCHEMA,
     generatedAt: new Date().toISOString(),

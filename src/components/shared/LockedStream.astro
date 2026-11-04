@@ -1,0 +1,51 @@
+---
+import { thumbnailSrcSet, thumbnailUrl } from '@/lib/media'
+
+interface Props {
+  datasetId: string
+  datasetLabel: string
+  videoId: string
+  title: string
+  date: string | null
+}
+
+const { datasetId, datasetLabel, videoId, title, date } = Astro.props
+const cover = thumbnailUrl(datasetId, videoId)
+const coverSrcSet = thumbnailSrcSet(datasetId, videoId)
+---
+
+<main class="mx-auto flex min-h-svh w-full max-w-3xl flex-col justify-center gap-6 px-4 py-12 md:px-6">
+  <a
+    class="text-footnote text-muted-foreground underline-offset-2 transition-colors duration-120 ease-out hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
+    href={`/${datasetId}/streams`}
+  >
+    ← 返回 {datasetLabel} 的场次
+  </a>
+
+  <figure class="overflow-hidden rounded-surface border border-hairline bg-card">
+    <img
+      alt=""
+      class="aspect-video w-full object-cover"
+      decoding="async"
+      sizes="(min-width: 48rem) 42rem, 100vw"
+      src={cover}
+      srcset={coverSrcSet}
+    />
+  </figure>
+
+  <div class="flex flex-col gap-3">
+    <p class="text-caption text-muted-foreground">
+      {datasetLabel}{date ? ` · ${date}` : ''} · 会员限定
+    </p>
+    <h1 class="text-title text-foreground">{title}</h1>
+    <p class="text-body text-muted-foreground">
+      这是一场会员限定直播。本站只保留封面与标题，不公开弹幕、SC、评论与统计数据。
+    </p>
+    <p class="text-footnote text-muted-foreground">
+      公开范围与数据来源见 <a
+        class="text-member-ink underline-offset-2 hover:underline"
+        href="/about">说明</a
+      >。
+    </p>
+  </div>
+</main>

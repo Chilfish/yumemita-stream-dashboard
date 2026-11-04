@@ -21,6 +21,8 @@ export interface StreamListOptions {
   limit?: number
   offset?: number
   availability?: string
+  /** 默认 `false`：会员限定场次不进入公开列表。 */
+  includeMemberOnly?: boolean
 }
 
 export interface StreamListResult {

@@ -1,7 +1,10 @@
 import type { APIRoute } from 'astro'
 import { env } from 'cloudflare:workers'
 import { db } from '@/db/client'
+import { getStream } from '@/db/queries/streams'
 import { getTranscriptMeta } from '@/db/queries/transcripts'
+import { memberOnlyAccess } from '@/lib/member-access'
+import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
@@ -28,6 +31,17 @@ export const GET: APIRoute = async (context) => {
     return json({ error: '缺少参数' }, 400)
   }
 
+  const { unlocked, keyed } = memberOnlyAccess(context.url)
+  if (keyed) context.cache.set(false)
+
+  const summary = await getStream(db, datasetId, videoId).catch((error) => {
+    console.error('[api] transcript stream lookup failed', error)
+    return null
+  })
+  if (summary && isMemberOnly(summary.availability) && !unlocked) {
+    return json({ error: '这场直播是会员限定，不公开逐字稿' }, 404)
+  }
+
   const meta = await getTranscriptMeta(db, datasetId, videoId).catch((error) => {
     console.error('[api] transcript lookup failed', error)
     return undefined
@@ -50,14 +64,19 @@ export const GET: APIRoute = async (context) => {
       return json({ error: '逐字稿暂时不可用' }, 503)
     }
 
-    context.cache.set({
-      maxAge: 300,
-      swr: 600,
-      tags: [`stream-${videoId}`, `dataset-${datasetId}`, 'transcripts'],
-    })
+    if (!keyed) {
+      context.cache.set({
+        maxAge: 300,
+        swr: 600,
+        tags: [`stream-${videoId}`, `dataset-${datasetId}`, 'transcripts'],
+      })
+    }
 
     return new Response(await object.text(), {
-      headers: { 'content-type': 'application/json; charset=utf-8' },
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        ...(keyed ? { 'cache-control': 'private, no-store' } : {}),
+      },
     })
   }
   catch (error) {

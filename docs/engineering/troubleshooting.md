@@ -46,7 +46,7 @@
 
 ## CI / 部署报缺少变量
 
-- `DATABASE_URL`、`PURGE_TOKEN`：仓库 Secrets（数据工作流），以及 `wrangler secret put`（Worker 运行时）。
+- `DATABASE_URL`、`PURGE_TOKEN`、`MEMBER_ONLY_KEY`：仓库 Secrets（数据工作流），以及 `wrangler secret put`（Worker 运行时）。
 - `PUBLIC_R2_BASE`、`SITE_URL`：仓库 Variables；`PUBLIC_R2_BASE` 在构建时内联，改了要重新部署。
 - `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`：部署工作流。
 - 本地用 `.env` 或 `.dev.vars`；不要提交真实凭据。

@@ -5,8 +5,11 @@ import { getDataset } from '@/db/queries/datasets'
 import { getStreamPack } from '@/db/queries/packs'
 import { getStream } from '@/db/queries/streams'
 import { getTranscriptMeta } from '@/db/queries/transcripts'
+import { memberOnlyAccess } from '@/lib/member-access'
+import { thumbnailUrl } from '@/lib/media'
 import { renderStreamMarkdown } from '@/lib/agent-markdown'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
+import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
@@ -81,15 +84,45 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
   const summary = await getStream(db, datasetId, videoId)
   if (!summary) return notFound()
 
+  const origin = context.site?.origin ?? DEFAULT_SITE_URL
+  const { unlocked, keyed } = memberOnlyAccess(context.url)
+  if (keyed) context.cache.set(false)
+
+  // 会员限定：只给标题与封面，和 HTML 页面的公开范围保持一致。
+  if (isMemberOnly(summary.availability) && !unlocked) {
+    const image = thumbnailUrl(datasetId, videoId)
+    const markdown = [
+      `# ${summary.title}`,
+      '',
+      `> 会员限定直播 · ${summary.date} · ${datasetId}`,
+      '',
+      '本站不公开该场的弹幕、SC、评论与统计数据。',
+      '',
+      `![封面](${image})`,
+      '',
+    ].join('\n')
+
+    return new Response(markdown, {
+      status: 200,
+      headers: {
+        'content-type': 'text/markdown; charset=utf-8',
+        'cache-control': keyed
+          ? 'private, no-store'
+          : 'public, max-age=300, stale-while-revalidate=600',
+        'x-robots-tag': 'noindex',
+        'content-signal': 'ai-train=no, search=yes, ai-input=yes',
+      },
+    })
+  }
+
   const [dataset, pack, transcriptMeta] = await Promise.all([
-    getDataset(db, datasetId),
+    getDataset(db, datasetId, { includeMemberOnly: true }),
     getStreamPack(db, datasetId, videoId),
     getTranscriptMeta(db, datasetId, videoId),
   ])
 
   const transcript = await readTranscriptBody(transcriptMeta?.r2Key)
 
-  const origin = context.site?.origin ?? DEFAULT_SITE_URL
   const includeTranscript = context.url.searchParams.get('transcript') !== '0'
   const full = context.url.searchParams.get('full') === '1'
 
@@ -107,12 +140,13 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
 
   const tags = [`stream-${videoId}`, `dataset-${datasetId}`]
   if (transcriptMeta) tags.push('transcripts')
-  context.cache.set({ maxAge: 300, swr: 600, tags })
+  if (!keyed) context.cache.set({ maxAge: 300, swr: 600, tags })
 
   return new Response(markdown, {
     status: 200,
     headers: {
       'content-type': 'text/markdown; charset=utf-8',
+      'cache-control': keyed ? 'private, no-store' : 'public, max-age=300',
       'x-robots-tag': 'noindex',
       'content-signal': 'ai-train=no, search=yes, ai-input=yes',
       'link': `<${origin}/${datasetId}/stream/${videoId}>; rel="alternate"; type="text/html"`,

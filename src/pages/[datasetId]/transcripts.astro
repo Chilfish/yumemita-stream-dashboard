@@ -6,16 +6,18 @@ import { db } from '@/db/client'
 import { getTranscriptIndex } from '@/db/queries/transcripts'
 import { getDatasetPageData } from '@/db/queries/view-data'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import { memberOnlyCachePolicy } from '@/lib/member-access'
 
 export const prerender = false
 
 const datasetId = Astro.params.datasetId!
+const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
 const [data, transcriptResult] = await Promise.all([
-  getDatasetPageData(db, datasetId).catch(error => {
+  getDatasetPageData(db, datasetId, { includeMemberOnly: unlocked }).catch(error => {
     console.error('[page] transcripts failed', error)
     return null
   }),
-  getTranscriptIndex(db, datasetId)
+  getTranscriptIndex(db, datasetId, { includeMemberOnly: unlocked })
     .then(entries => ({ entries, error: null as string | null }))
     .catch(error => {
       console.error('[page] transcripts index failed', error)
@@ -26,7 +28,7 @@ const [data, transcriptResult] = await Promise.all([
     }),
 ])
 if (!data) Astro.response.status = 404
-else Astro.cache.set({ maxAge: 300, swr: 600, tags: [`dataset-${datasetId}`, 'transcripts'] })
+else if (!keyed) Astro.cache.set({ maxAge: 300, swr: 600, tags: [`dataset-${datasetId}`, 'transcripts'] })
 
 const latest = data?.rows[0] ?? null
 const meta = data

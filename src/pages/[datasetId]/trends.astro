@@ -5,16 +5,18 @@ import { DatasetPage } from '@/components/app/dataset-page'
 import { db } from '@/db/client'
 import { getDatasetPageData } from '@/db/queries/view-data'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import { memberOnlyCachePolicy } from '@/lib/member-access'
 
 export const prerender = false
 
 const datasetId = Astro.params.datasetId!
-const data = await getDatasetPageData(db, datasetId).catch(error => {
+const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
+const data = await getDatasetPageData(db, datasetId, { includeMemberOnly: unlocked }).catch(error => {
   console.error('[page] trends failed', error)
   return null
 })
 if (!data) Astro.response.status = 404
-else Astro.cache.set({ maxAge: 300, swr: 600, tags: [`dataset-${datasetId}`] })
+else if (!keyed) Astro.cache.set({ maxAge: 300, swr: 600, tags: [`dataset-${datasetId}`] })
 
 const latest = data?.rows[0] ?? null
 const meta = data

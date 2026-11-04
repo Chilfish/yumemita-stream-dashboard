@@ -8,7 +8,7 @@
 
 ## 收录
 
-只收已结束的直播，按标题去重、保留正片；会员限定场也在内，但同接等统计通常缺失，页面上会标注。
+只收已结束的直播，按标题去重、保留正片。会员限定场次照常抓取与入库，但默认不公开：列表、聚合、单集页面与 `.md` 都看不到数据，只有配置了 `MEMBER_ONLY_KEY` 并用 `?key=` 访问时才放行。
 
 | 成员 | 场次 |
 | --- | ---: |
@@ -53,6 +53,7 @@
 **其他**
 
 - 深浅色主题，移动端底部标签栏，每个视图都有独立 URL
+- 说明与免责统一在 `/about`，成员页的 `/<datasetId>/about` 会 302 跳转过去
 - 快捷键 `j` / `k` 翻场、`1`–`5` 切页、`/` 聚焦搜索、`⌘K` 全局搜索、`⌘B` 收起侧栏
 - SEO：请求期输出 title / description / canonical / OG / JSON-LD；`sitemap.xml` 与 `llms.txt` 查库生成；旧 `#/...` 链接自动跳转
 
@@ -98,6 +99,10 @@ R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
 R2_BUCKET="yumemita-data"
 PURGE_TOKEN=""
+
+# 会员限定场次的公开密钥；不配置则永远不公开。
+# 配置后，访问 /<datasetId>/stream/<videoId>?key=<值> 才显示完整数据。
+MEMBER_ONLY_KEY=""
 ```
 
 页面请求期查数据库，所以新场次 ingest + purge 后刷新即可，不需要重新构建前端。
@@ -230,7 +235,7 @@ data-sources.json  # 成员注册表
 - 同接、视聴时间、播放、点赞来自 VSTATS；弹幕、SC、评论从 YouTube 公开数据抓取。时间一律按日本时间。
 - 不同币种的 SC 分开累计，不做汇率换算。
 - 非官方项目，与 夢限大みゅーたいぷ、所属事务所、Bushiroad、YouTube、VSTATS 均无隶属或合作关系。
-- 会员限定场可能包含不宜公开传播的信息，部署前请自行确认范围。
+- 会员限定场次默认不公开：不进入列表、相册、对比、聚合、sitemap 与 `.md`；直连单场只显示封面和标题。公开范围由 `MEMBER_ONLY_KEY` 控制，详见 [NOTICE.md](NOTICE.md)。
 - 原始内容版权归各自权利人所有，本仓库只做个人研究与分析用途，详见 [NOTICE.md](NOTICE.md)。
 
 ## 贡献

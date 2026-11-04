@@ -22,7 +22,7 @@ bun run cf:preview   # build + preview
 ```
 
 - 开发环境 `Astro.cache.enabled === false`，缓存调用是 no-op；要验证缓存必须用生产构建或线上。
-- `.dev.vars` 提供 `DATABASE_URL`、R2、`PUBLIC_R2_BASE`、`SITE_URL`、`PURGE_TOKEN`。
+- `.dev.vars` 提供 `DATABASE_URL`、R2、`PUBLIC_R2_BASE`、`SITE_URL`、`PURGE_TOKEN`、`MEMBER_ONLY_KEY`。
 - `astro preview` 下 R2 binding 不可用时，逐字稿 API 返回 503，客户端回退到本地 `content/transcripts/` 快照。
 - `astro.config.mjs` 里 `process.env.SITE_URL` 优先于 `.env`；本机 shell 残留同名变量时会覆盖 `.env`，部署前用 `SITE_URL=https://ymmt.chilfish.top bun run cf:deploy` 显式传一次最稳。
 
@@ -36,7 +36,7 @@ bunx wrangler rollback                    # 回滚到上一版
 - 必须用 `dist/server/wrangler.json` 部署：它由 adapter 生成，`main` 指向 `entry.mjs`、`assets` 指向 `../client`。根目录 `wrangler.jsonc` 只是源配置；直接 `wrangler deploy` 会把 `dist/server` 与 `.dev.vars` 当成静态资源上传。
 - `.github/workflows/deploy.yml` 手动触发（`workflow_dispatch`）：`bun run ci` → `wrangler deploy --config dist/server/wrangler.json` → 线上路由冒烟。
 - 需要仓库 Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`；Variables：`PUBLIC_R2_BASE`、`SITE_URL`。
-- Worker secrets（`wrangler secret put`）：`DATABASE_URL`、`PURGE_TOKEN`。
+- Worker secrets（`wrangler secret put`）：`DATABASE_URL`、`PURGE_TOKEN`、`MEMBER_ONLY_KEY`。
 - `wrangler.jsonc` 声明 `nodejs_compat`、`ASSETS`、`R2` binding 与 Workers Cache（`cross_version_cache: false`）。
 - `astro build` 与 `wrangler deploy` 不需要数据库；migration 在部署前单独执行。
 - `SITE_URL` 决定 canonical / OG / sitemap / `.md` 链接的域名；切域名时改这个变量（或本地环境）后重新构建部署一次。
@@ -48,11 +48,14 @@ bunx wrangler rollback                    # 回滚到上一版
 | Secret | `DATABASE_URL` | Worker 读 + ingest 写 |
 | Secret | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | ingest / 资产发布（桶 `yumemita-data`） |
 | Secret | `PURGE_TOKEN` | ingest 调 purge 端点 |
+| Secret | `MEMBER_ONLY_KEY` | 会员限定场次的公开密钥；不配置则不公开 |
 | Secret | `YT_COOKIES` / `MIHOMO_SUB_URL` | 抓取（GitHub Actions） |
 | Var | `PUBLIC_R2_BASE` | 封面 / 表情公开域名，`https://ymmt-s3.chilfish.top`（构建时内联） |
 | Var | `SITE_URL` | canonical / sitemap / purge 地址，`https://ymmt.chilfish.top` |
 
 `DATABASE_URL` 不进入客户端 bundle；只从 `astro:env/server` 或服务端读取。
+
+`MEMBER_ONLY_KEY` 只在服务端读取。带 `?key=` 的请求会调用 `Astro.cache.set(false)` 并返回 `private, no-store`，避免解锁后的响应进入共享缓存；未带 key 的公开响应仍按 `routeRules` 缓存。
 
 ## R2 布局
 
