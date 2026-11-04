@@ -109,8 +109,8 @@
 
 组首页与全组相册不拉五份完整 manifest，而是读两份由 manifest 派生的精简文件：
 
-- `<base>/group-summary.json`（schema `yumemita.dashboard.group-summary/v1`）：组首页，约 17 KB raw / 3.6 KB gzip。
-- `<base>/group-gallery.json`（schema `yumemita.dashboard.group-gallery/v1`）：全组相册，约 829 KB raw / 149 KB gzip，只在 `/gallery` 加载。
+- `<base>/group-summary.json`（schema `yumemita.dashboard.group-summary/v1`）：组首页的旧派生格式，当前页面不再读取；`days` 覆盖最近 100 天。
+- `<base>/group-gallery.json`（schema `yumemita.dashboard.group-gallery/v1`）：全组相册的旧派生格式，当前页面不再读取。
 
 这两份文件只在本地派生，不再上传。当前组数据由 `getGroupSummary()` / `getGroupGallery()` 查询生成。
 
@@ -141,7 +141,7 @@
 | 字段 | 说明 |
 | --- | --- |
 | `members` | 全期汇总：场次、弹幕、SC、时长、按时长加权的平均同接。不随“今天”变化。 |
-| `days` | 最近 40 天有场次的日期桶（`streams` / `chat`）。近 7 天与本月窗口最多覆盖 31 天，客户端用当前日期在这些桶上求和；不需要 1,891 行逐场明细。 |
+| `days` | 最近 100 天有场次的日期桶（`streams` / `chat`）。近 7 天 / 本月窗口与首页出勤条共用，客户端用当前日期在这些桶上求和与补格；不需要 1,891 行逐场明细。 |
 | `latest` | 每位成员最新一场，供 hero、成员列表与 SEO 分享图。 |
 | `recent` | 全组最近 20 场，首页实际展示前 8 条。 |
 
@@ -171,7 +171,7 @@
 
 ### 为什么不用逐场 `stats`
 
-窗口（近 7 天 / 本月）依赖“今天”，不能在发布时写死；但也不该把 1,891 行逐场统计塞进首页。用 `members`（全期汇总）+ `days`（最近 40 天按日桶）即可在客户端精确求和，体积从约 24 KB gzip 降到 3.6 KB gzip。
+窗口（近 7 天 / 本月）与出勤条依赖“今天”，不能在发布时写死；但也不该把 1,891 行逐场统计塞进首页。用 `members`（全期汇总）+ `days`（最近 100 天按日桶）即可在客户端精确求和与补格，体积仍远小于逐场明细。
 
 ## 4. insights
 

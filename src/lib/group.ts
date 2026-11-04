@@ -9,6 +9,9 @@ import type {
 
 export const DEFAULT_MEMBER_COLOR = "#b8461f";
 
+/** 组首页出勤条的窗口长度；与查询层 `DAY_WINDOW` 共用同一常量。 */
+export const ATTENDANCE_WINDOW_DAYS = 100;
+
 /** 跨成员的一行：精简场次字段 + 它属于谁，页面据此拼链接、取封面、上成员色。 */
 export interface GroupStreamRow extends GroupStreamSummary {
   memberLabel: string;
@@ -45,6 +48,14 @@ export interface GroupData {
   rows: GroupStreamRow[];
   members: GroupMemberSummary[];
   totals: GroupTotals;
+  /**
+   * 组首页出勤条用的近 100 天日桶，已限定在 `attendanceStart`–`attendanceEnd` 内。
+   * 相册路径没有这份精简数据，返回空数组。
+   */
+  days: GroupDayStat[];
+  /** 出勤窗口的日期由服务端确定，避免客户端换日时重新计算导致水合差异。 */
+  attendanceStart: string | null;
+  attendanceEnd: string | null;
 }
 
 const JST_DATE = new Intl.DateTimeFormat("en-CA", {
@@ -69,6 +80,12 @@ export function shiftDateKey(key: string, days: number): string {
 /** 最近 7 天的起点（含今天）：今天减 6 天。 */
 export function weekStartKey(now: Date = new Date()): string {
   return shiftDateKey(jstDateKey(now), -6);
+}
+
+/** 出勤窗口：以 JST 今天为终点，向前共 `ATTENDANCE_WINDOW_DAYS` 天。 */
+export function attendanceWindow(now: Date = new Date()): { start: string; end: string } {
+  const end = jstDateKey(now);
+  return { start: shiftDateKey(end, -(ATTENDANCE_WINDOW_DAYS - 1)), end };
 }
 
 function streamDateKey(row: { date: string }): string | null {
@@ -174,8 +191,8 @@ function attachMember(
 }
 
 /**
- * 首页只加载 `group-summary.json`：members 是全期汇总，days 只覆盖最近 40 天，
- * 用来按「现在」计算近 7 天 / 本月窗口；latest/recent 负责渲染。
+ * 首页只加载 `group-summary.json`：members 是全期汇总，days 覆盖最近 100 天，
+ * 用来按「现在」计算近 7 天 / 本月窗口与出勤条；latest/recent 负责渲染。
  */
 export function buildGroupDataFromSummary(
   datasets: DatasetIndexEntry[],
@@ -242,7 +259,15 @@ export function buildGroupDataFromSummary(
     })
     .filter((row): row is GroupStreamRow => row !== null);
 
-  return { members, rows: sortRows(rows), totals: totalsOf(members) };
+  const { start: attendanceStart, end: attendanceEnd } = attendanceWindow(now);
+  return {
+    members,
+    rows: sortRows(rows),
+    totals: totalsOf(members),
+    days: summary.days.filter(day => day.date >= attendanceStart && day.date <= attendanceEnd),
+    attendanceStart,
+    attendanceEnd,
+  };
 }
 
 /** 相册走 `group-gallery.json`：需要全部场次，再按成员分组聚合。 */
@@ -292,7 +317,14 @@ export function buildGroupDataFromStreams(
     rows.push(...memberRows);
   }
 
-  return { members, rows: sortRows(rows), totals: totalsOf(members) };
+  return {
+    members,
+    rows: sortRows(rows),
+    totals: totalsOf(members),
+    days: [],
+    attendanceStart: null,
+    attendanceEnd: null,
+  };
 }
 
 /**

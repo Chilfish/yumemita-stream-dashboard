@@ -20,7 +20,7 @@ export interface GroupMemberStat {
 }
 
 /**
- * 最近 40 天有场次的日期桶。近 7 天 / 本月窗口最多只覆盖 31 天，
+ * 最近 100 天有场次的日期桶。近 7 天 / 本月窗口与首页出勤条共用，
  * 因此不需要把全部 1,900 行明细带到首页；客户端用这些桶按当前日期求和即可。
  */
 export interface GroupDayStat {
@@ -53,7 +53,7 @@ export interface GroupSummaryFile {
   generatedAt: string;
   /** 每位成员的全期汇总（场次、弹幕、SC、时长、加权同接）。 */
   members: GroupMemberStat[];
-  /** 最近 40 天的按日桶：用于按「现在」计算近 7 天 / 本月窗口。 */
+  /** 最近 100 天的按日桶：用于按「现在」计算近 7 天 / 本月窗口与出勤条。 */
   days: GroupDayStat[];
   /** 每位成员最新一场：hero、成员列表与 SEO 分享图。 */
   latest: GroupStreamSummary[];

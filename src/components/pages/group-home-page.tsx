@@ -1,5 +1,6 @@
 import { GroupHero } from "@/components/dashboard/group-hero";
 import { GroupMemberEntries } from "@/components/dashboard/group-member-entries";
+import { GroupMemberPanel } from "@/components/dashboard/group-member-panel";
 import { GroupPulse } from "@/components/dashboard/group-pulse";
 import { GroupRecentUpdates } from "@/components/dashboard/group-recent-updates";
 import { useGroupDataContext } from "@/components/dashboard/group-data-context";
@@ -11,7 +12,7 @@ import { formatDate, formatTime } from "@/lib/format";
  * 顺序即优先级——脉冲只有三行数字，hero 拿走整块封面，最近更新与入口留在下面。
  */
 export function GroupHomePage() {
-  const { members, rows, totals } = useGroupDataContext();
+  const { attendanceEnd, attendanceStart, days, members, rows, totals } = useGroupDataContext();
   const latest = rows[0] ?? null;
 
   return (
@@ -32,6 +33,12 @@ export function GroupHomePage() {
 
       <GroupHero members={members} />
       <GroupRecentUpdates rows={rows} />
+      <GroupMemberPanel
+        attendanceEnd={attendanceEnd}
+        attendanceStart={attendanceStart}
+        days={days}
+        members={members}
+      />
       <GroupMemberEntries members={members} />
     </div>
   );

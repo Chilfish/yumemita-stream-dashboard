@@ -1,13 +1,21 @@
-import type { CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "@/lib/router-compat";
+import { Sparkline } from "@/components/charts/sparkline";
 import { MemberDot } from "@/components/dashboard/member-avatar";
 import { Panel, PanelBody, PanelHead } from "@/components/dashboard/panel";
 import { StreamCover } from "@/components/dashboard/stream-cover";
-import { formatDate, formatInteger, formatTime } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { formatDate, formatDecimal, formatInteger, formatTime } from "@/lib/format";
 import type { GroupStreamRow } from "@/lib/group";
-import { primaryReadout, recentUpdates } from "@/lib/group-home";
+import {
+  buildRecentTrend,
+  primaryReadout,
+  RECENT_UPDATE_LIMIT,
+  recentUpdates,
+} from "@/lib/group-home";
 import { streamPath } from "@/lib/routes";
 import { isMemberOnly } from "@/lib/visibility";
+import { GROUP_RECENT_LIMIT } from "@/types/group";
 
 interface GroupRecentUpdatesProps {
   rows: GroupStreamRow[];
@@ -15,18 +23,69 @@ interface GroupRecentUpdatesProps {
 
 /** 跨成员的最近更新：一行一场，成员名 + 封面 + 日期 + 标题 + 一个读数。 */
 export function GroupRecentUpdates({ rows }: GroupRecentUpdatesProps) {
-  const recent = recentUpdates(rows);
+  const [showAll, setShowAll] = useState(false);
+  const trend = useMemo(() => buildRecentTrend(rows, GROUP_RECENT_LIMIT), [rows]);
+  const recent = recentUpdates(rows, showAll ? rows.length : RECENT_UPDATE_LIMIT);
+  const peakIndex =
+    trend.length > 0
+      ? trend.reduce(
+          (best, point, index) => (point.value > (trend[best]?.value ?? 0) ? index : best),
+          0,
+        )
+      : -1;
+  const peak = peakIndex >= 0 ? trend[peakIndex] ?? null : null;
 
   return (
     <Panel>
-      <PanelHead meta={`全组最新 ${recent.length} 场，按开播时间倒序`} title="最近更新" />
+      <PanelHead
+        actions={
+          rows.length > RECENT_UPDATE_LIMIT ? (
+            <Button
+              aria-controls="group-recent-list"
+              aria-expanded={showAll}
+              onClick={() => setShowAll(value => !value)}
+              size="xs"
+              variant="ghost"
+            >
+              {showAll ? "收起" : `全部 ${rows.length} 条`}
+            </Button>
+          ) : undefined
+        }
+        meta={`全组最新 ${recent.length} 场，按开播时间倒序`}
+        title="最近更新"
+      />
       <PanelBody flush>
+        {trend.length > 1 ? (
+          <div className="border-t border-hairline px-5 pt-3 pb-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+              <p className="text-caption text-ink-3">
+                近 {trend.length} 场 · 每分钟弹幕（不含会员限定）
+              </p>
+              {peak ? (
+                <p className="text-caption text-ink-3 tabular-nums">
+                  峰值 {formatDate(peak.startedAt)} · {formatDecimal(peak.value)} 条/分
+                </p>
+              ) : null}
+            </div>
+            <Sparkline
+              area
+              ariaLabel={`近 ${trend.length} 场每分钟弹幕趋势`}
+              color="var(--chart-1)"
+              height={64}
+              peakIndex={peakIndex}
+              values={trend.map(point => point.value)}
+            />
+          </div>
+        ) : null}
         {recent.length === 0 ? (
           <p className="border-t border-hairline px-5 py-8 text-center text-footnote text-muted-foreground">
             还没有可以列出的场次。
           </p>
         ) : (
-          <ul className="divide-y divide-hairline border-t border-hairline">
+          <ul
+            className="divide-y divide-hairline border-t border-hairline"
+            id="group-recent-list"
+          >
             {recent.map(row => {
               const readout = primaryReadout(row);
               const memberOnly = isMemberOnly(row.availability);

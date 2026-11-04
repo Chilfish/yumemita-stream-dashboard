@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attendanceWindow,
   buildGroupData,
   buildGroupDataFromSummary,
   jstDateKey,
@@ -92,6 +93,14 @@ describe("shiftDateKey / weekStartKey", () => {
   });
 });
 
+describe("attendanceWindow", () => {
+  it("ends at JST today and spans 100 days inclusive", () => {
+    const { start, end } = attendanceWindow(new Date("2026-10-29T03:00:00Z"));
+    expect(end).toBe("2026-10-29");
+    expect(start).toBe("2026-07-22");
+  });
+});
+
 describe("buildGroupData", () => {
   const now = new Date("2026-10-29T03:00:00Z");
   const datasets = [member("nonoka", "宮永ののか"), member("arale", "仲町あられ")];
@@ -120,6 +129,9 @@ describe("buildGroupData", () => {
 
   it("rolls up totals and per-member windows", () => {
     const data = buildGroupData(datasets, manifests, now);
+    expect(data.days).toEqual([]);
+    expect(data.attendanceStart).toBeNull();
+    expect(data.attendanceEnd).toBeNull();
     expect(data.totals.streamCount).toBe(3);
     expect(data.totals.chatTotal).toBe(1000);
     expect(data.totals.weekStreams).toBe(1);
@@ -216,6 +228,13 @@ describe("buildGroupDataFromSummary", () => {
     expect(fromSummary.members.find(item => item.dataset.id === "nonoka")?.latest?.videoId).toBe(
       "new",
     );
+    expect(fromSummary.attendanceStart).toBe("2026-07-22");
+    expect(fromSummary.attendanceEnd).toBe("2026-10-29");
+    expect(fromSummary.days.map(day => day.date).sort()).toEqual([
+      "2026-09-30",
+      "2026-10-20",
+      "2026-10-28",
+    ]);
   });
 });
 

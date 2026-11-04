@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
 import { streams } from '@/db/schema'
-import { shiftDateKey } from '@/lib/group'
+import { ATTENDANCE_WINDOW_DAYS, shiftDateKey } from '@/lib/group'
 import { isMemberOnly, MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
 import {
   GROUP_GALLERY_SCHEMA,
@@ -15,7 +15,7 @@ import {
 } from '@/types/group'
 import { toIso, toNumber } from './shared'
 
-const DAY_WINDOW = 40
+const DAY_WINDOW = ATTENDANCE_WINDOW_DAYS
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
 const PUBLIC_ONLY = sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`
 const PUBLIC_WEIGHT = sql`case when ${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY} then 1 else 0 end`
@@ -85,7 +85,7 @@ async function dayStats(db: Db): Promise<GroupDayStat[]> {
 
   return rows
     .filter((row): row is typeof row & { date: string } => Boolean(row.date))
-    .filter(row => row.date >= shiftDateKey(row.latest, -DAY_WINDOW))
+    .filter(row => row.date >= shiftDateKey(row.latest, -(DAY_WINDOW - 1)))
     .map(row => ({
       datasetId: row.datasetId,
       date: row.date,

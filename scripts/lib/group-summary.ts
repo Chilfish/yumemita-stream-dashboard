@@ -1,11 +1,11 @@
 /**
  * 组级精简数据的生成规则。
  *
- * 组首页只需要「成员全期汇总 + 最近 40 天按日桶 + 每位成员最新一场 + 最近若干场」，
+ * 组首页只需要「成员全期汇总 + 最近 100 天按日桶 + 每位成员最新一场 + 最近若干场」，
  * 全组相册才需要全部精简行。两个文件都在发布时由 manifest 派生，
  * 页面不再为了摘要去拉五份完整 manifest。
  */
-import { shiftDateKey, toGroupStream } from "../../src/lib/group.ts";
+import { ATTENDANCE_WINDOW_DAYS, shiftDateKey, toGroupStream } from "../../src/lib/group.ts";
 import {
   GROUP_GALLERY_SCHEMA,
   GROUP_RECENT_LIMIT,
@@ -18,8 +18,8 @@ import {
 } from "../../src/types/group.ts";
 import type { StreamSummary } from "./dataset-manifest.ts";
 
-/** 当前月最多 31 天，留一周余量；再早的日期不可能落进近 7 天 / 本月窗口。 */
-const DAY_WINDOW = 40;
+/** 与首页出勤条共用窗口；再早的日期不会进入近 7 天 / 本月 / 出勤视图。 */
+const DAY_WINDOW = ATTENDANCE_WINDOW_DAYS;
 
 export interface GroupManifestSource {
   id: string;
@@ -62,8 +62,8 @@ function memberStat(datasetId: string, rows: GroupStreamSummary[]): GroupMemberS
 }
 
 /**
- * 只保留最近 40 天有场次的日期桶。窗口按“现在”算，所以不能把周/月数字写死；
- * 但当前月最多 31 天，40 天足够覆盖，客户端求和时不会缺日期。
+ * 只保留窗口内有场次的日期桶。窗口按“现在”算，所以不能把周/月数字写死；
+ * 100 天同时覆盖近 7 天、本月与首页出勤条，客户端求和时不会缺日期。
  */
 function dayStats(datasetId: string, rows: GroupStreamSummary[]): GroupDayStat[] {
   const buckets = new Map<string, { streams: number; chat: number }>();
@@ -77,7 +77,7 @@ function dayStats(datasetId: string, rows: GroupStreamSummary[]): GroupDayStat[]
 
   const latest = rows.find(row => isDateKey(row.date))?.date;
   if (!latest) return [];
-  const minDate = shiftDateKey(latest, -DAY_WINDOW);
+  const minDate = shiftDateKey(latest, -(DAY_WINDOW - 1));
 
   return [...buckets.entries()]
     .filter(([date]) => date >= minDate)
