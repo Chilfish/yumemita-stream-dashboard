@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "yumemita-stream-dashboard",
+  // 源配置：adapter 会生成 dist/server/wrangler.json，部署必须用那份。
   "main": "./src/worker.ts",
   "compatibility_date": "2026-11-03",
   "compatibility_flags": ["nodejs_compat"],

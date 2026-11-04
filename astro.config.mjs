@@ -10,7 +10,7 @@ import { DEFAULT_SITE_URL } from './src/lib/site-defaults.ts'
 
 // https://astro.build/config
 export default defineConfig({
-  site: DEFAULT_SITE_URL,
+  site: process.env.SITE_URL || DEFAULT_SITE_URL,
   output: 'server',
   session: false,
   adapter: cloudflare({

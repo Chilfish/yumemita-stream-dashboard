@@ -14,7 +14,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "cf:preview": "astro build && astro preview",
-    "cf:deploy": "astro build && wrangler deploy",
+    "cf:deploy": "astro build && wrangler deploy --config dist/server/wrangler.json",
     "astro": "astro",
     "typecheck": "astro check",
     "test": "vitest run",

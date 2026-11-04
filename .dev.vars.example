@@ -9,5 +9,6 @@ R2_BUCKET=
 R2_PREFIX=
 
 PUBLIC_R2_BASE=
+SITE_URL=https://ymmt.chilfish.top
 
 PURGE_TOKEN=
