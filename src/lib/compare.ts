@@ -128,6 +128,61 @@ const SERIES_COPY: Record<CompareMetricKey, { label: string; unit: string }> = {
   scPerHour: { label: "SC 强度", unit: "条/时" },
 };
 
+/** 场次为 0 视为「这个月没数据」，其余指标只认非空值。 */
+export function metricHasValue(
+  key: CompareMetricKey,
+  value: number | null | undefined,
+): boolean {
+  if (value == null || !Number.isFinite(value)) return false;
+  return key === "streams" ? value > 0 : true;
+}
+
+/**
+ * 裁掉首尾没有任何成员数据的月份。
+ * 同接等稀疏指标只在最近几个月有值，保留空月份会把有数据的部分挤到最右侧。
+ */
+export function trimmedMonthRange(
+  months: string[],
+  valuesByMember: Record<string, (number | null)[]>,
+  key: CompareMetricKey,
+): { start: number; end: number } {
+  let start = -1;
+  let end = -1;
+
+  for (let index = 0; index < months.length; index += 1) {
+    const hasValue = Object.values(valuesByMember).some(series =>
+      metricHasValue(key, series[index]),
+    );
+    if (!hasValue) continue;
+    if (start === -1) start = index;
+    end = index;
+  }
+
+  return start === -1
+    ? { start: 0, end: months.length - 1 }
+    : { start, end };
+}
+
+/** 均匀分布月份刻度，并保证最后一个刻度不会紧贴前一个。 */
+export function monthTickIndices(length: number, maxTicks = 6): number[] {
+  if (length <= 0) return [];
+  if (length <= maxTicks) {
+    return Array.from({ length }, (_, index) => index);
+  }
+
+  const step = Math.max(1, Math.ceil((length - 1) / (maxTicks - 1)));
+  const indices: number[] = [];
+  for (let index = 0; index < length; index += step) indices.push(index);
+
+  const last = length - 1;
+  if (indices.at(-1) !== last) {
+    if (last - (indices.at(-1) ?? 0) < step) indices.pop();
+    indices.push(last);
+  }
+
+  return indices;
+}
+
 export function buildCompareView(
   buckets: CompareBucket[],
   datasets: DatasetIndexEntry[],

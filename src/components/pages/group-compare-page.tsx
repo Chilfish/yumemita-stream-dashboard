@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { CONTENT_TYPES, CONTENT_TYPE_LABELS, type ContentTypeKey } from "@/lib/classify";
-import { buildCompareView } from "@/lib/compare";
+import { buildCompareView, monthTickIndices, trimmedMonthRange } from "@/lib/compare";
 import {
   COMPARE_WINDOWS,
   DEFAULT_COMPARE_WINDOW,
@@ -214,24 +214,30 @@ export function GroupComparePage({ datasets, data }: GroupComparePageProps) {
     params.type == null &&
     params.months === DEFAULT_COMPARE_WINDOW;
 
-  const monthStep = Math.max(1, Math.ceil(view.months.length / 6));
-  const xTickValues = view.months
-    .map((_, index) => index)
-    .filter(index => index % monthStep === 0 || index === view.months.length - 1);
-
-  function seriesFor(key: CompareMetricKey): ChartSeries[] {
+  function chartFor(key: CompareMetricKey): {
+    months: string[];
+    series: ChartSeries[];
+    ticks: number[];
+  } {
     const metric = view.series.find(item => item.key === key);
-    if (!metric) return [];
+    const valuesByMember: Record<string, (number | null)[]> = Object.fromEntries(
+      view.members.map(member => [member.id, metric?.values[member.id] ?? []]),
+    );
+    const { start, end } = trimmedMonthRange(view.months, valuesByMember, key);
+    const months = view.months.slice(start, end + 1);
 
-    return view.members.map((member, index) => ({
-      color: memberColor(member, index),
-      id: member.id,
-      label: member.label,
-      shortLabel: member.label,
-      values: metric.values[member.id] ?? [],
-    }));
+    return {
+      months,
+      ticks: monthTickIndices(months.length),
+      series: view.members.map((member, index) => ({
+        color: memberColor(member, index),
+        id: member.id,
+        label: member.label,
+        shortLabel: member.label,
+        values: (valuesByMember[member.id] ?? []).slice(start, end + 1),
+      })),
+    };
   }
-
   const windowLabel = WINDOW_LABELS[params.months];
   const typeLabel = params.type ? CONTENT_TYPE_LABELS[params.type] : "全部类型";
   const hasData = view.totals.streams > 0;
@@ -384,7 +390,7 @@ export function GroupComparePage({ datasets, data }: GroupComparePageProps) {
         {canChart ? (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             {CHART_METRICS.map(metric => {
-              const series = seriesFor(metric.key);
+              const chart = chartFor(metric.key);
               const copy = view.series.find(item => item.key === metric.key);
               return (
                 <ChartCard
@@ -395,10 +401,13 @@ export function GroupComparePage({ datasets, data }: GroupComparePageProps) {
                   <MultiLineChart
                     ariaLabel={`${metric.title}：所选成员的月度对比`}
                     emptyMessage="这个指标在所选范围里没有数据。"
-                    series={series}
+                    series={chart.series}
+                    xHoverTitle="月份"
+                    xHoverValue={index => chart.months[index] ?? ""}
                     xLabel="月份"
-                    xTickFormat={value => view.months[value]?.slice(2) ?? ""}
-                    xTickValues={xTickValues}
+                    xTickFormat={value => chart.months[value]?.slice(2) ?? ""}
+                    xTickValues={chart.ticks}
+                    yLabel={copy ? `${copy.label}（${copy.unit}）` : undefined}
                   />
                 </ChartCard>
               );

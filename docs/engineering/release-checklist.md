@@ -34,7 +34,7 @@
 - [ ] `/:datasetId/trends` 趋势与月度明细正常
 - [ ] `/:datasetId/gallery` 与 `/gallery` 相册按 JST 月份分组，筛选写进 URL
 - [ ] `/:datasetId/compare?ids=a,b,c` 最多 4 场，曲线叠加正常
-- [ ] `/compare?members=&type=&months=` 全员对比：筛选写进 URL、刷新保持、样本不足有标注
+- [ ] `/compare?members=&type=&months=` 全员对比：筛选写进 URL、刷新保持、样本不足有标注；图表纵轴有指标与单位，hover 显示月份，图例 hover 高亮对应成员
 - [ ] `/:datasetId/transcripts` 与有稿单场的逐字稿分段正常；时间码跳转正确
 - [ ] 不存在的路径 / dataset / videoId 返回 404
 - [ ] 旧 `#/...` 链接能改写成真实路径

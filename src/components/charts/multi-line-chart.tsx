@@ -14,6 +14,7 @@ import {
 } from "@/components/charts/axis";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatCompact, formatMinuteOffset } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export interface ChartSeries {
   id: string;
@@ -29,9 +30,15 @@ interface MultiLineChartProps {
   series: ChartSeries[];
   ariaLabel: string;
   xLabel?: string;
+  /** 纵轴标题，例如「平均同接（人）」；不传则不画。 */
+  yLabel?: string;
   /** 覆盖默认的「每 30 分钟」刻度位置。 */
   xTickValues?: number[];
   xTickFormat?: (value: number) => string;
+  /** hover 读数第一行的标题，默认「时间」。 */
+  xHoverTitle?: string;
+  /** hover 读数第一行的值，默认按分钟偏移格式化。 */
+  xHoverValue?: (index: number) => string;
   emptyMessage?: string;
 }
 
@@ -82,14 +89,21 @@ export function MultiLineChart({
   series,
   ariaLabel,
   xLabel = "开播后分钟",
+  yLabel,
   xTickValues,
   xTickFormat,
+  xHoverTitle = "时间",
+  xHoverValue,
   emptyMessage = "所选场次没有逐分钟弹幕数据，换一批场次再试。",
 }: MultiLineChartProps) {
   const gradientId = useId();
   const [hover, setHover] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const visible = series.filter(item => item.values.some(value => isValue(value) && value > 0));
+  // 筛选变化后 activeId 可能已不在图里，避免把剩下的折线全部压暗。
+  const highlightedId =
+    activeId != null && visible.some(item => item.id === activeId) ? activeId : null;
   const maxMinutes = max(visible, item => item.values.length - 1) ?? 1;
   const maxValue = max(visible.flatMap(item => item.values.filter(isValue))) ?? 1;
   const direct = visible.length > 0 && visible.length <= DIRECT_LABEL_LIMIT;
@@ -111,7 +125,7 @@ export function MultiLineChart({
       >
       {({ compact, width, height }) => {
         const margin = resolveMargin(
-          { top: 20, right: direct ? 92 : 20, bottom: 40, left: 44 },
+          { top: 20, right: direct ? 92 : 28, bottom: 40, left: yLabel ? 60 : 44 },
           compact,
         );
         const readoutWidth = compact ? 108 : 132;
@@ -171,6 +185,11 @@ export function MultiLineChart({
             </defs>
 
             <YAxis scale={y} x={innerWidth} />
+            {yLabel ? (
+              <AxisLabel vertical x={-margin.left + 12} y={innerHeight / 2}>
+                {yLabel}
+              </AxisLabel>
+            ) : null}
 
             {visible.map((item, index) => {
               const color = seriesColor(item, series.indexOf(item));
@@ -192,7 +211,7 @@ export function MultiLineChart({
                 .curve(curveMonotoneX)(values);
 
               return (
-                <g key={item.id}>
+                <g key={item.id} opacity={highlightedId == null || highlightedId === item.id ? 1 : 0.18}>
                   {areaPath ? (
                     <path className="chart-area" d={areaPath} fill={`url(#${gradientId}-${index})`}>
                       <title>{`${item.label}：逐分钟弹幕面积`}</title>
@@ -206,7 +225,7 @@ export function MultiLineChart({
                       pathLength={1}
                       stroke={color}
                       strokeLinejoin="round"
-                      strokeWidth={CHART_LINE_WIDTH}
+                      strokeWidth={highlightedId === item.id ? CHART_LINE_WIDTH + 0.8 : CHART_LINE_WIDTH}
                     >
                       <title>{`${item.label}：峰值 ${formatCompact(peak)} 条/分`}</title>
                     </path>
@@ -267,7 +286,10 @@ export function MultiLineChart({
                 ))}
                 <ChartReadout
                   rows={[
-                    { label: "时间", value: formatMinuteOffset(hover) },
+                    {
+                      label: xHoverTitle,
+                      value: xHoverValue ? xHoverValue(hover) : formatMinuteOffset(hover),
+                    },
                     ...hovered.map(({ item, value }) => ({
                       color: seriesColor(item, series.indexOf(item)),
                       label: item.shortLabel ?? item.label,
@@ -298,17 +320,39 @@ export function MultiLineChart({
         );
       }}
       </ChartCanvas>
-      {visible.length > DIRECT_LABEL_LIMIT ? <MultiLineLegend series={visible} /> : null}
+      {visible.length > DIRECT_LABEL_LIMIT ? (
+        <MultiLineLegend
+          activeId={highlightedId}
+          onActiveChange={setActiveId}
+          series={visible}
+        />
+      ) : null}
     </div>
   );
 }
 
-/** >2 个系列时补充图例（直接标注放不下）。 */
-export function MultiLineLegend({ series }: { series: ChartSeries[] }) {
+/** >2 个系列时补充图例（直接标注放不下）；hover 图例项时高亮对应折线。 */
+export function MultiLineLegend({
+  series,
+  activeId = null,
+  onActiveChange,
+}: {
+  series: ChartSeries[];
+  activeId?: string | null;
+  onActiveChange?: (id: string | null) => void;
+}) {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1">
       {series.map((item, index) => (
-        <li className="flex min-w-0 items-center gap-1.5 text-footnote" key={item.id}>
+        <li
+          className={cn(
+            "-mx-1 flex min-w-0 cursor-default items-center gap-1.5 rounded px-1 text-footnote transition-opacity duration-120 ease-out",
+            activeId != null && activeId !== item.id ? "opacity-35" : "opacity-100",
+          )}
+          key={item.id}
+          onMouseEnter={() => onActiveChange?.(item.id)}
+          onMouseLeave={() => onActiveChange?.(null)}
+        >
           <span
             aria-hidden="true"
             className="size-2 shrink-0 rounded-full"

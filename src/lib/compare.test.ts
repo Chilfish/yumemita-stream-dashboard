@@ -3,6 +3,8 @@ import {
   buildCompareBuckets,
   buildCompareView,
   monthKeyOf,
+  monthTickIndices,
+  trimmedMonthRange,
   type CompareStreamRow,
 } from "./compare";
 import type { CompareParams } from "@/types/compare";
@@ -205,5 +207,52 @@ describe("buildCompareView", () => {
     expect(view.members).toHaveLength(1);
     expect(view.totals.streams).toBe(2);
     expect(view.totals.chatTotal).toBe(910);
+  });
+});
+
+describe("trimmedMonthRange", () => {
+  const months = ["2025-11", "2025-12", "2026-01", "2026-02"];
+
+  it("trims leading and trailing months without data", () => {
+    expect(
+      trimmedMonthRange(
+        months,
+        {
+          a: [null, null, 100, 200],
+          b: [null, null, null, 150],
+        },
+        "avgConcurrent",
+      ),
+    ).toEqual({ start: 2, end: 3 });
+  });
+
+  it("treats zero streams at the edges as empty months", () => {
+    expect(
+      trimmedMonthRange(
+        months,
+        {
+          a: [0, 0, 2, 0],
+          b: [0, 0, 1, 0],
+        },
+        "streams",
+      ),
+    ).toEqual({ start: 2, end: 2 });
+  });
+
+  it("keeps the full range when nothing is populated", () => {
+    expect(
+      trimmedMonthRange(months, { a: [null, null, null, null] }, "avgConcurrent"),
+    ).toEqual({ start: 0, end: 3 });
+  });
+});
+
+describe("monthTickIndices", () => {
+  it("returns every index for short ranges", () => {
+    expect(monthTickIndices(5)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("spaces ticks and avoids a doubled last label", () => {
+    expect(monthTickIndices(8)).toEqual([0, 2, 4, 7]);
+    expect(monthTickIndices(36)).toEqual([0, 7, 14, 21, 28, 35]);
   });
 });
