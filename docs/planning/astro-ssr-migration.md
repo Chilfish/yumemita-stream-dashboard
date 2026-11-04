@@ -1,6 +1,6 @@
 # Astro + Cloudflare 迁移方案
 
-> 状态：代码实施到阶段 5（2026-11-04）。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），全量 1,897 场已入库、`db:verify` 0 problems。阶段 5 的清理已完成：每日任务改为数据库差集 + ingest + 资产 + purge；客户端媒体统一走 `PUBLIC_R2_BASE`；逐字稿正文改为同源 `/api/transcripts/...` 读取；`public/data/`、旧数据层与 R2 JSON 索引已删除；新增部署工作流。剩余：Cloudflare 线上部署、`Cf-Cache-Status` / purge / R2 正文实测与回滚演练。调研日期 2026-11-03（JST）。
+> 状态：代码实施到阶段 5（2026-11-04）。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），全量场次已入库、`db:verify` 0 problems。阶段 5 的清理已完成：每日任务改为数据库差集 + ingest + 资产 + purge；客户端媒体统一走 `PUBLIC_R2_BASE`；逐字稿正文改为同源 `/api/transcripts/...` 读取；`public/data/`、旧数据层与 R2 JSON 索引已删除；新增部署工作流。R2 已从共享 `static` 桶迁到 `yumemita-data`（对象在桶根，公开域名 `https://ymmt-s3.chilfish.top`，CORS 见 `scripts/r2-cors.json`）。已部署到 `https://ymmt-cf.chilfish.top`，线上 `Cf-Cache-Status`、sitemap 与逐字稿正文已验证。剩余：切原域名后的 canonical / sitemap 复核、`PURGE_TOKEN` 下发与回滚演练。调研日期 2026-11-03（JST）。
 > 目标：把当前的 React Router 8 + Vite 静态站迁到 Astro 7 + Cloudflare Workers，数据从「R2 上的 JSON + 浏览器运行时拉取」改为「PostgreSQL 查询 + R2 存对象」，单场页改为请求期 SSR，并为 Agent 提供 `{videoId}.md` 的 Markdown 视图。
 > 本文只描述已经验证过 API 的方案，不把未验证的平台行为写成事实。
 
@@ -98,7 +98,7 @@
 | 子请求 / 请求 | 50 | 10,000 |
 | 同时打开连接 / 请求 | 6 | 6 |
 
-SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Markdown 渲染会算。按当前 1,897 场、500 行/成员的规模，单页查询和渲染都在可控范围；上线前用 Workers 日志记录 CPU 与 wall time。
+SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Markdown 渲染会算。按当前全量场次、每成员约 500 行的规模，单页查询和渲染都在可控范围；上线前用 Workers 日志记录 CPU 与 wall time。
 
 ### 数据库驱动
 
@@ -236,7 +236,7 @@ SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Mar
 | 项 | 数值 |
 | --- | --- |
 | 成员 | 5 |
-| 场次 | 1,897（nonoka 288 / arale 506 / ritsu 340 / miyako 322 / yuno 441） |
+| 场次 | 全量（nonoka / arale / ritsu / miyako / yuno 五位成员） |
 | 本地 datapack | 约 151 MB，平均约 80 KB/场，最大约 467 KB |
 | manifest | 约 2.5 MB（5 份） |
 | 弹幕总量 | 约 691 万条（当前只在聚合层使用，未逐条入库） |
@@ -385,7 +385,7 @@ index (title gin_trgm_ops)          -- 可选，用于标题搜索
 | `aggregation` | `jsonb` | `full` / `partial` / `top-lists` + coverage |
 | `generated_at` | `timestamptz` | — |
 
-由 ingest 预聚合，页面直接读，不在请求期重算 1,897 场。
+由 ingest 预聚合，页面直接读，不在请求期重算全量场次。
 
 #### `transcripts`
 
@@ -586,12 +586,12 @@ src/db/queries/
 
 实现约定：
 
-- **聚合在 SQL 里做**：月度、Top、覆盖率、日期桶用 `GROUP BY` / 窗口函数 / `FILTER`，不要把 1,897 行拉到 Worker 再算。
+- **聚合在 SQL 里做**：月度、Top、覆盖率、日期桶用 `GROUP BY` / 窗口函数 / `FILTER`，不要把全量行拉到 Worker 再算。
 - **避免 N+1**：子表用 `inArray` 一次取回，或在一条查询里 `json_agg`。
 - **numeric 返回字符串**：Drizzle 的 `numeric` 在 JS 里是 string；查询层统一 `Number()` / `null` 转换，不要漏到组件。
 - **时间**：返回 ISO 字符串；格式化在 `src/lib/format.ts`，按 JST 显示。
 - **rank**：用 `row_number() over (partition by dataset_id order by started_at desc)`；不要落库。
-- **分页**：列表页首屏最多 500 行；超过时用 `limit/offset` 或 cursor。当前 1,897 场、单成员最多 506 场；表格与相册首屏只渲染 100 / 60 行，其余由「显示更多」接管。
+- **分页**：列表页首屏最多 500 行；超过时用 `limit/offset` 或 cursor。当前全量场次、单成员最多约 500 场；表格与相册首屏只渲染 100 / 60 行，其余由「显示更多」接管。
 - **缓存**：查询层不做模块级长期缓存；依赖 Workers Cache 和 `dataset_insights` 预聚合。需要时可以在 isolate 内做 30–60 秒的短缓存，但不要把新鲜度寄托在 isolate 复用上。
 
 ### 错误与降级
@@ -665,7 +665,7 @@ src/db/queries/
   - 查 `datasets` + `streams`，生成组首页、全组相册、每位成员的 6 个栏目页、全部单场页。
   - `lastmod` 用 `streams.source_generated_at`；成员页/组页用 `dataset_insights.generated_at`。
   - 不收录 `compare`、`.md`、`/api/*`。
-  - 条数公式：`2 + 6 × 成员数 + 单场数`；当前是 `2 + 30 + 1897 = 1929`。
+  - 条数公式：`2 + 6 × 成员数 + 单场数`；不要在这里写死具体条数，以数据库为准。
 - `robots.txt` 指向 `/sitemap.xml`；`.md` 不写进 sitemap，用 `X-Robots-Tag: noindex` 防止重复收录。
 - `llms.txt`：列出成员、最近场次、`.md` 链接和站点说明，方便 Agent 发现。
 
@@ -1055,27 +1055,29 @@ CI
 | 类型 | 名称 | 用途 |
 | --- | --- | --- |
 | Secret | `DATABASE_URL` | Worker 读 + ingest 写 |
-| Secret | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` / `R2_PREFIX` | ingest / 资产发布 |
+| Secret | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | ingest / 资产发布（桶 `yumemita-data`，对象在桶根） |
 | Secret | `PURGE_TOKEN` | ingest 调 purge 端点 |
 | Secret | `YT_COOKIES` / `MIHOMO_SUB_URL` | 抓取 |
 | Var | `SITE_URL` / `PUBLIC_R2_BASE` | canonical、封面地址 |
 
 - `DATABASE_URL` 不要进入客户端 bundle；只在 `astro:env/server` 或服务端读取。
+- R2 桶是 `yumemita-data`，对象直接放在桶根，没有公共前缀；`R2_PREFIX` 只作迁移期的兼容项，默认留空。
 - R2 公开域名用于封面/表情；逐字稿正文通过 Worker binding 读取，不直接暴露。
 
 ### R2 布局
 
 ```text
-<prefix>/
-  archive/<datasetId>/<videoId>.datapack.json   # 原始 pack，重放用
-  <datasetId>/thumbs/<videoId>.jpg              # 原图
-  <datasetId>/thumbs/<videoId>.<width>.webp     # 480 / 960 / 1280
-  emojis/<datasetId>/<hash>.png
-  emojis/youtube/<hash>.png
-  <datasetId>/transcripts/<videoId>.json        # 正文
+archive/<datasetId>/<videoId>.datapack.json   # 原始 pack，重放 / 恢复用
+<datasetId>/thumbs/<videoId>.jpg              # 原图
+<datasetId>/thumbs/<videoId>.<width>.webp     # 480 / 960 / 1280
+emojis/<datasetId>/<hash>.png
+emojis/youtube/<hash>.png
+<datasetId>/transcripts/<videoId>.json        # 正文
 ```
 
-`manifest` / `insights` / `group-*` 不再写 R2；逐字稿的 `transcripts/index.json` 仅作兼容产物，页面改查 `transcripts` 表。
+`manifest` / `insights` / `group-*` / `index.json` / `authors.json` 不再写 R2；页面全部查数据库，
+逐字稿只保留正文对象，元数据在 `transcripts` 表。
+Worker 的 `r2_buckets` 绑定同名桶，读取 `transcripts.r2_key`（形如 `<datasetId>/transcripts/<videoId>.json`）。
 
 ### 回滚
 
@@ -1126,7 +1128,7 @@ CI
 验收：
 
 - `/`、`/nonoka`、`/nonoka/streams` 返回 200，HTML 里有 title / description / canonical。
-- `/sitemap.xml` 条数为 `2 + 6 × 5 + 1897 = 1929`（以实际 ingest 结果为准）。
+- `/sitemap.xml` 条数为 `2 + 6 × 成员数 + 单场数`（以实际 ingest 结果为准，不写死数字）。
 - 未知路径返回 404；未知单场页返回 404 而不是首页。
 - 主题切换无闪烁；移动端 390 / 320px 无横向溢出。
 
@@ -1202,19 +1204,19 @@ CI
 
 ### 数据
 
-- [x] 5 个成员的 `streams` 行数与本地 manifest 一致（1,897 场；`db:verify` 0 problems）。
+- [x] 5 个成员的 `streams` 行数与本地 manifest 一致（`db:verify` 0 problems）。
 - [x] 每场 `chat_total` / `superchats` / `sc_totals_by_currency` 与 pack 一致。
 - [x] `stream_authors.messages` 之和等于 `chat.total`。
 - [x] `dataset_insights.totals` 与 `aggregateDataset()` 一致。
 - [x] `paid_events` / `comments` 条数与 pack 一致。
-- [ ] `transcripts.r2_key` 在 R2 上存在（线上 R2 实测待做）。
+- [x] `transcripts.r2_key` 在 R2 上存在（2026-11-04 迁移后逐条核对，线上 `/api/transcripts/...` 200）。
 - [x] 全量 ingest 可重跑，结果幂等（重跑 `processed 0 / skipped N`）。
 - [x] 单场失败记录到 `ingest_reports`，同成员其他场次继续（重跑补齐过 partial）。
 
 ### 页面
 
 - [x] `/` 正常（`test:smoke` 200）。
-- [ ] 单个成员查询失败不阻塞其他成员（组汇总目前是单条查询，未单独验证）。
+- [ ] 组首页查询失败时渲染错误态（当前是单条全表聚合查询，不做逐成员隔离；未断库验证）。
 - [x] 成员页、场次列表、趋势、相册、逐字稿索引、对比页返回 200（`test:smoke`）。
 - [x] 未知 dataset / videoId 返回 404（`test:smoke`）。
 - [x] 单场深链刷新、前进后退、分段 URL 可分享（开发日志 + 手工走查）。
@@ -1226,10 +1228,10 @@ CI
 ### SEO / Agent
 
 - [x] 单场页 HTML 有 title / description / canonical / OG / JSON-LD（本地 preview 抽查）。
-- [x] `/sitemap.xml` 条数为 `2 + 6 × 成员数 + 单场数`（1929 条）。
+- [x] `/sitemap.xml` 条数为 `2 + 6 × 成员数 + 单场数`。
 - [x] `.md` 不在 sitemap，带 `X-Robots-Tag: noindex`。
 - [x] `curl /nonoka/stream/<id>.md` 返回 `text/markdown`，frontmatter 完整。
-- [x] 有稿场次的 `.md` 包含原始逐字稿；无稿场次有说明。
+- [x] 有稿场次的 `.md` 包含原始逐字稿；无稿场次有说明（R2 绑定实测）。
 - [x] `llms.txt` 可访问，包含成员与 `.md` 链接。
 - [x] HTML 单场页有 `rel="alternate" type="text/markdown"`。
 

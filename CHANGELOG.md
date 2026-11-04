@@ -2,7 +2,15 @@
 
 ## 未发布
 
+### 工程
+
+- **R2 迁到独立桶 `yumemita-data`**：封面、表情、逐字稿正文与 `archive/` 从共享 `static` 桶（前缀 `stream-dashboard`）复制到新桶的桶根，不再有公共前缀；`publish:data` / `publish:transcripts` 默认写入新桶，Worker 的 `r2_buckets` binding 读到的 `transcripts.r2_key` 可直接命中。
+- **`.md` 封面地址修正**：frontmatter 的 `image` 改用 `PUBLIC_R2_BASE` 拼绝对地址，不再拼成站内 `/thumbs/...`（会 404）。
+- **缓存失效补齐**：`daily-update` 与 `purge-cache --dataset` 在成员有新增场次时同时失效 `gallery`，全组相册不再等 TTL 自然过期。
+
 ### 文档
+
+- 文档不再写死总场次与 sitemap 条数（本地 pack、数据库与 CDN 会短时不一致），统一改为「以数据库为准」并给出计算公式。
 
 - 按模板 `starter-astro-react` 的文档规范重组 `docs/`：拆成 `requirements/`、`planning/`、`engineering/`、`data/`、`ui-design/`、`postmortem/`、`reviews/`、`development-log/`、`archive/`；根目录只保留 `README.md` 与 `writing-style.md`，`docs/README.md` 作为唯一入口。
 - 新增 [docs/planning/astro-ssr-migration.md](docs/planning/astro-ssr-migration.md)：Astro 7 + Cloudflare Workers + PostgreSQL + R2 的完整迁移方案，含数据模型、ingest、`.md` Agent 路由、缓存失效与发布流程。

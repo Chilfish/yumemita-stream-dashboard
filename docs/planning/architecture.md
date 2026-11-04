@@ -110,7 +110,7 @@ src/db/
 
 约定：
 
-- 聚合在 SQL 里做；不要把 1,897 行拉到 Worker 再算。
+- 聚合在 SQL 里做；不要把全量场次拉到 Worker 再算。
 - 子表用 `inArray` 或 `json_agg` 一次取回，避免 N+1。
 - `numeric` 在 JS 里是字符串；查询层统一转 `number | null`。
 - 时间返回 ISO 字符串，格式化在 `src/lib/format.ts`。
@@ -239,7 +239,7 @@ src/types/                datapack / dataset / db DTO
 | 数据 | PostgreSQL 查询 + R2 对象 | 排序 / 筛选 / 聚合走 SQL，大对象不撑库 |
 | 图表库 | D3 + 手写 SVG | 可控、体积小 |
 | UI 库 | coss ui | Base UI 可访问性 + Tailwind token |
-| 聚合位置 | ingest 预聚合 + SQL | 请求期不重算 1,897 场 |
+| 聚合位置 | ingest 预聚合 + SQL | 请求期不重算全量场次 |
 | 状态管理 | URL + 局部状态 | 可分享、可刷新，避免全局 store |
 | 缓存 | Workers Cache + tag purge | 数据更新不靠重新部署 |
 | 标题搜索 | SQL（可选 pg_trgm） | 不为单个数字拉完整 manifest |
@@ -286,7 +286,7 @@ src/types/                datapack / dataset / db DTO
 
 完整记录见 [performance.md](../engineering/performance.md)。当前关键数字：
 
-- 1,897 场全量入库；列表 + insights 查询本机 → ap-southeast-1 的 p50 约 120 ms。
+- 全量场次已入库；列表 + insights 查询本机 → ap-southeast-1 的 p50 约 120 ms。
 - 首屏 HTML：`/` 约 99 KB、`/gallery` 约 1.65 MB、`/nonoka/streams` 约 1.16 MB、单场约 696 KB、`.md` 约 14 KB、`sitemap.xml` 192 KB。
 - 列表首屏 100 行、相册首屏 60 张，其余「显示更多」。
 - 跨区 Neon RTT 是 SSR 的主要延迟；Workers 同区部署后应显著下降。

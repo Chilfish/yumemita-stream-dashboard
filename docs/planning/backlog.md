@@ -7,9 +7,9 @@
 
 | 编号 | 任务 | 优先级 | 前置条件 | 来源 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 阶段 0–5 与全量 ingest 完成；每日 ingest / 资产 / purge、数据库差集、逐字稿 API 已接；线上部署与缓存实测待做 |
+| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 阶段 0–5 与全量 ingest 完成；每日 ingest / 资产 / purge、数据库差集、逐字稿 API 已接；已部署到 `ymmt-cf.chilfish.top`，待切原域名复核与回滚演练 |
 | B2 | 单场 `.md` Agent 路由（`FR-AGENT-001`） | P2 | B1 的数据库查询层 | 迁移 | ✅ 已实现 |
-| B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 缓存 purge 端点 | 已知缺口 | 🚧 端点与每日自动 purge 已实现，线上实测待做 |
+| B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 缓存 purge 端点 | 已知缺口 | 🚧 端点与每日自动 purge 已实现，线上缓存 HIT 已验证；Worker 未配置 `PURGE_TOKEN`，下发后实测 purge |
 | B4 | 跨成员对比（`FR-COMPARE-002`） | P2 | 统一场次/时间段口径 | roadmap | 📋 |
 | B5 | 观众重叠页面（`authors.json` 已有数据） | P2 | 确认重叠算法与最小样本 | roadmap | 📋 |
 | B6 | 全量弹幕入库与检索 | P2 | B1；`chat_events` 分区方案 | 迁移 | 📋 |
@@ -92,8 +92,8 @@
 - [x] 索引与明细拆分：首屏只拉 `index.json` + 当前 dataset 的 manifest/insights，单场按需拉 datapack。
 - [x] CI 从对象存储拉索引；`VITE_DATAPACK_BASE` 缺失时给出明确报错。
 - [x] 定时增量更新：`.github/workflows/data.yml` 每天 14:17 JST 先做频道差集，只抓有变化的成员；安静日不恢复、不发布。`--force` 重抓最近 24 小时，`bun scripts/daily-update.ts` 本地手动同款。
-- [ ] 数据更新后缓存失效：`ingest` 完成后调用 Worker 的 purge 端点，不再触发前端构建；方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
-- [x] Astro + PostgreSQL + Workers SSR 迁移：单场页请求期 SSR，`.md` 路由供 Agent 读取；全量 1,897 场已入库。线上部署与缓存实测仍待做，方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
+- [ ] 数据更新后缓存失效：`ingest` 完成后调用 Worker 的 purge 端点，不再触发前端构建；方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。端点与每日任务已实现，Worker 的 `PURGE_TOKEN` 待下发。
+- [x] Astro + PostgreSQL + Workers SSR 迁移：单场页请求期 SSR，`.md` 路由供 Agent 读取；全量场次已入库并部署到 `ymmt-cf.chilfish.top`。切原域名后的复核与回滚演练仍待做，方案见 [astro-ssr-migration.md](astro-ssr-migration.md)。
 - [x] 在 GitHub 仓库设置 `VITE_DATAPACK_BASE` repository variable（HTTPS 地址）。
 - [x] `ObjectStore` 支持二进制上传与 `Content-Type`；缓存头交给桶侧规则（Bun S3 写接口不支持自定义 Cache-Control）。
 - [x] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。

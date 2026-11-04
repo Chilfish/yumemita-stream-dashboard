@@ -322,7 +322,7 @@ hash   = id 的 `/` 后半段
 例如 `UC99kOG6_9RD0mR3OG4EOfxw/54y5aK3nFd-QoPwPxrGNqQk` 对应：
 
 ```text
-https://s3.chilfish.top/stream-dashboard/emojis/yuno/54y5aK3nFd-QoPwPxrGNqQk.png
+<PUBLIC_R2_BASE>/emojis/yuno/54y5aK3nFd-QoPwPxrGNqQk.png
 ```
 
 ### 8.3 名称、快捷键与回退

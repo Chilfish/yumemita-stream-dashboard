@@ -44,28 +44,43 @@ bunx wrangler rollback                    # 回滚到上一版
 | 类型 | 名称 | 用途 |
 | --- | --- | --- |
 | Secret | `DATABASE_URL` | Worker 读 + ingest 写 |
-| Secret | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` / `R2_PREFIX` | ingest / 资产发布 |
+| Secret | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | ingest / 资产发布（桶 `yumemita-data`） |
 | Secret | `PURGE_TOKEN` | ingest 调 purge 端点 |
 | Secret | `YT_COOKIES` / `MIHOMO_SUB_URL` | 抓取（GitHub Actions） |
-| Var | `PUBLIC_R2_BASE` | 封面 / 表情公开域名（构建时内联） |
+| Var | `PUBLIC_R2_BASE` | 封面 / 表情公开域名，`https://ymmt-s3.chilfish.top`（构建时内联） |
 | Var | `SITE_URL` | canonical / sitemap / purge 地址 |
 
 `DATABASE_URL` 不进入客户端 bundle；只从 `astro:env/server` 或服务端读取。
 
 ## R2 布局
 
+桶是 `yumemita-data`，对象直接放在桶根，没有公共前缀：
+
 ```text
-<prefix>/
-  <datasetId>/thumbs/<videoId>.jpg              # 原图
-  <datasetId>/thumbs/<videoId>.<width>.webp     # 480 / 960 / 1280
-  emojis/<datasetId>/<hash>.png
-  emojis/youtube/<hash>.png
-  archive/<datasetId>/<videoId>.datapack.json   # 原始 pack，重放 / 恢复用
-  <datasetId>/transcripts/<videoId>.json        # 逐字稿正文
+archive/<datasetId>/<videoId>.datapack.json   # 原始 pack，重放 / 恢复用
+<datasetId>/thumbs/<videoId>.jpg              # 原图
+<datasetId>/thumbs/<videoId>.<width>.webp     # 480 / 960 / 1280
+emojis/<datasetId>/<hash>.png
+emojis/youtube/<hash>.png
+<datasetId>/transcripts/<videoId>.json        # 逐字稿正文
 ```
 
-- 封面 / 表情走 R2 公开域名；逐字稿正文通过 Worker binding 读取，不直接暴露。
-- 不再写 `index.json` / `manifest.json` / `insights.json` / `group-*.json`；这些由数据库查询生成。
+- 封面 / 表情走 R2 公开域名 `https://ymmt-s3.chilfish.top`；逐字稿正文通过 Worker binding 读取，不直接暴露。
+- 不再写 `index.json` / `manifest.json` / `insights.json` / `group-*.json` / `authors.json`；这些由数据库查询生成。
+- `wrangler.jsonc` 的 `r2_buckets` 必须绑定这个桶；Worker 用 `transcripts.r2_key` 直接 `get()`，不要再拼前缀。
+
+### CORS
+
+浏览器会跨域请求表情索引（`fetch`），桶需要允许站点域名。规则用 wrangler 维护：
+
+```bash
+bunx wrangler r2 bucket cors set yumemita-data --file scripts/r2-cors.json
+bunx wrangler r2 bucket cors list yumemita-data
+```
+
+- 允许来源：`https://ymmt.chilfish.top`、`https://ymmt-cf.chilfish.top`、`https://*.chilfish.top`、`http://localhost:4321`、`http://127.0.0.1:4321`。
+- 允许方法：`GET` / `HEAD`；暴露 `Content-Length` / `Content-Type` / `ETag` / `Cache-Control`；预检缓存 1 小时。
+- 封面 `<img>` 本身不需要 CORS；规则主要服务表情索引与后续按需读取。
 
 ## 缓存
 

@@ -5,18 +5,18 @@
 
 ## 当前事实与目标形态
 
-**当前是 Astro SSR + Neon 查询形态（2026-11-04）。** 所有页面已迁到 `src/pages/*.astro`，旧 React Router 页面与依赖已删除；全量 1,897 场已入库并通过对账。每日任务已改为「数据库差集 → 抓取 → ingest → 资产 → purge」，客户端媒体统一走 `PUBLIC_R2_BASE`，逐字稿正文走同源 `/api/transcripts/...`。剩余线上部署与缓存 / R2 实测。
+**当前是 Astro SSR + Neon 查询形态（2026-11-04）。** 所有页面已迁到 `src/pages/*.astro`，旧 React Router 页面与依赖已删除；全量场次已入库并通过对账。每日任务已改为「数据库差集 → 抓取 → ingest → 资产 → purge」，客户端媒体统一走 `PUBLIC_R2_BASE`，逐字稿正文走同源 `/api/transcripts/...`。已部署到 `https://ymmt-cf.chilfish.top`；合并 main 后切回原域名，剩余缓存 / purge / 回滚演练。
 
 | 项 | 当前 | 目标 |
 | --- | --- | --- |
 | 框架 | Astro 7 + `@astrojs/cloudflare` | 同左 |
-| 数据 | PostgreSQL（全量 1,897 场）+ R2 对象 | 同左 |
+| 数据 | PostgreSQL（全量场次）+ R2 对象 | 同左 |
 | 路由 | `src/pages/` 文件路由 + 请求期 SSR | 同左 |
 | 单场页 | 请求期 SSR（DB 还原 pack） | 同左 |
 | Agent 视图 | `/{datasetId}/stream/{videoId}.md` 已实现 | 同左 |
-| 部署 | `wrangler.jsonc` 已配置，未正式部署 | Cloudflare Workers |
+| 部署 | 已部署到 `ymmt-cf.chilfish.top`；合并 main 后切回原域名 | Cloudflare Workers |
 
-已完成：Astro 脚手架、DB schema / ingest / 对账 / 查询层、全量 ingest（1,897 场，`db:verify` 0 problems）、全部页面与岛屿、sitemap / llms.txt / robots、`.md` 端点、逐字稿 API、内部 purge 端点、每日 ingest + purge、部署工作流、`astro check` / `test` / `build` / `preview` / `test:smoke`。剩余：Cloudflare 线上部署、`Cf-Cache-Status` / purge / R2 正文实测与回滚演练。详见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md)。
+已完成：Astro 脚手架、DB schema / ingest / 对账 / 查询层、全量 ingest（`db:verify` 0 problems）、全部页面与岛屿、sitemap / llms.txt / robots、`.md` 端点、逐字稿 API、内部 purge 端点、每日 ingest + purge、部署工作流、`astro check` / `test` / `build` / `preview` / `test:smoke`。剩余：切原域名后的 canonical / sitemap 复核、purge 凭证下发、回滚演练。
 
 ## 意图 → 文件映射（当前实现）
 
@@ -37,7 +37,7 @@
 | 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-danmaku.ts`、`fetch-live-chat.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts` | 手写 Markdown，发布到 R2 |
 | 数据字段 / 口径 | `docs/data/data-model.md`、`src/types/` | 改字段同步文档与类型 |
-| 部署 / 缓存 | `docs/engineering/deployment.md`、`wrangler.jsonc`、`astro.config.mjs` | Cloudflare Workers + R2 |
+| 部署 / 缓存 | `docs/engineering/deployment.md`、`wrangler.jsonc`、`scripts/r2-cors.json`、`astro.config.mjs` | Cloudflare Workers + R2 |
 | 发布检查 | `docs/engineering/release-checklist.md` | 按清单勾选 |
 | 迁移执行 | `docs/planning/astro-ssr-migration.md` | 分阶段，先 PoC 再切换 |
 
@@ -88,6 +88,7 @@ data/<id>/*.datapack.json
 ```
 
 - 页面只读数据库；R2 只放不可变对象。
+- R2 桶是 `yumemita-data`，对象直接放在桶根（`archive/`、`<datasetId>/thumbs/`、`emojis/`、`<datasetId>/transcripts/`），不再有公共前缀。
 - 数据更新后按 Cache-Tag purge，不触发前端构建。
 - `vstats` / `comments` / `avgConcurrent` 可能为 `null`；图表跳过或显示「—」。
 - 单场页只查该场数据；对比页最多 4 场。

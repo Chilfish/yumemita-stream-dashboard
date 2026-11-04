@@ -119,7 +119,7 @@ bun run dev -- --port 4322
 
 - 先确认本地有图：`data/<datasetId>/thumbs/<videoId>.jpg`；没有就 `bun run fetch:thumbs --dataset <id>`。
 - 生产读的是 `PUBLIC_R2_BASE/<dataset>/thumbs/<videoId>.jpg`，需要 `publish:assets` 上传；只跑 `fetch:thumbs` 不会出现在线上。
-- 图存在但显示成员色兜底：检查 `PUBLIC_R2_BASE` 是否包含桶内前缀（`R2_PREFIX`），以及对象是否公开可读。
+- 图存在但显示成员色兜底：确认 `PUBLIC_R2_BASE` 指向 `yumemita-data` 的公开域名（对象在桶根，不再有公共前缀），以及对象是否公开可读。
 - 相册里个别卡片是兜底：说明那场没有 `video.thumbnail` 或下载失败，可加 `--force` 重抓。
 
 ## 逐字稿不出现

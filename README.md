@@ -87,7 +87,7 @@ bun run dev
 DATABASE_URL=postgresql://user:password@ep-xxx.neon.tech/neondb?sslmode=require
 
 # 封面 / 表情的 R2 公开域名，构建时内联
-PUBLIC_R2_BASE=https://s3.example.com/stream-dashboard
+PUBLIC_R2_BASE=https://ymmt-s3.chilfish.top
 
 # 站点根地址，canonical / OG / sitemap / purge 用
 SITE_URL=https://ymmt.example.com
@@ -96,8 +96,7 @@ SITE_URL=https://ymmt.example.com
 R2_ACCOUNT_ID=""
 R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
-R2_BUCKET=""
-R2_PREFIX="stream-dashboard"
+R2_BUCKET="yumemita-data"
 PURGE_TOKEN=""
 ```
 
@@ -182,7 +181,7 @@ bun run cf:deploy      # astro build + wrangler deploy --config dist/server/wran
 - 单场 Markdown：`/{datasetId}/stream/{videoId}.md`，返回 `text/markdown` 并带逐字稿。
 - `sitemap.xml` / `llms.txt` 由 endpoint 生成；`robots.txt` 是静态文件。
 - 数据更新后调内部 `POST /api/internal/cache/purge`（Bearer `PURGE_TOKEN`）按 tag 失效。
-- 全量 1,897 场已入库；线上部署与缓存实测尚未执行。详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。
+- 全量场次已入库；已部署到 `ymmt-cf.chilfish.top`，切回原域名后复核 canonical / sitemap。详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。
 
 ## 项目结构
 

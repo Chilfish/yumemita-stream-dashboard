@@ -57,19 +57,21 @@
 - [ ] `vstats: null` 的场次相关图表跳过或显示「—」
 - [ ] 无评论 / 无 SC / 无逐字稿的空状态文案清晰
 - [ ] 数据库不可用时页面显示错误态 + 可执行动作，不白屏
-- [ ] 单个成员查询失败不阻塞组首页
+- [ ] 组首页查询失败时渲染错误态（当前是单条聚合查询，不做逐成员隔离）
 - [ ] 控制台无未处理异常
 
 ### SEO / Agent
 
-- [ ] 单场页 HTML 含 title / description / canonical / OG / JSON-LD
-- [ ] `sitemap.xml` 条数 = `2 + 6 × 成员数 + 单场数`
-- [ ] `robots.txt` 指向 `/sitemap.xml`
-- [ ] 对比页与未知路径 `noindex`
-- [ ] `/nonoka/stream/<id>.md` 返回 `text/markdown`，frontmatter 与逐字稿完整
-- [ ] 无稿场次 `.md` 写明没有稿件；未知 id 404 + `no-store`
-- [ ] `llms.txt` 包含成员与 `.md` 链接
-- [ ] HTML 单场页有 `<link rel="alternate" type="text/markdown">`
+- [x] 单场页 HTML 含 title / description / canonical / OG / JSON-LD（2026-11-04 线上核对）
+- [x] `sitemap.xml` 条数 = `2 + 6 × 成员数 + 单场数`（线上核对）
+- [x] `robots.txt` 指向 `/sitemap.xml`
+- [x] 对比页与未知路径 `noindex`
+- [x] `/nonoka/stream/<id>.md` 返回 `text/markdown`，frontmatter 与逐字稿完整
+- [x] 逐字稿正文可从 R2 binding 读取（`/api/transcripts/...` 200，`.md` 含正文）
+- [x] R2 桶内对象完整（封面 / 表情 / archive / 逐字稿），CORS 允许站点域名与 localhost
+- [x] 无稿场次 `.md` 写明没有稿件；未知 id 404 + `no-store`
+- [x] `llms.txt` 包含成员与 `.md` 链接
+- [x] HTML 单场页有 `<link rel="alternate" type="text/markdown">`
 
 ## 数据发布
 
@@ -82,9 +84,9 @@
 
 ## 缓存与部署
 
-- [ ] 第二次请求 `Cf-Cache-Status: HIT`（或 `REVALIDATED`）
-- [ ] purge 端点拒绝无 token 请求
-- [ ] `wrangler deploy --config dist/server/wrangler.json` 后 `/`、成员页、单场页、`.md`、sitemap 正常
+- [x] 第二次请求 `Cf-Cache-Status: HIT`（或 `REVALIDATED`）（2026-11-04 线上验证）
+- [ ] purge 端点拒绝无 token 请求（Worker 尚未配置 `PURGE_TOKEN`，当前返回 503）
+- [x] `wrangler deploy --config dist/server/wrangler.json` 后 `/`、成员页、单场页、`.md`、sitemap 正常（`ymmt-cf.chilfish.top`）
 - [ ] 部署后缓存行为符合 `cross_version_cache` 配置
 - [ ] 新场次入库后不触发前端构建即可访问
 - [ ] `DATABASE_URL` 只在服务端读取；R2 凭据不进入客户端 bundle

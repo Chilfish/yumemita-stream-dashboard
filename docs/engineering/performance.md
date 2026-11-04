@@ -5,7 +5,7 @@
 ## 原则
 
 1. **只查必要的数据**：页面只查当前视图需要的列与行，不为了一个数字扫整张表。
-2. **聚合在 SQL / ingest 里做**：`dataset_insights` 预聚合；请求期不重算 1,897 场。
+2. **聚合在 SQL / ingest 里做**：`dataset_insights` 预聚合；请求期不重算全量场次。
 3. **首屏有上限**：列表 100 行、相册 60 张，其余由「显示更多」在已水合的岛屿里追加。
 4. **缓存分层**：Workers Cache → 浏览器 HTTP 缓存 → 图片长缓存。
 5. **先量再改**：没有数字的“优化”不进文档。
@@ -24,7 +24,7 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 
 `perf:smoke` 每个 URL 请求 5 次，输出响应体中位数、耗时中位数、`cache-tag` 与 `content-type`。
 
-### 实测（全量 1,897 场，本机 → ap-southeast-1 Neon）
+### 实测（全量数据，本机 → ap-southeast-1 Neon）
 
 | 路由 | HTML 中位数 | 耗时中位数 | cache tag |
 | --- | ---: | ---: | --- |
@@ -38,17 +38,17 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 | `/nonoka/compare` | 1.22 MB | 475 ms | `dataset-nonoka,compare` |
 | `/nonoka/stream/<id>` | 696 KB | 402 ms | `streams,stream-<id>,dataset-nonoka` |
 | `.../<id>.md` | 14.0 KB | 359 ms | `streams,stream-<id>,dataset-nonoka` |
-| `/sitemap.xml` | 192 KB（1,929 条 URL） | 301 ms | `sitemap` |
+| `/sitemap.xml` | 192 KB（约 1,930 条 URL） | 301 ms | `sitemap` |
 | `/llms.txt` | 5.3 KB | 257 ms | `llms` |
 
 - 响应头带 `cloudflare-cdn-cache-control` 与 `Cache-Tag`；middleware 同步一份 `Cache-Control`，让 `<link rel=prefetch>` 的预取能被浏览器复用。
 - 耗时是**本机跨区**访问 Neon 的数字（每轮并行查询 ≈ 1 个 RTT）。同区 Worker + Neon 会低一个量级；线上以 `Cf-Cache-Status` 与 `x-response-time` 为准。
-- `bun run db:query`（列表 + insights，全量 1,897 场）：p50 122.5 ms / p95 247.6 ms。
+- `bun run db:query`（列表 + insights，全量场次）：p50 122.5 ms / p95 247.6 ms。
 - 首次请求冷，后续命中 Workers Cache 后只付边缘响应；本地 `wrangler dev` 不复现 Cache HIT，需线上观察。
 
 ### 长列表首屏上限
 
-成员最多 506 场、全组 1,897 场。此前 SSR 把所有行 / 封面都写进 HTML，页面体积随场次线性膨胀。现在：
+成员最多约 500 场、全组约 1,900 场（以数据库为准）。此前 SSR 把所有行 / 封面都写进 HTML，页面体积随场次线性膨胀。现在：
 
 | 路由 | 上限前 | 上限后 | 变化 |
 | --- | ---: | ---: | ---: |
