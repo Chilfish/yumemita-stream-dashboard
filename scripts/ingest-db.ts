@@ -400,10 +400,25 @@ async function main(): Promise<void> {
         }
       }
 
+      // 上次可能在写完 streams 后中断，重跑时所有 pack 都会 skip。
+      // 用数据库里的实际场次数判断 insights 是否过期，避免必须 --all 才能补汇总。
+      const [insightRow] = await db
+        .select({ totals: datasetInsights.totals })
+        .from(datasetInsights)
+        .where(eq(datasetInsights.datasetId, source.id))
+        .limit(1)
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(streams)
+        .where(eq(streams.datasetId, source.id))
+      const insightTotals = (insightRow?.totals ?? {}) as { streamCount?: unknown }
+      const insightCount = typeof insightTotals.streamCount === 'number' ? insightTotals.streamCount : null
+      const insightsStale = insightCount !== Number(countRow?.count ?? 0)
+
       if (args.limit) {
         console.log(`[ingest] ${source.id}: 小批量模式，跳过 dataset_insights 重算`)
       }
-      else if (changed || args.all) {
+      else if (changed || args.all || insightsStale) {
         const all = readPacks(source.id).map(({ file, raw }) => ({
           pack: JSON.parse(raw) as StreamDatapack,
           rel: `data/${source.id}/${basename(file)}`,
