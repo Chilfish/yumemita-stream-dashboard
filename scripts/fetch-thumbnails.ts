@@ -7,7 +7,7 @@
  *   bun run fetch:thumbs --dataset nonoka --limit 20 --dry-run
  *
  * 页面运行时只读对象存储（`<base>/<datasetId>/thumbs/<videoId>.jpg`），不直连 YouTube：
- * 避免热链、CORS 与慢请求拖慢首屏。抓完由 `bun run publish:data` 上传。
+ * 避免热链、CORS 与慢请求拖慢首屏。抓完由 `bun run publish:assets` 上传。
  *
  * 特性：
  *   - 可重入：已存在的 jpg 默认跳过，`--force` 才重抓
@@ -76,7 +76,7 @@ const USAGE = `用法：bun scripts/fetch-thumbnails.ts [选项]
 
 把每场直播的 YouTube 封面镜像到 data/<datasetId>/thumbs/<videoId>.jpg，
 并编码 480 / 960 / 1280w 的 WebP 变体（<videoId>.<width>.webp），
-发布时由 bun run publish:data 一起上传。已存在的原图默认跳过，只有原图时补变体；
+发布时由 bun run publish:assets 一起上传。已存在的原图默认跳过，只有原图时补变体；
 单张失败只记日志，不阻塞其余场次。
 
 选项：
@@ -344,7 +344,7 @@ async function main(): Promise<void> {
   if (selected.length > 1 || total.failed > 0)
     console.log(`[fetch-thumbs] 合计：成功 ${total.ok} / 跳过 ${total.skipped} / 失败 ${total.failed} / 变体 ${total.variants}`)
   if (total.ok > 0 || total.variants > 0)
-    console.log('[fetch-thumbs] 下一步：bun run publish:data 上传封面与变体（thumbs 先于 pack 上传）')
+    console.log('[fetch-thumbs] 下一步：bun run publish:assets 上传封面与变体（thumbs 先于 archive 上传）')
 }
 
 await main()

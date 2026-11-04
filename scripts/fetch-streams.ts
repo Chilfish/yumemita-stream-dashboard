@@ -39,7 +39,9 @@ const CHAT_GRACE_HOURS = 24
 /** VSTATS 对新场次的收录更慢；这段时间内缺页面按「还没生成」处理。 */
 const VSTATS_GRACE_HOURS = 24 * 14
 const DATAPACK_SCRIPT = join(APP_ROOT, 'scripts', 'stream-datapack.ts')
+const INGEST_SCRIPT = join(APP_ROOT, 'scripts', 'ingest-db.ts')
 const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
+const PURGE_SCRIPT = join(APP_ROOT, 'scripts', 'purge-cache.ts')
 
 interface DatasetSource {
   id: string
@@ -127,12 +129,12 @@ const USAGE = `用法：bun scripts/fetch-streams.ts --dataset <id> --root <会�
   --force <id[,id...]>       定点重抓：只处理点名的场次（meta/弹幕/评论/VSTATS 全覆盖），
                              不补跑频道里的其他待抓场次，也不拉频道列表；可重复传。
                              all = 忽略已入库，把本次全频道候选都重抓
-  --publish                  抓完调用 publish:data 发布；有 --force 时默认开启
-  --no-publish               即使有 --force 也不发布
+  --publish                  抓完写入数据库、发布资产并 purge；有 --force 时默认开启
+  --no-publish               即使有 --force 也不写库 / 不发布
   -h, --help                 显示本帮助
 
 恢复：本地没有 manifest 时默认自动执行，已存在的 pack 不会重复下载。
-远端来源按顺序尝试 DATAPACK_BASE / VITE_DATAPACK_BASE，再试 R2_*。`
+远端来源按顺序尝试 DATAPACK_BASE 公开地址，再试 R2_*。`
 
 function logFile(path: string, message: string): void {
   const line = `[${new Date().toISOString()}] ${message}`
@@ -356,7 +358,7 @@ async function main(): Promise<void> {
       for (const id of result.failed)
         restoreFailed.add(id)
       if (result.sources.length === 0) {
-        logFile(logPath, '恢复跳过：没有配置 DATAPACK_BASE / VITE_DATAPACK_BASE，也没有 R2_* 凭据')
+        logFile(logPath, '恢复跳过：没有配置 DATAPACK_BASE，也没有 R2_* 凭据')
       }
       else {
         const failedNote = result.failed.length > 0 ? `，失败 ${result.failed.length}` : ''
@@ -792,8 +794,8 @@ async function main(): Promise<void> {
       logFile(logPath, `retry 完成，剩余失败 ${failures.length}`)
     }
 
-    // 强制重抓只有一两场，本地 datapack 一更新就顺手发布：publish:data 是增量的，
-    // 只会传这一份 pack + manifest / insights / index，不会全量重传。
+    // 强制重抓只有一两场，本地 datapack 一更新就顺手入库 + 发资产 + 失效缓存。
+    // ingest 与 publish 都是增量的：未变化的场次会跳过。
     if (shouldPublish) {
       if (values['no-build']) {
         progress.publish = 'skipped: --no-build'
@@ -801,18 +803,28 @@ async function main(): Promise<void> {
       }
       else if (failures.length > 0) {
         progress.publish = `skipped: ${failures.length} failures`
-        logFile(logPath, `publish 跳过：仍有 ${failures.length} 项失败，修好后手动运行 bun scripts/publish-data.ts --dataset ${dataset.id}`)
+        logFile(logPath, `publish 跳过：仍有 ${failures.length} 项失败，修好后手动运行 bun scripts/db-ingest / publish-data --assets-only --dataset ${dataset.id}`)
       }
-      else if (!readCredentials()) {
-        progress.publish = 'skipped: no credentials'
-        logFile(logPath, 'publish 跳过：没有 R2_* 凭据；本地 datapack 已更新，配好凭据后手动运行 bun scripts/publish-data.ts')
+      else if (!process.env.DATABASE_URL || !readCredentials()) {
+        progress.publish = 'skipped: missing DATABASE_URL or R2 credentials'
+        logFile(logPath, 'publish 跳过：缺少 DATABASE_URL 或 R2_* 凭据；本地 datapack 已更新，配好后再跑 db:ingest / publish:assets')
       }
       else {
         try {
-          logFile(logPath, `publish：bun scripts/publish-data.ts --dataset ${dataset.id}`)
-          const output = await run('bun', [PUBLISH_SCRIPT, '--dataset', dataset.id], true, 0)
+          logFile(logPath, `ingest：bun scripts/ingest-db.ts --dataset ${dataset.id}`)
+          const ingestOutput = await run('bun', [INGEST_SCRIPT, '--dataset', dataset.id], true, 0)
+          for (const line of ingestOutput.split('\n').map(item => item.trim()).filter(Boolean))
+            logFile(logPath, `ingest | ${line}`)
+
+          logFile(logPath, `publish：bun scripts/publish-data.ts --dataset ${dataset.id} --assets-only`)
+          const output = await run('bun', [PUBLISH_SCRIPT, '--dataset', dataset.id, '--assets-only'], true, 0)
           for (const line of output.split('\n').map(item => item.trim()).filter(Boolean))
             logFile(logPath, `publish | ${line}`)
+
+          logFile(logPath, `purge：bun scripts/purge-cache.ts --dataset ${dataset.id}`)
+          const purgeOutput = await run('bun', [PURGE_SCRIPT, '--dataset', dataset.id], true, 0)
+          for (const line of purgeOutput.split('\n').map(item => item.trim()).filter(Boolean))
+            logFile(logPath, `purge | ${line}`)
           progress.publish = 'ok'
         }
         catch (error) {

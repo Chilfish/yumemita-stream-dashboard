@@ -1,5 +1,5 @@
-# data/ 是本地暂存区：真源在对象存储（R2 等），见 docs/data/adding-data.md。
-# manifest.json / insights.json 由 publish:data 生成，同样不提交。
+# data/ 是本地暂存区：pack 是唯一真源，入库后由 PostgreSQL 提供页面数据。
+# manifest.json / insights.json 由本地发布脚本派生，同样不提交。
 *
 !.gitignore
 !README.md

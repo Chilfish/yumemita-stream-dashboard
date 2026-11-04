@@ -35,7 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      VITE_DATAPACK_BASE: ${{ vars.VITE_DATAPACK_BASE }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SITE_URL: ${{ vars.SITE_URL }}
+      PURGE_TOKEN: ${{ secrets.PURGE_TOKEN }}
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -64,6 +66,11 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
+
+      # ingest / 探针现在直接用 drizzle-orm 与 @neondatabase/serverless；
+      # 旧脚本只依赖本地文件，以前不需要装包。
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       # yt-dlp 解 YouTube 的 JS challenge 需要一个 JS runtime；deno 与本地保持一致。
       - name: Setup Deno
@@ -159,13 +166,16 @@ jobs:
 
       - name: Check configuration
         run: |
-          if [ -z "$VITE_DATAPACK_BASE" ]; then
-            echo "::error::Set the repository variable VITE_DATAPACK_BASE to the public object storage root."
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Set the DATABASE_URL repository secret (Worker read path + ingest)."
             exit 1
           fi
           if [ -z "$R2_BUCKET" ] || [ -z "$R2_ACCOUNT_ID" ]; then
             echo "::error::Set the R2_* repository secrets before running the data job."
             exit 1
+          fi
+          if [ -z "$SITE_URL" ] || [ -z "$PURGE_TOKEN" ]; then
+            echo "::warning::SITE_URL / PURGE_TOKEN 未配置，本次不会失效 Workers Cache；页面会在 TTL 后自然过期。"
           fi
 
       # 本地暂存区跨运行保留：已有 150 MB 左右的 pack，不清空就不会每天重下。
@@ -192,7 +202,7 @@ jobs:
       # 而 fetch-streams 以前把元信息失败只记进进度文件。先探一场已知可读的场次，
       # 让失败停在日志清楚的地方，而不是跑完 7 分钟再报「成功」。
       # 探针不能写死视频 ID：yt-dlp 的测试视频 BaW_jenozKc 下架之后，这步会把
-      # 「视频没了」误报成 cookie / 代理故障。优先取缓存里最近的一场真实场次。
+      # 「视频没了」误报成 cookie / 代理故障。优先取数据库里最近的一场真实场次。
       - name: Check YouTube access
         run: |
           set -uo pipefail
@@ -201,15 +211,14 @@ jobs:
           if [ -n "${YTDLP_PROXY:-}" ]; then
             common+=(--proxy "$YTDLP_PROXY")
           fi
-          probe=$(jq -r '.streams[0]? // empty | "\(.startedAt // "")\t\(.videoId // "")"' data/*/manifest.json 2>/dev/null \
-            | sort -r | head -n 1 | cut -f 2)
+          probe=$(bun scripts/db-latest-video.ts 2>/dev/null || true)
           if [ -z "$probe" ]; then
             channel=$(jq -r '.datasets[0].channelId' data-sources.json)
             probe=$(yt-dlp --flat-playlist --playlist-items 1 --print '%(id)s' "${common[@]}" \
               "https://www.youtube.com/channel/${channel}/streams" 2> /dev/null | head -n 1)
           fi
           if [ -z "$probe" ]; then
-            echo "::error::拿不到探针视频：数据缓存为空，频道 /streams 也读不出来。先查 YT_COOKIES 与代理。"
+            echo "::error::拿不到探针视频：数据库为空，频道 /streams 也读不出来。先查 DATABASE_URL、YT_COOKIES 与代理。"
             exit 1
           fi
           echo "probe: https://www.youtube.com/watch?v=${probe}"
@@ -275,7 +284,7 @@ jobs:
             echo "## Annotations"
             printf '%s\n' "$annotations"
             echo
-            echo "检查顺序：Check YouTube access 那步的日志（cookie / PO token / 出口 IP）、MIHOMO_SUB_URL / mihomo 是否可用、YT_COOKIES 是否过期、R2_* 凭据。"
+            echo "检查顺序：Check YouTube access 那步的日志（cookie / PO token / 出口 IP）、MIHOMO_SUB_URL / mihomo 是否可用、YT_COOKIES 是否过期、DATABASE_URL 与 R2_* 凭据。"
           } > /tmp/issue-body.md
           gh issue create \
             --title "Data update failed" \
