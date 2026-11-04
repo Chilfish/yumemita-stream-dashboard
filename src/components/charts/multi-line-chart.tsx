@@ -18,7 +18,8 @@ import { formatCompact, formatMinuteOffset } from "@/lib/format";
 export interface ChartSeries {
   id: string;
   label: string;
-  values: number[];
+  /** `null` 表示该位置没有数据：折线断开，不画 0。 */
+  values: (number | null)[];
   color?: string;
   /** 直接标注用的短名（例如日期）；缺省回落到 label。 */
   shortLabel?: string;
@@ -28,6 +29,10 @@ interface MultiLineChartProps {
   series: ChartSeries[];
   ariaLabel: string;
   xLabel?: string;
+  /** 覆盖默认的「每 30 分钟」刻度位置。 */
+  xTickValues?: number[];
+  xTickFormat?: (value: number) => string;
+  emptyMessage?: string;
 }
 
 /** ≤2 条线直接标注、≤2 条线铺面积；更多系列只画线并保留图例。 */
@@ -60,27 +65,39 @@ function seriesColor(item: ChartSeries, index: number): string {
   return item.color ?? CHART_COLORS[index % CHART_COLORS.length];
 }
 
+function isValue(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value);
+}
+
 /** 线尾位置：最后一个非零分钟，避免把标签挂在数据结束后的空段。 */
 function lastIndex(item: ChartSeries): number {
   for (let index = item.values.length - 1; index >= 0; index -= 1) {
-    if (item.values[index] > 0) return index;
+    const value = item.values[index];
+    if (value != null && value > 0) return index;
   }
   return Math.max(0, item.values.length - 1);
 }
 
-export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }: MultiLineChartProps) {
+export function MultiLineChart({
+  series,
+  ariaLabel,
+  xLabel = "开播后分钟",
+  xTickValues,
+  xTickFormat,
+  emptyMessage = "所选场次没有逐分钟弹幕数据，换一批场次再试。",
+}: MultiLineChartProps) {
   const gradientId = useId();
   const [hover, setHover] = useState<number | null>(null);
 
-  const visible = series.filter(item => item.values.some(value => value > 0));
+  const visible = series.filter(item => item.values.some(value => isValue(value) && value > 0));
   const maxMinutes = max(visible, item => item.values.length - 1) ?? 1;
-  const maxValue = max(visible.flatMap(item => item.values)) ?? 1;
+  const maxValue = max(visible.flatMap(item => item.values.filter(isValue))) ?? 1;
   const direct = visible.length > 0 && visible.length <= DIRECT_LABEL_LIMIT;
 
   if (visible.length === 0) {
     return (
       <p className="py-12 text-center text-footnote text-muted-foreground">
-        所选场次没有逐分钟弹幕数据，换一批场次再试。
+        {emptyMessage}
       </p>
     );
   }
@@ -102,24 +119,28 @@ export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }
         const innerHeight = Math.max(0, height - margin.top - margin.bottom);
         const x = scaleLinear().domain([0, Math.max(1, maxMinutes)]).range([0, innerWidth]);
         const y = scaleLinear().domain([0, maxValue]).nice().range([innerHeight, 0]);
-        const xTicks = Array.from(
-          { length: Math.floor(maxMinutes / 30) + 1 },
-          (_, index) => index * 30,
+        const xTicks = (
+          xTickValues
+          ?? Array.from(
+            { length: Math.floor(maxMinutes / 30) + 1 },
+            (_, index) => index * 30,
+          )
         ).filter(tick => tick <= maxMinutes);
 
         // 直接标注沿 y 排序后逐条下压，保证最小行距，避免两条线尾标注重叠。
         const endLabels: EndLabel[] = direct
           ? visible
-              .map(item => {
+              .flatMap(item => {
                 const index = lastIndex(item);
-                const value = item.values[index] ?? 0;
-                return {
+                const value = item.values[index];
+                if (!isValue(value)) return [];
+                return [{
                   color: seriesColor(item, series.indexOf(item)),
                   index,
                   item,
                   value,
                   y: y(value),
-                };
+                }];
               })
               .sort((left, right) => left.y - right.y)
               .reduce<EndLabel[]>((accumulator, entry) => {
@@ -129,12 +150,13 @@ export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }
               }, [])
           : [];
 
-        const hovered =
-          hover == null
-            ? []
-            : visible
-                .filter(item => hover < item.values.length)
-                .map(item => ({ item, value: item.values[hover] ?? 0 }));
+        const hovered = hover == null
+          ? []
+          : visible.flatMap(item => {
+              if (hover >= item.values.length) return [];
+              const value = item.values[hover];
+              return isValue(value) ? [{ item, value }] : [];
+            });
 
         return (
           <g transform={`translate(${margin.left},${margin.top})`}>
@@ -152,19 +174,22 @@ export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }
 
             {visible.map((item, index) => {
               const color = seriesColor(item, series.indexOf(item));
-              const peak = max(item.values) ?? 0;
+              const peak = max(item.values.filter(isValue)) ?? 0;
+              const values = item.values;
               const areaPath =
                 visible.length <= AREA_LIMIT
-                  ? area<number>()
-                      .x((_, minute) => x(minute))
+                  ? area<number | null>()
+                      .defined((_, position) => values[position] != null)
+                      .x((_, position) => x(position))
                       .y0(innerHeight)
-                      .y1(value => y(value))
-                      .curve(curveMonotoneX)(item.values)
+                      .y1(value => y(value ?? 0))
+                      .curve(curveMonotoneX)(values)
                   : null;
-              const linePath = line<number>()
-                .x((_, minute) => x(minute))
-                .y(value => y(value))
-                .curve(curveMonotoneX)(item.values);
+              const linePath = line<number | null>()
+                .defined((_, position) => values[position] != null)
+                .x((_, position) => x(position))
+                .y(value => y(value ?? 0))
+                .curve(curveMonotoneX)(values);
 
               return (
                 <g key={item.id}>
@@ -192,7 +217,7 @@ export function MultiLineChart({ series, ariaLabel, xLabel = "开播后分钟" }
 
             {xTicks.map(tick => (
               <TickText key={tick} x={x(tick)} y={innerHeight + 16}>
-                {tick} 分
+                {xTickFormat ? xTickFormat(tick) : `${tick} 分`}
               </TickText>
             ))}
             <AxisLabel x={innerWidth / 2} y={innerHeight + 32}>
