@@ -10,7 +10,7 @@
 | B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | ✅ 已合并到 `main`，部署在 `ymmt.chilfish.top`；R2 为 `yumemita-data` |
 | B2 | 单场 `.md` Agent 路由（`FR-AGENT-001`） | P2 | B1 的数据库查询层 | 迁移 | ✅ 已实现 |
 | B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 缓存 purge 端点 | 已知缺口 | ✅ purge 端点与每日自动 purge 已实现；线上 401 / 200 与失效后回源已实测 |
-| B4 | 跨成员对比（`FR-COMPARE-002`） | P2 | 统一场次/时间段口径 | roadmap | 📋 |
+| B4 | 跨成员对比（`FR-COMPARE-002`） | P2 | 统一场次/时间段口径 | roadmap | ✅ 已实现：组级 `/compare`，按最新数据月份 × 内容类型对比；`?members=&type=&months=` 可分享 |
 | B5 | 观众重叠页面（`authors.json` 已有数据） | P2 | 确认重叠算法与最小样本 | roadmap | 📋 |
 | B6 | 全量弹幕入库与检索 | P2 | B1；`chat_events` 分区方案 | 迁移 | 📋 |
 | B7 | 评论增长快照 / 多次抓取对比 | P3 | 抓取侧支持重复快照 | roadmap | 📋 |
@@ -37,7 +37,7 @@
 3. [x] **逐字稿**：`content/transcripts/` 手动维护，`publish:transcripts` 发布后运行时渲染；时间戳跳 YouTube。
 4. [x] **全组相册**：`/gallery` 跨成员封面墙，`?member=` / `?type=` 筛选写进 URL。
 5. [x] **组首页**：`/` 首屏回答「最近谁播了」，含近 7 天 / 本月脉冲、全组焦点场、最近更新与成员入口。
-6. [ ] **跨成员对比**：对比仍只在 `/:datasetId/compare` 内选场次，尚未支持跨成员。
+6. [x] **跨成员对比**：组级 `/compare` 按月份区间 + 内容类型横向对比，筛选写进 URL。
 7. [x] **精确词频 / 发言者**：datapack v2 追加全量 `wordCounts` / `authors`，发布时精确聚合并标注口径；v1 场次逐场回退。已支持 `full` / `partial` 覆盖率。
 
 ## 数据
@@ -48,7 +48,7 @@
 - [x] 精确词频 / 发言者：v2 pack 已带全量字段；已重建的场次 `insights` 为精确值，未重建的按 `partial` 标注覆盖率。
 - [ ] 同接时间序列：VSTATS 只给平均/最大；若以后有采样源，可加曲线。
 - [ ] 评论增长快照：同一场多次抓取，观察评论随时间的变化。
-- [ ] 与其他成员的横向对比：同一时间段、同一内容类型的同接/弹幕/付费。
+- [x] 与其他成员的横向对比：同一时间段、同一内容类型的同接/弹幕/付费（组级 `/compare`）。
 
 ## 分析
 
@@ -75,7 +75,7 @@
 - [x] 相册页（成员）：`/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
 - [x] 逐字稿：`content/transcripts/` 手动维护，发布后运行时渲染，支持时间戳跳转与目录。
 - [x] 全组相册与组首页：跨成员封面墙、全组脉搏。
-- [ ] 跨成员对比：同一时间段 / 内容类型的横向对比。
+- [x] 跨成员对比：组级 `/compare`，同一时间段 / 内容类型的横向对比。
 - [ ] 推文联动：先用手动 pin 验证价值，外部服务只做增强。
 - [ ] 空数据 / 部分数据的更明确提示（已有基础版）。
 
@@ -94,6 +94,8 @@
 - [x] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。
 - [x] 逐字稿脚本：`transcript:new` / `transcript:import` 从模板或已有 Markdown 生成。
 - [ ] 200% 缩放复核（320px 已通过）。
+- [x] 会员限定场次默认不公开：`MEMBER_ONLY_KEY` 为唯一开关，URL `?key=` 匹配才放行；列表、聚合、单场、`.md`、`/api/packs`、逐字稿索引全部过滤，直连单场只留封面与标题。抓取与 ingest 不受影响。
+- [x] 成员页「说明」统一为组级 `/about`：`/<datasetId>/about` 302 跳转，组侧栏与 sitemap 同步。
 
 ## 非目标
 

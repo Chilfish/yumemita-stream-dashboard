@@ -1,7 +1,7 @@
 # 需求规格说明（PRD）
 
 > 本文件是项目需求真相源。变更时同步更新 [README.md](../README.md) 索引，并在文末「变更记录」追加一行。
-> 当前实现是 React Router 8 + Vite 8 静态站；Astro + PostgreSQL 迁移是规划中的目标形态，相关条目标 `📋`。
+> 当前实现是 Astro 7 + Cloudflare Workers SSR + PostgreSQL + R2，部署在 `ymmt.chilfish.top`；未实现的能力标 `📋` 或 `🚧`。
 
 ## 产品定位
 
@@ -25,16 +25,16 @@
 - 单场页：概览、时间轴、弹幕与词、付费、评论、逐字稿
 - 趋势页：月度趋势与明细、内容类型对比、典型节奏曲线、全期高频词与发言者
 - 相册：成员相册、全组相册、按 JST 自然月分组
-- 对比：同一成员内最多 4 场；跨成员对比为规划项
+- 对比：同一成员内最多 4 场；组级「全员对比」按月份 + 内容类型横向比较
 - 逐字稿：手写 Markdown，发布后在单场页与索引页渲染
-- 数据链路：本地 pack → manifest / insights / 组级文件 → R2；每日增量抓取与发布
-- SEO：真实路径、每页 title / description / canonical / OG、构建期静态 head、sitemap、robots
+- 数据链路：本地 pack → PostgreSQL（`db:ingest`）；封面 / 表情 / archive / 逐字稿正文 → R2；每日增量抓取与发布
+- SEO：真实路径、每页请求期输出 title / description / canonical / OG、sitemap、robots
 - 主题、快捷键、移动端底部标签栏
-- 迁移目标：Astro 7 + Cloudflare Workers + PostgreSQL + R2，单场页请求期 SSR，`.md` 路由供 Agent 读取
+- 运行形态：Astro 7 + Cloudflare Workers + PostgreSQL + R2，数据页请求期 SSR，`.md` 路由供 Agent 读取
 
 **不做：**
 
-- 实时抓取 / 直播中数据
+- 实时看板 / 直播中展示（归档侧可用 `fetch:live-chat` 采集等待室与直播中弹幕，页面仍只读已入库场次）
 - 用户系统、评论发布、收藏
 - 逐字稿在线编辑器 / CMS（独立项目）
 - 内容正文的翻译或字幕编辑（归档 pipeline 职责）
@@ -53,12 +53,12 @@
 | `FR-GALLERY-001` | P1 | 成员相册按 JST 自然月分组 | `AC-GALLERY-001`：`/:datasetId/gallery` 按月份分组，图片懒加载，`?order=` 可分享；390 / 320px 无横向滚动（手工） | ✅ | product-direction |
 | `FR-GALLERY-002` | P1 | 全组相册支持跨成员筛选 | `AC-GALLERY-002`：`/gallery` 展示全部成员封面，`?member=` / `?type=` 写进 URL（手工） | ✅ | product-direction |
 | `FR-COMPARE-001` | P1 | 同一成员内最多 4 场对比 | `AC-COMPARE-001`：`?ids=a,b,c` 可分享；逐分钟曲线叠加；指标横表；超过 4 场有明确限制（手工） | ✅ | README |
-| `FR-COMPARE-002` | P2 | 跨成员对比 | `AC-COMPARE-002`：同一时间段 / 内容类型的横向对比可分享；样本不足时标注（手工） | 📋 | roadmap |
+| `FR-COMPARE-002` | P2 | 跨成员对比 | `AC-COMPARE-002`：组级 `/compare` 按同一月份区间与内容类型横向对比；`?members=` / `?type=` / `?months=` 可分享；样本不足时标注（手工） | ✅ | roadmap |
 | `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签（手工） | ✅ | product-direction |
 | `FR-DATA-001` | P0 | 由 pack 派生 streams / insights | `AC-DATA-001`：`bun run db:ingest` 重建 `streams` + `dataset_insights`；`db:verify` 0 problems；不手改数据库（手工 / 脚本） | ✅ | data-model |
 | `FR-DATA-002` | P0 | 资产发布到 R2 | `AC-DATA-002`：`publish:assets` 上传顺序为 thumbs → emoji → archive；逐字稿单独发布；对象可达（手工） | ✅ | deployment |
 | `FR-DATA-003` | P0 | 每日增量抓取与入库 | `AC-DATA-003`：`daily-update.ts` 与 `streams` 做差集；安静日不抓取、不 ingest；失败开 issue（手工 / Actions 日志） | ✅ | deployment |
-| `FR-DATA-004` | P1 | 数据更新后刷新缓存与 SEO 产物 | `AC-DATA-004`：ingest 后调 `POST /api/internal/cache/purge` 按 tag 失效；sitemap 请求期生成；线上缓存实测待做 | 🚧 | astro-ssr-migration |
+| `FR-DATA-004` | P1 | 数据更新后刷新缓存与 SEO 产物 | `AC-DATA-004`：ingest 后调 `POST /api/internal/cache/purge` 按 tag 失效；sitemap 请求期生成；线上 MISS → HIT 与 purge 后回源已实测 | ✅ | astro-ssr-migration |
 | `FR-SEO-001` | P0 | 每页输出 metadata 与 sitemap | `AC-SEO-001`：请求期输出 title / canonical / OG；`sitemap.xml`、`llms.txt`、`robots.txt` 可访问 | ✅ | architecture |
 | `FR-SEO-002` | P1 | 新场次的分享卡片及时更新 | `AC-SEO-002`：新场次 ingest 后，HTML head 与 sitemap 在请求期立即使用新数据，不需要构建 | ✅ | architecture |
 | `FR-A11Y-001` | P1 | 键盘与可访问性 | `AC-A11Y-001`：焦点可见；图标按钮有可访问名称；图表有 `aria-label`；首页 / 场次 / 单场 / 对比 axe 0 violations（手工） | ✅ | roadmap |
@@ -73,14 +73,14 @@
 ## 非功能需求
 
 - **时间**：一律 JST（UTC+9）；`startedAt` 取开播时刻，不是公开时刻。
-- **数据源**：当前是 R2 上的 JSON；迁移目标是 PostgreSQL 查询 + R2 对象。两者不能混写为「已经成立」。
-- **无后端**（当前）：静态托管即可运行；迁移后 Worker 只读数据库，不提供用户写入接口。
+- **数据源**：页面只读 PostgreSQL；R2 只放不可变对象（封面 / 表情 / archive / 逐字稿正文），不参与查询。
+- **运行时**：Cloudflare Workers 在请求期 SSR；只读数据库与对象存储，不提供用户写入接口。
 - **性能**：首屏只加载当前页面必需的数据；成员页不下载全部 datapack；单场按需拉取。
 - **可访问性**：焦点可见；非文本图表提供 `role` / `aria-label`；200% 缩放不溢出。
 - **样式**：颜色来自设计 Token；浅色 / 深色同时成立；不硬编码颜色。
 - **隐私**：不公开 cookie、邮箱、付款信息；会员限定内容上线前确认范围。
 - **SEO**：canonical 为绝对地址且不带 query；表格筛选、相册筛选归一到基路径；对比页与未知路径 `noindex`。
-- **迁移期**：旧 URL 必须保持可访问；`.md` 路由不进 sitemap，用 `X-Robots-Tag: noindex`。
+- **兼容**：旧地址 `/:id/overview`、`/:id/table`、`/:id/stream` 保持 302；`.md` 路由不进 sitemap，用 `X-Robots-Tag: noindex`。
 
 ## 需求溯源
 
@@ -91,7 +91,8 @@
 | `FR-STREAM-002` | `src/components/dashboard/stream-detail-view.tsx` 等 | 单场分段 |
 | `FR-TREND-001` | `src/components/dashboard/trends-view.tsx`、`src/lib/aggregate.ts` | 聚合与图表 |
 | `FR-GALLERY-*` | `src/components/dashboard/gallery-view.tsx`、`group-gallery-page.tsx` | 相册 |
-| `FR-COMPARE-001` | `src/components/dashboard/compare-view.tsx`、`multi-line-chart.tsx` | 对比 |
+| `FR-COMPARE-001` | `src/components/dashboard/compare-view.tsx`、`multi-line-chart.tsx` | 同成员场次对比 |
+| `FR-COMPARE-002` | `src/pages/compare.astro`、`src/components/pages/group-compare-page.tsx`、`src/lib/compare.ts`、`src/db/queries/group-compare.ts` | 组级全员对比 |
 | `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript-view.tsx`、`transcripts-view.tsx`、`src/db/queries/transcripts.ts`、`src/pages/[datasetId]/transcripts.astro`、`scripts/publish-transcripts.ts` | 逐字稿 |
 | `FR-DATA-*` | `scripts/publish-data.ts`、`scripts/daily-update.ts`、`scripts/lib/` | 数据链路 |
 | `FR-SEO-*` | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | SEO |
@@ -102,3 +103,4 @@
 | 日期 | 变更 | 版本 |
 | --- | --- | --- |
 | 2026-11-03 | 建立需求规格，登记首页、成员、场次、单场、趋势、相册、对比、逐字稿、数据、SEO、迁移等 FR | v1.0 |
+| 2026-11-04 | `FR-COMPARE-002` 组级全员对比上线；`FR-DATA-004` 线上实测通过；同步当前运行形态与数据链路表述 | v1.1 |

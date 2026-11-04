@@ -34,9 +34,14 @@
 - [ ] `/:datasetId/trends` 趋势与月度明细正常
 - [ ] `/:datasetId/gallery` 与 `/gallery` 相册按 JST 月份分组，筛选写进 URL
 - [ ] `/:datasetId/compare?ids=a,b,c` 最多 4 场，曲线叠加正常
+- [ ] `/compare?members=&type=&months=` 全员对比：筛选写进 URL、刷新保持、样本不足有标注
 - [ ] `/:datasetId/transcripts` 与有稿单场的逐字稿分段正常；时间码跳转正确
 - [ ] 不存在的路径 / dataset / videoId 返回 404
 - [ ] 旧 `#/...` 链接能改写成真实路径
+- [ ] `/about` 显示说明与免责；`/:datasetId/about` 302 到 `/about`
+- [ ] 未配置 `MEMBER_ONLY_KEY` 时，会员限定场次不出现在列表 / 相册 / 聚合 / sitemap；直连单场只有封面与标题。组级 `/compare` 是纯聚合统计，仍计入这些场次
+- [ ] 配置 `MEMBER_ONLY_KEY` 后，带正确 `?key=` 的单场、列表与 `.md` 显示完整数据；`Cache-Control` 为 `private, no-store`
+- [ ] 带错误 `?key=` 的请求同样不被缓存，且不显示会员限定数据
 
 ### 主题与响应式
 
@@ -63,7 +68,7 @@
 ### SEO / Agent
 
 - [x] 单场页 HTML 含 title / description / canonical / OG / JSON-LD（2026-11-04 线上核对）
-- [x] `sitemap.xml` 条数 = `2 + 6 × 成员数 + 单场数`（线上核对）
+- [x] `sitemap.xml` 条数 = `3 + 5 × 成员数 + 单场数`（线上核对）
 - [x] `robots.txt` 指向 `/sitemap.xml`
 - [x] 对比页与未知路径 `noindex`
 - [x] `/nonoka/stream/<id>.md` 返回 `text/markdown`，frontmatter 与逐字稿完整
@@ -80,7 +85,7 @@
 - [ ] 逐字稿有更新时 `bun run publish:transcripts` 成功
 - [ ] `bun run purge:cache` 成功；页面与 `.md` 返回新数据
 - [ ] `data-sources.json` 与新增成员 / 场次一致
-- [ ] 会员限定内容范围已确认
+- [ ] 会员限定场次的公开范围已确认（默认隐藏，`MEMBER_ONLY_KEY` 未配置）
 
 ## 缓存与部署
 

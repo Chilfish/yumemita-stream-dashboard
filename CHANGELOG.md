@@ -44,6 +44,7 @@
 - **相册页**：`/:datasetId/gallery`，按 JST 自然月分组的封面墙，懒加载、`?order=` 可分享；侧栏与移动端标签栏新增入口。
 - **组首页**：`/` 跨成员首屏：近 7 天 / 本月脉冲、最近一场焦点、跨成员最近更新与按成员进入；单个成员 manifest 加载失败时跳过并提示，不阻塞其余成员。
 - **全组相册**：`/gallery` 把相册扩展为跨成员时间线，`?member=` / `?type=` / `?order=` 写进 URL，成员与内容类型筛选带实时计数。
+- **全员对比**：`/compare` 按同一月份区间与内容类型横向对比五位成员的场次、平均同接、弹幕密度与 SC 强度；`?members=` / `?type=` / `?months=` 可分享，样本不足会标注，筛选在客户端即时重算。
 - **逐字稿**：`content/transcripts/<datasetId>/<videoId>.md` 手写 Markdown，`publish:transcripts` 上传后运行时渲染；单场页按需出现「逐字稿」分段，带目录、时间戳跳 YouTube，索引页 `/:datasetId/transcripts`。
 - 单场页页头改为「标题 + 右侧 16:9 封面」网格；移动端分段控件改为容器内横向滚动，避免页面横向溢出。
 - 成员色拆成两个 token：`--member-color` 保留 `data-sources.json` 里的品牌原色（图表、色点、色条），

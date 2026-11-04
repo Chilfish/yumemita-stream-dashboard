@@ -30,6 +30,7 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 | --- | ---: | ---: | --- |
 | `/` | 98.6 KB | 410 ms | `group` |
 | `/gallery` | 1.65 MB | 402 ms | `group,gallery` |
+| `/compare` | 365 KB | 1.20 s | `datasets,group,compare` |
 | `/nonoka` | 894 KB | 181 ms | `datasets,dataset-nonoka` |
 | `/nonoka/streams` | 1.16 MB | 178 ms | `datasets,dataset-nonoka` |
 | `/nonoka/trends` | 828 KB | 165 ms | `datasets,dataset-nonoka` |

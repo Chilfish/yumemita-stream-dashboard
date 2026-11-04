@@ -129,7 +129,8 @@ src/db/
 
 - 岛屿 props 必须可序列化；查询层只返回字符串 / 数字 / 布尔 / 数组 / 普通对象。
 - 首屏数据由页面传入，组件不自己 fetch manifest。
-- URL 状态（`q` / `type` / `sort` / `dir` / `vstats` / `member` / `cols` / `view` / `ids`）由服务端读初始值，岛屿用 `history.replaceState` 同步。
+- URL 状态（`q` / `type` / `sort` / `dir` / `vstats` / `member` / `cols` / `view` / `ids` / `members` / `months`）由服务端读初始值，岛屿用 `history.replaceState` 同步。
+- 组级全员对比把「成员 × 月份 × 内容类型」预聚合成桶，筛选在岛屿内重算，不发额外请求。
 
 ## 路由
 
@@ -137,6 +138,7 @@ src/db/
 | --- | --- | --- |
 | `/` | 组首页 | SSR |
 | `/gallery?member=&type=&order=` | 全组相册 | SSR |
+| `/compare?members=&type=&months=` | 全员对比（组级，聚合统计） | SSR |
 | `/:datasetId` | 成员首页 | SSR |
 | `/:datasetId/streams?q=&type=&sort=&dir=&vstats=` | 场次列表 | SSR |
 | `/:datasetId/trends` | 趋势 | SSR |
