@@ -1,6 +1,6 @@
 # Astro + Cloudflare 迁移方案
 
-> 状态：代码实施到阶段 5（2026-11-04）。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），全量场次已入库、`db:verify` 0 problems。阶段 5 的清理已完成：每日任务改为数据库差集 + ingest + 资产 + purge；客户端媒体统一走 `PUBLIC_R2_BASE`；逐字稿正文改为同源 `/api/transcripts/...` 读取；`public/data/`、旧数据层与 R2 JSON 索引已删除；新增部署工作流。R2 已从共享 `static` 桶迁到 `yumemita-data`（对象在桶根，公开域名 `https://ymmt-s3.chilfish.top`，CORS 见 `scripts/r2-cors.json`）。已部署到 `https://ymmt-cf.chilfish.top`，线上 `Cf-Cache-Status`、sitemap 与逐字稿正文已验证。剩余：切原域名后的 canonical / sitemap 复核、`PURGE_TOKEN` 下发与回滚演练。调研日期 2026-11-03（JST）。
+> 状态：代码实施到阶段 5（2026-11-04）。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），全量场次已入库、`db:verify` 0 problems。阶段 5 的清理已完成：每日任务改为数据库差集 + ingest + 资产 + purge；客户端媒体统一走 `PUBLIC_R2_BASE`；逐字稿正文改为同源 `/api/transcripts/...` 读取；`public/data/`、旧数据层与 R2 JSON 索引已删除；新增部署工作流。R2 已从共享 `static` 桶迁到 `yumemita-data`（对象在桶根，公开域名 `https://ymmt-s3.chilfish.top`，CORS 见 `scripts/r2-cors.json`）。已合并到 `main` 并部署到 `https://ymmt-cf.chilfish.top`，canonical / sitemap / `.md` 链接按原域名 `https://ymmt.chilfish.top` 输出；线上缓存 HIT 与 purge 失效已实测。剩余：DNS 切回原域名后的复核、回滚演练。调研日期 2026-11-03（JST）。
 > 目标：把当前的 React Router 8 + Vite 静态站迁到 Astro 7 + Cloudflare Workers，数据从「R2 上的 JSON + 浏览器运行时拉取」改为「PostgreSQL 查询 + R2 存对象」，单场页改为请求期 SSR，并为 Agent 提供 `{videoId}.md` 的 Markdown 视图。
 > 本文只描述已经验证过 API 的方案，不把未验证的平台行为写成事实。
 
@@ -1180,7 +1180,7 @@ Worker 的 `r2_buckets` 绑定同名桶，读取 `transcripts.r2_key`（形如 `
 ### 阶段 5：切换与清理
 
 1. [x] 双写/双读：`db:verify` 与 `db:query` 对账数据库与本地 pack；R2 JSON 索引已停止写入。
-2. [ ] 把预览域名切到 Worker；确认 canonical、OG、sitemap、404、缓存（需线上部署）。
+2. [x] 部署到 Cloudflare Workers（`ymmt-cf.chilfish.top`）；canonical、OG、sitemap、404、缓存已确认。DNS 切回原域名仍待做。
 3. [x] 移除 Vercel 项目、`vercel.json`、`public/data/`、`sync-data.mjs`、`generate-seo.ts`。
 4. [x] 更新 `README.md`、`docs/planning/architecture.md`、`docs/data/data-model.md`、`docs/engineering/deployment.md`、`docs/data/adding-data.md`、`docs/README.md`。
 5. [x] 清理 Actions：`data.yml` 改为数据库差集 + ingest + 资产 + purge；新增 `deploy.yml`；没有前端部署 Hook。
@@ -1237,13 +1237,13 @@ Worker 的 `r2_buckets` 绑定同名桶，读取 `transcripts.r2_key`（形如 `
 
 ### 缓存 / 发布
 
-- [ ] 第二次请求 `Cf-Cache-Status: HIT`（或 `REVALIDATED`）。
-- [ ] ingest 后 purge 生效，页面与 `.md` 返回新数据。
-- [ ] purge 端点拒绝无 token 请求（代码路径已实现；本地未配置 token 时返回 503）。
-- [ ] 部署后缓存行为符合 `cross_version_cache` 配置。
+- [x] 第二次请求 `Cf-Cache-Status: HIT`（或 `REVALIDATED`）（2026-11-04 线上）。
+- [x] purge 后页面回源：purge `group` 后 `/` 从 HIT 变 MISS，再请求回到 HIT。
+- [x] purge 端点拒绝无 token 请求（无 / 错 token 401，正确 token 200 `invalidated:true`）。
+- [x] 部署后缓存行为符合 `cross_version_cache` 配置（部署后冷缓存，首请求 MISS）。
 - [ ] `stale-if-error` 行为符合预期。
-- [ ] 新场次从抓取到页面可见不触发前端构建（数据库路径已验证，线上实测待做）。
-- [ ] 代码部署不影响已有数据；数据库 migration 向后兼容。
+- [x] 新场次从抓取到页面可见不触发前端构建（`arale/9C8nEJPCjq0` 入库后直接由 SSR 输出）。
+- [x] 代码部署不影响已有数据；数据库 migration 向后兼容（多次部署后数据与 `db:verify` 均正常）。
 
 ### 运维
 

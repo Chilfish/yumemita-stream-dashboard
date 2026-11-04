@@ -112,6 +112,7 @@ bun run dev -- --port 4322
 
 - 单场 head 由 SSR 在请求期输出；新场次 ingest 后立即可用，不需要额外构建。
 - 检查 `SITE_URL` / `astro.config.mjs` 的 `site`：canonical / `og:url` / `og:image` 需要绝对地址。
+- canonical 一直停在旧域名：`astro.config.mjs` 优先读 `process.env.SITE_URL`，本机 shell 残留同名变量会覆盖 `.env`；用 `SITE_URL=https://ymmt.chilfish.top bun run cf:deploy` 显式传一次再验证。
 - `og:image` 走 `PUBLIC_R2_BASE/<dataset>/thumbs/<videoId>.jpg`；确认 R2 公开域名可访问。
 - 用 `curl -s <单场 URL> | grep -E '<title>|canonical|og:image'` 确认请求期 head 正常输出。
 

@@ -85,10 +85,11 @@
 ## 缓存与部署
 
 - [x] 第二次请求 `Cf-Cache-Status: HIT`（或 `REVALIDATED`）（2026-11-04 线上验证）
-- [ ] purge 端点拒绝无 token 请求（Worker 尚未配置 `PURGE_TOKEN`，当前返回 503）
+- [x] purge 端点拒绝无 token 请求（401）；正确 token 返回 200 且失效后回源
 - [x] `wrangler deploy --config dist/server/wrangler.json` 后 `/`、成员页、单场页、`.md`、sitemap 正常（`ymmt-cf.chilfish.top`）
-- [ ] 部署后缓存行为符合 `cross_version_cache` 配置
-- [ ] 新场次入库后不触发前端构建即可访问
+- [x] 部署后缓存行为符合 `cross_version_cache` 配置（部署后冷缓存）
+- [x] 新场次入库后不触发前端构建即可访问（`arale/9C8nEJPCjq0` 实测）
+- [ ] DNS 切回 `ymmt.chilfish.top` 后复核 canonical / sitemap / `.md` 链接
 - [ ] `DATABASE_URL` 只在服务端读取；R2 凭据不进入客户端 bundle
 
 ## 文档一致性

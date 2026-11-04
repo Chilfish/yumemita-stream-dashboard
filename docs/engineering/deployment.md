@@ -1,6 +1,6 @@
 # 部署
 
-> **当前形态（2026-11-04）**：Astro 7 SSR + `@astrojs/cloudflare`，部署到 Cloudflare Workers。页面请求期查 Neon PostgreSQL；R2 只放封面、表情、原始 pack 归档与逐字稿正文。旧的静态托管、Vercel、`generate-seo`、`sync:data` 已删除。
+> **当前形态（2026-11-04）**：Astro 7 SSR + `@astrojs/cloudflare`，部署到 Cloudflare Workers。页面请求期查 Neon PostgreSQL；R2 只放封面、表情、原始 pack 归档与逐字稿正文。旧的静态托管、Vercel、`generate-seo`、`sync:data` 已删除。线上实例：`https://ymmt-cf.chilfish.top`；canonical / sitemap 按原域名 `https://ymmt.chilfish.top` 输出，DNS 待切。
 
 ## 构建与检查
 
@@ -24,6 +24,7 @@ bun run cf:preview   # build + preview
 - 开发环境 `Astro.cache.enabled === false`，缓存调用是 no-op；要验证缓存必须用生产构建或线上。
 - `.dev.vars` 提供 `DATABASE_URL`、R2、`PUBLIC_R2_BASE`、`SITE_URL`、`PURGE_TOKEN`。
 - `astro preview` 下 R2 binding 不可用时，逐字稿 API 返回 503，客户端回退到本地 `content/transcripts/` 快照。
+- `astro.config.mjs` 里 `process.env.SITE_URL` 优先于 `.env`；本机 shell 残留同名变量时会覆盖 `.env`，部署前用 `SITE_URL=https://ymmt.chilfish.top bun run cf:deploy` 显式传一次最稳。
 
 ## 部署
 
@@ -34,10 +35,11 @@ bunx wrangler rollback                    # 回滚到上一版
 
 - 必须用 `dist/server/wrangler.json` 部署：它由 adapter 生成，`main` 指向 `entry.mjs`、`assets` 指向 `../client`。根目录 `wrangler.jsonc` 只是源配置；直接 `wrangler deploy` 会把 `dist/server` 与 `.dev.vars` 当成静态资源上传。
 - `.github/workflows/deploy.yml` 手动触发（`workflow_dispatch`）：`bun run ci` → `wrangler deploy --config dist/server/wrangler.json` → 线上路由冒烟。
-- 需要仓库 Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`；Variables：`PUBLIC_R2_BASE`、`SITE_URL`。
+- 需要仓库 Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`；Variables：`PUBLIC_R2_BASE`、`SITE_URL`、`SMOKE_BASE_URL`（冒烟目标；DNS 未切时指向 `ymmt-cf.chilfish.top`）。
 - Worker secrets（`wrangler secret put`）：`DATABASE_URL`、`PURGE_TOKEN`。
 - `wrangler.jsonc` 声明 `nodejs_compat`、`ASSETS`、`R2` binding 与 Workers Cache（`cross_version_cache: false`）。
 - `astro build` 与 `wrangler deploy` 不需要数据库；migration 在部署前单独执行。
+- `SITE_URL` 决定 canonical / OG / sitemap / `.md` 链接的域名；切域名时改这个变量（或本地环境）后重新构建部署一次。
 
 ## 环境变量
 
@@ -48,7 +50,8 @@ bunx wrangler rollback                    # 回滚到上一版
 | Secret | `PURGE_TOKEN` | ingest 调 purge 端点 |
 | Secret | `YT_COOKIES` / `MIHOMO_SUB_URL` | 抓取（GitHub Actions） |
 | Var | `PUBLIC_R2_BASE` | 封面 / 表情公开域名，`https://ymmt-s3.chilfish.top`（构建时内联） |
-| Var | `SITE_URL` | canonical / sitemap / purge 地址 |
+| Var | `SITE_URL` | canonical / sitemap / purge 地址，`https://ymmt.chilfish.top` |
+| Var | `SMOKE_BASE_URL` | 部署后冒烟目标；DNS 未切时用 `https://ymmt-cf.chilfish.top` |
 
 `DATABASE_URL` 不进入客户端 bundle；只从 `astro:env/server` 或服务端读取。
 
