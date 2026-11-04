@@ -164,7 +164,9 @@ export function CalendarHeatmap({ days, metric, ariaLabel, className }: Calendar
               >
                 <title>
                   {cell.day
-                    ? `${cell.key}：${cell.day.streams} 场 · ${formatInteger(cell.day.chat)} 条弹幕 · ${formatInteger(cell.day.superchats)} 笔 SC`
+                    ? cell.day.chat === 0 && cell.day.superchats === 0
+                      ? `${cell.key}：${cell.day.streams} 场`
+                      : `${cell.key}：${cell.day.streams} 场 · ${formatInteger(cell.day.chat)} 条弹幕 · ${formatInteger(cell.day.superchats)} 笔 SC`
                     : `${cell.key}：没有直播`}
                 </title>
               </rect>

@@ -11,6 +11,7 @@ import {
   formatWeekday,
 } from "@/lib/format";
 import { streamPath } from "@/lib/routes";
+import { isMemberOnly } from "@/lib/visibility";
 import type { StreamSummary } from "@/types/dataset";
 
 const SPARK_STREAMS = 12;
@@ -27,7 +28,8 @@ function chatPerMinute(row: StreamSummary): number {
 }
 
 export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamProps) {
-  const recent = rows.slice(0, SPARK_STREAMS).reverse();
+  const publicRows = rows.filter(row => !isMemberOnly(row.availability));
+  const recent = publicRows.slice(0, SPARK_STREAMS).reverse();
   const rates = recent.map(chatPerMinute);
   const peakIndex = rates.length > 0 ? rates.indexOf(Math.max(...rates)) : -1;
   const peakRow = peakIndex >= 0 ? recent[peakIndex] : null;

@@ -3,12 +3,22 @@ import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
 import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/panel";
 import { StreamCover } from "@/components/dashboard/stream-cover";
 import { StreamList } from "@/components/dashboard/stream-list";
+import { Badge } from "@/components/ui/badge";
 import { CONTENT_TYPE_LABELS, classifyTitle } from "@/lib/classify";
 import { formatDate, formatDuration, formatInteger } from "@/lib/format";
 import { streamsPath, streamPath } from "@/lib/routes";
+import { isMemberOnly } from "@/lib/visibility";
 import type { StreamSummary } from "@/types/dataset";
 
 const RECENT_LIMIT = 8;
+
+function Missing() {
+  return <span className="text-ink-3 opacity-40">—</span>;
+}
+
+function metricCell(row: StreamSummary, value: number | null | undefined) {
+  return isMemberOnly(row.availability) ? <Missing /> : formatInteger(value);
+}
 
 interface HomeRecentStreamsProps {
   datasetId: string;
@@ -41,6 +51,11 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
             videoId={row.videoId}
           />
           <span className="min-w-0 truncate text-foreground">{row.title}</span>
+          {isMemberOnly(row.availability) ? (
+            <Badge className="shrink-0" size="sm" variant="outline">
+              会员限定
+            </Badge>
+          ) : null}
         </span>
       ),
     },
@@ -63,25 +78,25 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
       align: "right",
       header: "平均",
       key: "avg",
-      render: row => formatInteger(row.avgConcurrent),
+      render: row => metricCell(row, row.avgConcurrent),
     },
     {
       align: "right",
       header: "峰值",
       key: "max",
-      render: row => formatInteger(row.maxConcurrent),
+      render: row => metricCell(row, row.maxConcurrent),
     },
     {
       align: "right",
       header: "弹幕",
       key: "chat",
-      render: row => formatInteger(row.chatTotal),
+      render: row => metricCell(row, row.chatTotal),
     },
     {
       align: "right",
       header: "SC",
       key: "sc",
-      render: row => formatInteger(row.superchats),
+      render: row => metricCell(row, row.superchats),
     },
   ];
 

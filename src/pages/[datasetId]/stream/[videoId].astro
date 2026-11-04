@@ -1,11 +1,9 @@
 ---
 import Layout from '@/layouts/Layout.astro'
 import ErrorState from '@/components/shared/ErrorState.astro'
-import LockedStream from '@/components/shared/LockedStream.astro'
 import { DatasetPage } from '@/components/app/dataset-page'
 import { db } from '@/db/client'
 import { getStreamPack } from '@/db/queries/packs'
-import { getStream } from '@/db/queries/streams'
 import { getTranscriptMeta } from '@/db/queries/transcripts'
 import { getDatasetPageData } from '@/db/queries/view-data'
 import { memberOnlyCachePolicy } from '@/lib/member-access'
@@ -18,25 +16,26 @@ const datasetId = Astro.params.datasetId!
 const videoId = Astro.params.videoId!
 const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
 
-const data = await getDatasetPageData(db, datasetId, { includeMemberOnly: unlocked }).catch(error => {
+const data = await getDatasetPageData(db, datasetId).catch(error => {
   console.error('[page] stream failed', error)
   return null
 })
 
 const summary = data?.rows.find(row => row.videoId === videoId) ?? null
-// 列表里没有不代表不存在：可能是被隐藏的会员限定场次，单独查一次判断。
-const hidden = summary ? null : await getStream(db, datasetId, videoId).catch(() => null)
-const locked = hidden !== null && isMemberOnly(hidden.availability)
+// 会员限定场的封面、标题与时间公开，弹幕 / 评论 / SC 等明细要带访问参数才放行。
+const locked = summary !== null && isMemberOnly(summary.availability) && !unlocked
 
 // 第三个状态是查询失败：交给客户端索引兜底，而不是当作「没有稿」。
-const transcript = summary
+const transcript = summary && !locked
   ? await getTranscriptMeta(db, datasetId, videoId).catch(error => {
       console.error('[page] stream transcript lookup failed', error)
       return undefined
     })
   : null
 
-const pack = summary ? await getStreamPack(db, datasetId, videoId).catch(() => null) : null
+const pack = summary && !locked
+  ? await getStreamPack(db, datasetId, videoId).catch(() => null)
+  : null
 const hasTranscript = Boolean(transcript)
 
 if (locked) {
@@ -50,14 +49,14 @@ else if (!keyed) {
 }
 
 const datasetLabel = data?.dataset.label ?? datasetId
-const baseMeta = locked && hidden
+const baseMeta = locked && summary
   ? pageSeo(Astro, {
       section: 'stream',
       dataset: { id: datasetId, label: datasetLabel, count: data?.dataset.count },
       stream: {
-        videoId: hidden.videoId,
-        title: hidden.title,
-        startedAt: hidden.startedAt,
+        videoId: summary.videoId,
+        title: summary.title,
+        startedAt: summary.startedAt,
         durationSec: null,
         avgConcurrent: null,
         maxConcurrent: null,
@@ -66,7 +65,7 @@ const baseMeta = locked && hidden
       },
       streamCount: data?.rows.length ?? null,
       memberCount: data?.datasets.length ?? null,
-      updatedAt: hidden.startedAt,
+      updatedAt: summary.startedAt,
       imageStream: { datasetId, videoId },
     })
   : data && summary
@@ -107,7 +106,7 @@ const meta = locked
   : baseMeta
 
 // 解锁后的 Markdown 视图保留 key，否则同源链接会立刻掉回锁定版。
-const markdownHref = summary
+const markdownHref = summary && !locked
   ? `/${datasetId}/stream/${videoId}.md${keyed ? `?key=${encodeURIComponent(Astro.url.searchParams.get('key') ?? '')}` : ''}`
   : undefined
 ---
@@ -116,34 +115,25 @@ const markdownHref = summary
   alternateMarkdown={markdownHref}
   meta={meta}
 >
-  {locked && hidden
+  {data && summary
     ? (
-        <LockedStream
-          datasetId={datasetId}
-          datasetLabel={datasetLabel}
-          date={hidden.date}
-          title={hidden.title}
-          videoId={hidden.videoId}
+        <DatasetPage
+          client:idle
+          comparePacks={{}}
+          dataset={data.dataset}
+          datasets={data.datasets}
+          hasTranscript={hasTranscript}
+          locked={locked}
+          pack={pack}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          rows={data.rows}
+          search={requestSearch(Astro)}
+          section="stream"
+          stream={summary}
+          totals={data.totals}
+          view="stream"
         />
       )
-    : data && summary
-      ? (
-          <DatasetPage
-            client:idle
-            comparePacks={{}}
-            dataset={data.dataset}
-            datasets={data.datasets}
-            hasTranscript={hasTranscript}
-            pack={pack}
-            params={requestParams(Astro)}
-            pathname={Astro.url.pathname}
-            rows={data.rows}
-            search={requestSearch(Astro)}
-            section="stream"
-            stream={summary}
-            totals={data.totals}
-            view="stream"
-          />
-        )
-      : <ErrorState code="404" title="找不到这场直播" detail="它可能已被删除，或从未被本站收录。" />}
+    : <ErrorState code="404" title="找不到这场直播" detail="它可能已被删除，或从未被本站收录。" />}
 </Layout>

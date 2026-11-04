@@ -1,8 +1,8 @@
-import { and, sql } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
 import { streams } from '@/db/schema'
 import { shiftDateKey } from '@/lib/group'
-import { MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
+import { isMemberOnly, MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
 import {
   GROUP_GALLERY_SCHEMA,
   GROUP_RECENT_LIMIT,
@@ -17,20 +17,13 @@ import { toIso, toNumber } from './shared'
 
 const DAY_WINDOW = 40
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
-
-interface GroupQueryOptions {
-  /** 默认 `false`：组级统计与相册都不含会员限定场次。 */
-  includeMemberOnly?: boolean
-}
-
-function visibilityFilter(includeMemberOnly: boolean | undefined) {
-  if (includeMemberOnly) return undefined
-  return sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`
-}
+const PUBLIC_ONLY = sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`
+const PUBLIC_WEIGHT = sql`case when ${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY} then 1 else 0 end`
 
 type StreamRow = typeof streams.$inferSelect
 
 function toGroupStream(row: StreamRow): GroupStreamSummary {
+  const memberOnly = isMemberOnly(row.availability)
   return {
     datasetId: row.datasetId,
     date: row.date ?? '',
@@ -39,29 +32,29 @@ function toGroupStream(row: StreamRow): GroupStreamSummary {
     startedAt: toIso(row.startedAt),
     durationSec: row.durationSec,
     availability: row.availability,
-    avgConcurrent: toNumber(row.avgConcurrent),
-    maxConcurrent: row.maxConcurrent,
-    chatTotal: row.chatTotal,
-    superchats: row.superchats,
-    vstatsViews: row.vstatsViews,
-    snapshotViews: row.snapshotViews,
+    avgConcurrent: memberOnly ? null : toNumber(row.avgConcurrent),
+    maxConcurrent: memberOnly ? null : row.maxConcurrent,
+    chatTotal: memberOnly ? 0 : row.chatTotal,
+    superchats: memberOnly ? 0 : row.superchats,
+    vstatsViews: memberOnly ? null : row.vstatsViews,
+    snapshotViews: memberOnly ? null : row.snapshotViews,
     thumbnail: row.thumbnailKey,
   }
 }
 
-async function memberStats(db: Db, options: GroupQueryOptions): Promise<GroupMemberStat[]> {
+async function memberStats(db: Db): Promise<GroupMemberStat[]> {
   const rows = await db
     .select({
       datasetId: streams.datasetId,
       streamCount: sql<number>`count(*)::int`,
-      chatTotal: sql<number>`coalesce(sum(${streams.chatTotal}), 0)::bigint`,
-      superchats: sql<number>`coalesce(sum(${streams.superchats}), 0)::bigint`,
-      durationSec: sql<number>`coalesce(sum(${streams.durationSec}), 0)::bigint`,
-      weighted: sql<string>`coalesce(sum(${streams.avgConcurrent} * ${streams.durationSec}), 0)`,
-      concurrentDuration: sql<string>`coalesce(sum(case when ${streams.avgConcurrent} is not null then ${streams.durationSec} else 0 end), 0)`,
+      // 场次数包含会员限定；派生指标只累加公开场次。
+      chatTotal: sql<number>`coalesce(sum(case when ${PUBLIC_WEIGHT} = 1 then ${streams.chatTotal} else 0 end), 0)::bigint`,
+      superchats: sql<number>`coalesce(sum(case when ${PUBLIC_WEIGHT} = 1 then ${streams.superchats} else 0 end), 0)::bigint`,
+      durationSec: sql<number>`coalesce(sum(case when ${PUBLIC_WEIGHT} = 1 then ${streams.durationSec} else 0 end), 0)::bigint`,
+      weighted: sql<string>`coalesce(sum(case when ${PUBLIC_WEIGHT} = 1 then ${streams.avgConcurrent} * ${streams.durationSec} else 0 end), 0)`,
+      concurrentDuration: sql<string>`coalesce(sum(case when ${PUBLIC_WEIGHT} = 1 and ${streams.avgConcurrent} is not null then ${streams.durationSec} else 0 end), 0)`,
     })
     .from(streams)
-    .where(visibilityFilter(options.includeMemberOnly))
     .groupBy(streams.datasetId)
 
   return rows.map(row => {
@@ -77,20 +70,17 @@ async function memberStats(db: Db, options: GroupQueryOptions): Promise<GroupMem
   })
 }
 
-async function dayStats(db: Db, options: GroupQueryOptions): Promise<GroupDayStat[]> {
+async function dayStats(db: Db): Promise<GroupDayStat[]> {
   const rows = await db
     .select({
       datasetId: streams.datasetId,
       date: streams.date,
       streamCount: sql<number>`count(*)::int`,
-      chat: sql<number>`coalesce(sum(${streams.chatTotal}), 0)::bigint`,
+      chat: sql<number>`coalesce(sum(case when ${PUBLIC_WEIGHT} = 1 then ${streams.chatTotal} else 0 end), 0)::bigint`,
       latest: sql<string>`max(${streams.date})`,
     })
     .from(streams)
-    .where(and(
-      sql`${streams.date} is not null`,
-      visibilityFilter(options.includeMemberOnly),
-    ))
+    .where(sql`${streams.date} is not null`)
     .groupBy(streams.datasetId, streams.date)
 
   return rows
@@ -105,34 +95,31 @@ async function dayStats(db: Db, options: GroupQueryOptions): Promise<GroupDaySta
     .sort((a, b) => b.date.localeCompare(a.date) || a.datasetId.localeCompare(b.datasetId))
 }
 
-async function latestStreams(db: Db, options: GroupQueryOptions): Promise<GroupStreamSummary[]> {
+async function latestStreams(db: Db): Promise<GroupStreamSummary[]> {
   const rows = await db
     .selectDistinctOn([streams.datasetId])
     .from(streams)
-    .where(visibilityFilter(options.includeMemberOnly))
+    // 首页主视觉只取公开场次，会员限定不占大图。
+    .where(PUBLIC_ONLY)
     .orderBy(streams.datasetId, NEWEST_FIRST)
   return rows.map(toGroupStream)
 }
 
-async function recentStreams(db: Db, options: GroupQueryOptions): Promise<GroupStreamSummary[]> {
+async function recentStreams(db: Db): Promise<GroupStreamSummary[]> {
   const rows = await db
     .select()
     .from(streams)
-    .where(visibilityFilter(options.includeMemberOnly))
     .orderBy(NEWEST_FIRST)
     .limit(GROUP_RECENT_LIMIT)
   return rows.map(toGroupStream)
 }
 
-export async function getGroupSummary(
-  db: Db,
-  options: GroupQueryOptions = {},
-): Promise<GroupSummaryFile> {
+export async function getGroupSummary(db: Db): Promise<GroupSummaryFile> {
   const [members, days, latest, recent] = await Promise.all([
-    memberStats(db, options),
-    dayStats(db, options),
-    latestStreams(db, options),
-    recentStreams(db, options),
+    memberStats(db),
+    dayStats(db),
+    latestStreams(db),
+    recentStreams(db),
   ])
 
   const generatedAt = recent
@@ -151,14 +138,10 @@ export async function getGroupSummary(
   }
 }
 
-export async function getGroupGallery(
-  db: Db,
-  options: GroupQueryOptions = {},
-): Promise<GroupGalleryFile> {
+export async function getGroupGallery(db: Db): Promise<GroupGalleryFile> {
   const rows = await db
     .select()
     .from(streams)
-    .where(visibilityFilter(options.includeMemberOnly))
     .orderBy(NEWEST_FIRST)
   return {
     schema: GROUP_GALLERY_SCHEMA,

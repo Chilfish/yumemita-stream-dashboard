@@ -7,12 +7,13 @@ import { getComparePacks, getDatasetPageData } from '@/db/queries/view-data'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 import { parseCompareIds } from '@/lib/routes'
 import { memberOnlyCachePolicy } from '@/lib/member-access'
+import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
 const datasetId = Astro.params.datasetId!
 const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
-const data = await getDatasetPageData(db, datasetId, { includeMemberOnly: unlocked }).catch(error => {
+const data = await getDatasetPageData(db, datasetId).catch(error => {
   console.error('[page] compare failed', error)
   return null
 })
@@ -24,8 +25,14 @@ const validIds = urlIds.filter(id => data?.rows.some(row => row.videoId === id))
 const selectedIds = validIds.length > 0
   ? validIds
   : (data?.rows.slice(0, 3).map(row => row.videoId) ?? [])
+// 未解锁时不预取会员限定场次的 pack，避免把明细随首屏 HTML 送到客户端。
+const packIds = selectedIds.filter(id => {
+  if (unlocked) return true
+  const row = data?.rows.find(item => item.videoId === id)
+  return !isMemberOnly(row?.availability)
+})
 const comparePacks = data
-  ? await getComparePacks(db, datasetId, selectedIds).catch(() => ({}))
+  ? await getComparePacks(db, datasetId, packIds).catch(() => ({}))
   : {}
 
 const latest = data?.rows[0] ?? null

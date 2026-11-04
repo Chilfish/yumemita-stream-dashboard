@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useSearchParams } from "@/lib/router-compat";
 import { StreamCover } from "@/components/dashboard/stream-cover";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { memberAccent } from "@/lib/color";
@@ -9,6 +10,7 @@ import { formatDate, formatInteger } from "@/lib/format";
 import { type GalleryOrder, parseGalleryOrder, writeGalleryOrder } from "@/lib/gallery-params";
 import { DEFAULT_MEMBER_COLOR } from "@/lib/group";
 import { streamPath } from "@/lib/routes";
+import { isMemberOnly } from "@/lib/visibility";
 import type { GroupStreamSummary } from "@/types/group";
 
 export type { GalleryOrder };
@@ -98,8 +100,9 @@ function sortKey(row: GroupStreamSummary): string {
   return row.startedAt ?? row.date ?? "";
 }
 
-/** 一个读数：优先峰值同接，没有 VSTATS 时退回弹幕。 */
-function cardMetric(row: GroupStreamSummary): { label: string; value: string } {
+/** 一个读数：优先峰值同接，没有 VSTATS 时退回弹幕；会限不展示读数。 */
+function cardMetric(row: GroupStreamSummary): { label: string; value: string } | null {
+  if (isMemberOnly(row.availability)) return null;
   if (row.maxConcurrent != null) {
     return { label: "峰值同接", value: formatInteger(row.maxConcurrent) };
   }
@@ -259,10 +262,16 @@ export function GalleryView({
                               {showMember ? (
                                 <MemberTag color={memberColor} label={memberLabel} />
                               ) : null}
-                              <span className="ms-auto tabular-nums">
-                                <span className="text-ink-3">{metric.label}</span>{" "}
-                                <span className="font-medium text-foreground">{metric.value}</span>
-                              </span>
+                              {metric ? (
+                                <span className="ms-auto tabular-nums">
+                                  <span className="text-ink-3">{metric.label}</span>{" "}
+                                  <span className="font-medium text-foreground">{metric.value}</span>
+                                </span>
+                              ) : (
+                                <Badge className="ms-auto" size="sm" variant="outline">
+                                  会员限定
+                                </Badge>
+                              )}
                             </p>
                             <p className="line-clamp-2 text-body text-foreground transition-colors duration-120 ease-out group-hover:text-member-ink">
                               {row.title}

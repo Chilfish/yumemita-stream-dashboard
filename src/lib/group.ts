@@ -1,4 +1,5 @@
 import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/dataset";
+import { isMemberOnly } from "@/lib/visibility";
 import type {
   GroupDayStat,
   GroupMemberStat,
@@ -81,6 +82,7 @@ interface RowStat {
   superchats: number;
   durationSec: number | null;
   avgConcurrent: number | null;
+  memberOnly: boolean;
 }
 
 function summarizeMember(
@@ -100,16 +102,17 @@ function summarizeMember(
   let concurrentDuration = 0;
 
   for (const row of stats) {
+    const date = streamDateKey(row);
+    if (date && date >= weekStart) weekStreams += 1;
+    if (date && date.slice(0, 7) === monthKey) monthStreams += 1;
+
+    // 场次 / 日期统计保留会限；弹幕、SC、时长与同接只累加公开场次。
+    if (row.memberOnly) continue;
+
     chatTotal += row.chatTotal ?? 0;
     superchats += row.superchats ?? 0;
     durationSec += row.durationSec ?? 0;
-
-    const date = streamDateKey(row);
-    if (date && date >= weekStart) {
-      weekStreams += 1;
-      weekChat += row.chatTotal ?? 0;
-    }
-    if (date && date.slice(0, 7) === monthKey) monthStreams += 1;
+    if (date && date >= weekStart) weekChat += row.chatTotal ?? 0;
 
     if (row.avgConcurrent != null && row.durationSec) {
       weightedConcurrent += row.avgConcurrent * row.durationSec;
@@ -274,10 +277,17 @@ export function buildGroupDataFromStreams(
       superchats: row.superchats,
       durationSec: row.durationSec,
       avgConcurrent: row.avgConcurrent,
+      memberOnly: isMemberOnly(row.availability),
     }));
 
     members.push(
-      summarizeMember(dataset, stats, memberRows[0] ?? null, weekStart, monthKey),
+      summarizeMember(
+        dataset,
+        stats,
+        memberRows.find(row => !isMemberOnly(row.availability)) ?? null,
+        weekStart,
+        monthKey,
+      ),
     );
     rows.push(...memberRows);
   }
@@ -311,6 +321,7 @@ export function buildGroupData(
 
 /** 完整 manifest 行 → 组视图行。生成脚本也复用同一份投影规则。 */
 export function toGroupStream(datasetId: string, row: StreamSummary): GroupStreamSummary {
+  const memberOnly = isMemberOnly(row.availability);
   return {
     datasetId,
     date: row.date,
@@ -319,12 +330,12 @@ export function toGroupStream(datasetId: string, row: StreamSummary): GroupStrea
     startedAt: row.startedAt,
     durationSec: row.durationSec,
     availability: row.availability,
-    avgConcurrent: row.avgConcurrent,
-    maxConcurrent: row.maxConcurrent,
-    chatTotal: row.chatTotal,
-    superchats: row.superchats,
-    vstatsViews: row.vstatsViews,
-    snapshotViews: row.snapshotViews,
+    avgConcurrent: memberOnly ? null : row.avgConcurrent,
+    maxConcurrent: memberOnly ? null : row.maxConcurrent,
+    chatTotal: memberOnly ? 0 : row.chatTotal,
+    superchats: memberOnly ? 0 : row.superchats,
+    vstatsViews: memberOnly ? null : row.vstatsViews,
+    snapshotViews: memberOnly ? null : row.snapshotViews,
     thumbnail: row.thumbnail,
   };
 }

@@ -4,6 +4,7 @@ import { getDatasets } from '@/db/queries/datasets'
 import { listStreams } from '@/db/queries/streams'
 import { buildSitemap } from '@/lib/seo'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
+import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
@@ -17,10 +18,13 @@ export const GET: APIRoute = async (context) => {
       return {
         id: dataset.id,
         updatedAt: dataset.generatedAt,
-        streams: list.streams.map(stream => ({
-          videoId: stream.videoId,
-          startedAt: stream.startedAt,
-        })),
+        // 会限单场是 noindex，不进 sitemap。
+        streams: list.streams
+          .filter(stream => !isMemberOnly(stream.availability))
+          .map(stream => ({
+            videoId: stream.videoId,
+            startedAt: stream.startedAt,
+          })),
       }
     }),
   )

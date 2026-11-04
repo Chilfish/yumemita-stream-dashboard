@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
 import {
   authors,
@@ -9,7 +9,6 @@ import {
   streams,
   streamWords,
 } from '@/db/schema'
-import { MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
 import type {
   ChatDensity,
   ChatEvent,
@@ -314,17 +313,11 @@ async function loadChildren(db: Db, ids: number[]) {
 export async function getDatasetPacks(
   db: Db,
   datasetId: string,
-  options: { includeMemberOnly?: boolean } = {},
 ): Promise<Map<string, StreamDatapack>> {
   const rows = await db
     .select()
     .from(streams)
-    .where(and(
-      eq(streams.datasetId, datasetId),
-      options.includeMemberOnly
-        ? undefined
-        : sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`,
-    ))
+    .where(eq(streams.datasetId, datasetId))
   const { details, paid, comments: commentRows, words, authorRows } = await loadChildren(
     db,
     rows.map(row => row.id),

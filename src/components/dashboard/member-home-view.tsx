@@ -18,6 +18,7 @@ import {
   formatTime,
 } from "@/lib/format";
 import { galleryPath, streamsPath, streamPath } from "@/lib/routes";
+import { isMemberOnly } from "@/lib/visibility";
 import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/dataset";
 
 interface MemberHomeViewProps {
@@ -63,7 +64,8 @@ function HeadlineStats({ items }: { items: HeadlineStat[] }) {
 }
 
 export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeViewProps) {
-  const latest = rows[0] ?? null;
+  // 首页大图只放公开场次，会员限定不占主视觉。
+  const latest = rows.find(row => !isMemberOnly(row.availability)) ?? null;
   const oldest = rows.at(-1) ?? null;
 
   const range =

@@ -5,23 +5,22 @@ import { GroupPage } from '@/components/app/group-page'
 import { db } from '@/db/client'
 import { getGroupPageData, type GroupPageData } from '@/db/queries/view-data'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
-import { memberOnlyCachePolicy } from '@/lib/member-access'
+import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
-const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
-if (!keyed) Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group'] })
+Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group'] })
 
 let data: GroupPageData | null = null
 try {
-  data = await getGroupPageData(db, 'home', { includeMemberOnly: unlocked })
+  data = await getGroupPageData(db, 'home')
 }
 catch (error) {
   console.error('[page] group home failed', error)
   Astro.response.status = 500
 }
 
-const latest = data?.data.rows[0] ?? null
+const latest = data?.data.rows.find(row => !isMemberOnly(row.availability)) ?? null
 const meta = pageSeo(Astro, {
   section: 'home',
   memberCount: data?.datasets.length ?? null,

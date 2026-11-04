@@ -1,6 +1,7 @@
 import type { ChatByKind, CurrencyTotals } from '@/types/datapack'
 import type { StreamSummary } from '@/types/dataset'
 import type { StreamDbRow } from '@/types/db'
+import { isMemberOnly } from '@/lib/visibility'
 
 export function toNumber(value: string | number | null | undefined): number | null {
   if (value == null) return null
@@ -58,5 +59,40 @@ export function mapStreamSummary(row: StreamDbRow, rank: number): StreamSummary 
     sessionDir: '',
     datapack: '',
     generatedAt: toIso(row.sourceGeneratedAt) ?? '',
+  }
+}
+
+/**
+ * 会员限定场只公开元数据：派生指标清零 / 置空。
+ * 列表仍保留这一行，图表和聚合按空值或 0 跳过。
+ */
+export function maskMemberOnlyMetrics(summary: StreamSummary): StreamSummary {
+  if (!isMemberOnly(summary.availability)) return summary
+
+  return {
+    ...summary,
+    avgConcurrent: null,
+    maxConcurrent: null,
+    maxConcurrentAt: null,
+    watchTimeHours: null,
+    vstatsViews: null,
+    vstatsLikes: null,
+    snapshotViews: null,
+    snapshotLikes: null,
+    snapshotComments: null,
+    chatTotal: 0,
+    chatByKind: { text: 0, superchat: 0, sticker: 0, membership: 0, gift: 0 },
+    pureEmojiOnly: 0,
+    uniqueAuthors: 0,
+    superchats: 0,
+    scTotalsByCurrency: {},
+    stickers: 0,
+    memberships: 0,
+    gifts: 0,
+    giftedMemberships: 0,
+    commentsCaptured: null,
+    chatPer1000AvgViewers: null,
+    likesPer1000Views: null,
+    scPerHour: null,
   }
 }

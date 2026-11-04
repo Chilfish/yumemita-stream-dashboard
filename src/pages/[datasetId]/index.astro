@@ -5,21 +5,19 @@ import { DatasetPage } from '@/components/app/dataset-page'
 import { db } from '@/db/client'
 import { getDatasetPageData } from '@/db/queries/view-data'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
-import { memberOnlyCachePolicy } from '@/lib/member-access'
+import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
 const datasetId = Astro.params.datasetId!
-// 会员限定场次默认不公开；URL 带上与环境变量一致的 key 才放行。
-const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
-const data = await getDatasetPageData(db, datasetId, { includeMemberOnly: unlocked }).catch(error => {
+const data = await getDatasetPageData(db, datasetId).catch(error => {
   console.error('[page] dataset home failed', error)
   return null
 })
 
-const latest = data?.rows[0] ?? null
+const latest = data?.rows.find(row => !isMemberOnly(row.availability)) ?? null
 if (!data) Astro.response.status = 404
-else if (!keyed) Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`] })
+else Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`] })
 
 const meta = data
   ? pageSeo(Astro, {

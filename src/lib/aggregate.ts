@@ -5,6 +5,7 @@ import {
   type ContentTypeKey,
 } from "@/lib/classify";
 import { isStopword } from "@/lib/stopwords";
+import { isMemberOnly } from "@/lib/visibility";
 import type {
   ChatByKind,
   CurrencyTotal,
@@ -308,12 +309,14 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
   let paidShareCount = 0;
   let weightedAvgNumerator = 0;
   let weightedAvgDenominator = 0;
-  let memberOnlyCount = 0;
   let withVstatsCount = 0;
   let bestPeak: PeakChatMinute | null = null;
   const packRows: { row: StreamRow; chat: number; sc: number; avg: number | null }[] = [];
+  // 场次数保留会限场；弹幕 / SC / 同接等派生指标只累加公开场次。
+  const publicRows = rows.filter(row => !isMemberOnly(row.summary.availability));
+  const memberOnlyCount = rows.length - publicRows.length;
 
-  for (const row of rows) {
+  for (const row of publicRows) {
     const { summary, pack } = row;
     const chat = pack.chat;
     durationSec += summary.durationSec ?? 0;
@@ -334,7 +337,6 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
       paidShareSum += chat.paid.paidSharePct;
       paidShareCount += 1;
     }
-    if (pack.video.availability === "subscriber_only") memberOnlyCount += 1;
     if (pack.vstats?.avgConcurrent != null) {
       withVstatsCount += 1;
       if (summary.durationSec) {
@@ -473,9 +475,9 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
     topWords: [...wordCounts.values()].sort((a, b) => b.count - a.count).slice(0, 40),
     topAuthors: [...authorCounts.values()].sort((a, b) => b.messages - a.messages).slice(0, 30),
     aggregation: {
-      words: aggregationMode(wordsFullCount, rows.length),
-      authors: aggregationMode(authorsFullCount, rows.length),
-      coverage: { words: wordsFullCount, authors: authorsFullCount, total: rows.length },
+      words: aggregationMode(wordsFullCount, publicRows.length),
+      authors: aggregationMode(authorsFullCount, publicRows.length),
+      coverage: { words: wordsFullCount, authors: authorsFullCount, total: publicRows.length },
     },
     badges: [...badgeCounts.entries()]
       .map(([name, count]) => ({ name, count }))
@@ -497,7 +499,7 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
       ? { videoId: bestByScRow.row.summary.videoId, title: bestByScRow.row.summary.title, value: bestByScRow.sc }
       : null,
     peakChatMinute: bestPeak,
-    streamShape: buildStreamShape(rows),
+    streamShape: buildStreamShape(publicRows),
   };
 }
 
@@ -559,6 +561,11 @@ export function buildMonthlySeries(rows: StreamSummary[], limit = 6): MonthlyPoi
       concurrentCount: 0,
     };
     bucket.streams += 1;
+    // 场次数含会限；弹幕 / SC / 同接等指标只看公开场次。
+    if (isMemberOnly(row.availability)) {
+      buckets.set(month, bucket);
+      continue;
+    }
     bucket.durationSec += row.durationSec ?? 0;
     bucket.chatTotal += row.chatTotal ?? 0;
     bucket.superchats += row.superchats ?? 0;
@@ -620,9 +627,11 @@ export function buildCalendarDays(rows: StreamSummary[]): CalendarDay[] {
       durationSec: 0,
     };
     day.streams += 1;
-    day.chat += row.chatTotal ?? 0;
-    day.superchats += row.superchats ?? 0;
-    day.durationSec += row.durationSec ?? 0;
+    if (!isMemberOnly(row.availability)) {
+      day.chat += row.chatTotal ?? 0;
+      day.superchats += row.superchats ?? 0;
+      day.durationSec += row.durationSec ?? 0;
+    }
     byDate.set(candidate, day);
   }
 
@@ -663,6 +672,7 @@ export function buildContentTypeStats(rows: StreamSummary[]): ContentTypeStat[] 
     ContentTypeKey,
     {
       streams: number;
+      metricStreams: number;
       durationSec: number;
       chatTotal: number;
       superchats: number;
@@ -675,6 +685,7 @@ export function buildContentTypeStats(rows: StreamSummary[]): ContentTypeStat[] 
       key,
       {
         streams: 0,
+        metricStreams: 0,
         durationSec: 0,
         chatTotal: 0,
         superchats: 0,
@@ -691,6 +702,9 @@ export function buildContentTypeStats(rows: StreamSummary[]): ContentTypeStat[] 
     if (!bucket) continue;
 
     bucket.streams += 1;
+    // 场次占比含会限；时长 / 弹幕 / SC / 评论等指标只看公开场次。
+    if (isMemberOnly(row.availability)) continue;
+    bucket.metricStreams += 1;
     bucket.durationSec += row.durationSec ?? 0;
     bucket.chatTotal += row.chatTotal ?? 0;
     bucket.superchats += row.superchats ?? 0;
@@ -704,6 +718,7 @@ export function buildContentTypeStats(rows: StreamSummary[]): ContentTypeStat[] 
   return CONTENT_TYPES.map(key => {
     const bucket = buckets.get(key) ?? {
       streams: 0,
+      metricStreams: 0,
       durationSec: 0,
       chatTotal: 0,
       superchats: 0,
@@ -717,12 +732,12 @@ export function buildContentTypeStats(rows: StreamSummary[]): ContentTypeStat[] 
       streams: bucket.streams,
       share: rows.length > 0 ? bucket.streams / rows.length : 0,
       durationSec: bucket.durationSec,
-      avgDurationSec: bucket.streams > 0 ? bucket.durationSec / bucket.streams : null,
+      avgDurationSec: bucket.metricStreams > 0 ? bucket.durationSec / bucket.metricStreams : null,
       chatTotal: bucket.chatTotal,
       superchats: bucket.superchats,
       commentsCaptured: bucket.commentsCaptured,
       commentsPerStream:
-        bucket.streams > 0 ? bucket.commentsCaptured / bucket.streams : null,
+        bucket.metricStreams > 0 ? bucket.commentsCaptured / bucket.metricStreams : null,
       chatPerMinute:
         bucket.durationSec > 0 ? bucket.chatTotal / (bucket.durationSec / 60) : null,
       scPerHour:

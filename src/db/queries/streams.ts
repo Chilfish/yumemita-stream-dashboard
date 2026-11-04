@@ -1,21 +1,18 @@
 import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
 import { streams, streamDetails } from '@/db/schema'
-import { MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
 import type { StreamSummary } from '@/types/dataset'
 import type { StreamListOptions, StreamListResult, StreamNeighbors, StreamDetailDto } from '@/types/db'
-import { mapStreamSummary, toNumber } from './shared'
+import { mapStreamSummary, maskMemberOnlyMetrics, toNumber } from './shared'
 
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
 
-/** 会员限定场次默认不出现在公开查询里；放行时由调用方显式打开。 */
-function visibilityFilter(includeMemberOnly: boolean | undefined) {
-  if (includeMemberOnly) return undefined
-  return sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`
-}
-
 function toSummary(row: typeof streams.$inferSelect, rank: number): StreamSummary {
   return mapStreamSummary(row, rank)
+}
+
+function toPublicSummary(row: typeof streams.$inferSelect, rank: number): StreamSummary {
+  return maskMemberOnlyMetrics(toSummary(row, rank))
 }
 
 export async function listStreams(
@@ -28,7 +25,6 @@ export async function listStreams(
   const where = and(
     eq(streams.datasetId, datasetId),
     options.availability ? eq(streams.availability, options.availability) : undefined,
-    visibilityFilter(options.includeMemberOnly),
   )
 
   // 一次窗口函数取回总数与当前页，避免多一次 HTTP 往返。
@@ -44,7 +40,7 @@ export async function listStreams(
     .offset(offset)
 
   return {
-    streams: rows.map((row, index) => toSummary(row, offset + index + 1)),
+    streams: rows.map((row, index) => toPublicSummary(row, offset + index + 1)),
     total: rows[0]?.total ?? 0,
   }
 }
@@ -64,27 +60,25 @@ export async function getStream(
 export async function getLatestStream(
   db: Db,
   datasetId: string,
-  options: { includeMemberOnly?: boolean } = {},
 ): Promise<StreamSummary | null> {
   const [row] = await db
     .select()
     .from(streams)
-    .where(and(eq(streams.datasetId, datasetId), visibilityFilter(options.includeMemberOnly)))
+    .where(eq(streams.datasetId, datasetId))
     .orderBy(NEWEST_FIRST)
     .limit(1)
-  return row ? toSummary(row, 1) : null
+  return row ? toPublicSummary(row, 1) : null
 }
 
 export async function getStreamNeighbors(
   db: Db,
   datasetId: string,
   videoId: string,
-  options: { includeMemberOnly?: boolean } = {},
 ): Promise<StreamNeighbors> {
   const ordered = await db
     .select({ videoId: streams.videoId })
     .from(streams)
-    .where(and(eq(streams.datasetId, datasetId), visibilityFilter(options.includeMemberOnly)))
+    .where(eq(streams.datasetId, datasetId))
     .orderBy(NEWEST_FIRST)
 
   const index = ordered.findIndex(row => row.videoId === videoId)
@@ -105,8 +99,8 @@ export async function getStreamNeighbors(
   const next = nextId ? byVideo.get(nextId) : undefined
 
   return {
-    previous: previous ? toSummary(previous, index) : null,
-    next: next ? toSummary(next, index + 2) : null,
+    previous: previous ? toPublicSummary(previous, index) : null,
+    next: next ? toPublicSummary(next, index + 2) : null,
   }
 }
 

@@ -2,6 +2,7 @@ import { Link } from "@/lib/router-compat";
 import { CONTENT_TYPE_LABELS, classifyTitle } from "@/lib/classify";
 import { formatDate, formatDuration, formatInteger, formatTime } from "@/lib/format";
 import { streamPath } from "@/lib/routes";
+import { isMemberOnly } from "@/lib/visibility";
 import type { StreamSummary } from "@/types/dataset";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ export function StreamList({ datasetId, rows, empty, className }: StreamListProp
     <ul className={cn("divide-y divide-hairline", className)}>
       {rows.map(row => {
         const { key, matched } = classifyTitle(row.title);
+        const memberOnly = isMemberOnly(row.availability);
 
         return (
           <li key={row.videoId}>
@@ -57,17 +59,23 @@ export function StreamList({ datasetId, rows, empty, className }: StreamListProp
                 <span className={matched ? "text-muted-foreground" : "text-ink-3"}>
                   {CONTENT_TYPE_LABELS[key]}
                 </span>
-                {row.availability === "subscriber_only" ? <span>会员限定</span> : null}
+                {memberOnly ? <span>会员限定</span> : null}
                 <span className="ms-auto tabular-nums">{formatDuration(row.durationSec)}</span>
               </div>
 
               <p className="line-clamp-2 text-body text-foreground">{row.title}</p>
 
               <p className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-caption">
-                <Value label="平均" value={formatInteger(row.avgConcurrent)} />
-                <Value label="峰值" value={formatInteger(row.maxConcurrent)} />
-                <Value label="弹幕" value={formatInteger(row.chatTotal)} />
-                <Value label="SC" value={formatInteger(row.superchats)} />
+                {memberOnly
+                  ? <span className="text-ink-3">会员限定 · 明细不公开</span>
+                  : (
+                      <>
+                        <Value label="平均" value={formatInteger(row.avgConcurrent)} />
+                        <Value label="峰值" value={formatInteger(row.maxConcurrent)} />
+                        <Value label="弹幕" value={formatInteger(row.chatTotal)} />
+                        <Value label="SC" value={formatInteger(row.superchats)} />
+                      </>
+                    )}
               </p>
             </Link>
           </li>

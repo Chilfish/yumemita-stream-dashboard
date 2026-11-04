@@ -23,6 +23,7 @@ import {
   isTableSortKey,
 } from "@/lib/table-params";
 import type { StreamSummary } from "@/types/dataset";
+import { isMemberOnly } from "@/lib/visibility";
 import { cn } from "@/lib/utils";
 
 const INITIAL_VISIBLE_ROWS = 100;
@@ -37,6 +38,9 @@ export interface StreamsViewProps {
 }
 
 function sortValue(row: StreamSummary, key: TableSortKey): number | null {
+  // 会限只公开场次与日期；指标排序时把这一行推到最后。
+  if (isMemberOnly(row.availability) && key !== "date" && key !== "duration") return null;
+
   switch (key) {
     case "date":
       return row.startedAt ? Date.parse(row.startedAt) : null;
@@ -89,6 +93,20 @@ function numberCell(value: number | null | undefined, strong = false): ReactNode
 function likeRateCell(value: number | null | undefined): ReactNode {
   if (value == null) return <Missing />;
   return <span className="text-muted-foreground">{formatPercent(value / 10, 2)}</span>;
+}
+
+function streamMetricCell(
+  row: StreamSummary,
+  value: number | null | undefined,
+  strong = false,
+): ReactNode {
+  if (isMemberOnly(row.availability)) return <Missing />;
+  return numberCell(value, strong);
+}
+
+function streamRateCell(row: StreamSummary, value: number | null | undefined): ReactNode {
+  if (isMemberOnly(row.availability)) return <Missing />;
+  return likeRateCell(value);
 }
 
 function averageDuration(rows: StreamSummary[]): number | null {
@@ -215,7 +233,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
             align: "right" as const,
             sortable: true,
             width: "6rem",
-            render: (row: StreamSummary) => numberCell(row.avgConcurrent),
+            render: (row: StreamSummary) => streamMetricCell(row, row.avgConcurrent),
           } satisfies DataColumn<StreamSummary>,
         ]
       : []),
@@ -225,7 +243,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
       align: "right",
       sortable: true,
       width: "5rem",
-      render: row => numberCell(row.maxConcurrent, true),
+      render: row => streamMetricCell(row, row.maxConcurrent, true),
     },
     {
       key: "views",
@@ -233,7 +251,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
       align: "right",
       sortable: true,
       width: "5.5rem",
-      render: row => numberCell(row.vstatsViews ?? row.snapshotViews),
+      render: row => streamMetricCell(row, row.vstatsViews ?? row.snapshotViews),
     },
     {
       key: "chat",
@@ -241,7 +259,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
       align: "right",
       sortable: true,
       width: "5.5rem",
-      render: row => numberCell(row.chatTotal),
+      render: row => streamMetricCell(row, row.chatTotal),
     },
     ...(extra.has("authors")
       ? [
@@ -251,7 +269,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
             align: "right" as const,
             sortable: true,
             width: "5rem",
-            render: (row: StreamSummary) => numberCell(row.uniqueAuthors),
+            render: (row: StreamSummary) => streamMetricCell(row, row.uniqueAuthors),
           } satisfies DataColumn<StreamSummary>,
         ]
       : []),
@@ -263,7 +281,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
             align: "right" as const,
             sortable: true,
             width: "3.5rem",
-            render: (row: StreamSummary) => numberCell(row.superchats),
+            render: (row: StreamSummary) => streamMetricCell(row, row.superchats),
           } satisfies DataColumn<StreamSummary>,
         ]
       : []),
@@ -275,7 +293,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
             align: "right" as const,
             sortable: true,
             width: "4.5rem",
-            render: (row: StreamSummary) => numberCell(row.commentsCaptured),
+            render: (row: StreamSummary) => streamMetricCell(row, row.commentsCaptured),
           } satisfies DataColumn<StreamSummary>,
         ]
       : []),
@@ -286,7 +304,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
             header: "点赞率",
             align: "right" as const,
             width: "4.5rem",
-            render: (row: StreamSummary) => likeRateCell(row.likesPer1000Views),
+            render: (row: StreamSummary) => streamRateCell(row, row.likesPer1000Views),
           } satisfies DataColumn<StreamSummary>,
         ]
       : []),
@@ -322,22 +340,26 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
       "SC",
       "评论",
     ];
-    const body = visible.map(row => [
-      row.date,
-      row.title,
-      CONTENT_TYPE_LABELS[classifyTitle(row.title).key],
-      row.videoId,
-      row.durationHms,
-      row.avgConcurrent,
-      row.maxConcurrent,
-      row.watchTimeHours,
-      row.vstatsViews ?? row.snapshotViews,
-      row.vstatsLikes ?? row.snapshotLikes,
-      row.chatTotal,
-      row.uniqueAuthors,
-      row.superchats,
-      row.commentsCaptured,
-    ]);
+    const body = visible.map(row => {
+      // 会限只导出元数据，指标留空，避免 CSV 绕过详情页的公开范围。
+      const memberOnly = isMemberOnly(row.availability);
+      return [
+        row.date,
+        row.title,
+        CONTENT_TYPE_LABELS[classifyTitle(row.title).key],
+        row.videoId,
+        row.durationHms,
+        memberOnly ? null : row.avgConcurrent,
+        memberOnly ? null : row.maxConcurrent,
+        memberOnly ? null : row.watchTimeHours,
+        memberOnly ? null : (row.vstatsViews ?? row.snapshotViews),
+        memberOnly ? null : (row.vstatsLikes ?? row.snapshotLikes),
+        memberOnly ? null : row.chatTotal,
+        memberOnly ? null : row.uniqueAuthors,
+        memberOnly ? null : row.superchats,
+        memberOnly ? null : row.commentsCaptured,
+      ];
+    });
     const csv = [headers, ...body].map(line => line.map(escapeCsv).join(",")).join("\n");
     const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);

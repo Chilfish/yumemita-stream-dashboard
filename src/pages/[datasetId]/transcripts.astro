@@ -11,9 +11,10 @@ import { memberOnlyCachePolicy } from '@/lib/member-access'
 export const prerender = false
 
 const datasetId = Astro.params.datasetId!
+// 场次元数据公开；逐字稿正文与索引仍按访问参数放行。
 const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
 const [data, transcriptResult] = await Promise.all([
-  getDatasetPageData(db, datasetId, { includeMemberOnly: unlocked }).catch(error => {
+  getDatasetPageData(db, datasetId).catch(error => {
     console.error('[page] transcripts failed', error)
     return null
   }),

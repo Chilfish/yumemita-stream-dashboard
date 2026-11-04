@@ -3,6 +3,7 @@ import { db } from '@/db/client'
 import { getDatasets } from '@/db/queries/datasets'
 import { listStreams } from '@/db/queries/streams'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
+import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
@@ -27,8 +28,11 @@ export const GET: APIRoute = async (context) => {
   lines.push('', '## 最近场次', '')
   const recent = await Promise.all(
     datasets.map(async dataset => {
-      const list = await listStreams(db, dataset.id, { limit: 5 })
-      return list.streams.map(stream => ({ dataset, stream }))
+      const list = await listStreams(db, dataset.id, { limit: 20 })
+      return list.streams
+        .filter(stream => !isMemberOnly(stream.availability))
+        .slice(0, 5)
+        .map(stream => ({ dataset, stream }))
     }),
   )
 

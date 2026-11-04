@@ -5,7 +5,6 @@ import type { DatasetIndexEntry, StreamSummary } from '@/types/dataset'
 import type { StreamDatapack } from '@/types/datapack'
 import { getDatasets } from './datasets'
 import { getGroupGallery, getGroupSummary } from './group'
-import { getDatasetInsights } from './insights'
 import { getDatasetPacks, getStreamPack } from './packs'
 import { listStreams } from './streams'
 
@@ -19,11 +18,6 @@ export interface DatasetPageData {
 export interface GroupPageData {
   datasets: DatasetIndexEntry[]
   data: GroupData
-}
-
-export interface VisibilityOptions {
-  /** 默认 `false`：列表、统计与聚合都不含会员限定场次。 */
-  includeMemberOnly?: boolean
 }
 
 export function toIndex(rows: Awaited<ReturnType<typeof getDatasets>>): DatasetIndexEntry[] {
@@ -44,14 +38,9 @@ async function resolveTotals(
   db: Db,
   datasetId: string,
   rows: StreamSummary[],
-  insightTotals: DatasetTotals | null,
-  includeMemberOnly: boolean,
 ): Promise<DatasetTotals> {
-  // insights 的口径包含会员限定场次；公开视图必须按同一过滤条件重算，
-  // 否则页头场次数会和列表、图表对不上。
-  if (includeMemberOnly && insightTotals) return insightTotals
-
-  const packs = await getDatasetPacks(db, datasetId, { includeMemberOnly })
+  // insights 的口径包含会员限定；公开页面的指标必须按公开场次重算。
+  const packs = await getDatasetPacks(db, datasetId)
   const aggregateRows: AggregateStreamRow[] = rows
     .map(summary => {
       const pack = packs.get(summary.videoId)
@@ -65,27 +54,18 @@ async function resolveTotals(
 export async function getDatasetPageData(
   db: Db,
   datasetId: string,
-  options: VisibilityOptions = {},
 ): Promise<DatasetPageData | null> {
-  const includeMemberOnly = options.includeMemberOnly ?? false
-  // 三个查询并行发出；Neon HTTP 每个查询一次往返，并行能把等待压到一轮。
-  const [all, list, insight] = await Promise.all([
-    getDatasets(db, { includeMemberOnly }),
-    listStreams(db, datasetId, { limit: 2000, includeMemberOnly }),
-    includeMemberOnly ? getDatasetInsights(db, datasetId) : Promise.resolve(null),
+  // 两个查询并行发出；Neon HTTP 每个查询一次往返，并行能把等待压到一轮。
+  const [all, list] = await Promise.all([
+    getDatasets(db),
+    listStreams(db, datasetId, { limit: 2000 }),
   ])
 
   const datasets = toIndex(all)
   const dataset = datasets.find(item => item.id === datasetId)
   if (!dataset) return null
 
-  const totals = await resolveTotals(
-    db,
-    datasetId,
-    list.streams,
-    insight?.totals ?? null,
-    includeMemberOnly,
-  )
+  const totals = await resolveTotals(db, datasetId, list.streams)
 
   return {
     datasets,
@@ -98,17 +78,15 @@ export async function getDatasetPageData(
 export async function getGroupPageData(
   db: Db,
   view: 'home' | 'gallery',
-  options: VisibilityOptions = {},
 ): Promise<GroupPageData> {
-  const includeMemberOnly = options.includeMemberOnly ?? false
-  const datasets = toIndex(await getDatasets(db, { includeMemberOnly }))
+  const datasets = toIndex(await getDatasets(db))
 
   if (view === 'gallery') {
-    const gallery = await getGroupGallery(db, { includeMemberOnly })
+    const gallery = await getGroupGallery(db)
     return { datasets, data: buildGroupDataFromStreams(datasets, gallery.streams) }
   }
 
-  const summary = await getGroupSummary(db, { includeMemberOnly })
+  const summary = await getGroupSummary(db)
   return { datasets, data: buildGroupDataFromSummary(datasets, summary) }
 }
 

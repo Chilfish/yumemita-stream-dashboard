@@ -1,26 +1,11 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
 import { datasets, streams } from '@/db/schema'
-import { MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
 import type { DatasetSummary } from '@/types/db'
 import { toIso } from './shared'
 
-interface DatasetQueryOptions {
-  /** 默认 `false`：场次数只统计公开场次。 */
-  includeMemberOnly?: boolean
-}
-
-async function selectDatasets(
-  db: Db,
-  datasetId: string | undefined,
-  options: DatasetQueryOptions,
-) {
-  const joinCondition = and(
-    eq(streams.datasetId, datasets.id),
-    options.includeMemberOnly
-      ? undefined
-      : sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`,
-  )
+async function selectDatasets(db: Db, datasetId: string | undefined) {
+  const joinCondition = eq(streams.datasetId, datasets.id)
 
   return db
     .select({
@@ -57,20 +42,16 @@ function mapDataset(row: Awaited<ReturnType<typeof selectDatasets>>[number]): Da
   }
 }
 
-export async function getDatasets(
-  db: Db,
-  options: DatasetQueryOptions = {},
-): Promise<DatasetSummary[]> {
-  const rows = await selectDatasets(db, undefined, options)
+export async function getDatasets(db: Db): Promise<DatasetSummary[]> {
+  const rows = await selectDatasets(db, undefined)
   return rows.map(mapDataset)
 }
 
 export async function getDataset(
   db: Db,
   datasetId: string,
-  options: DatasetQueryOptions = {},
 ): Promise<DatasetSummary | null> {
-  const rows = await selectDatasets(db, datasetId, options)
+  const rows = await selectDatasets(db, datasetId)
   const row = rows[0]
   return row ? mapDataset(row) : null
 }

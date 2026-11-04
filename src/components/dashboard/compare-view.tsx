@@ -15,6 +15,7 @@ import { formatDate, formatDuration, formatInteger, formatPercent } from "@/lib/
 import { MAX_COMPARE } from "@/lib/routes";
 import type { StreamDatapack } from "@/types/datapack";
 import type { StreamSummary } from "@/types/dataset";
+import { isMemberOnly } from "@/lib/visibility";
 import { cn } from "@/lib/utils";
 
 interface CompareViewProps {
@@ -92,12 +93,17 @@ interface BestValue {
 
 function bestValue(metric: Metric, selected: StreamSummary[]): BestValue {
   const numeric = selected
-    .map(metric.value)
+    .map(row => metricValue(metric, row))
     .filter((value): value is number => value != null && Number.isFinite(value));
   return {
     best: numeric.length > 0 ? Math.max(...numeric) : null,
     count: numeric.length,
   };
+}
+
+/** 会限的派生指标不公开，按空值参与比较。 */
+function metricValue(metric: Metric, row: StreamSummary): number | null {
+  return isMemberOnly(row.availability) ? null : metric.value(row);
 }
 
 export function CompareView({
@@ -170,7 +176,7 @@ export function CompareView({
           </span>
         ),
         render: (metric: Metric) => {
-          const value = metric.value(row);
+          const value = metricValue(metric, row);
           const best = bests.get(metric.key);
           const marked =
             value != null && best?.best != null && best.count > 1 && value === best.best;
@@ -246,6 +252,7 @@ export function CompareView({
                         <span className="min-w-0">
                           <span className="block text-caption text-ink-3 tabular-nums">
                             {formatDate(row.startedAt)}
+                            {isMemberOnly(row.availability) ? " · 会员限定" : ""}
                           </span>
                           <span className="mt-0.5 block truncate text-foreground">
                             {row.title}

@@ -13,6 +13,7 @@ import { StreamsPage } from '@/components/pages/streams-page'
 import { TranscriptsPage } from '@/components/pages/transcripts-page'
 import { TrendsPage } from '@/components/pages/trends-page'
 import { CompareView } from '@/components/dashboard/compare-view'
+import { LockedStreamView } from '@/components/dashboard/locked-stream-view'
 import { StreamDetailView } from '@/components/dashboard/stream-detail-view'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
@@ -20,6 +21,7 @@ import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 import type { DatasetTotals } from '@/lib/aggregate'
 import { memberAccent } from '@/lib/color'
 import { rememberMember } from '@/lib/preferences'
+import { isMemberOnly } from '@/lib/visibility'
 import {
   DEFAULT_STREAM_SUBVIEW,
   parseCompareIds,
@@ -59,6 +61,8 @@ export interface DatasetPageProps {
   transcripts?: TranscriptIndexEntry[]
   transcriptError?: string | null
   hasTranscript?: boolean
+  /** 会员限定单场：复用详情页外壳，正文换成公开范围说明。 */
+  locked?: boolean
 }
 
 export function DatasetPage(props: DatasetPageProps) {
@@ -188,10 +192,14 @@ function DatasetBody(props: DatasetPageProps) {
   }
 }
 
-function StreamBody({ dataset, rows, stream, pack, hasTranscript }: DatasetPageProps) {
+function StreamBody({ dataset, rows, stream, pack, hasTranscript, locked }: DatasetPageProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const view = parseStreamSubView(searchParams.get('view'))
+
+  if (locked && stream) {
+    return <LockedStreamView datasetId={dataset.id} summary={stream} />
+  }
 
   if (!stream || !pack) {
     return (
@@ -232,6 +240,9 @@ function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
   const validIds = urlIds.filter(id => rows.some(row => row.videoId === id))
   const selectedIds = hasParam ? validIds : rows.slice(0, 3).map(row => row.videoId)
   const selectedKey = selectedIds.join(',')
+  // 带 key 访问时会员限定场的 pack 也放行；否则跳过它们，避免 404 拖垮整页曲线。
+  const accessKey = searchParams.get('key')
+  const accessSuffix = accessKey ? `?key=${encodeURIComponent(accessKey)}` : ''
 
   const writeIds = useCallback((ids: string[]) => {
     const params = new URLSearchParams(searchParams)
@@ -241,7 +252,12 @@ function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
 
   // 切换对比场次时只按需拉缺失的 pack，首屏已经带上的不再请求。
   useEffect(() => {
-    const missing = (selectedKey ? selectedKey.split(',') : []).filter(id => !packs.has(id))
+    const missing = (selectedKey ? selectedKey.split(',') : []).filter((id) => {
+      if (packs.has(id)) return false
+      if (accessKey) return true
+      const row = rows.find(item => item.videoId === id)
+      return !isMemberOnly(row?.availability)
+    })
     if (missing.length === 0) return
 
     let cancelled = false
@@ -252,7 +268,7 @@ function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
     Promise.all(
       missing.map(async videoId => {
         const response = await fetch(
-          `/api/packs/${encodeURIComponent(dataset.id)}/${encodeURIComponent(videoId)}`,
+          `/api/packs/${encodeURIComponent(dataset.id)}/${encodeURIComponent(videoId)}${accessSuffix}`,
         )
         if (!response.ok) throw new Error(`加载 ${videoId} 失败`)
         return [videoId, (await response.json()) as StreamDatapack] as const
@@ -276,7 +292,7 @@ function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
     return () => {
       cancelled = true
     }
-  }, [dataset.id, packs, selectedKey])
+  }, [accessKey, accessSuffix, dataset.id, packs, rows, selectedKey])
 
   return (
     <CompareView

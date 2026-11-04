@@ -5,16 +5,14 @@ import { GroupPage } from '@/components/app/group-page'
 import { db } from '@/db/client'
 import { getGroupPageData, type GroupPageData } from '@/db/queries/view-data'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
-import { memberOnlyCachePolicy } from '@/lib/member-access'
 
 export const prerender = false
 
-const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
-if (!keyed) Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group'] })
+Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group'] })
 
 let data: GroupPageData | null = null
 try {
-  data = await getGroupPageData(db, 'home', { includeMemberOnly: unlocked })
+  data = await getGroupPageData(db, 'home')
 }
 catch (error) {
   console.error('[page] about failed', error)

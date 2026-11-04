@@ -303,6 +303,35 @@ describe("aggregate", () => {
     });
   });
 
+  it("counts member-only streams but excludes their metrics from totals", () => {
+    const memberOnly = {
+      summary: makeSummary({
+        videoId: "m",
+        startedAt: "2026-10-03T20:00:00+09:00",
+        durationSec: 1800,
+        chatTotal: 999,
+        availability: "subscriber_only",
+      }),
+      pack: makePack({
+        id: "m",
+        startedAt: "2026-10-03T20:00:00+09:00",
+        durationSec: 1800,
+        avg: 999,
+        chat: 999,
+        availability: "subscriber_only",
+      }),
+    };
+
+    const totals = aggregateDataset([...rows, memberOnly]);
+    expect(totals.streamCount).toBe(3);
+    expect(totals.memberOnlyCount).toBe(1);
+    expect(totals.chatTotal).toBe(150);
+    expect(totals.views).toBe(2000);
+    expect(totals.withVstatsCount).toBe(2);
+    expect(totals.bestByChat?.videoId).toBe("a");
+    expect(totals.aggregation?.coverage.total).toBe(2);
+  });
+
   it("sorts currency rows by amount", () => {
     expect(
       currencyRows({
@@ -535,6 +564,33 @@ describe("buildMonthlySeries", () => {
     });
   });
 
+  it("keeps member-only streams in the count without adding their metrics", () => {
+    const rows = [
+      makeSummary({
+        startedAt: "2026-10-01T20:00:00+09:00",
+        videoId: "a",
+        durationSec: 600,
+        chatTotal: 60,
+      }),
+      makeSummary({
+        startedAt: "2026-10-02T20:00:00+09:00",
+        videoId: "m",
+        durationSec: 3600,
+        chatTotal: 600,
+        availability: "subscriber_only",
+      }),
+    ];
+
+    const [point] = buildMonthlySeries(rows);
+    expect(point).toMatchObject({
+      month: "2026-10",
+      streams: 2,
+      durationSec: 600,
+      chatTotal: 60,
+      chatPerMinute: 6,
+    });
+  });
+
   it("keeps only the most recent months", () => {
     const rows = ["2026-05", "2026-06", "2026-07"].map((month, index) =>
       makeSummary({
@@ -592,6 +648,34 @@ describe("buildCalendarDays", () => {
     expect(calendarMetricValue(days[0]!, "streams")).toBe(2);
     expect(calendarMetricValue(days[0]!, "chat")).toBe(150);
     expect(calendarMetricValue(days[0]!, "superchats")).toBe(3);
+  });
+
+  it("counts member-only streams without adding their metrics", () => {
+    const rows = [
+      makeSummary({
+        startedAt: "2026-10-01T20:00:00+09:00",
+        videoId: "a",
+        durationSec: 600,
+        chatTotal: 60,
+        superchats: 1,
+      }),
+      makeSummary({
+        startedAt: "2026-10-01T23:00:00+09:00",
+        videoId: "m",
+        durationSec: 1800,
+        chatTotal: 600,
+        superchats: 9,
+        availability: "subscriber_only",
+      }),
+    ];
+
+    expect(buildCalendarDays(rows)[0]).toEqual({
+      date: "2026-10-01",
+      streams: 2,
+      chat: 60,
+      superchats: 1,
+      durationSec: 600,
+    });
   });
 
   it("falls back to startedAt when date is empty", () => {
@@ -686,6 +770,38 @@ describe("buildContentTypeStats", () => {
     expect(game).toMatchObject({ streams: 1, chatPerMinute: 2, scPerHour: 1.5 });
     expect(talk).toMatchObject({ streams: 2, chatTotal: 40, commentsPerStream: 1 });
     expect(stats.map(stat => stat.label)).toEqual(["弹唱", "活动", "杂谈", "游戏"]);
+  });
+
+  it("keeps member-only streams in the share without adding their metrics", () => {
+    const rows = [
+      makeSummary({
+        videoId: "a",
+        startedAt: "2026-10-01T20:00:00+09:00",
+        durationSec: 600,
+        chatTotal: 60,
+        superchats: 1,
+        title: "【弾き語り】A",
+      }),
+      makeSummary({
+        videoId: "m",
+        startedAt: "2026-10-02T20:00:00+09:00",
+        durationSec: 1800,
+        chatTotal: 600,
+        superchats: 9,
+        title: "【弾き語り】B",
+        availability: "subscriber_only",
+      }),
+    ];
+
+    const sing = buildContentTypeStats(rows).find(stat => stat.key === "sing");
+    expect(sing).toMatchObject({
+      streams: 2,
+      share: 1,
+      durationSec: 600,
+      avgDurationSec: 600,
+      chatTotal: 60,
+      superchats: 1,
+    });
   });
 
   it("returns zeroed rows for an empty dataset", () => {

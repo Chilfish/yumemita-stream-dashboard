@@ -7,6 +7,7 @@ import { formatDate, formatInteger, formatTime } from "@/lib/format";
 import type { GroupStreamRow } from "@/lib/group";
 import { primaryReadout, recentUpdates } from "@/lib/group-home";
 import { streamPath } from "@/lib/routes";
+import { isMemberOnly } from "@/lib/visibility";
 
 interface GroupRecentUpdatesProps {
   rows: GroupStreamRow[];
@@ -28,6 +29,7 @@ export function GroupRecentUpdates({ rows }: GroupRecentUpdatesProps) {
           <ul className="divide-y divide-hairline border-t border-hairline">
             {recent.map(row => {
               const readout = primaryReadout(row);
+              const memberOnly = isMemberOnly(row.availability);
 
               return (
                 <li key={`${row.datasetId}-${row.videoId}`}>
@@ -52,16 +54,22 @@ export function GroupRecentUpdates({ rows }: GroupRecentUpdatesProps) {
                           {formatDate(row.startedAt)} {formatTime(row.startedAt)}
                         </span>
                         <span className="ms-auto shrink-0 tabular-nums">
-                          <span className="text-ink-3">{readout.label}</span>{" "}
-                          <span className="font-medium text-foreground">
-                            {formatInteger(readout.value)}
-                          </span>
-                          {readout.value == null ? null : (
-                            <>
-                              {" "}
-                              <span className="text-ink-3">{readout.unit}</span>
-                            </>
-                          )}
+                          {memberOnly
+                            ? <span className="text-ink-3">会员限定</span>
+                            : (
+                                <>
+                                  <span className="text-ink-3">{readout.label}</span>{" "}
+                                  <span className="font-medium text-foreground">
+                                    {formatInteger(readout.value)}
+                                  </span>
+                                  {readout.value == null ? null : (
+                                    <>
+                                      {" "}
+                                      <span className="text-ink-3">{readout.unit}</span>
+                                    </>
+                                  )}
+                                </>
+                              )}
                         </span>
                       </span>
                       <span className="mt-0.5 line-clamp-2 block text-body text-foreground transition-colors duration-120 ease-out group-hover:text-member-ink">

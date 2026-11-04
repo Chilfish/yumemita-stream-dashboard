@@ -116,7 +116,7 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
   }
 
   const [dataset, pack, transcriptMeta] = await Promise.all([
-    getDataset(db, datasetId, { includeMemberOnly: true }),
+    getDataset(db, datasetId),
     getStreamPack(db, datasetId, videoId),
     getTranscriptMeta(db, datasetId, videoId),
   ])
