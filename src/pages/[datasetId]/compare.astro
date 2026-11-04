@@ -1,0 +1,62 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { DatasetPage } from '@/components/app/dataset-page'
+import { db } from '@/db/client'
+import { getComparePacks, getDatasetPageData } from '@/db/queries/view-data'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import { parseCompareIds } from '@/lib/routes'
+
+export const prerender = false
+
+const datasetId = Astro.params.datasetId!
+const data = await getDatasetPageData(db, datasetId).catch(error => {
+  console.error('[page] compare failed', error)
+  return null
+})
+if (!data) Astro.response.status = 404
+else Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`, 'compare'] })
+
+const urlIds = parseCompareIds(Astro.url.searchParams.get('ids'))
+const validIds = urlIds.filter(id => data?.rows.some(row => row.videoId === id))
+const selectedIds = validIds.length > 0
+  ? validIds
+  : (data?.rows.slice(0, 3).map(row => row.videoId) ?? [])
+const comparePacks = data
+  ? await getComparePacks(db, datasetId, selectedIds).catch(() => ({}))
+  : {}
+
+const latest = data?.rows[0] ?? null
+const meta = data
+  ? pageSeo(Astro, {
+      section: 'compare',
+      dataset: { id: data.dataset.id, label: data.dataset.label, count: data.dataset.count },
+      streamCount: data.rows.length,
+      memberCount: data.datasets.length,
+      updatedAt: latest?.startedAt ?? null,
+      imageStream: latest ? { datasetId: data.dataset.id, videoId: latest.videoId } : null,
+    })
+  : pageSeo(Astro, { section: 'compare', dataset: null, notFound: true })
+---
+
+<Layout meta={meta}>
+  {data
+    ? (
+        <DatasetPage
+          client:idle
+          comparePacks={comparePacks}
+          dataset={data.dataset}
+          datasets={data.datasets}
+          pack={null}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          rows={data.rows}
+          search={requestSearch(Astro)}
+          section="compare"
+          stream={null}
+          totals={data.totals}
+          view="compare"
+        />
+      )
+    : <ErrorState code="404" title="找不到这位成员" detail="成员 id 可能写错了，或者还没有导入数据。" />}
+</Layout>

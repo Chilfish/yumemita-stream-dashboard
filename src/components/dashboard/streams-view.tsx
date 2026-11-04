@@ -1,5 +1,5 @@
 import { RotateCcw } from "lucide-react";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
 import { PageHeader, type Fact } from "@/components/dashboard/page-header";
 import { StreamList } from "@/components/dashboard/stream-list";
@@ -24,6 +24,9 @@ import {
 } from "@/lib/table-params";
 import type { StreamSummary } from "@/types/dataset";
 import { cn } from "@/lib/utils";
+
+const INITIAL_VISIBLE_ROWS = 100;
+const VISIBLE_STEP = 200;
 
 export interface StreamsViewProps {
   rows: StreamSummary[];
@@ -134,6 +137,18 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
       return dir === "asc" ? left - right : right - left;
     });
   }, [rows, q, typeFilter, onlyVstats, onlyMember, sort, dir]);
+
+  // 初次只渲染一部分行：500 场全铺进 HTML 会让首字节膨胀到 MB 级。
+  // 筛选条件变化时回到首批，避免旧上限让结果看起来是空的。
+  const filterKey = `${q}|${typeFilter}|${sort}|${dir}|${onlyVstats}|${onlyMember}`;
+  const [page, setPage] = useState({ key: filterKey, limit: INITIAL_VISIBLE_ROWS });
+  const limit = page.key === filterKey ? page.limit : INITIAL_VISIBLE_ROWS;
+  const rendered = useMemo(() => visible.slice(0, limit), [visible, limit]);
+  const remaining = visible.length - rendered.length;
+
+  function showMore(): void {
+    setPage({ key: filterKey, limit: limit + VISIBLE_STEP });
+  }
 
   const extra = new Set(params.cols);
 
@@ -351,7 +366,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
         ) : (
           <>
             <div className="overflow-hidden rounded-panel bg-card shadow-surface md:hidden">
-              <StreamList datasetId={datasetId} empty="没有匹配的场次" rows={visible} />
+              <StreamList datasetId={datasetId} empty="没有匹配的场次" rows={rendered} />
             </div>
 
             <div
@@ -373,7 +388,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
                 rowHref={row => streamPath(datasetId, row.videoId)}
                 rowKey={row => row.videoId}
                 rowLabel={row => `打开 ${row.title}`}
-                rows={visible}
+                rows={rendered}
                 sort={{ key: sort, dir }}
                 stickyFirstColumn
                 stickyHeader
@@ -381,6 +396,15 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
             </div>
           </>
         )}
+
+        {remaining > 0 ? (
+          <div className="flex justify-center py-2">
+            <Button onClick={showMore} size="sm" type="button" variant="outline">
+              再显示 {formatInteger(Math.min(remaining, VISIBLE_STEP))} 场（剩余{" "}
+              {formatInteger(remaining)} 场）
+            </Button>
+          </div>
+        ) : null}
 
         <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-caption text-ink-3">
           <p className="tabular-nums">

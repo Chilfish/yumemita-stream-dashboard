@@ -1,0 +1,1 @@
+ALTER TABLE "stream_details" ADD COLUMN "events" jsonb;

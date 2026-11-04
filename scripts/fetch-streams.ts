@@ -28,8 +28,10 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat } from './lib/live-chat.ts'
+import { mergeDanmakuFiles } from './lib/danmaku-merge.ts'
 import { readCredentials } from './lib/object-storage.ts'
 import { restoreDataset } from './lib/restore-datapacks.ts'
+import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
@@ -39,7 +41,9 @@ const CHAT_GRACE_HOURS = 24
 /** VSTATS 对新场次的收录更慢；这段时间内缺页面按「还没生成」处理。 */
 const VSTATS_GRACE_HOURS = 24 * 14
 const DATAPACK_SCRIPT = join(APP_ROOT, 'scripts', 'stream-datapack.ts')
+const INGEST_SCRIPT = join(APP_ROOT, 'scripts', 'ingest-db.ts')
 const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
+const PURGE_SCRIPT = join(APP_ROOT, 'scripts', 'purge-cache.ts')
 
 interface DatasetSource {
   id: string
@@ -93,6 +97,9 @@ const OPTIONS = {
   limit: { type: 'string', default: '0' },
   cookies: { type: 'string' },
   'cookies-from-browser': { type: 'string', default: 'firefox' },
+  'cookie-cache': { type: 'string' },
+  'refresh-cookies': { type: 'boolean' },
+  'no-cookies': { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   'no-build': { type: 'boolean' },
   restore: { type: 'boolean' },
@@ -117,8 +124,11 @@ const USAGE = `用法：bun scripts/fetch-streams.ts --dataset <id> --root <会�
   --meta-concurrency <n>     元信息并发，默认 6
   --build-every <n>          每 n 场构建一次，默认 5；0 = 全部抓完再构建
   --limit <n>                本次最多处理 n 场（含元信息阶段），0 = 全部
-  --cookies <文件>           Netscape cookie jar；不传则用 --cookies-from-browser
-  --cookies-from-browser <b> 默认 firefox
+  --cookies <文件>           Netscape cookie jar；不传则复用 ~/yt-cookies.txt（缺失时从浏览器导出）
+  --cookies-from-browser <b> 导出缓存时用哪个浏览器，默认 firefox
+  --cookie-cache <文件>      cookie 缓存路径，默认 ~/yt-cookies.txt
+  --refresh-cookies          强制重新从浏览器导出 cookie
+  --no-cookies               不使用 cookie 缓存
   --dry-run                  只列出候选，不抓取
   --no-build                 只抓素材，不生成 datapack
   --restore                  从对象存储恢复 manifest 与缺失的 datapack 后再规划
@@ -127,12 +137,12 @@ const USAGE = `用法：bun scripts/fetch-streams.ts --dataset <id> --root <会�
   --force <id[,id...]>       定点重抓：只处理点名的场次（meta/弹幕/评论/VSTATS 全覆盖），
                              不补跑频道里的其他待抓场次，也不拉频道列表；可重复传。
                              all = 忽略已入库，把本次全频道候选都重抓
-  --publish                  抓完调用 publish:data 发布；有 --force 时默认开启
-  --no-publish               即使有 --force 也不发布
+  --publish                  抓完写入数据库、发布资产并 purge；有 --force 时默认开启
+  --no-publish               即使有 --force 也不写库 / 不发布
   -h, --help                 显示本帮助
 
 恢复：本地没有 manifest 时默认自动执行，已存在的 pack 不会重复下载。
-远端来源按顺序尝试 DATAPACK_BASE / VITE_DATAPACK_BASE，再试 R2_*。`
+远端来源按顺序尝试 DATAPACK_BASE 公开地址，再试 R2_*。`
 
 function logFile(path: string, message: string): void {
   const line = `[${new Date().toISOString()}] ${message}`
@@ -333,9 +343,18 @@ async function main(): Promise<void> {
   const concurrency = Number(values.concurrency)
   const metaConcurrency = Number(values['meta-concurrency'])
   const buildEvery = Number(values['build-every'])
-  const cookieArgs = values.cookies
-    ? ['--cookies', resolve(values.cookies)]
-    : ['--cookies-from-browser', values['cookies-from-browser'] ?? 'firefox']
+  // cookie 默认复用 ~/yt-cookies.txt；缺失时从浏览器导出一次，所有 yt-dlp 调用共用。
+  const resolvedCookies = await resolveCookies({
+    cookies: values.cookies,
+    envCookie: process.env.YT_COOKIE,
+    browser: values['cookies-from-browser'],
+    cachePath: values['cookie-cache'],
+    refresh: values['refresh-cookies'],
+    disable: values['no-cookies'],
+    appRoot: APP_ROOT,
+    log: line => console.log(`[fetch:streams] ${line}`),
+  })
+  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: values['cookies-from-browser'] })
   // CI 里 GitHub runner 的出口 IP 更容易被 YouTube 的 bot 检查拦；
   // 配了 YTDLP_PROXY（mihomo）就让所有 yt-dlp 请求走代理，没配就直连。
   const proxy = process.env.YTDLP_PROXY
@@ -356,7 +375,7 @@ async function main(): Promise<void> {
       for (const id of result.failed)
         restoreFailed.add(id)
       if (result.sources.length === 0) {
-        logFile(logPath, '恢复跳过：没有配置 DATAPACK_BASE / VITE_DATAPACK_BASE，也没有 R2_* 凭据')
+        logFile(logPath, '恢复跳过：没有配置 DATAPACK_BASE，也没有 R2_* 凭据')
       }
       else {
         const failedNote = result.failed.length > 0 ? `，失败 ${result.failed.length}` : ''
@@ -630,6 +649,17 @@ async function main(): Promise<void> {
           if (existsSync(chatFile)) {
             try {
               await normalizeLiveChat(chatFile, jsonlPath, id)
+              // 等待室 / 直播中已经采过：回放到手后按 rendererId 合并，补齐开播段。
+              const livePath = join(session, 'danmaku', `danmaku_live_${id}.jsonl`)
+              if (existsSync(livePath)) {
+                try {
+                  const merged = mergeDanmakuFiles([jsonlPath, livePath], jsonlPath)
+                  logFile(logPath, `${id} 合并实时采集弹幕：${merged.before} + ${merged.added} → ${merged.after}（重复 ${merged.duplicates}）`)
+                }
+                catch (error) {
+                  logFile(logPath, `${id} 合并实时采集弹幕失败，保留回放：${error instanceof Error ? error.message : String(error)}`)
+                }
+              }
               media.chat += 1
             }
             catch (error) {
@@ -792,8 +822,8 @@ async function main(): Promise<void> {
       logFile(logPath, `retry 完成，剩余失败 ${failures.length}`)
     }
 
-    // 强制重抓只有一两场，本地 datapack 一更新就顺手发布：publish:data 是增量的，
-    // 只会传这一份 pack + manifest / insights / index，不会全量重传。
+    // 强制重抓只有一两场，本地 datapack 一更新就顺手入库 + 发资产 + 失效缓存。
+    // ingest 与 publish 都是增量的：未变化的场次会跳过。
     if (shouldPublish) {
       if (values['no-build']) {
         progress.publish = 'skipped: --no-build'
@@ -801,18 +831,28 @@ async function main(): Promise<void> {
       }
       else if (failures.length > 0) {
         progress.publish = `skipped: ${failures.length} failures`
-        logFile(logPath, `publish 跳过：仍有 ${failures.length} 项失败，修好后手动运行 bun scripts/publish-data.ts --dataset ${dataset.id}`)
+        logFile(logPath, `publish 跳过：仍有 ${failures.length} 项失败，修好后手动运行 bun scripts/db-ingest / publish-data --assets-only --dataset ${dataset.id}`)
       }
-      else if (!readCredentials()) {
-        progress.publish = 'skipped: no credentials'
-        logFile(logPath, 'publish 跳过：没有 R2_* 凭据；本地 datapack 已更新，配好凭据后手动运行 bun scripts/publish-data.ts')
+      else if (!process.env.DATABASE_URL || !readCredentials()) {
+        progress.publish = 'skipped: missing DATABASE_URL or R2 credentials'
+        logFile(logPath, 'publish 跳过：缺少 DATABASE_URL 或 R2_* 凭据；本地 datapack 已更新，配好后再跑 db:ingest / publish:assets')
       }
       else {
         try {
-          logFile(logPath, `publish：bun scripts/publish-data.ts --dataset ${dataset.id}`)
-          const output = await run('bun', [PUBLISH_SCRIPT, '--dataset', dataset.id], true, 0)
+          logFile(logPath, `ingest：bun scripts/ingest-db.ts --dataset ${dataset.id}`)
+          const ingestOutput = await run('bun', [INGEST_SCRIPT, '--dataset', dataset.id], true, 0)
+          for (const line of ingestOutput.split('\n').map(item => item.trim()).filter(Boolean))
+            logFile(logPath, `ingest | ${line}`)
+
+          logFile(logPath, `publish：bun scripts/publish-data.ts --dataset ${dataset.id} --assets-only`)
+          const output = await run('bun', [PUBLISH_SCRIPT, '--dataset', dataset.id, '--assets-only'], true, 0)
           for (const line of output.split('\n').map(item => item.trim()).filter(Boolean))
             logFile(logPath, `publish | ${line}`)
+
+          logFile(logPath, `purge：bun scripts/purge-cache.ts --dataset ${dataset.id}`)
+          const purgeOutput = await run('bun', [PURGE_SCRIPT, '--dataset', dataset.id], true, 0)
+          for (const line of purgeOutput.split('\n').map(item => item.trim()).filter(Boolean))
+            logFile(logPath, `purge | ${line}`)
           progress.publish = 'ok'
         }
         catch (error) {

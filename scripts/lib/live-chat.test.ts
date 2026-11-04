@@ -150,4 +150,110 @@ describe('normalizeLiveChat', () => {
       },
     ])
   })
+
+  it('does not drop emoji assets already collected from live chat', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'live-chat-merge-'))
+    const input = join(dir, 'merge.live_chat.json')
+    const output = join(dir, 'danmaku_merge.jsonl')
+    writeFileSync(input, fixture.join('\n'), 'utf8')
+    writeFileSync(join(dir, 'emoji_merge.json'), JSON.stringify({
+      schema: 'yumemita.chat-emoji/v1',
+      emojis: [{ id: 'UC99kOG6_9RD0mR3OG4EOfxw/preRoll', name: 'preRoll', url: 'https://example/pre.png' }],
+    }), 'utf8')
+
+    await normalizeLiveChat(input, output, 'merge')
+
+    const sidecar = JSON.parse(readFileSync(join(dir, 'emoji_merge.json'), 'utf8')) as {
+      emojis: { id: string }[]
+    }
+    expect(sidecar.emojis.map(emoji => emoji.id)).toEqual([
+      'UC99kOG6_9RD0mR3OG4EOfxw/54y5aNPZFd-QoPwPxrGNqQk',
+      'UC99kOG6_9RD0mR3OG4EOfxw/preRoll',
+    ])
+  })
+
+  it('会员留言按普通弹幕处理，并保留 SC 颜色 / 贴纸资源', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'live-chat-paid-'))
+    const input = join(dir, 'paid.live_chat.json')
+    const output = join(dir, 'danmaku_paid.jsonl')
+    writeFileSync(input, [
+      chatLine({
+        liveChatMembershipItemRenderer: {
+          id: 'MEMBER1',
+          timestampUsec: '1774876000000000',
+          authorName: { simpleText: '@member' },
+          headerPrimaryText: { runs: [{ text: 'Member for ' }, { text: '25' }, { text: ' months' }] },
+          headerSubtext: { simpleText: 'もぐもぐ' },
+          message: { runs: [{ text: '今月もよろしくお願いします' }] },
+        },
+      }),
+      chatLine({
+        liveChatPaidMessageRenderer: {
+          id: 'SC1',
+          timestampUsec: '1774876001000000',
+          authorName: { simpleText: '@sc' },
+          purchaseAmountText: { simpleText: '¥500' },
+          message: { runs: [{ text: 'hi' }] },
+          headerBackgroundColor: 4294947584,
+          headerTextColor: 4278190080,
+          bodyBackgroundColor: 4294953512,
+          bodyTextColor: 4278190080,
+          authorNameTextColor: 2315255808,
+          timestampColor: 2147483648,
+        },
+      }),
+      chatLine({
+        liveChatPaidStickerRenderer: {
+          id: 'STICKER1',
+          timestampUsec: '1774876002000000',
+          authorName: { simpleText: '@sticker' },
+          purchaseAmountText: { simpleText: '¥140' },
+          sticker: {
+            thumbnails: [{ url: '//lh3.googleusercontent.com/cake=s40-rp', width: 40, height: 40 }],
+            accessibility: { accessibilityData: { label: 'cake' } },
+          },
+          moneyChipBackgroundColor: 4280150454,
+          moneyChipTextColor: 4278190080,
+          backgroundColor: 4280150454,
+        },
+      }),
+    ].join('\n'), 'utf8')
+
+    await normalizeLiveChat(input, output, 'paid')
+
+    const records = readFileSync(output, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as {
+        rendererId?: string
+        msg: {
+          kind: string
+          memberMessage?: boolean
+          header?: string
+          membershipPrimary?: string
+          colors?: Record<string, number>
+          sticker?: { name: string | null, url: string }
+        }
+      })
+
+    const member = records.find(record => record.rendererId === 'MEMBER1')!
+    expect(member.msg.kind).toBe('text')
+    expect(member.msg.memberMessage).toBe(true)
+    expect(member.msg.header).toBe('もぐもぐ')
+    expect(member.msg.membershipPrimary).toBe('Member for 25 months')
+
+    const sc = records.find(record => record.rendererId === 'SC1')!
+    expect(sc.msg.colors).toMatchObject({
+      headerBackground: 4294947584,
+      bodyBackground: 4294953512,
+      authorName: 2315255808,
+    })
+
+    const sticker = records.find(record => record.rendererId === 'STICKER1')!
+    expect(sticker.msg.sticker).toEqual({
+      name: 'cake',
+      url: 'https://lh3.googleusercontent.com/cake=s40-rp',
+    })
+    expect(sticker.msg.colors).toMatchObject({ moneyChipBackground: 4280150454 })
+  })
 })

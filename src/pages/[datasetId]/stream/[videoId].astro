@@ -1,0 +1,87 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { DatasetPage } from '@/components/app/dataset-page'
+import { db } from '@/db/client'
+import { getStreamPack } from '@/db/queries/packs'
+import { getTranscriptMeta } from '@/db/queries/transcripts'
+import { getDatasetPageData } from '@/db/queries/view-data'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+
+export const prerender = false
+
+const datasetId = Astro.params.datasetId!
+const videoId = Astro.params.videoId!
+// 第三个状态是查询失败：交给客户端索引兜底，而不是当作「没有稿」。
+const [data, transcript] = await Promise.all([
+  getDatasetPageData(db, datasetId).catch(error => {
+    console.error('[page] stream failed', error)
+    return null
+  }),
+  getTranscriptMeta(db, datasetId, videoId).catch(error => {
+    console.error('[page] stream transcript lookup failed', error)
+    return undefined
+  }),
+])
+
+const summary = data?.rows.find(row => row.videoId === videoId) ?? null
+const pack = summary ? await getStreamPack(db, datasetId, videoId).catch(() => null) : null
+const hasTranscript = Boolean(transcript)
+
+if (!data || !summary) Astro.response.status = 404
+else Astro.cache.set({ maxAge: 300, swr: 600, tags: [`stream-${videoId}`, `dataset-${datasetId}`] })
+
+const meta = data && summary
+  ? pageSeo(Astro, {
+      section: 'stream',
+      dataset: { id: data.dataset.id, label: data.dataset.label, count: data.dataset.count },
+      stream: {
+        videoId: summary.videoId,
+        title: summary.title,
+        startedAt: summary.startedAt,
+        durationSec: summary.durationSec,
+        avgConcurrent: summary.avgConcurrent,
+        maxConcurrent: summary.maxConcurrent,
+        chatTotal: summary.chatTotal,
+        superchats: summary.superchats,
+      },
+      streamCount: data.rows.length,
+      memberCount: data.datasets.length,
+      updatedAt: summary.startedAt,
+      imageStream: { datasetId, videoId },
+    })
+  : pageSeo(Astro, {
+      section: 'stream',
+      dataset: data
+        ? { id: data.dataset.id, label: data.dataset.label, count: data.dataset.count }
+        : null,
+      stream: null,
+      notFound: true,
+    })
+---
+
+<Layout
+  alternateMarkdown={summary ? `/${datasetId}/stream/${videoId}.md` : undefined}
+  meta={meta}
+>
+  {data && summary
+    ? (
+        <DatasetPage
+          client:idle
+          comparePacks={{}}
+          dataset={data.dataset}
+          datasets={data.datasets}
+          hasTranscript={hasTranscript}
+          pack={pack}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          rows={data.rows}
+          search={requestSearch(Astro)}
+          section="stream"
+          stream={summary}
+          totals={data.totals}
+          view="stream"
+        />
+      )
+    : <ErrorState code="404" title="找不到这场直播" detail="它可能已被删除，或从未被本站收录。" />}
+</Layout>

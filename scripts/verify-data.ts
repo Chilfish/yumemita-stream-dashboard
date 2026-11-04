@@ -65,7 +65,7 @@ if (values.remote) {
   const credentials = readCredentials()
   store = credentials ? createObjectStore(credentials) : null
   if (!store && !remoteBase()) {
-    console.error('[verify] --remote 需要 R2_* 凭据或 DATAPACK_BASE / VITE_DATAPACK_BASE')
+    console.error('[verify] --remote 需要 R2_* 凭据或 DATAPACK_BASE')
     process.exit(1)
   }
 }

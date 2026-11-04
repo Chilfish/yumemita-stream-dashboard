@@ -10,8 +10,42 @@
 | VSTATS 快照              | 平均/最大同接・最大值时刻・视聴时间・播放・点赞（YouTube 自身不提供同接历史） |
 
 产物写到本地暂存区 `data/<datasetId>/<videoId>.datapack.json`（已 gitignore），并更新该 dataset 的
-本地 `manifest.json` 摘要。正式发布用 `bun run publish:data` 重建 manifest + insights 并上传对象存储。
+本地 `manifest.json` 摘要。正式入库用 `bun run db:ingest`，资产发布用 `bun run publish:assets`。
 原始素材（视频/音频/弹幕回放/评论原文）不进本仓库。
+
+## 数据库 ingest
+
+本地 pack 仍是唯一真源；`ingest-db.ts` 把 pack 投影到 Neon PostgreSQL。读路径走 `neon-http`，
+写入 / 事务走 `neon-serverless` 的 WebSocket Pool，不用 `postgres.js`。
+
+```powershell
+# 建表 / 升级（读取 .env 或 .dev.vars 的 DATABASE_URL）
+bun run db:migrate
+
+# 增量：内容哈希没变的场次跳过
+bun run db:ingest
+
+# 小批量试跑
+bun run db:ingest -- --dataset nonoka --limit 30
+bun run db:ingest -- --dataset arale --ids ids.txt --limit 5
+
+# 全量重投影
+bun run db:ingest -- --all
+
+# 对账：行数、chat_total、SC、评论、作者、insights
+bun run db:verify -- --dataset nonoka --limit 30
+
+# 查询层冒烟 + 本地延迟（成员列表 / insights / 组首页 / 相册）
+bun run db:query
+
+# 生产构建的页面级性能冒烟（先起 wrangler dev）
+bun run perf:smoke -- --url http://127.0.0.1:8787
+```
+
+- 事务边界：一场一个事务；子表按 `stream_id` 删除后重插。
+- 增量判断：`streams.content_hash`（pack 的 sha256）。
+- 小批量模式（`--limit`）跳过 `dataset_insights` 重算，避免用不完整场次覆盖汇总。
+- `--dry-run` 只解析与校验，不连数据库写入。
 
 ## 用法
 
@@ -66,11 +100,11 @@ bun scripts/fetch-streams.ts --dataset nonoka --root .\temp\youtube-live
 | `--ids <文件>` | 直接读视频 ID 列表（每行一个），跳过频道列表抓取 |
 | `--dry-run` | 只列出候选 |
 | `--no-build` | 只抓素材 |
-| `--restore` | 从对象存储恢复 manifest 与缺失的 datapack；本地没有 manifest 时默认开启 |
+| `--restore` | 从对象存储 `archive/<id>/` 恢复缺失的 datapack；本地没有 manifest 时默认开启 |
 | `--no-restore` | 关闭自动恢复 |
 | `--force <id[,id...]>` | 定点重抓这些场次（只跑它们，不补跑其他待抓场次）；可重复传，`all` = 全频道候选都重抓 |
-| `--publish` | 抓完调用 `publish:data` 发布；有 `--force` 时默认开启 |
-| `--no-publish` | 即使有 `--force` 也不发布 |
+| `--publish` | 抓完 `db:ingest` + `publish:assets` + `purge:cache`；有 `--force` 时默认开启 |
+| `--no-publish` | 即使有 `--force` 也不写库 / 不发布 |
 
 单场返工 / 修数据：
 
@@ -78,14 +112,15 @@ bun scripts/fetch-streams.ts --dataset nonoka --root .\temp\youtube-live
 # 重抓一场（meta → 弹幕 → 评论 → VSTATS → datapack），完成后自动增量发布
 bun scripts/fetch-streams.ts --dataset nonoka --force 5xYz1234567
 
-# 只发布本地 pack，不重抓
-bun run publish:data --dataset nonoka
+# 只把本地 pack 写库 + 发资产，不重抓
+bun run db:ingest --dataset nonoka
+bun run publish:assets --dataset nonoka
 ```
 
 `--force` 只跑点名的场次（不拉频道列表、不补跑其他待抓场次），会先删掉该场的
 `danmaku_*.jsonl` / 评论 / VSTATS / 「不可用」标记再抓，所以结果一定是这次新拉的；
 同名/时长等去重规则对强制场次不生效。任一步失败时不会发布，避免把缺数据的 pack 推上去；
-修好后手动跑 `bun run publish:data --dataset <id>` 即可。
+修好后手动跑 `bun run db:ingest --dataset <id>` 即可。
 
 监控：
 
@@ -104,17 +139,17 @@ Get-Content "<root>/.fetch-state/fetch-progress.json"
 跳过判定依赖本地 `data/<id>/`，所以空环境直接续跑会把整个频道重抓一遍。脚本在本地没有
 manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` 可关闭）：
 
-1. 按 `DATAPACK_BASE` / `VITE_DATAPACK_BASE` 的公开地址拉 `manifest.json`；
-2. 拉不到的 pack 再从 `R2_*` 凭据读（需要 `R2_BUCKET`，可选 `R2_PREFIX`）；
+1. 先试 `DATAPACK_BASE` 公开地址，读 `archive/<id>/<videoId>.datapack.json`；
+2. 拉不到的 pack 再从 `R2_*` 凭据读（需要 `R2_BUCKET`，桶内无前缀）；
 3. 只下载本地缺失的 pack，已存在的不重复下载。
 
-恢复后再按正常的「已入库 + 已有素材」逻辑跳过。公开地址要带桶内前缀，例如
-`https://s3.example.com/stream-dashboard`。
+恢复后再按正常的「已入库 + 已有素材」逻辑跳过。没有 manifest 时也可以列桶 `archive/` 前缀。
+公开地址要指向新桶的公开域名，例如 `https://data.example.com`（对象在桶根，无公共前缀）。
 
 ## 每日增量更新
 
-`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面 → 定点发布」串成一条命令，本地和 GitHub Actions 共用。
-定时任务见 [docs/deployment.md](../docs/deployment.md) 的「定时增量更新」。
+`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面 → 上传逐字稿 → ingest → 资产发布 → purge」串成一条命令，本地和 GitHub Actions 共用。
+定时任务见 [docs/engineering/deployment.md](../docs/engineering/deployment.md) 的「每日数据流程」。
 
 ```powershell
 bun scripts/daily-update.ts                 # 增量；本地默认用 Firefox cookie
@@ -133,20 +168,31 @@ bun scripts/daily-update.ts --no-publish    # 只写本地，不上传对象存�
 | `--cookies <文件>` | Netscape cookie jar；CI 用这个 |
 | `--cookies-from-browser <b>` | 本地默认 firefox |
 | `--force` | 重抓最近 24 小时结束的场次（刷新播放量 / 点赞 / 评论快照） |
-| `--dry-run` | 只列候选，不抓取、不发布 |
-| `--no-publish` | 只写本地 |
-| `--bootstrap` | 远端清单读不到时也允许按全量新场次处理 |
+| `--dry-run` | 只列候选，不抓取、不写库、不发布 |
+| `--no-publish` | 只写本地，不写库、不上传 |
+| `--bootstrap` | 数据库为空时也允许按全量新场次处理 |
 
 行为：
 
-- 先拉频道 `/streams`（`-J`，带 `live_status` / 标题 / 时长），和**远端 manifest**求差集。
+- 先拉频道 `/streams`（`-J`，带 `live_status` / 标题 / 时长），和**数据库里的 `streams`** 求差集。
 - 未来场（`is_upcoming`）、正在直播（`is_live`）、同标题但短于正片 60% 的摘要不进入候选；
   它们会记在「暂缓」里，不会每天重新拉元信息。
-- 没有新场次、也没有待补数据的成员直接跳过，不恢复 datapack、不发布。
-- 有变化时只对该成员 `--restore`（补齐远端 pack，保证 insights 精确）并 `publish:data --dataset <id>`。
+- 没有新场次、本地 pack 也不比数据库新时直接跳过，不恢复 datapack、不 ingest。
+- 有变化时只对该成员 `--restore`，然后依次 `publish-transcripts`、`ingest-db`、`publish-data --assets-only`。
 - 平时会重试近期缺 VSTATS（公开场次，14 天内）或缺弹幕（7 天内）的场次；刚结束的场次不会被写成「不可用」。
-- 本地 manifest 比远端新（上次发布失败，或本地跑过 `--no-publish`）时，即使没有新场次也会补一次发布。
-- 发布前 `publish:data` 会核对远端 manifest 场次数；本地 pack 更少时拒绝覆盖（防止不完整的恢复把线上数据缩水）。
+- 本地 pack 比数据库新（上次 ingest 失败，或本地跑过 `--no-publish`）时，即使没有新场次也会补一次 ingest。
+- 数据库提交成功后按 `dataset-<id>` / `stream-<id>` / `group` / `sitemap` / `llms` / `transcripts` 调用 purge。
+
+### 缓存失效与最新场次
+
+```powershell
+bun run purge:cache --dataset nonoka --video W0bKqP-Eyj4
+bun run purge:cache --tags group,sitemap,llms
+bun run db:latest --dataset nonoka    # 数据工作流的 YouTube 探针
+```
+
+需要 `SITE_URL` 与 `PURGE_TOKEN`；未配置时脚本打印跳过，不视为失败。缓存是 Workers Cache，
+zone 级 purge 不影响它，只能走 Worker 的内部端点。
 
 ### 导出 YouTube cookie
 
@@ -169,7 +215,7 @@ GitHub runner 是云厂商 IP，YouTube 除了认 cookie 还要 PO token。工�
 - `Check YouTube access` 先用 cookie 读一场已知视频的元信息，日志里打出出口 IP/地区、加载到的 PO token 提供者和 `cookies are no longer valid`；读不到直接报错停下；
 - `fetch-streams` 不再吞掉元信息失败：bot 检查、会员限定分别归类，前者计入失败并让工作流开 issue。
 
-排查顺序写在 [docs/deployment.md](../docs/deployment.md) 的「定时增量更新」。
+排查顺序写在 [docs/engineering/deployment.md](../docs/engineering/deployment.md) 的「定时增量更新」。
 
 ### CI 代理（可选）
 
@@ -230,11 +276,11 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 <base>/<datasetId>/thumbs/<videoId>.<w>.webp   # 对象存储
 ```
 
-`bun run publish:data` 的上传顺序是 **thumbs（原图 + 变体）→ pack → manifest / insights → index**：
-先保证图在，manifest 里的 `thumbnail` 出现时就一定有对应文件与全部 `srcset` 候选。要下架某张图，
+`bun run publish:assets` 的上传顺序是 **thumbs（原图 + 变体）→ emoji → archive**：
+先保证图在，页面渲染封面时一定有对应文件与全部 `srcset` 候选。要下架某张图，
 删掉本地文件后重跑发布即可；缺变体只警告，页面会退回原图。
 
-页面侧约定：`src/lib/thumb-variants.ts` 定义宽度与命名，`src/lib/data.ts` 拼 `thumbnailUrl()` /
+页面侧约定：`src/lib/thumb-variants.ts` 定义宽度与命名，`src/lib/media.ts` 拼 `thumbnailUrl()` /
 `thumbnailSrcSet()`，`StreamCover` 用 `srcset` + `sizes` 交给浏览器选档。
 
 ## 频道表情
@@ -254,7 +300,7 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 bun run fetch:emoji --dataset yuno                   # 只补缺失
 bun run fetch:emoji --dataset yuno --force           # 重抓全部
 bun run fetch:emoji --dataset yuno --dry-run
-bun run publish:data --dataset yuno                  # 上传表情与 index.json
+bun run publish:assets --dataset yuno                # 上传表情与封面 / archive
 ```
 
 | 选项 | 说明 |
@@ -278,16 +324,20 @@ bun run publish:data --dataset yuno                  # 上传表情与 index.jso
 data/<datasetId>/emoji/<hash>.png        # 成员表情（gitignore）
 data/<datasetId>/emoji/index.json        # id → 名称，供旧 pack 渲染标签
 data/youtube/emoji/<hash>.png            # YouTube 全局表情（只存一份）
-<base>/emojis/<datasetId>/<hash>.png     # 对象存储（R2_PREFIX 之后）
+<base>/emojis/<datasetId>/<hash>.png     # 对象存储（桶根）
 <base>/emojis/<datasetId>/index.json     # 名称索引
 <base>/emojis/youtube/<hash>.png         # 全局表情
 ```
 
 ## 补缺失弹幕（v2 全量升级）
 
-只抓 `live_chat` 回放，不重新抓 meta / 评论 / VSTATS；已有 pack 的其余字段原样保留。
+只抓弹幕回放，不重新抓 meta / 评论 / VSTATS；已有 pack 的其余字段原样保留。
+默认走 InnerTube 回放（匿名可用），watch 页没有回放聊天时回退 yt-dlp 的 `live_chat` 字幕。
 
 ```bash
+# 单场补数据（最常用）
+bun scripts/fetch-danmaku.ts --dataset nonoka --video W0bKqP-Eyj4
+
 # 1. 生成缺失清单（有弹幕、但本机没有 danmaku_<id>.jsonl）
 bun scripts/missing-danmaku.ts --root "D:/projects/claude-messages/temp/youtube-live"
 
@@ -297,8 +347,9 @@ bun scripts/fetch-danmaku.ts --root "D:/projects/claude-messages/temp/youtube-li
 # 3. 用新弹幕把 v1 pack 升级成 v2
 bun scripts/enrich-chat.ts --root "D:/projects/claude-messages/temp/youtube-live"
 
-# 4. 重建 insights（本地；确认后再去掉 --no-upload 发布）
-bun run publish:data --no-upload
+# 4. 重新投影到数据库（重算 streams / dataset_insights）
+bun run db:ingest --dataset <id>
+bun run db:verify --dataset <id>
 ```
 
 多实例并行（互不重叠）：
@@ -311,8 +362,14 @@ bun scripts/fetch-danmaku.ts --root "..." --shard 4/4 --concurrency 3
 ```
 
 - `--shard i/n` 按全局任务顺序取模分片，多个实例不会抢同一场；中断后重跑会跳过已有 jsonl。
+- `--engine auto`（默认）先走 InnerTube 回放，没有回放聊天时回退 yt-dlp；`--engine innertube` / `yt-dlp` 可强制单条链路。
+- InnerTube 输出 `danmaku_<id>.jsonl` + `events_<id>.jsonl` + `emoji_<id>.json`，与实时采集同一套字段；
+  中断后从 `work/replay-state.json` 续翻，`--force` 才从头重抓。
+- 已有 yt-dlp 档时按「`rendererId` + 内容」双键合并：旧档没有 id 也不会重复，历史消息不会丢。
+- 回放接口只覆盖 YouTube 当前可见的消息；被删除 / 封禁账号的旧消息只在 yt-dlp 字幕档里，
+  需要完整历史时用 `--force --engine yt-dlp` 再抓一次。
 - 建议总并发（实例数 × `--concurrency`）控制在 8–12，太高容易触发 YouTube 限流。
-- 会员限定场次需要 Firefox cookie；默认 `--cookies-from-browser firefox`，也可 `--cookies <jar>`。
+- 会员限定场次需要登录态：默认复用 `~/yt-cookies.txt`（见下节），也可 `--cookies <jar>` / `--cookie <请求头>`。
 - 没有弹幕回放的场次会写 `work/chat-unavailable.txt`，下次跳过；失败写 `data/missing-danmaku/failed*.json`。
 - `scripts/enrich-chat.ts` 只重算作者 / 词频 / 徽章 / 构成，保留 video / vstats / comments / density / paid。
 
@@ -321,12 +378,84 @@ bun scripts/fetch-danmaku.ts --root "..." --shard 4/4 --concurrency 3
 ```bash
 bun scripts/backfill-author-id.ts --root "D:/projects/claude-messages/temp/youtube-live"
 bun scripts/enrich-chat.ts --root "D:/projects/claude-messages/temp/youtube-live" --force
-bun run publish:data
-bun run verify:data --remote
+bun run db:ingest
+bun run db:verify
 ```
 
 - `scripts/backfill-author-id.ts` 只重写缺少 `authorId` 的 jsonl，已有 ID 的默认跳过；条数应与原文件一致。
 - `scripts/enrich-chat.ts --force` 会把已是 v2 的 pack 也用新 jsonl 重新聚合。
+
+## cookie 缓存（`~/yt-cookies.txt`）
+
+抓取脚本共用一份登录态 cookie：第一次从浏览器导出，之后直接复用。
+
+```bash
+# 手动导出 / 强制刷新（平时不需要，缺失时脚本会自动导出）
+bun scripts/export-yt-cookies.ts
+bun scripts/export-yt-cookies.ts --browser edge --push
+```
+
+- 默认 `--browser firefox`，输出 `~/yt-cookies.txt`；`fetch-streams` / `fetch-danmaku` / `fetch-live-chat` /
+  `daily-update` / `backfill-owner-chats` 都会自动读取。
+- 首次导出后直接复用；需要刷新时加 `--refresh-cookies`，换路径用 `--cookie-cache <文件>`，
+  完全不使用加 `--no-cookies`。
+- 优先级：`--cookie` 请求头 > `--cookies <文件>` > `YT_COOKIE` > `~/yt-cookies.txt` > 匿名。
+- 文件是登录态凭据，等同账号密码：不要提交、不要贴到聊天里；浏览器退出登录即可失效。
+- 手工请求 watch 页只发送 youtube.com 的 cookie；混入 google.com 的 `NID` / `SIDCC` 会被降级成没有
+  `ytInitialData` 的页面。`#HttpOnly_` 是前缀不是注释，`SID` / `__Secure-*` 都会保留。
+
+## 开播前 / 直播中采集（实时通道）
+
+`fetch-live-chat.ts` 走 InnerTube 实时聊天，补 yt-dlp 只能拿回放的盲区：等待室与直播中也能落弹幕。
+直播结束后再跑一次会**自动改走 InnerTube 回放**，写出与 `fetch-danmaku` 相同的一套文件。
+
+```powershell
+# 跟随到结束；Ctrl-C 保存状态退出
+bun run fetch:live-chat --video fmjJNbzcr3g
+
+# 已结束的场次：直接翻完整回放
+bun run fetch:live-chat --video W0bKqP-Eyj4
+
+# 只拉一页（等待室历史 / 定时任务），不会触发完整回放
+bun run fetch:live-chat --video fmjJNbzcr3g --once
+bun run fetch:live-chat --dataset yuno --ids ids.txt --once
+```
+
+- watch 页必须带浏览器 UA + `hl=en`；continuation 优先级 reload → timed → invalidation → replay，
+  等待室只给 reload。`LIVE_STREAM_OFFLINE` 不是终态。
+- 实时采集输出 `danmaku_live_<videoId>.jsonl` 与 `events_<videoId>.jsonl`；回放输出
+  `danmaku_<videoId>.jsonl`、`events_<videoId>.jsonl` 与 `emoji_<videoId>.json`，并自动合并已有的
+  实时采集（按 `rendererId` 去重）。
+- `events` 覆盖置顶 / 投票（含票数快照）/ Q&A / 商品 / 系统 / 模式变更 / 删除 / 替换；
+  ticker 是消息的滚动副本，忽略并计入 `skipped`。主播操作标 `owner: true`。
+- 回放已翻完的场次再次执行会直接跳过；`--force` 重抓，`--no-replay` 只报告不抓，`--max-pages` 可限流。
+- 会话目录：优先复用已有 `_<videoId>` 目录；没有时用 pack 的 `startedAt` + 成员名新建。
+- 会员限定场次默认复用 `~/yt-cookies.txt`（见上节），也可 `--cookie` / `--cookies` / `YT_COOKIE`。
+
+## 补主播本人发言（一次性）
+
+`scripts/backfill-owner-chats.ts` 只抓 `live_chat`，把 Owner 徽章发言补成 `chat.ownerChats`，不重抓 meta / 评论 / VSTATS；默认只处理「`ownerMessages > 0` 且还没有 `ownerChats`」的场次。pack 先尝试从对象存储读，读不到再回退本地；改完写回本地 `data/<id>/` 并同步上传。
+
+```bash
+bun scripts/backfill-owner-chats.ts --dry-run
+bun scripts/backfill-owner-chats.ts --dataset yuno
+bun scripts/backfill-owner-chats.ts --dataset arale --ids ids.txt --concurrency 3
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dataset <id>` | 只处理指定 dataset |
+| `--ids <文件>` | 指定 videoId 列表（每行一个），需同时指定 `--dataset` |
+| `--concurrency <n>` | yt-dlp 并发，默认 3 |
+| `--limit <n>` | 本次最多处理 n 场，0 = 全部 |
+| `--work-dir <目录>` | 临时下载目录，默认 `./temp/owner-chats` |
+| `--cookies <文件>` / `--cookies-from-browser <b>` | 登录态来源 |
+| `--force` | 已有 `ownerChats` 的场次也重抓 |
+| `--no-upload` | 只更新本地 pack，不上传对象存储 |
+| `--keep-raw` | 保留 `live_chat` 与归一化 jsonl |
+| `--dry-run` | 只列出目标 |
+
+补完后重新 `bun run db:ingest --dataset <id>` 让页面读到新字段。
 
 ## 校验 v2 数据
 

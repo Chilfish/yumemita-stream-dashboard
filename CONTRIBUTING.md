@@ -1,5 +1,7 @@
 # 贡献指南
 
+文档入口见 [docs/README.md](docs/README.md)；AI 协作规范见 [AGENTS.md](AGENTS.md)。
+
 ## 开发
 
 ```bash
@@ -26,10 +28,10 @@ bun run build
 
 ## 数据改动
 
-- 新增场次：把 pack 放进 `data/<dataset>/`，然后跑 `bun run publish:data`（会重建 manifest + insights 并上传对象存储）。
+- 新增场次：把 pack 放进 `data/<dataset>/`，然后跑 `bun run db:ingest`（写库）、`bun run publish:assets`（封面 / 表情 / archive）与 `bun run purge:cache`。
 - 不要手写或手改 manifest / insights：它们由 pack 派生。
 - 数据文件必须能通过 `bun run validate:data`；发布后加 `--remote` 确认对象存储可达。
-- 不要提交 `data/`（除 `README.md`）、`public/data/`、`dist/`、原始媒体/弹幕/评论抓取。
+- 不要提交 `data/`（除 `README.md`）、`dist/`、原始媒体/弹幕/评论抓取。
 - 会员限定内容：确认可公开范围；不确定就不要放到公开桶里。
 
 ## 代码改动
@@ -38,7 +40,7 @@ bun run build
 - 新组件遵循现有分层：`dashboard/`（页面）、`charts/`（D3）、`ui/`（coss 生成）。
 - 不修改 `src/components/ui/` 里的业务逻辑；需要定制时用 props / `render` / `className`。
 - 新图表必须处理空数据与 `null`，并加 `aria-label` / `<title>`。
-- 改字段/口径时同步更新 `docs/data-model.md`。
+- 改字段/口径时同步更新 `docs/data/data-model.md`。
 
 ## 文案与文档
 

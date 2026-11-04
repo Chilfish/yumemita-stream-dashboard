@@ -2,12 +2,12 @@ import { ExternalLink, ListTree, RotateCcw, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import Markdown, { type Components } from "react-markdown";
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTranscript, useTranscriptAvailability } from "@/hooks/use-transcript";
+import { useTranscript } from "@/hooks/use-transcript";
 import { transcriptsPath } from "@/lib/routes";
 import {
   type TranscriptFile,
@@ -316,11 +316,6 @@ export interface TranscriptViewProps {
 
 export function TranscriptView({ datasetId, videoId, className }: TranscriptViewProps) {
   const { file, status, error, retry } = useTranscript(datasetId, videoId);
-  // 远端对象不存在时 R2 的 404 可能不带 CORS 头，fetch 会变成网络错误。
-  // 索引说这场没有稿，就按「还没有逐字稿」处理，而不是报错。
-  const { hasTranscript, status: indexStatus } = useTranscriptAvailability(datasetId);
-  const missing = indexStatus === "ready" && !hasTranscript(videoId);
-
 
   const toc = file?.toc ?? EMPTY_TOC;
   const idsByLine = useMemo(
@@ -335,9 +330,6 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
 
   if (status === "idle" || status === "loading") return <TranscriptSkeleton />;
   if (status === "empty") return <TranscriptEmpty datasetId={datasetId} videoId={videoId} />;
-  if (status === "error" && missing) {
-    return <TranscriptEmpty datasetId={datasetId} videoId={videoId} />;
-  }
   if (status === "error" || !file) {
     return (
       <TranscriptError datasetId={datasetId} error={error} onRetry={retry} videoId={videoId} />
@@ -396,3 +388,4 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
     </div>
   );
 }
+

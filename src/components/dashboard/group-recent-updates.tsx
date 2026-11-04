@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { MemberDot } from "@/components/dashboard/member-avatar";
 import { Panel, PanelBody, PanelHead } from "@/components/dashboard/panel";
 import { StreamCover } from "@/components/dashboard/stream-cover";
@@ -78,3 +78,4 @@ export function GroupRecentUpdates({ rows }: GroupRecentUpdatesProps) {
     </Panel>
   );
 }
+

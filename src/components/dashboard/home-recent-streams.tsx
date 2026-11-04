@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
 import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/panel";
 import { StreamCover } from "@/components/dashboard/stream-cover";
@@ -118,3 +118,4 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
     </Panel>
   );
 }
+

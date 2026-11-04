@@ -54,16 +54,16 @@
 
 - 深浅色主题，移动端底部标签栏，每个视图都有独立 URL
 - 快捷键 `j` / `k` 翻场、`1`–`5` 切页、`/` 聚焦搜索、`⌘K` 全局搜索、`⌘B` 收起侧栏
-- SEO：真实路径、每页 title / description / canonical / OG，构建期生成单场页静态 head、`sitemap.xml` 与 `robots.txt`；旧 `#/...` 链接自动跳转
+- SEO：请求期输出 title / description / canonical / OG / JSON-LD；`sitemap.xml` 与 `llms.txt` 查库生成；旧 `#/...` 链接自动跳转
 
 ## 技术栈
 
-- **前端**：React 19、Vite、TypeScript
-- **路由**：React Router v8，path 路由（兼容子路径），路由级懒加载
+- **框架**：Astro 7（`output: 'server'`）+ `@astrojs/cloudflare`
+- **前端**：React 19 岛屿、TypeScript
 - **UI**：Tailwind CSS v4、coss ui（Base UI + shadcn 风格组件）
 - **图表**：D3，只算比例尺与路径，DOM 交给 React
 - **测试**：Vitest、oxlint
-- **数据**：Cloudflare R2（S3 兼容），与前端分开发布
+- **数据**：Neon PostgreSQL（查询）+ Cloudflare R2（封面 / 表情 / 归档 / 逐字稿正文）
 
 ## 快速开始
 
@@ -76,67 +76,76 @@ bun install
 bun run dev
 ```
 
-打开 <http://localhost:5173>。
+打开 <http://localhost:4321>。构建与本地预览用 `bun run build` / `bun run preview`（Cloudflare workerd）。
 
 ### 配置
 
 把 `.env.example` 复制成 `.env`。
 
 ```env
-# 数据根地址，构建时注入；留空则只读本地 data/ 的兜底快照
-VITE_DATAPACK_BASE=https://s3.example.com/stream-dashboard
+# Neon PostgreSQL（页面查询 + ingest 写入）
+DATABASE_URL=postgresql://user:password@ep-xxx.neon.tech/neondb?sslmode=require
 
-# 站点根地址，canonical / OG / sitemap 用；CI 里必填
-VITE_SITE_URL=https://ymmt.example.com
+# 封面 / 表情的 R2 公开域名，构建时内联
+PUBLIC_R2_BASE=https://ymmt-s3.chilfish.top
 
-# 以下只有发布数据时需要
+# 站点根地址，canonical / OG / sitemap / purge 用
+SITE_URL=https://ymmt.example.com
+
+# 以下只有发布数据 / 失效缓存时需要
 R2_ACCOUNT_ID=""
 R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
-R2_BUCKET=""
-R2_PREFIX="stream-dashboard"
+R2_BUCKET="yumemita-data"
+PURGE_TOKEN=""
 ```
 
-页面启动后直接向 `VITE_DATAPACK_BASE` 请求索引和单场数据，所以发布数据不用重新构建前端。远端不可达或还没发布过索引时，会回退到 `public/data/` 里的构建期快照。
+页面请求期查数据库，所以新场次 ingest + purge 后刷新即可，不需要重新构建前端。
 
 ## 数据
 
-`data/<成员>/*.datapack.json` 是本地暂存区，不入库。`bun run publish:data` 从这些 pack 派生出 `index.json`、`manifest.json`、`insights.json`，连同封面、逐字稿一起上传对象存储。git 里只有代码、`data-sources.json` 和手写的逐字稿。
+`data/<成员>/*.datapack.json` 是本地暂存区，也是唯一真源。`bun run db:ingest` 把它们事务投影到 PostgreSQL；`bun run publish:assets` 上传封面、表情与原始 pack 归档；`bun run publish:transcripts` 上传逐字稿正文。git 里只有代码、`data-sources.json` 和手写的逐字稿。
 
-日常增量用 `bun scripts/daily-update.ts`（仓库按 14:17 JST 的 cron 每天跑一次，GitHub 调度可能晚几小时）：先做频道差集，只处理有新场次或缺 VSTATS / 弹幕的成员，再定点发布。`publish:data` 保留给手动发布、返工和首次建档。
+日常增量用 `bun scripts/daily-update.ts`（仓库按 14:17 JST 的 cron 每天跑一次，GitHub 调度可能晚几小时）：先和数据库做频道差集，只处理有新场次或缺 VSTATS / 弹幕的成员，然后 ingest、发布资产、purge 缓存。
 
 ```text
 data/<id>/*.datapack.json            本地暂存
-        │  bun run publish:data
+        ├─ bun run db:ingest
+        │     ▼
+        │   Neon PostgreSQL（datasets / streams / details / insights / transcripts）
+        │
+        └─ bun run publish:assets
+              ▼
+            R2  <id>/thumbs/*
+                emojis/<id>/*
+                archive/<id>/<videoId>.datapack.json
+                <id>/transcripts/<videoId>.json
+        │
         ▼
-对象存储  index.json
-          <id>/manifest.json
-          <id>/insights.json
-          <id>/<videoId>.datapack.json
-          <id>/thumbs/<videoId>.webp
-          <id>/transcripts/<videoId>.json
-        │  页面启动时读取
-        ▼
-组首页 / 成员页 / 场次 / 单场 / 趋势 / 相册 / 对比
+请求期 SSR：组首页 / 成员页 / 场次 / 单场 / 趋势 / 相册 / 对比
 ```
 
-索引和 pack 一起上传，索引最后写，保证不会指向还不存在的文件。封面同样是本地镜像后再传，不热链 YouTube。
+封面同样是本地镜像后再传，不热链 YouTube。数据更新后按 Cache-Tag 失效，不触发前端构建。
 
 ## 常用命令
 
 ```bash
-bun run dev                  # 同步数据 + 开发服务器
-bun run build                # 同步数据 + 类型检查 + 生产构建
-bun run check                # typecheck + test + lint
-bun run ci                   # CI 同款：sync + validate + check + build + verify:seo
-bun run verify:seo           # 校验静态 head、canonical、sitemap 与 robots
+bun run dev                  # Astro 开发服务器（Cloudflare workerd）
+bun run build                # astro build：Worker + 预渲染 404/500
+bun run preview              # 本地预览构建产物
+bun run check                # astro check + test + lint
+bun run ci                   # check + build
 
-bun run publish:data         # 重建索引并上传对象存储
-bun scripts/daily-update.ts  # 每日增量：频道差集 → 抓取 → 补封面 → 定点发布
+bun run db:migrate           # 应用 Drizzle 迁移
+bun run db:ingest            # 本地 pack → PostgreSQL（增量）
+bun run db:verify            # 数据库与 pack 字段级对账
+bun run db:query             # 查询层冒烟 + 本地延迟
+
+bun run publish:assets       # 上传封面 / 表情 / archive（不写 JSON 索引）
+bun scripts/daily-update.ts  # 每日增量：频道差集 → 抓取 → ingest → 资产 → purge
 bun run publish:transcripts  # 增量上传逐字稿
-bun run add:datapack         # 加一份 datapack，自动更新 manifest
+bun run purge:cache          # 手动按 tag 失效 Workers Cache
 bun run fetch:thumbs         # 镜像封面到本地
-bun run validate:data        # 校验 index → manifest → insights
 ```
 
 补缺失弹幕、回填 `authorId` 这类一次性修复脚本没有注册到 `package.json`，用法见 [scripts/README.md](scripts/README.md)。
@@ -148,40 +157,52 @@ bun run validate:data        # 校验 index → manifest → insights
 ```bash
 bun run add:datapack nonoka /path/to/<videoId>.datapack.json
 bun run fetch:thumbs --dataset nonoka
-bun run publish:data
+bun run db:ingest --dataset nonoka
+bun run publish:assets --dataset nonoka
+bun run purge:cache --dataset nonoka
 ```
 
-加一位成员：新建 `data/<id>/` 放入 pack，在 `data-sources.json` 里加一条 dataset，再 `bun run publish:data --dataset <id>`。成员入口和页面都是按配置生成的，不用改组件。
+加一位成员：新建 `data/<id>/` 放入 pack，在 `data-sources.json` 里加一条 dataset，再 `bun run db:ingest --dataset <id>`。成员入口和页面都是按配置生成的，不用改组件。
 
 逐字稿：`bun run transcript:new <videoId> --dataset nonoka` 建模板，写完执行 `bun run publish:transcripts`。
 
-字段和步骤的细节见 [docs/adding-data.md](docs/adding-data.md)。
+字段和步骤的细节见 [docs/data/adding-data.md](docs/data/adding-data.md)。
 
 ## 部署
 
-构建产物在 `dist/`，交给任意静态托管即可，`vercel.json` 里已经配好 SPA 重写和缓存头。
+目标是 Cloudflare Workers + Neon PostgreSQL + R2。`wrangler.jsonc` 已声明 Worker 入口、`nodejs_compat`、静态资源、R2 binding 与 Workers Cache。
 
 ```bash
-VITE_DATAPACK_BASE=https://s3.example.com/stream-dashboard \
-VITE_SITE_URL=https://ymmt.example.com bun run build
+bun run build          # astro build
+bun run cf:deploy      # astro build + wrangler deploy --config dist/server/wrangler.json
 ```
 
-构建会为每个路由生成带 head 的静态 HTML，并输出 `sitemap.xml` / `robots.txt`。数据更新只需要 `bun run publish:data`，逐字稿更新 `bun run publish:transcripts`，都不用重新构建；新场次的静态分享卡片要等下次构建，客户端 meta 立即生效。部署在子路径时设 `VITE_BASE`。详见 [docs/deployment.md](docs/deployment.md)。
+- 数据页请求期查 Neon；`/`、成员页、场次、单场、趋势、相册、对比都由数据库驱动。
+- 单场 Markdown：`/{datasetId}/stream/{videoId}.md`，返回 `text/markdown` 并带逐字稿。
+- `sitemap.xml` / `llms.txt` 由 endpoint 生成；`robots.txt` 是静态文件。
+- 数据更新后调内部 `POST /api/internal/cache/purge`（Bearer `PURGE_TOKEN`）按 tag 失效。
+- 全量场次已入库；已部署到 `ymmt-cf.chilfish.top`，切回原域名后复核 canonical / sitemap。详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。
 
 ## 项目结构
 
 ```text
 src/
-├─ pages/          # 路由页面：数据 ↔ 视图 ↔ 导航
+├─ pages/          # Astro 文件路由与 endpoint（含 .md、sitemap、purge）
+├─ layouts/        # Layout.astro：SEO、主题、ClientRouter
 ├─ components/
+│  ├─ app/         # 岛屿壳层：DatasetPage / GroupPage
+│  ├─ pages/       # 页面视图（沿用迁移前的 dashboard 视图）
 │  ├─ dashboard/   # 页面级组件
 │  ├─ charts/      # D3 图表
+│  ├─ shared/      # SEO、主题、进度条、错误态
 │  └─ ui/          # coss ui 生成物，不手写业务逻辑
-├─ hooks/          # 数据加载、主题、尺寸测量
-├─ lib/            # 纯函数：聚合、格式化、路由、SEO
-├─ types/          # datapack / dataset 的 TS 镜像
-└─ router.tsx
-scripts/           # 同步、发布、校验、封面、逐字稿
+├─ db/             # schema、连接、查询层
+├─ hooks/          # 水合、快捷键、逐字稿
+├─ lib/            # 纯函数：聚合、格式化、路由兼容、SEO、Markdown
+├─ stores/         # Zustand：主题
+├─ types/          # datapack / dataset / db DTO
+└─ middleware.ts / worker.ts
+scripts/           # 抓取、ingest、对账、发布、封面、逐字稿
 content/transcripts/  # 手写逐字稿
 docs/              # 架构、数据模型、开发、部署
 data-sources.json  # 成员注册表
@@ -189,15 +210,20 @@ data-sources.json  # 成员注册表
 
 ## 文档
 
-- [docs/README.md](docs/README.md) 文档索引
-- [docs/architecture.md](docs/architecture.md) 分层、数据流、路由
-- [docs/performance.md](docs/performance.md) 首屏数据流、缓存、图片与实测数字
-- [docs/data-model.md](docs/data-model.md) manifest / datapack 字段与口径
-- [docs/adding-data.md](docs/adding-data.md) 加场次、成员、数据集
-- [docs/development.md](docs/development.md) 本地开发、代码规范、图表写法
-- [docs/deployment.md](docs/deployment.md) 构建与静态托管
-- [docs/troubleshooting.md](docs/troubleshooting.md) 常见问题
-- [docs/roadmap.md](docs/roadmap.md) 后续计划
+- [docs/README.md](docs/README.md) 文档唯一入口
+- [docs/requirements/](docs/requirements/) 需求规格与用户故事
+- [docs/planning/architecture.md](docs/planning/architecture.md) 分层、数据流、路由
+- [docs/planning/astro-ssr-migration.md](docs/planning/astro-ssr-migration.md) Astro + Workers + PostgreSQL 迁移方案
+- [docs/planning/backlog.md](docs/planning/backlog.md) 任务清单
+- [docs/data/data-model.md](docs/data/data-model.md) manifest / datapack 字段与口径
+- [docs/data/adding-data.md](docs/data/adding-data.md) 加场次、成员、数据集
+- [docs/engineering/development.md](docs/engineering/development.md) 本地开发与代码规范
+- [docs/engineering/deployment.md](docs/engineering/deployment.md) 构建与部署
+- [docs/engineering/performance.md](docs/engineering/performance.md) 性能记录
+- [docs/engineering/troubleshooting.md](docs/engineering/troubleshooting.md) 常见问题
+- [docs/ui-design/README.md](docs/ui-design/README.md) 设计系统
+- [docs/development-log/](docs/development-log/) 开发日志
+- [AGENTS.md](AGENTS.md) AI 协作指南
 
 ## 说明
 

@@ -100,6 +100,28 @@ interface CommentJson {
   }[]
 }
 
+/** `events_<videoId>.jsonl` 的一行：实时采集侧的非消息事件（置顶 / 投票 / 系统 / 删除等）。 */
+interface RawChatEvent {
+  at?: number
+  type?: string
+  owner?: boolean
+  author?: string
+  authorId?: string
+  text?: string | null
+  id?: string
+  data?: Record<string, unknown>
+}
+
+interface PackChatEvent {
+  at: string
+  type: string
+  owner: boolean
+  author?: string
+  authorId?: string
+  text: string | null
+  data?: Record<string, unknown>
+}
+
 interface VstatsVideo {
   updatedAt: string | null
   startedAt: string | null
@@ -345,6 +367,7 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
     ?? pick(join(sessionDir, 'danmaku'), ANY_DANMAKU_RE)
   const rawChatPath = pick(join(sessionDir, 'danmaku'), new RegExp(`^${videoId}\\.live_chat\\.json$`))
   const emojiPath = pick(join(sessionDir, 'danmaku'), new RegExp(`^emoji_${videoId}\\.json$`))
+  const eventsPath = pick(join(sessionDir, 'danmaku'), new RegExp(`^events_${videoId}\\.jsonl$`))
   const commentsPath = pick(join(sessionDir, 'comments'), new RegExp(`^comments_${videoId}\\.json$`))
   const vstatsPath = vstatsOverride
     ?? pick(join(sessionDir, 'web'), new RegExp(`^vstats_video_${videoId}\\.html$`))
@@ -397,6 +420,8 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
   let ownerMessages = 0
   // 主播本人发言单独存一份：徽章 Owner 只统计次数，明细要全量留给页面展示。
   const ownerChats: { at: string, kind: string, text: string, emojis?: string[] }[] = []
+  /** 已经作为主播发言入库的 rendererId：置顶事件不再重复一条。 */
+  const ownerRecordIds = new Set<string>()
 
   for (const { record, at } of timed) {
     const rawKind = record.msg.kind ?? 'text'
@@ -434,6 +459,8 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
 
     const text = record.msg.text ?? ''
     if ((record.msg.badges ?? []).includes('Owner')) {
+      if (record.rendererId)
+        ownerRecordIds.add(record.rendererId)
       const emojiIds = record.msg.emoji?.map(item => item.id) ?? []
       ownerChats.push({
         at: jstIso(at),
@@ -555,6 +582,77 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
 
   const vstats = vstatsPath && existsSync(vstatsPath) ? parseVstats(readFileSync(vstatsPath, 'utf8')) : null
 
+  const rawEvents: RawChatEvent[] = eventsPath
+    ? readFileSync(eventsPath, 'utf8')
+        .split('\n')
+        .filter(line => line.trim())
+        .map((line) => {
+          try {
+            return JSON.parse(line) as RawChatEvent
+          }
+          catch {
+            return null
+          }
+        })
+        .filter((row): row is RawChatEvent => row != null)
+    : []
+
+  // 投票更新只覆盖同一条 poll 的 choices，最终票数进 data；事件本身保留首次出现的位置。
+  const chatEvents: PackChatEvent[] = []
+  const pollIndex = new Map<string, number>()
+  for (const raw of rawEvents) {
+    if (typeof raw.at !== 'number' || typeof raw.type !== 'string')
+      continue
+    const event: PackChatEvent = {
+      at: jstIso(raw.at),
+      type: raw.type,
+      owner: raw.owner === true,
+      ...(raw.author ? { author: raw.author } : {}),
+      ...(raw.authorId ? { authorId: raw.authorId } : {}),
+      text: typeof raw.text === 'string' ? raw.text : null,
+      ...(raw.data && typeof raw.data === 'object' ? { data: raw.data } : {}),
+    }
+    if (raw.type === 'poll' || raw.type === 'pollUpdate') {
+      const key = typeof raw.data?.pollKey === 'string' ? raw.data.pollKey : raw.id ?? ''
+      const existingIndex = pollIndex.get(key)
+      if (existingIndex != null) {
+        const existing = chatEvents[existingIndex]
+        if (existing) {
+          existing.data = { ...(existing.data ?? {}), ...(raw.data ?? {}), updatedAt: event.at }
+          existing.text = existing.text ?? event.text
+        }
+        continue
+      }
+      pollIndex.set(key, chatEvents.length)
+    }
+    chatEvents.push(event)
+  }
+
+  // 主播操作（置顶 / 投票 / Q&A / 商品 / 被删消息）并入 ownerChats，?view=words 直接可见。
+  for (const event of chatEvents) {
+    if (!event.owner)
+      continue
+    if (event.type === 'banner' && typeof event.data?.targetId === 'string' && ownerRecordIds.has(event.data.targetId))
+      continue
+    let text = event.text
+    if (!text && event.type === 'deleted' && typeof event.data?.targetText === 'string')
+      text = `[已删除] ${event.data.targetText}`
+    if (!text)
+      continue
+    const pinned = event.data?.pinnedEmojis
+    const pinnedEmojis = Array.isArray(pinned)
+      ? pinned.filter((id): id is string => typeof id === 'string')
+      : []
+    ownerChats.push({
+      at: event.at,
+      kind: 'event',
+      text,
+      ...(pinnedEmojis.length ? { emojis: pinnedEmojis } : {}),
+    })
+  }
+  // 消息按时间、事件按 at；合并后统一排序，避免主播事件排在最后。
+  ownerChats.sort((a, b) => a.at.localeCompare(b.at))
+
   const pack = {
     schema: SCHEMA,
     generatedAt: jstIso(Date.now() / 1000),
@@ -624,6 +722,7 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
       emojiKinds: { distinct: emoji.size, top: [...emoji.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([id, count]) => ({ id, count })) },
       ...(emojiAssets.length ? { emojis: emojiAssets } : {}),
       ...(ownerChats.length ? { ownerChats } : {}),
+      ...(chatEvents.length ? { events: chatEvents } : {}),
     },
     comments: comments
       ? {

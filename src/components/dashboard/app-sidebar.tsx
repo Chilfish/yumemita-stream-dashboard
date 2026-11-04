@@ -10,7 +10,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router";
+import { Link, NavLink, useLocation, useNavigate } from "@/lib/router-compat";
 import {
   Sidebar,
   SidebarContent,
@@ -24,7 +24,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import type { Theme } from "@/hooks/use-theme";
+import type { Theme } from "@/types/theme";
 import { formatInteger } from "@/lib/format";
 import {
   groupGalleryPath,
@@ -252,3 +252,4 @@ export function AppSidebar({
     </Sidebar>
   );
 }
+

@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { CopyLinkButton } from "@/components/dashboard/copy-link-button";
 import { HomeCalendar } from "@/components/dashboard/home-calendar";
 import { HomeLatestStream } from "@/components/dashboard/home-latest-stream";
@@ -183,3 +183,4 @@ export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeVi
     </div>
   );
 }
+

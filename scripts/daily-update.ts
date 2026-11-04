@@ -9,29 +9,37 @@
  *   bun scripts/daily-update.ts --no-publish       # 只抓本地，不传对象存储
  *
  * 设计要点：
- *   - 先拉频道 `/streams`（flat-playlist，不需要 cookie），和**远端 manifest** 求差集；
- *     没有新场次且没有待补数据的成员直接跳过，不恢复、不发布。
- *   - 有变化才对该成员 `--restore`（补齐远端 pack，保证 insights 精确）并定点发布，
- *     其余成员不下载、不上传。
+ *   - 先拉频道 `/streams`（flat-playlist，不需要 cookie），和**数据库里的 streams** 求差集；
+ *     没有新场次且没有待补数据的成员直接跳过，不恢复、不 ingest。
+ *   - 有变化才对该成员 `--restore`（补齐远端 pack，保证 insights 精确），
+ *     然后 ingest 数据库、发布封面 / 表情 / archive，其余成员不下载、不上传。
  *   - `--force` 重抓最近 24 小时；平时也会重试近期缺 VSTATS / 缺弹幕的场次，
  *     避免回放或 VSTATS 页面还没生成时被永久判死。
- *   - 发布时间点在最后：抓取失败只影响该成员，是否发布由 publish 的完整性校验兜底。
+ *   - 发布顺序：抓取 → ingest → 资产 → 逐字稿 → purge；数据库提交成功后才失效缓存。
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { createObjectStore, manifestKey, readCredentials, remoteBase } from './lib/object-storage.ts'
+import { eq } from 'drizzle-orm'
+import { createDb } from '../src/db/connection.ts'
+import { datasetInsights, streams } from '../src/db/schema.ts'
+import { loadEnvFiles, requireEnv } from './lib/env.ts'
+import { purgeCache } from './lib/purge.ts'
 import { planDataset, type ChannelEntry, type PlanStream } from './lib/update-plan.ts'
+import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
 const FETCH_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-streams.ts')
 const THUMB_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-thumbnails.ts')
+const INGEST_SCRIPT = join(APP_ROOT, 'scripts', 'ingest-db.ts')
 const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
+const TRANSCRIPT_SCRIPT = join(APP_ROOT, 'scripts', 'publish-transcripts.ts')
 
 const FORCE_RECENT_HOURS = 24
+const PACK_SUFFIX = '.datapack.json'
 
 interface DatasetSource {
   id: string
@@ -41,28 +49,11 @@ interface DatasetSource {
   datapackDir: string
 }
 
-interface ManifestStream {
-  videoId?: string
-  title?: string | null
-  durationSec?: number | null
-  startedAt?: string | null
-  endedAt?: string | null
-  availability?: string | null
-  vstatsViews?: number | null
-  avgConcurrent?: number | null
-  chatTotal?: number | null
-}
-
-interface ManifestFile {
-  count?: number
-  streams?: ManifestStream[]
-}
-
-interface LoadedManifest {
+interface LoadedState {
   streams: PlanStream[]
-  /** 远端/本地清单的 generatedAt，用来判断本地是否有未发布的改动。 */
+  /** dataset_insights.generated_at；用来判断本地 pack 是否还没 ingest。 */
   generatedAt: string | null
-  from: 'remote' | 'vault' | 'local' | 'empty'
+  from: 'database'
 }
 
 const OPTIONS = {
@@ -72,6 +63,9 @@ const OPTIONS = {
   concurrency: { type: 'string', default: '3' },
   cookies: { type: 'string' },
   'cookies-from-browser': { type: 'string', default: 'firefox' },
+  'cookie-cache': { type: 'string' },
+  'refresh-cookies': { type: 'boolean' },
+  'no-cookies': { type: 'boolean' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   'no-publish': { type: 'boolean' },
@@ -81,8 +75,8 @@ const OPTIONS = {
 
 const USAGE = `用法：bun scripts/daily-update.ts [选项]
 
-按频道 /streams 列表和远端 manifest 求差集，只抓有变化的场次并定点发布。
-没有任何新场次的成员不会恢复 datapack，也不会发布。
+按频道 /streams 列表和数据库里的 streams 求差集，只抓有变化的场次。
+抓取后依次运行 ingest、资产发布、逐字稿发布与缓存失效。
 
 选项：
   --dataset <id>              只处理一个 dataset；默认全部
@@ -90,14 +84,17 @@ const USAGE = `用法：bun scripts/daily-update.ts [选项]
   --state-dir <目录>          进度/频道缓存（默认 <root>/.fetch-state）
   --concurrency <n>           抓取并发，默认 3
   --cookies <文件>            Netscape cookie jar；CI 用这个
-  --cookies-from-browser <b>  本地默认 firefox
+  --cookies-from-browser <b>  导出缓存时用哪个浏览器，默认 firefox
+  --cookie-cache <文件>       cookie 缓存路径，默认 ~/yt-cookies.txt
+  --refresh-cookies           强制重新从浏览器导出 cookie
+  --no-cookies                不使用 cookie 缓存
   --force                     额外重抓最近 ${FORCE_RECENT_HOURS} 小时结束的场次
-  --dry-run                   只列候选，不抓取、不发布
-  --no-publish                只写本地，不上传对象存储
-  --bootstrap                 远端清单读不到时也允许按全量新场次处理
+  --dry-run                   只列候选，不抓取、不写库、不发布
+  --no-publish                只写本地，不写库、不上传对象存储
+  --bootstrap                 数据库为空时也允许按全量新场次处理
   -h, --help                  显示本帮助
 
-发布需要 R2_* 凭据；只抓取不需要。`
+写入数据库需要 DATABASE_URL；发布资产需要 R2_* 凭据；缓存失效需要 SITE_URL + PURGE_TOKEN。`
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf8')) as T
@@ -141,66 +138,63 @@ function runScript(script: string, args: string[]): Promise<number> {
   })
 }
 
-/** 远端公开地址优先，其次直接读桶，最后回退本地暂存区。 */
-async function loadManifest(source: DatasetSource): Promise<LoadedManifest> {
-  const base = remoteBase()
-  if (base) {
-    try {
-      const response = await fetch(`${base}/${source.id}/manifest.json?t=${Date.now()}`, {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(20_000),
+/** 已入库的场次与 insights 时间：数据库是「哪些场次已经有了」的唯一来源。 */
+async function loadDatabaseState(
+  db: ReturnType<typeof createDb>,
+  source: DatasetSource,
+): Promise<LoadedState> {
+  const [rows, insight] = await Promise.all([
+    db
+      .select({
+        videoId: streams.videoId,
+        title: streams.title,
+        durationSec: streams.durationSec,
+        startedAt: streams.startedAt,
+        endedAt: streams.endedAt,
+        availability: streams.availability,
+        vstatsViews: streams.vstatsViews,
+        avgConcurrent: streams.avgConcurrent,
+        chatTotal: streams.chatTotal,
       })
-      if (response.ok) {
-        const manifest = (await response.json()) as ManifestFile
-        return { streams: toPlanStreams(manifest), generatedAt: manifest.generatedAt ?? null, from: 'remote' }
-      }
-    }
-    catch {
-      // 公开地址不可达时继续试桶凭据。
-    }
-  }
+      .from(streams)
+      .where(eq(streams.datasetId, source.id)),
+    db
+      .select({ generatedAt: datasetInsights.generatedAt })
+      .from(datasetInsights)
+      .where(eq(datasetInsights.datasetId, source.id))
+      .limit(1),
+  ])
 
-  const credentials = readCredentials()
-  if (credentials) {
-    try {
-      const text = await createObjectStore(credentials).get(manifestKey(source.id))
-      if (text) {
-        const manifest = JSON.parse(text) as ManifestFile
-        return { streams: toPlanStreams(manifest), generatedAt: manifest.generatedAt ?? null, from: 'vault' }
-      }
-    }
-    catch {
-      // 读桶失败不阻塞本地回退。
-    }
+  return {
+    streams: rows.map(row => ({
+      videoId: row.videoId,
+      title: row.title ?? null,
+      durationSec: row.durationSec ?? null,
+      startedAt: row.startedAt ? row.startedAt.toISOString() : null,
+      endedAt: row.endedAt ? row.endedAt.toISOString() : null,
+      availability: row.availability ?? null,
+      vstatsViews: row.vstatsViews ?? null,
+      avgConcurrent: row.avgConcurrent == null ? null : Number(row.avgConcurrent),
+      chatTotal: row.chatTotal ?? null,
+    })),
+    generatedAt: insight[0]?.generatedAt ? insight[0].generatedAt.toISOString() : null,
+    from: 'database',
   }
-
-  const localPath = resolve(APP_ROOT, source.manifest)
-  if (existsSync(localPath)) {
-    try {
-      const manifest = readJson<ManifestFile>(localPath)
-      return { streams: toPlanStreams(manifest), generatedAt: manifest.generatedAt ?? null, from: 'local' }
-    }
-    catch {
-      // 本地文件损坏时按空清单处理，交给 --bootstrap 或下一次恢复。
-    }
-  }
-  return { streams: [], generatedAt: null, from: 'empty' }
 }
 
-function toPlanStreams(manifest: ManifestFile): PlanStream[] {
-  return (manifest.streams ?? [])
-    .filter((stream): stream is ManifestStream & { videoId: string } => Boolean(stream.videoId))
-    .map(stream => ({
-      videoId: stream.videoId,
-      title: stream.title ?? null,
-      durationSec: stream.durationSec ?? null,
-      startedAt: stream.startedAt ?? null,
-      endedAt: stream.endedAt ?? null,
-      availability: stream.availability ?? null,
-      vstatsViews: stream.vstatsViews ?? null,
-      avgConcurrent: stream.avgConcurrent ?? null,
-      chatTotal: stream.chatTotal ?? null,
-    }))
+/** 本地暂存区的 pack 数量与最新修改时间，用来发现「抓到了但 ingest 没成功」的场次。 */
+function localPackState(source: DatasetSource): { count: number, newest: number | null } {
+  const dir = resolve(APP_ROOT, source.datapackDir)
+  if (!existsSync(dir)) return { count: 0, newest: null }
+  let count = 0
+  let newest: number | null = null
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(PACK_SUFFIX)) continue
+    count += 1
+    const mtime = statSync(join(dir, name)).mtimeMs
+    if (newest == null || mtime > newest) newest = mtime
+  }
+  return { count, newest }
 }
 
 interface ChannelList {
@@ -277,6 +271,7 @@ function readChannelCache(path: string): ChannelEntry[] {
 }
 
 async function main(): Promise<void> {
+  loadEnvFiles()
   const { values } = parseArgs({ options: OPTIONS, args: process.argv.slice(2), allowPositionals: false })
   if (values.help) {
     console.log(USAGE)
@@ -308,32 +303,45 @@ async function main(): Promise<void> {
     console.error('[update] --concurrency 需要是 >= 1 的整数')
     process.exit(1)
   }
-  const cookieArgs = values.cookies
-    ? ['--cookies', resolve(values.cookies)]
-    : ['--cookies-from-browser', values['cookies-from-browser'] ?? 'firefox']
+  // cookie 默认复用 ~/yt-cookies.txt；缺失时从浏览器导出一次。
+  const resolvedCookies = await resolveCookies({
+    cookies: values.cookies,
+    envCookie: process.env.YT_COOKIE,
+    browser: values['cookies-from-browser'],
+    cachePath: values['cookie-cache'],
+    refresh: values['refresh-cookies'],
+    disable: values['no-cookies'],
+    appRoot: APP_ROOT,
+    log: line => console.log(`[update] ${line}`),
+  })
+  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: values['cookies-from-browser'] })
   const dryRun = Boolean(values['dry-run'])
   const noPublish = Boolean(values['no-publish'])
+
+  const db = createDb(requireEnv('DATABASE_URL'))
 
   let failures = 0
   let newTotal = 0
   let forcedTotal = 0
   let published = 0
+  let transcriptsPublished = false
+  const purgeTags = new Set<string>()
 
   for (const source of selected) {
     console.log(`\n[update] === ${source.label} (${source.id}) ===`)
-    const manifest = await loadManifest(source)
-    const knownIds = manifest.streams.map(stream => stream.videoId)
-    console.log(`[update] 清单：${knownIds.length} 场（${manifest.from}）`)
+    const state = await loadDatabaseState(db, source)
+    const knownIds = state.streams.map(stream => stream.videoId)
+    console.log(`[update] 数据库：${knownIds.length} 场（${state.from}）`)
 
     const channelList = await readChannelEntries(source, stateDir)
     const channel = channelList.entries
     if (channel.length === 0 && knownIds.length === 0) {
-      console.warn(`[update] ${source.id} 既没有频道列表也没有清单，跳过`)
+      console.warn(`[update] ${source.id} 既没有频道列表也没有已入库场次，跳过`)
       failures += 1
       continue
     }
-    if (manifest.from === 'empty' && channel.length > 20 && !values.bootstrap) {
-      console.error(`[update] ${source.id} 读不到已发布清单，但频道有 ${channel.length} 条；`)
+    if (knownIds.length === 0 && channel.length > 20 && !values.bootstrap) {
+      console.error(`[update] ${source.id} 数据库里还没有场次，但频道有 ${channel.length} 条；`)
       console.error('[update] 拒绝把整个频道当成新场次。确认要首次建档时加 --bootstrap。')
       failures += 1
       continue
@@ -342,7 +350,7 @@ async function main(): Promise<void> {
     const plan = planDataset({
       channel,
       knownIds,
-      streams: manifest.streams,
+      streams: state.streams,
       forceRecentHours: values.force ? FORCE_RECENT_HOURS : 0,
     })
 
@@ -354,22 +362,15 @@ async function main(): Promise<void> {
       console.log(`[update]   重抓：${detail}${plan.forceIds.length > 10 ? ` 等 ${plan.forceIds.length} 场` : ''}`)
     }
 
-    // 上次抓取成功但发布失败（或本地用了 --no-publish）时，清单会比远端新；
-    // 这种日子没有新场次也要补一次发布，否则改动会一直卡在本地。
-    const localManifestPath = resolve(APP_ROOT, source.manifest)
-    let localGeneratedAt: string | null = null
-    if (existsSync(localManifestPath)) {
-      try {
-        localGeneratedAt = readJson<ManifestFile>(localManifestPath).generatedAt ?? null
-      }
-      catch {
-        // 本地清单损坏时交给下面的抓取 / 发布流程。
-      }
-    }
-    const localAhead = localGeneratedAt != null && manifest.generatedAt != null
-      && Date.parse(localGeneratedAt) > Date.parse(manifest.generatedAt)
+    // 上次抓取成功但 ingest 失败（或本地用了 --no-publish）时，本地 pack 会比数据库新；
+    // 这种日子没有新场次也要补一次 ingest，否则改动会一直卡在本地。
+    const local = localPackState(source)
+    const localAhead = local.count > state.streams.length
+      || (state.generatedAt == null
+        ? local.count > 0
+        : local.newest != null && local.newest > Date.parse(state.generatedAt))
     if (localAhead)
-      console.log('[update] 本地清单比远端新，本次补发布')
+      console.log('[update] 本地 pack 还没入库，本次补 ingest')
 
     const hasFetchWork = plan.newIds.length > 0 || plan.forceIds.length > 0
     if (!hasFetchWork && !localAhead) {
@@ -452,13 +453,44 @@ async function main(): Promise<void> {
       }
     }
 
-    console.log(`[update] ${source.id} 发布…`)
-    const publishCode = await runScript(PUBLISH_SCRIPT, ['--dataset', source.id])
+    // 逐字稿先上传正文，随后 ingest 才会把新稿的元数据同步进数据库。
+    if (!transcriptsPublished) {
+      console.log('[update] 发布逐字稿…')
+      const transcriptCode = await runScript(TRANSCRIPT_SCRIPT, [])
+      if (transcriptCode !== 0) {
+        datasetFailed = true
+        console.warn(`[update] 逐字稿发布有失败项（exit ${transcriptCode}）`)
+      }
+      else {
+        transcriptsPublished = true
+        purgeTags.add('transcripts')
+      }
+    }
+
+    console.log(`[update] ${source.id} 写入数据库…`)
+    const ingestCode = await runScript(INGEST_SCRIPT, ['--dataset', source.id])
+    const ingestOk = ingestCode === 0
+    if (!ingestOk) {
+      datasetFailed = true
+      console.warn(`[update] ${source.id} ingest 失败（exit ${ingestCode}）`)
+    }
+
+    console.log(`[update] ${source.id} 发布资产…`)
+    const publishCode = await runScript(PUBLISH_SCRIPT, ['--dataset', source.id, '--assets-only'])
     if (publishCode !== 0) {
       datasetFailed = true
-      console.warn(`[update] ${source.id} 发布失败（exit ${publishCode}）`)
+      console.warn(`[update] ${source.id} 资产发布失败（exit ${publishCode}）`)
     }
-    else {
+
+    // 数据库已提交即可失效页面缓存；资产失败只影响封面，不该挡住数据更新。
+    if (ingestOk) {
+      purgeTags.add(`dataset-${source.id}`)
+      purgeTags.add('group')
+      purgeTags.add('gallery')
+      purgeTags.add('sitemap')
+      purgeTags.add('llms')
+      for (const id of unique([...plan.newIds, ...plan.forceIds]))
+        purgeTags.add(`stream-${id}`)
       published += 1
     }
 
@@ -466,7 +498,19 @@ async function main(): Promise<void> {
       failures += 1
   }
 
-  console.log(`\n[update] 完成：新场次 ${newTotal}，重抓 ${forcedTotal}，发布 ${published} 个成员，失败 ${failures} 个`)
+  if (purgeTags.size > 0) {
+    const result = await purgeCache({ tags: [...purgeTags] })
+    if (result.skipped)
+      console.log(`[update] 缓存失效跳过：${result.reason}`)
+    else if (result.success)
+      console.log(`[update] 缓存失效：${[...purgeTags].join(', ')}`)
+    else {
+      failures += 1
+      console.warn(`[update] 缓存失效失败：${result.reason ?? `HTTP ${result.status ?? '?'}`}`)
+    }
+  }
+
+  console.log(`\n[update] 完成：新场次 ${newTotal}，重抓 ${forcedTotal}，更新 ${published} 个成员，失败 ${failures} 个`)
   if (failures > 0)
     process.exitCode = 1
 }

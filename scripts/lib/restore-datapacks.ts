@@ -3,14 +3,16 @@
  *
  * `fetch-streams` 用本地 `data/<id>/manifest.json` 判断哪些场次已经抓过。换设备、
  * 清掉缓存后本地什么都没有，直接续跑会把整个频道重抓一遍。这里先把远端已有的
- * pack 恢复回来，让「已入库」判定和 `publish:data` 的「本地 pack 是唯一真源」都成立。
+ * pack 恢复回来，让「已入库」判定和「本地 pack 是唯一真源」都成立。
  *
- * 读取顺序：先试 `DATAPACK_BASE` / `VITE_DATAPACK_BASE`（公开地址，不需要凭据），
- * 失败时再试 `R2_*`（私有桶）。已存在的 pack 不重复下载，可反复执行。
+ * 读取顺序：先试 `DATAPACK_BASE`（公开地址，不需要凭据），
+ * 失败时再试 `R2_*`（私有桶）。pack 从 `archive/<id>/` 读取，兼容旧的公开路径。
+ * 已存在的 pack 不重复下载，可反复执行。
  */
 import { existsSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  archiveKey,
   createObjectStore,
   datapackKey,
   manifestKey,
@@ -195,7 +197,7 @@ export async function restoreDataset(options: RestoreOptions): Promise<RestoreRe
     if (credentials) {
       try {
         const objects = await createObjectStore(credentials).list()
-        const prefix = `${options.datasetId}/`
+        const prefix = `archive/${options.datasetId}/`
         for (const key of objects.keys()) {
           if (key.startsWith(prefix) && key.endsWith(PACK_SUFFIX))
             ids.add(key.slice(prefix.length, -PACK_SUFFIX.length))
@@ -213,7 +215,9 @@ export async function restoreDataset(options: RestoreOptions): Promise<RestoreRe
 
   await runPool(pending, concurrency, async (id) => {
     try {
-      const { text } = await readFrom(packReaders, datapackKey(options.datasetId, id))
+      const archived = await readFrom(packReaders, archiveKey(options.datasetId, id))
+      const text = archived.text
+        ?? (await readFrom(packReaders, datapackKey(options.datasetId, id))).text
       if (text == null)
         throw new Error('远端不存在')
       const pack = JSON.parse(text) as { schema?: string, video?: { id?: string } }

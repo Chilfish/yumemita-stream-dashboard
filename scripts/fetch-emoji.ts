@@ -8,7 +8,7 @@
  *
  * 图片来源是 datapack 的 `chat.emojis[].url`（归一化时从原始回放的 emoji run 抓到的
  * `yt3.ggpht.com` 地址）；浏览器只读对象存储，不直连 YouTube。
- * 抓完由 `bun run publish:data` 上传到 `<base>/<datasetId>/emoji/`。
+ * 抓完由 `bun run publish:assets` 上传到 `<base>/emojis/<datasetId>/`。
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -68,7 +68,7 @@ const OPTIONS = {
 const USAGE = `用法：bun scripts/fetch-emoji.ts [选项]
 
 把频道表情镜像到 data/<datasetId>/emoji/<hash>.png，发布时由
-bun run publish:data 一起上传。来源：
+bun run publish:assets 一起上传。来源：
   - data/emoji-<datasetId>.html：频道表情选择器的 HTML（不依赖任何一场的原始回放）
   - data/emoji-youtube.html：YouTube 全局表情选择器（UCksz… 前缀）
   - datapack 的 chat.emojis：重新归一化过的场次带上的图片地址
@@ -317,7 +317,7 @@ async function main(): Promise<void> {
   if (selected.length > 1 || total.failed > 0)
     console.log(`[fetch-emoji] 合计：成功 ${total.ok} / 跳过 ${total.skipped} / 失败 ${total.failed}`)
   if (total.ok > 0)
-    console.log('[fetch-emoji] 下一步：bun run publish:data 上传表情（emoji 先于 pack 上传）')
+    console.log('[fetch-emoji] 下一步：bun run publish:assets 上传表情（emoji 先于 archive 上传）')
 }
 
 await main()

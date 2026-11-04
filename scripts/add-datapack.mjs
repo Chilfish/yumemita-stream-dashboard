@@ -57,4 +57,4 @@ const { count } = upsertManifestStream(manifestPath, pack, datapackRel);
 
 console.log(`[add-datapack] ${videoId} -> data/${datasetId}/（暂存区，需上传到对象存储）`);
 console.log(`[add-datapack] manifest: ${count} 场`);
-console.log("[add-datapack] 下一步：bun run sync:data && bun run validate:data");
+console.log("[add-datapack] 下一步：bun run db:ingest -- --dataset <id> && bun run db:verify");

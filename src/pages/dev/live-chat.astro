@@ -1,0 +1,31 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import { LiveChatPreviewLoader } from '@/components/dev/live-chat-preview-loader'
+import type { SeoMeta } from '@/lib/seo'
+
+export const prerender = false
+
+// 只在开发环境开放；生产构建里这个分支会被静态消除。
+// 不用 import.meta.env.DEV：当前 Bun 环境会把 NODE_ENV 设成 production，DEV 会是 false。
+if (import.meta.env.MODE !== 'development')
+  return new Response(null, { status: 404 })
+
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+Astro.response.headers.set('Cache-Control', 'no-store')
+
+const meta: SeoMeta = {
+  title: '内部预览 · 弹幕与事件',
+  description: '仅开发环境可用：渲染本地实时采集的弹幕与事件。',
+  canonical: Astro.url.pathname,
+  image: null,
+  imageAlt: null,
+  robots: 'noindex,follow',
+  ogType: 'website',
+  publishedTime: null,
+  jsonLd: [],
+}
+---
+
+<Layout meta={meta}>
+  <LiveChatPreviewLoader client:load initialSession={Astro.url.searchParams.get('session')} />
+</Layout>

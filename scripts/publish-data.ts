@@ -8,18 +8,17 @@
  *   bun scripts/publish-data.ts --force       # 忽略进度，全量重传
  *
  * 本地 `data/<id>/*.datapack.json` 是**唯一真源**：
- * 1. 由 pack 派生 manifest（摘要索引）与 insights（预聚合）；
- * 2. 写回本地 `data/<id>/`（gitignore，本地 dev 直接复用）；
- * 3. thumbs → pack → manifest → insights → dataset index 的顺序上传，索引永远指向已存在的文件；
+ * 1. 由 pack 派生 manifest（摘要索引）与 insights（预聚合），写回本地供恢复与调试；
+ * 2. 页面改由 PostgreSQL 查询，对象存储只保留不可变资产：封面 / 表情 / archive / 逐字稿；
+ * 3. thumbs → archive 的顺序上传，先有图再引用；
  * 4. 增量上传：内容摘要记在 `data/.publish-state.json`，未变化且远端对得上的对象跳过。
  *
  * 封面图（`data/<id>/thumbs/<videoId>.jpg`）与 480 / 960 / 1280w 的 WebP 变体
  * （`<videoId>.<width>.webp`）由 `bun run fetch:thumbs` 生成，一起上传到
- * `<base>/<id>/thumbs/`；先传图再传 pack / manifest，页面上的 `thumbnail`
- * 一旦出现就一定有对应文件与全部 `srcset` 候选。
+ * `<base>/<id>/thumbs/`；原始 pack 归档到 `archive/<id>/<videoId>.datapack.json`。
  *
- * `index.json` 是页面的入口：浏览器启动时直接向对象存储读它，再按 dataset 拉
- * manifest / insights / datapack。发布后刷新即可，不需要重新构建前端。
+ * `--assets-only` 只上传资产与 archive，不写任何 JSON 索引（manifest / insights /
+ * group-* / index）。每日增量走这个模式；全量重建时才需要默认模式。
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -37,9 +36,9 @@ import { buildGroupGallery, buildGroupSummary } from './lib/group-summary.ts'
 import {
   INSIGHTS_SCHEMA,
   MANIFEST_SCHEMA,
+  archiveKey,
   authorsKey,
   createObjectStore,
-  datapackKey,
   emojiKey,
   groupGalleryKey,
   groupSummaryKey,
@@ -72,6 +71,7 @@ const { values } = parseArgs({
   options: {
     dataset: { type: 'string' },
     'no-upload': { type: 'boolean' },
+    'assets-only': { type: 'boolean' },
     force: { type: 'boolean' },
     'allow-shrink': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
@@ -81,10 +81,11 @@ const { values } = parseArgs({
 
 const USAGE = `用法：bun scripts/publish-data.ts [选项]
 
-由本地 datapack 生成 manifest + insights，并上传到对象存储。
+由本地 datapack 生成 manifest + insights，并上传封面 / 表情 / archive 到对象存储。
 
 选项：
   --dataset <id>   只发布指定 dataset
+  --assets-only    只上传封面 / 表情 / archive，不写 JSON 索引
   --no-upload      只生成本地文件，不上传
   --force          忽略 data/.publish-state.json 的进度，全量重传
   --allow-shrink   允许本地场次少于远端（确实要下架场次时才用）
@@ -259,6 +260,7 @@ if (!values['no-upload'] && !credentials)
   fail('缺少 R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET；只生成文件请加 --no-upload')
 
 const store = credentials && !values['no-upload'] ? createObjectStore(credentials) : null
+const assetsOnly = Boolean(values['assets-only'])
 const publishStartedAt = isoJst(new Date())
 const thumbUploads: ThumbUpload[] = []
 const emojiUploads: ThumbUpload[] = collectGlobalEmoji()
@@ -272,7 +274,7 @@ for (const source of selected) {
   const packsById = new Map(packs.map(pack => [pack.video.id, pack]))
 
   const streams = packs
-    .map(pack => buildStreamSummary(pack, datapackKey(source.id, pack.video.id)))
+    .map(pack => buildStreamSummary(pack, archiveKey(source.id, pack.video.id)))
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))
     .map((stream, index) => ({ ...stream, rank: index + 1 }))
 
@@ -288,7 +290,8 @@ for (const source of selected) {
   }
 
   // 完整性校验：本地 pack 少于远端清单时拒绝覆盖，避免一次不完整的恢复把线上数据缩水。
-  if (store) {
+  // --assets-only 不写 manifest，远端也没有可比的旧清单，跳过。
+  if (store && !assetsOnly) {
     let remoteCount: number | null = null
     try {
       const remoteText = await store.get(manifestKey(source.id))
@@ -349,11 +352,13 @@ for (const source of selected) {
   }
 
   for (const pack of packs)
-    packUploads.push({ key: datapackKey(source.id, pack.video.id as string), body: JSON.stringify(pack) })
-  indexUploads.push({ key: manifestKey(source.id), body: JSON.stringify(manifest) })
-  indexUploads.push({ key: insightsKey(source.id), body: JSON.stringify(insights) })
-  if (authorIndex)
-    indexUploads.push({ key: authorsKey(source.id), body: JSON.stringify(authorIndex) })
+    packUploads.push({ key: archiveKey(source.id, pack.video.id as string), body: JSON.stringify(pack) })
+  if (!assetsOnly) {
+    indexUploads.push({ key: manifestKey(source.id), body: JSON.stringify(manifest) })
+    indexUploads.push({ key: insightsKey(source.id), body: JSON.stringify(insights) })
+    if (authorIndex)
+      indexUploads.push({ key: authorsKey(source.id), body: JSON.stringify(authorIndex) })
+  }
 
   indexSources.set(source.id, {
     id: source.id,
@@ -368,39 +373,41 @@ for (const source of selected) {
 
 // 组级精简数据由全部成员的最新 manifest 派生；--dataset 只发布一部分时，
 // 其余成员优先读本地 manifest，本地没有再从对象存储读，避免组级文件少人。
-const groupManifests: { id: string, streams: BatchManifest['streams'] }[] = []
-for (const source of config.datasets) {
-  const manifestPath = join(resolve(APP_ROOT, source.datapackDir), 'manifest.json')
-  let manifest: BatchManifest | null = null
+if (!assetsOnly) {
+  const groupManifests: { id: string, streams: BatchManifest['streams'] }[] = []
+  for (const source of config.datasets) {
+    const manifestPath = join(resolve(APP_ROOT, source.datapackDir), 'manifest.json')
+    let manifest: BatchManifest | null = null
 
-  if (existsSync(manifestPath)) {
-    manifest = readJson<BatchManifest>(manifestPath)
-  }
-  else if (store) {
-    try {
-      const text = await store.get(manifestKey(source.id))
-      if (text)
-        manifest = JSON.parse(text) as BatchManifest
+    if (existsSync(manifestPath)) {
+      manifest = readJson<BatchManifest>(manifestPath)
     }
-    catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      console.warn(`[publish-data]   ! ${source.id} 读取远端 manifest 失败：${detail}`)
+    else if (store) {
+      try {
+        const text = await store.get(manifestKey(source.id))
+        if (text)
+          manifest = JSON.parse(text) as BatchManifest
+      }
+      catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        console.warn(`[publish-data]   ! ${source.id} 读取远端 manifest 失败：${detail}`)
+      }
     }
+
+    if (!manifest || !Array.isArray(manifest.streams) || manifest.streams.length === 0) {
+      console.warn(`[publish-data]   ! ${source.id} 没有可用 manifest，组级数据里跳过`)
+      continue
+    }
+    groupManifests.push({ id: source.id, streams: manifest.streams })
   }
 
-  if (!manifest || !Array.isArray(manifest.streams) || manifest.streams.length === 0) {
-    console.warn(`[publish-data]   ! ${source.id} 没有可用 manifest，组级数据里跳过`)
-    continue
-  }
-  groupManifests.push({ id: source.id, streams: manifest.streams })
+  const groupSummary = buildGroupSummary(groupManifests, publishStartedAt)
+  const groupGallery = buildGroupGallery(groupManifests, publishStartedAt)
+  indexUploads.push({ key: groupSummaryKey(), body: JSON.stringify(groupSummary) })
+  indexUploads.push({ key: groupGalleryKey(), body: JSON.stringify(groupGallery) })
+  const groupStreamCount = groupSummary.members.reduce((sum, member) => sum + member.streamCount, 0)
+  console.log(`[publish-data] 组级数据：${groupStreamCount} 场 / ${groupSummary.days.length} 个日期桶（首页 ${Math.round(JSON.stringify(groupSummary).length / 1024)} KB，相册 ${Math.round(JSON.stringify(groupGallery).length / 1024)} KB）`)
 }
-
-const groupSummary = buildGroupSummary(groupManifests, publishStartedAt)
-const groupGallery = buildGroupGallery(groupManifests, publishStartedAt)
-indexUploads.push({ key: groupSummaryKey(), body: JSON.stringify(groupSummary) })
-indexUploads.push({ key: groupGalleryKey(), body: JSON.stringify(groupGallery) })
-const groupStreamCount = groupSummary.members.reduce((sum, member) => sum + member.streamCount, 0)
-console.log(`[publish-data] 组级数据：${groupStreamCount} 场 / ${groupSummary.days.length} 个日期桶（首页 ${Math.round(JSON.stringify(groupSummary).length / 1024)} KB，相册 ${Math.round(JSON.stringify(groupGallery).length / 1024)} KB）`)
 
 if (!store || !credentials) {
   console.log('[publish-data] 已跳过上传（--no-upload）')
@@ -409,50 +416,53 @@ if (!store || !credentials) {
 }
 
 // --dataset 只重算了一部分：其余 dataset 沿用远端索引里的条目，远端没有再看本地 manifest。
-const missing = config.datasets.filter(source => !indexSources.has(source.id))
-if (missing.length > 0) {
-  let published: DatasetIndex | null = null
-  try {
-    const text = await store.get(INDEX_KEY)
-    if (text)
-      published = JSON.parse(text) as DatasetIndex
-  }
-  catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    console.warn(`[publish-data]   ! 读取远端 ${INDEX_KEY} 失败（${detail}）`)
+let datasetIndex: DatasetIndex | null = null
+if (!assetsOnly) {
+  const missing = config.datasets.filter(source => !indexSources.has(source.id))
+  if (missing.length > 0) {
+    let published: DatasetIndex | null = null
+    try {
+      const text = await store.get(INDEX_KEY)
+      if (text)
+        published = JSON.parse(text) as DatasetIndex
+    }
+    catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      console.warn(`[publish-data]   ! 读取远端 ${INDEX_KEY} 失败（${detail}）`)
+    }
+
+    for (const source of missing) {
+      const entry = published?.datasets?.find(item => item.id === source.id)
+      if (entry) {
+        indexSources.set(source.id, entry)
+        continue
+      }
+      const manifestPath = join(resolve(APP_ROOT, source.datapackDir), 'manifest.json')
+      if (!existsSync(manifestPath)) {
+        console.warn(`[publish-data]   ! ${source.id} 没有可用的 manifest，dataset 索引里跳过`)
+        continue
+      }
+      const manifest = readJson<BatchManifest>(manifestPath)
+      indexSources.set(source.id, {
+        id: source.id,
+        label: source.label,
+        color: source.color,
+        avatar: source.avatar,
+        channelId: source.channelId ?? manifest.channelId,
+        count: manifest.count ?? manifest.streams?.length ?? 0,
+        generatedAt: manifest.generatedAt ?? null,
+      })
+    }
   }
 
-  for (const source of missing) {
-    const entry = published?.datasets?.find(item => item.id === source.id)
-    if (entry) {
-      indexSources.set(source.id, entry)
-      continue
-    }
-    const manifestPath = join(resolve(APP_ROOT, source.datapackDir), 'manifest.json')
-    if (!existsSync(manifestPath)) {
-      console.warn(`[publish-data]   ! ${source.id} 没有可用的 manifest，dataset 索引里跳过`)
-      continue
-    }
-    const manifest = readJson<BatchManifest>(manifestPath)
-    indexSources.set(source.id, {
-      id: source.id,
-      label: source.label,
-      color: source.color,
-      avatar: source.avatar,
-      channelId: source.channelId ?? manifest.channelId,
-      count: manifest.count ?? manifest.streams?.length ?? 0,
-      generatedAt: manifest.generatedAt ?? null,
-    })
-  }
+  datasetIndex = buildDatasetIndex(
+    config.datasets.flatMap((source) => {
+      const entry = indexSources.get(source.id)
+      return entry ? [entry] : []
+    }),
+    publishStartedAt,
+  )
 }
-
-const datasetIndex = buildDatasetIndex(
-  config.datasets.flatMap((source) => {
-    const entry = indexSources.get(source.id)
-    return entry ? [entry] : []
-  }),
-  publishStartedAt,
-)
 
 // 进度记录：内容摘要对齐就不重传；同时列一次远端，确认对象还在、大小对得上。
 const statePath = join(APP_ROOT, 'data', '.publish-state.json')
@@ -538,13 +548,17 @@ finally {
 }
 
 // 索引最后写：即使中途失败，也是“多一个 pack”而不是“指向不存在的 pack”。
-console.log(`[publish-data] 上传 ${indexUploads.length} 个 manifest / insights / 组级数据...`)
-await runPool(indexUploads, 2, async (item) => {
-  await store.put(item.key, item.body)
-})
+if (indexUploads.length > 0) {
+  console.log(`[publish-data] 上传 ${indexUploads.length} 个 manifest / insights / 组级数据...`)
+  await runPool(indexUploads, 2, async (item) => {
+    await store.put(item.key, item.body)
+  })
+}
 
-console.log(`[publish-data] 上传 dataset 索引 ${INDEX_KEY}（${datasetIndex.datasets.length} 个 dataset）...`)
-await store.put(INDEX_KEY, JSON.stringify(datasetIndex))
+if (datasetIndex) {
+  console.log(`[publish-data] 上传 dataset 索引 ${INDEX_KEY}（${datasetIndex.datasets.length} 个 dataset）...`)
+  await store.put(INDEX_KEY, JSON.stringify(datasetIndex))
+}
 
 const base = remoteBase()
 console.log(`[publish-data] 完成${base ? `：${base}` : ''}`)

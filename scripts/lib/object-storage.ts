@@ -10,13 +10,18 @@ import { thumbVariantName } from '../../src/lib/thumb-variants.ts'
 export const MANIFEST_SCHEMA = 'yumemita.stream-datapack.batch/v1'
 export const INSIGHTS_SCHEMA = 'yumemita.dashboard.insights/v1'
 
-/** datapack / manifest / insights 的公开根地址；构建与校验都用它。 */
+/** 对象存储公开根地址；只用于 archive / 逐字稿 / 封面的可达性校验与恢复。 */
 export function remoteBase(): string {
-  return (process.env.DATAPACK_BASE ?? process.env.VITE_DATAPACK_BASE ?? '').replace(/\/+$/, '')
+  return (process.env.DATAPACK_BASE ?? '').replace(/\/+$/, '')
 }
 
 export function datapackKey(datasetId: string, videoId: string): string {
   return `${datasetId}/${videoId}.datapack.json`
+}
+
+/** 原始 pack 归档；页面不再读取，只在恢复本地镜像或重放时使用。 */
+export function archiveKey(datasetId: string, videoId: string): string {
+  return `archive/${datasetId}/${videoId}.datapack.json`
 }
 
 export function manifestKey(datasetId: string): string {
@@ -57,7 +62,7 @@ export function thumbVariantKey(datasetId: string, videoId: string, width: numbe
 
 /**
  * 频道专属表情：`emojis/<dataset>/<hash>.png`。
- * 静态资源，和场次无关；手动跑一次 fetch:emoji + publish:data 即可，不必每天上传。
+ * 静态资源，和场次无关；手动跑一次 fetch:emoji + publish:assets 即可，不必每天上传。
  */
 export function emojiKey(datasetId: string, fileName: string): string {
   return `emojis/${datasetId}/${fileName}`

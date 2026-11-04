@@ -1,0 +1,45 @@
+---
+import type { SeoMeta } from '@/lib/seo'
+import { SITE_NAME, TWITTER_SITE } from '@/lib/seo'
+
+interface Props {
+  meta: SeoMeta
+}
+
+const {
+  title,
+  description,
+  canonical,
+  image,
+  imageAlt,
+  robots,
+  ogType,
+  publishedTime,
+  jsonLd,
+} = Astro.props.meta
+---
+
+<title>{title}</title>
+<meta name="description" content={description} />
+<meta name="robots" content={robots} />
+<link rel="canonical" href={canonical} />
+<meta property="og:site_name" content={SITE_NAME} />
+<meta property="og:locale" content="zh_CN" />
+<meta property="og:type" content={ogType} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+{image && <meta property="og:image" content={image} />}
+{imageAlt && <meta property="og:image:alt" content={imageAlt} />}
+{publishedTime && <meta property="article:published_time" content={publishedTime} />}
+<meta
+  name="twitter:card"
+  content={image ? 'summary_large_image' : 'summary'}
+/>
+{TWITTER_SITE && <meta name="twitter:site" content={TWITTER_SITE} />}
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+{image && <meta name="twitter:image" content={image} />}
+{jsonLd.map(item => (
+  <script type="application/ld+json" set:html={JSON.stringify(item)} />
+))}

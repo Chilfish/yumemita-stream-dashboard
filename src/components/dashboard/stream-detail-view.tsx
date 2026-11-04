@@ -13,7 +13,6 @@ import { TranscriptView } from "@/components/dashboard/transcript-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import { useTranscriptAvailability } from "@/hooks/use-transcript";
 import type { StreamRow } from "@/lib/aggregate";
 import {
   formatDuration,
@@ -41,9 +40,14 @@ interface StreamDetailViewProps {
   view: StreamSubView;
   onViewChange: (view: StreamSubView) => void;
   onSelect: (videoId: string) => void;
+  hasTranscript: boolean;
 }
 
-function renderSubview(view: StreamSubView, row: StreamRow, datasetId: string): ReactNode {
+function renderSubview(
+  view: StreamSubView,
+  row: StreamRow,
+  datasetId: string,
+): ReactNode {
   switch (view) {
     case "timeline":
       return <StreamTimelinePanel row={row} />;
@@ -54,7 +58,9 @@ function renderSubview(view: StreamSubView, row: StreamRow, datasetId: string): 
     case "comments":
       return <StreamCommentsPanel row={row} />;
     case "transcript":
-      return <TranscriptView datasetId={datasetId} videoId={row.summary.videoId} />;
+      return (
+        <TranscriptView datasetId={datasetId} videoId={row.summary.videoId} />
+      );
     case "overview":
     default:
       return <StreamOverviewPanel row={row} />;
@@ -68,6 +74,7 @@ export function StreamDetailView({
   view,
   onViewChange,
   onSelect,
+  hasTranscript: hasTranscriptProp,
 }: StreamDetailViewProps) {
   const { pack, summary } = row;
   const memberOnly = pack.video.availability === "subscriber_only";
@@ -75,9 +82,7 @@ export function StreamDetailView({
   const superchatCount = pack.chat.paid.superchats.length;
 
   // 逐字稿是可选内容：没有稿的场次不显示这个分段，避免出现永远为空的标签。
-  const { hasTranscript } = useTranscriptAvailability(datasetId);
-  const showTranscript = hasTranscript(summary.videoId);
-  const subviews = STREAM_SUBVIEWS.filter(subview => subview !== "transcript" || showTranscript);
+  const subviews = STREAM_SUBVIEWS.filter(subview => subview !== "transcript" || hasTranscriptProp);
 
   const currentIndex = rows.findIndex(item => item.videoId === summary.videoId);
   const newer = currentIndex > 0 ? rows[currentIndex - 1] : undefined;

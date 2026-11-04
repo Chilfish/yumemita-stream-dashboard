@@ -25,10 +25,26 @@ interface Renderer {
   authorBadges?: BadgeWrapper[]
   message?: { runs?: Run[] }
   header?: { liveChatSponsorshipsHeaderRenderer?: SponsorshipsHeader }
-  /** 会员入会/续费文案；普通弹幕没有。 */
-  headerSubtext?: { runs?: Run[] }
+  /** 会员留言的主文案（如 `Member for 25 months`）。 */
+  headerPrimaryText?: { runs?: Run[]; simpleText?: string }
+  /** 会员入会/续费文案或会员自定义状态；普通弹幕没有。 */
+  headerSubtext?: { runs?: Run[]; simpleText?: string }
   timestampUsec?: string
   purchaseAmountText?: { simpleText?: string }
+  sticker?: {
+    thumbnails?: { url?: string, width?: number, height?: number }[]
+    accessibility?: { accessibilityData?: { label?: string } }
+  }
+  // YouTube 把 SC / 贴纸的等级颜色直接写在 renderer 上（ARGB 整数）。
+  headerBackgroundColor?: number
+  headerTextColor?: number
+  bodyBackgroundColor?: number
+  bodyTextColor?: number
+  authorNameTextColor?: number
+  timestampColor?: number
+  moneyChipBackgroundColor?: number
+  moneyChipTextColor?: number
+  backgroundColor?: number
 }
 
 interface BadgeWrapper {
@@ -53,7 +69,7 @@ interface Run {
   emoji?: RawEmoji
 }
 
-interface ChatItemWrapper {
+export interface ChatItemWrapper {
   liveChatTextMessageRenderer?: Renderer
   liveChatPaidMessageRenderer?: Renderer
   liveChatPaidStickerRenderer?: Renderer
@@ -66,10 +82,32 @@ interface RawLine {
   replayChatItemAction?: { actions?: Array<{ addChatItemAction?: { item?: ChatItemWrapper } }> }
 }
 
+export interface ChatPaidColors {
+  headerBackground?: number
+  headerText?: number
+  bodyBackground?: number
+  bodyText?: number
+  authorName?: number
+  timestamp?: number
+  moneyChipBackground?: number
+  moneyChipText?: number
+  background?: number
+}
+
+export interface ChatStickerAsset {
+  name: string | null
+  url: string
+}
+
 export interface ChatRecord {
   seq: number
   video: string
   ts: number
+  /**
+   * 聊天项 id（`renderer.id`）。实时采集与回放是同一条消息时 id 相同，
+   * 合并两份 jsonl 时用它去重；旧档或结构变化时可能缺失。
+   */
+  rendererId?: string
   msg: {
     author?: string
     /** 稳定的频道 ID（`authorExternalChannelId`）；显示名会改、会重名，重叠分析要用它。 */
@@ -80,8 +118,16 @@ export interface ChatRecord {
     timestampUs?: string
     emoji?: { id: string }[]
     badges?: string[]
-    /** 会员里程碑文案，如 `Welcome to …`（仅 `kind: 'membership'`）。 */
+    /** 会员里程碑文案或会员自定义状态；普通弹幕没有。 */
     header?: string
+    /** 会员留言的主文案（`Member for 25 months`）。 */
+    membershipPrimary?: string
+    /** 会员留言带正文时归为 text，但仍保留会员标记。 */
+    memberMessage?: boolean
+    /** SC / 贴纸的等级颜色（ARGB 整数）；旧档没有。 */
+    colors?: ChatPaidColors
+    /** 付费贴纸的图片与无障碍名称；旧档没有。 */
+    sticker?: ChatStickerAsset
     /** 一次赠送的会员个数（仅 `kind: 'gift'`）。 */
     giftCount?: number
   }
@@ -152,7 +198,49 @@ function toEmojiAsset(emoji: RawEmoji): ChatEmoji | null {
   return { id, name: label || shortcut || null, url }
 }
 
-function toRecord(
+/** `{ simpleText } | { runs[] }` 两种文案形态。 */
+function readText(value: { runs?: Run[], simpleText?: string } | undefined): string {
+  if (!value)
+    return ''
+  if (typeof value.simpleText === 'string')
+    return value.simpleText.trim()
+  return (value.runs ?? []).map(run => run.text ?? '').join('').trim()
+}
+
+function readPaidColors(renderer: Renderer): ChatPaidColors | null {
+  const entries: [keyof ChatPaidColors, number | undefined][] = [
+    ['headerBackground', renderer.headerBackgroundColor],
+    ['headerText', renderer.headerTextColor],
+    ['bodyBackground', renderer.bodyBackgroundColor],
+    ['bodyText', renderer.bodyTextColor],
+    ['authorName', renderer.authorNameTextColor],
+    ['timestamp', renderer.timestampColor],
+    ['moneyChipBackground', renderer.moneyChipBackgroundColor],
+    ['moneyChipText', renderer.moneyChipTextColor],
+    ['background', renderer.backgroundColor],
+  ]
+  const colors: ChatPaidColors = {}
+  for (const [key, value] of entries) {
+    if (typeof value === 'number')
+      colors[key] = value
+  }
+  return Object.keys(colors).length > 0 ? colors : null
+}
+
+function readSticker(renderer: Renderer): ChatStickerAsset | null {
+  const thumbs = [...(renderer.sticker?.thumbnails ?? [])]
+    .filter(thumb => typeof thumb.url === 'string' && thumb.url)
+    .sort((a, b) => (b.width ?? 0) - (a.width ?? 0))
+  const url = thumbs[0]?.url
+  if (!url)
+    return null
+  return {
+    name: renderer.sticker?.accessibility?.accessibilityData?.label?.trim() || null,
+    url: url.startsWith('//') ? `https:${url}` : url,
+  }
+}
+
+export function toRecord(
   item: ChatItemWrapper | undefined,
   videoId: string,
   seq: number,
@@ -217,9 +305,27 @@ function toRecord(
     timestampUs,
   }
   if (kind === 'membership') {
-    const header = (renderer.headerSubtext?.runs ?? []).map(run => run.text ?? '').join('').trim()
+    const primary = readText(renderer.headerPrimaryText)
+    const subtext = readText(renderer.headerSubtext)
+    if (primary)
+      msg.membershipPrimary = primary
+    // 老数据里会员留言（带正文）被记成 membership；新数据按普通弹幕处理，徽章仍保留成员身份。
+    if (text.trim()) {
+      kind = 'text'
+      msg.kind = 'text'
+      msg.memberMessage = true
+    }
+    const header = subtext || primary
     if (header)
       msg.header = header
+  }
+  const colors = readPaidColors(renderer)
+  if (colors)
+    msg.colors = colors
+  if (kind === 'sticker') {
+    const sticker = readSticker(renderer)
+    if (sticker)
+      msg.sticker = sticker
   }
   if (kind === 'gift') {
     const giftCount = giftCountOf(runs, text)
@@ -235,6 +341,9 @@ function toRecord(
     msg.badges = badges
 
   const record: ChatRecord = { seq, video: videoId, ts: 0, msg }
+  const rendererId = (renderer as unknown as { id?: unknown }).id
+  if (typeof rendererId === 'string' && rendererId)
+    record.rendererId = rendererId
   if (timestampUs) {
     const seconds = Number(timestampUs) / 1_000_000
     if (Number.isFinite(seconds))
@@ -300,7 +409,7 @@ export async function normalizeLiveChat(
     stream.end((error?: Error | null) => (error ? fail(error) : done()))
   })
 
-  writeEmojiSidecar(output, videoId, emojis)
+  mergeEmojiSidecar(output, videoId, emojis)
 
   return {
     total: Object.values(counts).reduce((sum, n) => sum + n, 0),
@@ -315,7 +424,7 @@ export async function normalizeLiveChat(
  * `emoji_<videoId>.json`：id → 图片地址 + 名称，供 `stream-datapack` 写进 pack、
  * `fetch:emoji` 镜像到对象存储。没有表情时删掉旧文件，避免重跑后留下过期的表。
  */
-function writeEmojiSidecar(output: string, videoId: string, emojis: Map<string, ChatEmoji>): void {
+export function writeEmojiSidecar(output: string, videoId: string, emojis: Map<string, ChatEmoji>): void {
   const path = join(dirname(output), `emoji_${videoId}.json`)
   if (emojis.size === 0) {
     if (existsSync(path))
@@ -327,6 +436,27 @@ function writeEmojiSidecar(output: string, videoId: string, emojis: Map<string, 
     emojis: [...emojis.values()].sort((a, b) => a.id.localeCompare(b.id)),
   }
   writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+}
+
+/**
+ * 合并已有 sidecar 再写：实时采集可能已经镜像了等待室出现的表情，
+ * 回放归一化不能把它们覆盖掉。
+ */
+export function mergeEmojiSidecar(output: string, videoId: string, emojis: Map<string, ChatEmoji>): void {
+  const path = join(dirname(output), `emoji_${videoId}.json`)
+  if (existsSync(path)) {
+    try {
+      const payload = JSON.parse(readFileSync(path, 'utf8')) as { emojis?: ChatEmoji[] }
+      for (const asset of payload.emojis ?? []) {
+        if (asset?.id && asset.url && !emojis.has(asset.id))
+          emojis.set(asset.id, asset)
+      }
+    }
+    catch {
+      // 坏档按不存在处理，下面会覆写成新表
+    }
+  }
+  writeEmojiSidecar(output, videoId, emojis)
 }
 
 if (import.meta.main) {

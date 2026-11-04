@@ -1,0 +1,47 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { GroupPage } from '@/components/app/group-page'
+import { db } from '@/db/client'
+import { getGroupPageData, type GroupPageData } from '@/db/queries/view-data'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+
+export const prerender = false
+
+Astro.cache.set({ maxAge: 300, swr: 600, tags: ['group', 'gallery'] })
+
+let data: GroupPageData | null = null
+try {
+  data = await getGroupPageData(db, 'gallery')
+}
+catch (error) {
+  console.error('[page] group gallery failed', error)
+  Astro.response.status = 500
+}
+
+const latest = data?.data.rows[0] ?? null
+const meta = pageSeo(Astro, {
+  section: 'gallery',
+  memberCount: data?.datasets.length ?? null,
+  streamCount: data?.data.totals.streamCount ?? null,
+  updatedAt: latest?.startedAt ?? null,
+  imageStream: latest ? { datasetId: latest.datasetId, videoId: latest.videoId } : null,
+})
+---
+
+<Layout meta={meta}>
+  {data
+    ? (
+        <GroupPage
+          client:idle
+          data={data.data}
+          datasets={data.datasets}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          search={requestSearch(Astro)}
+          section="gallery"
+          view="gallery"
+        />
+      )
+    : <ErrorState code="500" />}
+</Layout>

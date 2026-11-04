@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate } from "@/lib/router-compat";
 import {
   isCommandPaletteShortcut,
   isEditableElement,
@@ -105,3 +105,4 @@ export function useKeyboardShortcuts({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [datasetId, navigate, onCommandPalette, pathname, rows]);
 }
+

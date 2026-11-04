@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { MemberAvatar, MemberDot } from "@/components/dashboard/member-avatar";
 import { formatDate, formatInteger } from "@/lib/format";
 import { sortMembersByLatest, type GroupMemberSummary } from "@/lib/group";
@@ -65,3 +65,4 @@ export function GroupMemberEntries({ members }: GroupMemberEntriesProps) {
     </section>
   );
 }
+

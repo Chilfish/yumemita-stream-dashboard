@@ -1,0 +1,64 @@
+name: Deploy
+
+# 首版手动触发，确认线上部署与缓存行为后再考虑加 push: branches: [main]。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      PUBLIC_R2_BASE: ${{ vars.PUBLIC_R2_BASE }}
+      SITE_URL: ${{ vars.SITE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Check configuration
+        run: |
+          if [ -z "$PUBLIC_R2_BASE" ]; then
+            echo "::error::Set the repository variable PUBLIC_R2_BASE (covers / emoji public domain)."
+            exit 1
+          fi
+          if [ -z "$SITE_URL" ]; then
+            echo "::error::Set the repository variable SITE_URL (canonical / sitemap / smoke target)."
+            exit 1
+          fi
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets."
+            exit 1
+          fi
+
+      - name: Verify
+        run: bun run ci
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler deploy --config dist/server/wrangler.json
+
+      - name: Smoke production routes
+        run: bun run test:smoke
+        env:
+          BASE_URL: ${{ vars.SITE_URL }}

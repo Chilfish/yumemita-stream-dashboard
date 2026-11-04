@@ -1,7 +1,7 @@
 import { Activity, Images, LayoutDashboard, Table2, Users } from "lucide-react";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { MemberSheet } from "@/components/dashboard/member-sheet";
 import {
   galleryPath,
@@ -118,3 +118,4 @@ export function MobileTabBar({
     </>
   );
 }
+

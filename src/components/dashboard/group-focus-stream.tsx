@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Link } from "react-router";
+import { Link } from "@/lib/router-compat";
 import { MemberAvatar, MemberDot } from "@/components/dashboard/member-avatar";
 import { StreamCover } from "@/components/dashboard/stream-cover";
 import { Badge } from "@/components/ui/badge";
@@ -154,3 +154,4 @@ export function GroupFocusStream({ member, stream }: GroupFocusStreamProps) {
     </section>
   );
 }
+

@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "@/lib/router-compat";
 import { StreamCover } from "@/components/dashboard/stream-cover";
+import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { memberAccent } from "@/lib/color";
 import { formatDate, formatInteger } from "@/lib/format";
@@ -40,6 +41,8 @@ const ORDER_OPTIONS: { value: GalleryOrder; label: string }[] = [
 ];
 
 const UNKNOWN_MONTH = "unknown";
+const INITIAL_VISIBLE_ROWS = 60;
+const VISIBLE_STEP = 120;
 
 const CHIP_CLASS =
   "rounded-full px-2.5 text-footnote text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background";
@@ -125,6 +128,22 @@ function buildGroups(rows: GalleryRow[], order: GalleryOrder): MonthGroup[] {
     .sort((a, b) => (order === "asc" ? a.key.localeCompare(b.key) : b.key.localeCompare(a.key)));
 }
 
+/** 按月份顺序取前 `limit` 行，保留分组本身的场次数用于标题。 */
+function takeVisibleGroups(
+  groups: MonthGroup[],
+  limit: number,
+): (MonthGroup & { visibleRows: GalleryRow[] })[] {
+  const result: (MonthGroup & { visibleRows: GalleryRow[] })[] = [];
+  let consumed = 0;
+  for (const group of groups) {
+    const take = Math.max(0, Math.min(group.rows.length, limit - consumed));
+    consumed += take;
+    if (take > 0) result.push({ ...group, visibleRows: group.rows.slice(0, take) });
+    if (consumed >= limit) break;
+  }
+  return result;
+}
+
 function GalleryEmpty() {
   return (
     <div className="flex flex-col gap-2 rounded-panel bg-card px-4 py-8 shadow-surface">
@@ -147,6 +166,19 @@ export function GalleryView({
   const [searchParams, setSearchParams] = useSearchParams();
   const order = parseGalleryOrder(searchParams.get("order"));
   const groups = useMemo(() => buildGroups(rows, order), [rows, order]);
+
+  // 全组相册有近两千张封面：首屏只铺前 60 张，其余由「显示更多」接管。
+  const viewKey = `${order}|${rows.length}`;
+  const [page, setPage] = useState({ key: viewKey, limit: INITIAL_VISIBLE_ROWS });
+  const limit = page.key === viewKey ? page.limit : INITIAL_VISIBLE_ROWS;
+
+  const visibleGroups = useMemo(() => takeVisibleGroups(groups, limit), [groups, limit]);
+
+  const visibleCount = visibleGroups.reduce(
+    (sum, group) => sum + group.visibleRows.length,
+    0,
+  );
+  const remaining = rows.length - visibleCount;
 
   function changeOrder(next: string[]): void {
     const [value] = next;
@@ -183,7 +215,9 @@ export function GalleryView({
 
       {rows.length === 0
         ? (emptyState ?? <GalleryEmpty />)
-        : groups.map(group => {
+        : (
+          <>
+            {visibleGroups.map(group => {
             const headingId = `gallery-month-${group.key}`;
 
             return (
@@ -200,7 +234,7 @@ export function GalleryView({
                 </div>
 
                 <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-4">
-                  {group.rows.map(row => {
+                  {group.visibleRows.map(row => {
                     const metric = cardMetric(row);
                     const memberLabel = row.memberLabel ?? row.datasetId;
                     const memberColor = row.memberColor ?? DEFAULT_MEMBER_COLOR;
@@ -241,7 +275,25 @@ export function GalleryView({
                 </ul>
               </section>
             );
-          })}
+            })}
+
+            {remaining > 0 ? (
+              <div className="flex justify-center py-2">
+                <Button
+                  onClick={() =>
+                    setPage({ key: viewKey, limit: limit + VISIBLE_STEP })
+                  }
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  显示更多（剩余 {formatInteger(remaining)} 场）
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )}
     </div>
   );
 }
+

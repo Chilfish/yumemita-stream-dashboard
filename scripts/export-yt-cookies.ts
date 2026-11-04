@@ -2,25 +2,27 @@
 /**
  * 从本机浏览器导出 YouTube cookie（Netscape 格式），可选直接推到 GitHub Actions Secrets。
  *
- *   bun scripts/export-yt-cookies.ts                 # 只导出到 node_modules/.cache
+ *   bun scripts/export-yt-cookies.ts                 # 导出到 ~/yt-cookies.txt（各抓取脚本默认复用）
  *   bun scripts/export-yt-cookies.ts --push          # 导出并 gh secret set YT_COOKIES
  *   bun scripts/export-yt-cookies.ts --browser edge --push
  *
  * 说明：
- *   - 文件是登录态会话，等同账号凭据；默认落在 gitignore 的 node_modules/.cache 下，不要提交。
- *   - CI 用 `--cookies <文件>` 读取；本地抓取仍可直接 `--cookies-from-browser firefox`。
+ *   - 文件是登录态会话，等同账号凭据；默认落在 home 目录，不会被 git 看到。
+ *   - `fetch-streams` / `fetch-danmaku` / `fetch-live-chat` 等脚本默认读这份缓存，
+ *     缺失时才自动导出；平时不需要手动跑本脚本。
+ *   - CI 用 `--cookies <文件>` 读取；本地抓取也可以继续 `--cookies-from-browser firefox`。
  *   - 默认只保留 youtube.com / google.com：浏览器 profile 里还有 bilibili、pixiv 等
  *     别的站点会话，推到 CI 的 secret 里没有必要，漏出去反而更麻烦。
  *   - 只打印数量与登录检查，不打印任何 cookie 值。
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { defaultCookieCachePath, exportCookieJar } from './lib/yt-cookies.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const DEFAULT_OUT = join(APP_ROOT, 'node_modules', '.cache', 'stream-dashboard', 'yt-cookies.txt')
 
 const OPTIONS = {
   browser: { type: 'string', default: 'firefox' },
@@ -39,7 +41,7 @@ const USAGE = `用法：bun scripts/export-yt-cookies.ts [选项]
 
 选项：
   --browser <name>   firefox / chrome / edge / brave / safari，默认 firefox
-  --out <文件>       输出路径，默认 node_modules/.cache/stream-dashboard/yt-cookies.txt
+  --out <文件>       输出路径，默认 ~/yt-cookies.txt（抓取脚本共用）
   --url <地址>       触发导出的 YouTube 地址，默认取本地清单里最新一场，没有清单时用首个频道的 /streams
   --domains <列表>   只保留这些域的 cookie，逗号分隔，默认 youtube.com,google.com（空 = 全留）
   --push             导出后执行 gh secret set
@@ -113,55 +115,6 @@ function latestVideoUrl(): string | null {
   return best?.url ?? null
 }
 
-/**
- * 清单为空时退回首个频道的 /streams：yt-dlp 列一次列表就能拿到 cookie。
- * 以前写死的是 yt-dlp 的测试视频 BaW_jenozKc，它下架后这里会直接失败。
- */
-function fallbackUrl(): string | null {
-  try {
-    const sources = JSON.parse(readFileSync(join(APP_ROOT, 'data-sources.json'), 'utf8')) as {
-      datasets?: { channelId?: string }[]
-    }
-    const channelId = sources.datasets?.find(item => item.channelId)?.channelId
-    return channelId ? `https://www.youtube.com/channel/${channelId}/streams` : null
-  }
-  catch {
-    return null
-  }
-}
-
-/**
- * 按域裁剪 Netscape cookie 文件。`#HttpOnly_` 只是前缀标记，不是注释，
- * 它的域也要参与匹配（YouTube 的 SID / __Secure-* 全是 HttpOnly）。
- */
-function filterDomains(path: string, domains: string[]): { before: number, after: number } {
-  const rows = readFileSync(path, 'utf8').split(/\r?\n/).filter(line => line.trim())
-  if (domains.length === 0)
-    return { before: rows.length, after: rows.length }
-
-  const kept = rows.filter((line) => {
-    // 头部注释要留着：yt-dlp 靠 "# Netscape HTTP Cookie File" 识别文件格式。
-    if (line.startsWith('#') && !line.startsWith('#HttpOnly_'))
-      return true
-    const domain = line.replace(/^#HttpOnly_/, '').split('\t')[0] ?? ''
-    const bare = domain.replace(/^\./, '')
-    return domains.some(item => bare === item || bare.endsWith(`.${item}`))
-  })
-  writeFileSync(path, `${kept.join('\n')}\n`, 'utf8')
-  return { before: rows.length, after: kept.length }
-}
-
-function inspect(path: string): { lines: number, youtube: number, loggedIn: boolean } {
-  const text = readFileSync(path, 'utf8')
-  const lines = text.split(/\r?\n/)
-  const cookies = lines.filter(line => line.trim() && !line.startsWith('#'))
-  const youtube = cookies.filter(line => /(^|\t)\.?youtube\.com\t/.test(line))
-  // Netscape 格式：domain / includeSubdomains / path / secure / expiry / name / value
-  const names = new Set(cookies.map(line => line.split('\t')[5]).filter(Boolean))
-  const loggedIn = names.has('SID') || names.has('__Secure-3PSID') || names.has('__Secure-1PSID')
-  return { lines: cookies.length, youtube: youtube.length, loggedIn }
-}
-
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: OPTIONS, args: process.argv.slice(2), allowPositionals: false })
   if (values.help) {
@@ -169,9 +122,20 @@ async function main(): Promise<void> {
     return
   }
 
-  const out = resolve(values.out ?? DEFAULT_OUT)
-  mkdirSync(dirname(out), { recursive: true })
-  const url = values.url ?? latestVideoUrl() ?? fallbackUrl()
+  const out = resolve(values.out ?? defaultCookieCachePath())
+  const url = values.url ?? latestVideoUrl()
+    ?? (() => {
+      try {
+        const sources = JSON.parse(readFileSync(join(APP_ROOT, 'data-sources.json'), 'utf8')) as {
+          datasets?: { channelId?: string }[]
+        }
+        const channelId = sources.datasets?.find(item => item.channelId)?.channelId
+        return channelId ? `https://www.youtube.com/channel/${channelId}/streams` : null
+      }
+      catch {
+        return null
+      }
+    })()
   if (!url) {
     console.error('[cookies] 找不到可用的 YouTube 地址：本地没有 data 清单，data-sources.json 里也没有 channelId。用 --url 指定一个视频页。')
     process.exit(1)
@@ -179,42 +143,27 @@ async function main(): Promise<void> {
 
   console.log(`[cookies] 从 ${values.browser} 导出，输出 ${out}`)
   console.log(`[cookies] 触发地址：${url}`)
-  // 旧文件被裁剪坏了的话 yt-dlp 会直接报「不是 Netscape 格式」并且不写盘；
-  // cookie 的唯一来源是浏览器，先删掉重来最省事。
-  if (existsSync(out))
-    unlinkSync(out)
-
-  const code = await run('yt-dlp', [
-    '--cookies-from-browser', values.browser,
-    '--cookies', out,
-    '--skip-download',
-    '--simulate',
-    '--flat-playlist',
-    '--playlist-items', '1',
-    '--no-warnings',
+  const domains = (values.domains ?? '').split(',').map(item => item.trim()).filter(Boolean)
+  const result = await exportCookieJar({
+    out,
+    browser: values.browser,
     url,
-  ])
-  if (!existsSync(out)) {
-    console.error(`[cookies] yt-dlp 没有写出 cookie 文件（exit ${code}）。确认浏览器已登录 YouTube，且浏览器进程已关闭。`)
+    domains,
+    log: line => console.log(`[cookies] ${line}`),
+  })
+  if (!result.ok || !result.info) {
+    console.error(`[cookies] 导出失败：${result.error}`)
+    console.error('[cookies] 确认浏览器已登录 YouTube，且浏览器进程已关闭。')
     process.exit(1)
   }
-  if (code !== 0)
-    console.warn(`[cookies] yt-dlp exit ${code}，但 cookie 文件已写出，继续检查`)
-
-  const domains = (values.domains ?? '').split(',').map(item => item.trim()).filter(Boolean)
-  const filtered = filterDomains(out, domains)
-  if (filtered.after !== filtered.before) {
-    console.log(`[cookies] 按域裁剪：${filtered.before} → ${filtered.after} 条，保留 ${domains.join(' / ')}`)
-  }
-
-  const info = inspect(out)
-  const size = statSync(out).size
-  console.log(`[cookies] 共 ${info.lines} 条 cookie，其中 youtube.com ${info.youtube} 条，${Math.round(size / 1024)} KB`)
-  if (!info.loggedIn) {
+  if (result.filtered && result.filtered.after !== result.filtered.before)
+    console.log(`[cookies] 按域裁剪：${result.filtered.before} → ${result.filtered.after} 条，保留 ${domains.join(' / ') || '全部'}`)
+  console.log(`[cookies] 共 ${result.info.cookies} 条 cookie，其中 youtube.com ${result.info.youtube} 条，${Math.round(statSync(out).size / 1024)} KB`)
+  if (!result.info.loggedIn) {
     console.error('[cookies] 没有找到登录态 cookie（SID / __Secure-3PSID）。先在浏览器登录 YouTube 再导出。')
     process.exit(1)
   }
-  if (info.youtube === 0) {
+  if (result.info.youtube === 0) {
     console.error('[cookies] 没有任何 youtube.com cookie，导出的文件对 CI 没用。')
     process.exit(1)
   }

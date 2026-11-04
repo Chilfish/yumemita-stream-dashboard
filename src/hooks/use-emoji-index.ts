@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchEmojiIndex } from "@/lib/data";
+import { fetchEmojiIndex } from "@/lib/media";
 
 /** 频道表情 id → 名称；失败或还没发布时返回空表，页面退回 id / 占位。 */
 export function useEmojiIndex(datasetId: string): Map<string, string> {
