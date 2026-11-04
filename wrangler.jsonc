@@ -7,17 +7,22 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
   },
   "r2_buckets": [
     {
       "binding": "R2",
-      "bucket_name": "yumemita-data"
-    }
+      "bucket_name": "yumemita-data",
+    },
   ],
   // Workers Cache：首版关闭跨版本复用，部署后从冷缓存开始。
   "cache": {
     "enabled": true,
-    "cross_version_cache": false
-  }
+    "cross_version_cache": false,
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+    },
+  },
 }
