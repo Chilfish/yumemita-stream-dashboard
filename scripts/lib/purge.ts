@@ -1,6 +1,6 @@
 /** 调用 Worker 内部 purge 端点；zone 级 purge 不影响 Workers Cache，只能走这里。 */
 export interface PurgeOptions {
-  /** 站点根地址；默认读 SITE_URL / VITE_SITE_URL。 */
+  /** 站点根地址；默认读 SITE_URL。 */
   siteUrl?: string
   /** 内部端点令牌；默认读 PURGE_TOKEN。 */
   token?: string
@@ -17,7 +17,7 @@ export interface PurgeResult {
 }
 
 export async function purgeCache(options: PurgeOptions): Promise<PurgeResult> {
-  const siteUrl = (options.siteUrl ?? process.env.SITE_URL ?? process.env.VITE_SITE_URL ?? '').replace(/\/+$/, '')
+  const siteUrl = (options.siteUrl ?? process.env.SITE_URL ?? '').replace(/\/+$/, '')
   const token = options.token ?? process.env.PURGE_TOKEN ?? ''
   const tags = [...new Set(options.tags.filter(Boolean))]
 

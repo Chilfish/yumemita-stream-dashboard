@@ -61,4 +61,5 @@ jobs:
       - name: Smoke production routes
         run: bun run test:smoke
         env:
-          BASE_URL: ${{ vars.SITE_URL }}
+          # 站点正式域名可能还没切过来（canonical 用 SITE_URL）；冒烟打当前可访问的地址。
+          BASE_URL: ${{ vars.SMOKE_BASE_URL || vars.SITE_URL }}
