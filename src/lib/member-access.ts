@@ -3,9 +3,9 @@ import { MEMBER_ONLY_KEY } from "astro:env/server";
 import { MEMBER_ONLY_PARAM, memberOnlyUnlocked } from "./visibility";
 
 export interface MemberOnlyAccess {
-  /** `?key=` 与环境变量一致；数据是否放行。 */
+  /** 数据是否放行。 */
   unlocked: boolean;
-  /** URL 带了 `?key=`（不论对错）。带 key 的响应一律不进入共享缓存。 */
+  /** 本次请求是否带了访问参数（带参数时响应一律不进入共享缓存）。 */
   keyed: boolean;
 }
 
@@ -20,7 +20,7 @@ export function memberOnlyAccess(url: URL): MemberOnlyAccess {
   return readAccess(url);
 }
 
-/** 页面用：处理访问判断，并在带 key 时关掉 Astro / CDN 缓存。 */
+/** 页面用：处理访问判断，并在带访问参数时关掉 Astro / CDN 缓存。 */
 export function memberOnlyCachePolicy(astro: AstroGlobal): MemberOnlyAccess {
   const access = readAccess(astro.url);
   if (access.keyed) {

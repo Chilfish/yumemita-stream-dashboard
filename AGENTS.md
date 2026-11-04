@@ -37,7 +37,7 @@
 | 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-danmaku.ts`、`fetch-live-chat.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts` | 手写 Markdown，发布到 R2 |
 | 数据字段 / 口径 | `docs/data/data-model.md`、`src/types/` | 改字段同步文档与类型 |
-| 会员限定公开范围 | `src/lib/visibility.ts`、`src/lib/member-access.ts`、`src/db/queries/*` | 默认过滤；`MEMBER_ONLY_KEY` + `?key=` 放行，带 key 不缓存 |
+| 会员限定公开范围 | `src/lib/visibility.ts`、`src/lib/member-access.ts`、`src/db/queries/*` | 默认过滤；直连单场只显示封面与标题 |
 | 部署 / 缓存 | `docs/engineering/deployment.md`、`wrangler.jsonc`、`scripts/r2-cors.json`、`astro.config.mjs` | Cloudflare Workers + R2 |
 | 发布检查 | `docs/engineering/release-checklist.md` | 按清单勾选 |
 | 迁移执行 | `docs/planning/astro-ssr-migration.md` | 分阶段，先 PoC 再切换 |

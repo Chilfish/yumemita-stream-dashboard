@@ -94,7 +94,7 @@
 - [x] `fetch:thumbs` / `publish:transcripts` 脚本：增量、可续跑、单条失败不阻塞。
 - [x] 逐字稿脚本：`transcript:new` / `transcript:import` 从模板或已有 Markdown 生成。
 - [ ] 200% 缩放复核（320px 已通过）。
-- [x] 会员限定场次默认不公开：`MEMBER_ONLY_KEY` 为唯一开关，URL `?key=` 匹配才放行；列表、聚合、单场、`.md`、`/api/packs`、逐字稿索引全部过滤，直连单场只留封面与标题。抓取与 ingest 不受影响。
+- [x] 会员限定场次默认不公开：列表、聚合、单场、`.md`、`/api/packs`、逐字稿索引全部过滤，直连单场只留封面与标题。抓取与 ingest 不受影响。
 - [x] 成员页「说明」统一为组级 `/about`：`/<datasetId>/about` 302 跳转，组侧栏与 sitemap 同步。
 
 ## 非目标

@@ -39,9 +39,8 @@
 - [ ] 不存在的路径 / dataset / videoId 返回 404
 - [ ] 旧 `#/...` 链接能改写成真实路径
 - [ ] `/about` 显示说明与免责；`/:datasetId/about` 302 到 `/about`
-- [ ] 未配置 `MEMBER_ONLY_KEY` 时，会员限定场次不出现在列表 / 相册 / 聚合 / sitemap；直连单场只有封面与标题。组级 `/compare` 是纯聚合统计，仍计入这些场次
-- [ ] 配置 `MEMBER_ONLY_KEY` 后，带正确 `?key=` 的单场、列表与 `.md` 显示完整数据；`Cache-Control` 为 `private, no-store`
-- [ ] 带错误 `?key=` 的请求同样不被缓存，且不显示会员限定数据
+- [ ] 会员限定场次不出现在列表 / 相册 / 逐字稿索引 / sitemap；直连单场只有封面与标题。组级 `/compare` 是纯聚合统计，仍计入这些场次
+- [ ] 会限单场的 `.md` 只输出标题与封面；`/api/packs`、`/api/transcripts` 返回 404
 
 ### 主题与响应式
 
@@ -85,7 +84,7 @@
 - [ ] 逐字稿有更新时 `bun run publish:transcripts` 成功
 - [ ] `bun run purge:cache` 成功；页面与 `.md` 返回新数据
 - [ ] `data-sources.json` 与新增成员 / 场次一致
-- [ ] 会员限定场次的公开范围已确认（默认隐藏，`MEMBER_ONLY_KEY` 未配置）
+- [ ] 会员限定场次的公开范围已确认（默认隐藏）
 
 ## 缓存与部署
 

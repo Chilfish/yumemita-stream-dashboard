@@ -2,7 +2,7 @@
  * 会员限定场次的公开范围。
  *
  * 数据仍然完整入库（抓取、ingest、对账都不排除），这里只控制公开读取：
- * 默认全部隐藏，只有 URL 带上与环境变量一致的 `?key=` 才放行。
+ * 默认全部隐藏，由服务端的访问策略决定是否放行。
  */
 
 export const MEMBER_ONLY_AVAILABILITY = "subscriber_only";
