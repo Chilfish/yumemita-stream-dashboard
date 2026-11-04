@@ -61,6 +61,7 @@ for (const datasetId of values.dataset ?? []) {
   tags.add(`dataset-${datasetId}`)
   tags.add('group')
   tags.add('gallery')
+  tags.add('schedule')
   tags.add('sitemap')
   tags.add('llms')
 }
@@ -69,11 +70,12 @@ for (const videoId of values.video ?? [])
 if (values.group) {
   tags.add('group')
   tags.add('gallery')
+  tags.add('schedule')
   tags.add('sitemap')
   tags.add('llms')
 }
 if (values.all) {
-  for (const tag of ['group', 'gallery', 'datasets', 'streams', 'transcripts', 'sitemap', 'llms', 'compare'])
+  for (const tag of ['group', 'gallery', 'datasets', 'streams', 'transcripts', 'schedule', 'sitemap', 'llms', 'compare'])
     tags.add(tag)
   const config = JSON.parse(readFileSync(join(APP_ROOT, 'data-sources.json'), 'utf8')) as {
     datasets?: { id: string }[]

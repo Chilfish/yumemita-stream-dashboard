@@ -15,6 +15,13 @@
       "when": 1793763384375,
       "tag": "0001_add_stream_events",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793802485348,
+      "tag": "0002_public_polaris",
+      "breakpoints": true
     }
   ]
 }

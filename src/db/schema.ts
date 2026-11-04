@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import {
   bigint,
   bigserial,
@@ -78,6 +79,43 @@ export const streams = pgTable(
     index('streams_dataset_started_idx').on(table.datasetId, table.startedAt.desc()),
     index('streams_dataset_date_idx').on(table.datasetId, table.date.desc()),
     index('streams_dataset_availability_idx').on(table.datasetId, table.availability),
+  ],
+)
+
+/**
+ * 直播日历里的未来场次。与 `streams` 平行：这里只存还没结束的安排，
+ * 开播结束后由每日任务照常写入 `streams`，日历读取时按 video_id 关联。
+ */
+export const scheduledStreams = pgTable(
+  'scheduled_streams',
+  {
+    datasetId: text('dataset_id')
+      .notNull()
+      .references(() => datasets.id, { onDelete: 'cascade' }),
+    /** `yt:<videoId>` 或 `manual:<id>`；有 videoId 时统一用前者。 */
+    eventKey: text('event_key').notNull(),
+    videoId: text('video_id'),
+    title: text('title').notNull(),
+    url: text('url'),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+    expectedMinutes: integer('expected_minutes'),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    availability: text('availability'),
+    source: text('source').notNull().default('manual'),
+    note: text('note'),
+    /** 最近一次在频道列表里看到的时间，用于清理自动行。 */
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    /** 最近一次频道检查报告 `is_live` 的时间，用于派生「直播中」。 */
+    lastLiveAt: timestamp('last_live_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  table => [
+    primaryKey({ columns: [table.datasetId, table.eventKey] }),
+    uniqueIndex('scheduled_streams_video_unique')
+      .on(table.datasetId, table.videoId)
+      .where(sql`${table.videoId} is not null`),
+    index('scheduled_streams_at_idx').on(table.scheduledAt),
   ],
 )
 
@@ -222,6 +260,7 @@ export const ingestReports = pgTable('ingest_reports', {
 
 export type DatasetRow = typeof datasets.$inferSelect
 export type StreamRow = typeof streams.$inferSelect
+export type ScheduledStreamRow = typeof scheduledStreams.$inferSelect
 export type StreamDetailsRow = typeof streamDetails.$inferSelect
 export type PaidEventRow = typeof paidEvents.$inferSelect
 export type CommentRow = typeof comments.$inferSelect

@@ -17,6 +17,8 @@ export interface ChannelEntry {
   title?: string | null
   durationSec?: number | null
   liveStatus?: string | null
+  /** 频道列表里能拿到的预定开播时刻（ISO）；拿不到时为 null。 */
+  scheduledAt?: string | null
 }
 
 export interface PlanStream {

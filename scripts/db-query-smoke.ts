@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { createDb } from '../src/db/connection.ts'
+import { getCalendarData } from '../src/db/queries/calendar.ts'
 import { getDatasets, getDataset } from '../src/db/queries/datasets.ts'
 import { getGroupCompareData } from '../src/db/queries/group-compare.ts'
 import { getGroupGallery, getGroupSummary } from '../src/db/queries/group.ts'
@@ -10,6 +11,7 @@ import {
   listStreams,
 } from '../src/db/queries/streams.ts'
 import { getTranscriptIndex, getTranscriptMeta } from '../src/db/queries/transcripts.ts'
+import { calendarWindow, currentJstMonth, monthRange } from '../src/lib/calendar.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 
 const failures: string[] = []
@@ -46,6 +48,30 @@ async function main(): Promise<void> {
 
   const latest = await getLatestStream(db, 'nonoka')
   check(latest?.videoId === list.streams[0]?.videoId, 'getLatestStream 与列表首行不一致')
+
+  const now = new Date()
+  const month = currentJstMonth(now)
+  const calendarWindowRange = calendarWindow(month, 1, 1)
+  const calendar = await getCalendarData(db, {
+    from: `${calendarWindowRange.start}-01`,
+    to: monthRange(calendarWindowRange.end).to,
+    window: calendarWindowRange,
+    datasetId: 'nonoka',
+    now,
+  })
+  check(calendar.members.length === datasets.length, 'calendar 成员数与 datasets 不一致')
+  check(
+    calendar.events.every(event => event.datasetId === 'nonoka'),
+    'calendar 混入了其他成员',
+  )
+  check(
+    calendar.events.every(event => event.at === null || Number.isFinite(Date.parse(event.at))),
+    'calendar 事件时间不是合法 ISO',
+  )
+  const calendarStates = calendar.events.reduce<Record<string, number>>((counts, event) => {
+    counts[event.state] = (counts[event.state] ?? 0) + 1
+    return counts
+  }, {})
 
   const middle = list.streams[Math.floor(list.streams.length / 2)]
   if (middle) {
@@ -111,6 +137,7 @@ async function main(): Promise<void> {
       latest: latest?.videoId ?? null,
       insights: insights ? insights.totals.streamCount : null,
       transcripts: transcriptEntries.length,
+      calendar: { events: calendar.events.length, states: calendarStates },
     },
     group: {
       members: summary.members.length,

@@ -27,6 +27,7 @@ import { createDb } from '../src/db/connection.ts'
 import { datasetInsights, streams } from '../src/db/schema.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 import { purgeCache } from './lib/purge.ts'
+import { syncScheduleFromChannel } from './lib/schedule-sync.ts'
 import { planDataset, type ChannelEntry, type PlanStream } from './lib/update-plan.ts'
 import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
 
@@ -228,17 +229,32 @@ async function readChannelEntries(source: DatasetSource, stateDir: string): Prom
       `https://www.youtube.com/channel/${source.channelId}/streams`,
     ], { PYTHONIOENCODING: 'utf-8' })
     const playlist = JSON.parse(raw) as {
-      entries?: { id?: unknown, title?: unknown, duration?: unknown, live_status?: unknown }[]
+      entries?: {
+        id?: unknown
+        title?: unknown
+        duration?: unknown
+        live_status?: unknown
+        release_timestamp?: unknown
+        timestamp?: unknown
+      }[]
     }
     const entries: ChannelEntry[] = []
     for (const entry of playlist.entries ?? []) {
       if (typeof entry?.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(entry.id))
         continue
+      const timestamp = typeof entry.release_timestamp === 'number'
+        ? entry.release_timestamp
+        : typeof entry.timestamp === 'number'
+          ? entry.timestamp
+          : null
       entries.push({
         id: entry.id,
         title: typeof entry.title === 'string' ? entry.title : null,
         durationSec: typeof entry.duration === 'number' ? entry.duration : null,
         liveStatus: typeof entry.live_status === 'string' ? entry.live_status : null,
+        scheduledAt: timestamp && timestamp > 0
+          ? new Date(timestamp * 1000).toISOString()
+          : null,
       })
     }
     if (entries.length > 0) {
@@ -345,6 +361,24 @@ async function main(): Promise<void> {
       console.error('[update] 拒绝把整个频道当成新场次。确认要首次建档时加 --bootstrap。')
       failures += 1
       continue
+    }
+
+    // 未来场只写日程表；开播结束后仍由下面的 ingest 写入 streams。
+    // 频道列表失败时用的是缓存，可能已经过期，不写日程。
+    if (!channelList.failed && !dryRun && !noPublish) {
+      try {
+        const schedule = await syncScheduleFromChannel(db, source.id, channel, {
+          knownIds: new Set(knownIds),
+        })
+        if (schedule.changed) {
+          purgeTags.add('schedule')
+          console.log(`[update] ${source.id} 日程：预定 ${schedule.upserted}，直播中 ${schedule.live}`)
+        }
+      }
+      catch (error) {
+        failures += 1
+        console.warn(`[update] ${source.id} 日程同步失败：${describe(error)}`)
+      }
     }
 
     const plan = planDataset({
