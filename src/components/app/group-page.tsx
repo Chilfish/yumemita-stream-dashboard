@@ -2,6 +2,7 @@ import { AppSidebar } from '@/components/dashboard/app-sidebar'
 import { GroupDataContext } from '@/components/dashboard/group-data-context'
 import { GroupHeader } from '@/components/dashboard/group-header'
 import { MobileTabBar } from '@/components/dashboard/mobile-tab-bar'
+import { GroupAboutPage } from '@/components/pages/group-about-page'
 import { GroupGalleryPage } from '@/components/pages/group-gallery-page'
 import { GroupHomePage } from '@/components/pages/group-home-page'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
@@ -11,7 +12,7 @@ import type { GroupData } from '@/lib/group'
 import type { DatasetIndexEntry } from '@/types/dataset'
 import { useShellTheme } from './shell-theme'
 
-export type GroupView = 'home' | 'gallery'
+export type GroupView = 'home' | 'gallery' | 'about'
 
 export interface GroupPageProps {
   datasets: DatasetIndexEntry[]
@@ -34,7 +35,6 @@ export function GroupPage(props: GroupPageProps) {
 function GroupShell({ datasets, data, section }: GroupPageProps) {
   const { theme, onToggleTheme } = useShellTheme()
   const navigate = useNavigate()
-  const streamCount = data.totals.streamCount
 
   return (
     <SidebarProvider>
@@ -58,13 +58,17 @@ function GroupShell({ datasets, data, section }: GroupPageProps) {
           chatTotal={data.totals.chatTotal}
           memberCount={datasets.length}
           section={section}
-          streamCount={streamCount}
+          streamCount={data.totals.streamCount}
         />
 
         <div className="mx-auto w-full max-w-[82.5rem] px-4 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
           <GroupDataContext.Provider value={data}>
             <div className="motion-view" key={section}>
-              {section === 'gallery' ? <GroupGalleryPage /> : <GroupHomePage />}
+              {section === 'about'
+                ? <GroupAboutPage />
+                : section === 'gallery'
+                  ? <GroupGalleryPage />
+                  : <GroupHomePage />}
             </div>
           </GroupDataContext.Provider>
         </div>

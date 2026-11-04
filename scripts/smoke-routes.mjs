@@ -14,6 +14,7 @@ const baseUrl = (
 const routes = [
   { path: '/', status: 200 },
   { path: '/gallery', status: 200 },
+  { path: '/about', status: 200 },
   { path: '/sitemap.xml', status: 200, type: 'xml' },
   { path: '/llms.txt', status: 200 },
   { path: '/robots.txt', status: 200 },
@@ -22,7 +23,7 @@ const routes = [
   { path: '/nonoka/trends', status: 200 },
   { path: '/nonoka/gallery', status: 200 },
   { path: '/nonoka/transcripts', status: 200 },
-  { path: '/nonoka/about', status: 200 },
+  { path: '/nonoka/about', status: 302 },
   { path: '/nonoka/compare', status: 200 },
   { path: '/nonoka/overview', status: 302 },
   { path: '/nonoka/table', status: 302 },

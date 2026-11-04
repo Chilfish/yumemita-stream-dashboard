@@ -27,6 +27,7 @@ import {
 import type { Theme } from "@/types/theme";
 import { formatInteger } from "@/lib/format";
 import {
+  groupAboutPath,
   groupGalleryPath,
   groupHomePath,
   homePath,
@@ -66,7 +67,14 @@ interface GroupNavItem {
 const GROUP_NAV_ITEMS: GroupNavItem[] = [
   { key: "home", label: "组首页", icon: LayoutDashboard, to: groupHomePath() },
   { key: "gallery", label: "全组相册", icon: Images, to: groupGalleryPath() },
+  { key: "about", label: "说明", icon: Info, to: groupAboutPath() },
 ];
+
+const GROUP_NAV_TARGETS: Record<GroupViewKey, string> = {
+  home: groupHomePath(),
+  gallery: groupGalleryPath(),
+  about: groupAboutPath(),
+};
 
 const ACTIVE_ITEM_CLASS =
   "relative before:absolute before:inset-y-2 before:-left-2 before:w-[2.5px] before:rounded-full before:bg-transparent data-[active=true]:before:bg-member data-[active=true]:bg-card! data-[active=true]:font-medium data-[active=true]:shadow-sm/5";
@@ -102,7 +110,7 @@ export function AppSidebar({
 
   function isGroupActive(key: GroupViewKey): boolean {
     if (dataset) return false;
-    return key === "home" ? pathname === groupHomePath() : pathname === groupGalleryPath();
+    return pathname === GROUP_NAV_TARGETS[key];
   }
 
   function handleMemberSelect(next: DatasetIndexEntry): void {

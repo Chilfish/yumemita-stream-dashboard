@@ -7,7 +7,6 @@ import { AppSidebar } from '@/components/dashboard/app-sidebar'
 import { CommandPalette } from '@/components/dashboard/command-palette'
 import { DatasetViewContext } from '@/components/dashboard/dataset-view-context'
 import { MobileTabBar } from '@/components/dashboard/mobile-tab-bar'
-import { AboutPage } from '@/components/pages/about-page'
 import { GalleryPage } from '@/components/pages/gallery-page'
 import { HomePage } from '@/components/pages/home-page'
 import { StreamsPage } from '@/components/pages/streams-page'
@@ -42,7 +41,6 @@ export type DatasetView =
   | 'gallery'
   | 'transcripts'
   | 'compare'
-  | 'about'
   | 'stream'
 
 export interface DatasetPageProps {
@@ -183,8 +181,6 @@ function DatasetBody(props: DatasetPageProps) {
           transcripts={props.transcripts ?? []}
         />
       )
-    case 'about':
-      return <AboutPage />
     case 'compare':
       return <CompareBody {...props} />
     case 'stream':

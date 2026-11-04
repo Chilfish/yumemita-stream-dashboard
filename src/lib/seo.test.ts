@@ -65,6 +65,14 @@ describe("组级页面", () => {
     expect(meta.jsonLd[0]?.["@type"]).toBe("BreadcrumbList");
   });
 
+  it("说明页是组级页面", () => {
+    const meta = build({ section: "about", pathname: "/about" });
+    expect(meta.title).toContain("说明");
+    expect(meta.description).toContain("Bushiroad");
+    expect(meta.canonical).toBe("https://example.com/dashboard/about");
+    expect(meta.robots).toBe("index,follow");
+  });
+
   it("未知路径归一到首页并且不收录", () => {
     const meta = build({ section: "home", pathname: "/", notFound: true });
     expect(meta.robots).toBe("noindex,follow");
@@ -88,7 +96,7 @@ describe("成员页面", () => {
   });
 
   it("各栏目标题互不相同", () => {
-    const sections = ["streams", "trends", "gallery", "transcripts", "about"] as const;
+    const sections = ["streams", "trends", "gallery", "transcripts"] as const;
     const titles = sections.map(section =>
       build({ dataset, pathname: `/nonoka/${section}`, section }).title,
     );
@@ -213,8 +221,10 @@ describe("sitemap", () => {
 
     const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
     expect(locs).toHaveLength(9);
+    expect(locs).toContain("https://example.com/dashboard/about");
     expect(locs).toContain("https://example.com/dashboard/nonoka/trends");
     expect(locs).toContain("https://example.com/dashboard/nonoka/stream/a&amp;b");
+    expect(locs.some(loc => loc.includes("/nonoka/about"))).toBe(false);
     expect(locs.every(loc => !loc.includes("?"))).toBe(true);
     expect(xml).toContain("<lastmod>2026-10-29</lastmod>");
   });

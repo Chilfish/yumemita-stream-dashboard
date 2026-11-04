@@ -24,7 +24,7 @@ describe("route paths", () => {
     expect(viewPath("nonoka", "trends")).toBe("/nonoka/trends");
     expect(viewPath("nonoka", "stream")).toBe("/nonoka/stream");
     expect(viewPath("nonoka", "compare")).toBe("/nonoka/compare");
-    expect(viewPath("nonoka", "about")).toBe("/nonoka/about");
+    expect(viewPath("nonoka", "about")).toBe("/about");
   });
 
   it("keeps the default subview out of the URL", () => {
@@ -38,6 +38,7 @@ describe("route paths", () => {
   it("encodes path segments", () => {
     expect(streamPath("nonoka", "a/b")).toBe("/nonoka/stream/a%2Fb");
   });
+
 });
 
 describe("sectionFromPathname", () => {
@@ -57,6 +58,10 @@ describe("sectionFromPathname", () => {
     expect(sectionFromPathname("/nonoka")).toBe("home");
     expect(sectionFromPathname("/nonoka/nope")).toBe("home");
     expect(sectionFromPathname("/")).toBe("home");
+  });
+
+  it("marks the group about page", () => {
+    expect(sectionFromPathname("/about")).toBe("about");
   });
 });
 

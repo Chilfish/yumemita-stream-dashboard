@@ -1,0 +1,46 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { GroupPage } from '@/components/app/group-page'
+import { db } from '@/db/client'
+import { getGroupPageData, type GroupPageData } from '@/db/queries/view-data'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import { memberOnlyCachePolicy } from '@/lib/member-access'
+
+export const prerender = false
+
+const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
+if (!keyed) Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group'] })
+
+let data: GroupPageData | null = null
+try {
+  data = await getGroupPageData(db, 'home', { includeMemberOnly: unlocked })
+}
+catch (error) {
+  console.error('[page] about failed', error)
+  Astro.response.status = 500
+}
+
+const meta = pageSeo(Astro, {
+  section: 'about',
+  memberCount: data?.datasets.length ?? null,
+  streamCount: data?.data.totals.streamCount ?? null,
+})
+---
+
+<Layout meta={meta}>
+  {data
+    ? (
+        <GroupPage
+          client:idle
+          data={data.data}
+          datasets={data.datasets}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          search={requestSearch(Astro)}
+          section="about"
+          view="about"
+        />
+      )
+    : <ErrorState code="500" />}
+</Layout>

@@ -25,7 +25,7 @@ export type StreamSubView = (typeof STREAM_SUBVIEWS)[number];
 export const DEFAULT_STREAM_SUBVIEW: StreamSubView = "overview";
 
 /** 组级（跨成员）页面：没有 `:datasetId` 前缀，直接挂在根路由下。 */
-export const GROUP_VIEWS = ["home", "gallery"] as const;
+export const GROUP_VIEWS = ["home", "gallery", "about"] as const;
 
 export type GroupViewKey = (typeof GROUP_VIEWS)[number];
 
@@ -51,8 +51,14 @@ export function groupGalleryPath(): string {
   return "/gallery";
 }
 
+export function groupAboutPath(): string {
+  return "/about";
+}
+
 export function groupSectionFromPathname(pathname: string): GroupViewKey {
-  return pathname === groupGalleryPath() ? "gallery" : "home";
+  if (pathname === groupGalleryPath()) return "gallery";
+  if (pathname === groupAboutPath()) return "about";
+  return "home";
 }
 
 export function homePath(datasetId: string): string {
@@ -88,8 +94,9 @@ export function comparePath(datasetId: string): string {
   return `${datasetPath(datasetId)}/compare`;
 }
 
-export function aboutPath(datasetId: string): string {
-  return `${datasetPath(datasetId)}/about`;
+/** 「说明」是组级页面，所有成员共用同一份说明。 */
+export function aboutPath(): string {
+  return groupAboutPath();
 }
 
 export function viewPath(datasetId: string, view: ViewKey): string {
@@ -109,11 +116,12 @@ export function viewPath(datasetId: string, view: ViewKey): string {
     case "compare":
       return comparePath(datasetId);
     case "about":
-      return aboutPath(datasetId);
+      return aboutPath();
   }
 }
 
 export function sectionFromPathname(pathname: string): ViewKey {
+  if (pathname === groupAboutPath()) return "about";
   const segment = pathname.split("/")[2];
   if (!segment) return "home";
   if (segment === "streams" || segment === "table") return "streams";

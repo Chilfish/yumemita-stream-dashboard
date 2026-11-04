@@ -42,6 +42,7 @@ export const GET: APIRoute = async (context) => {
     '',
     '## 约定',
     '',
+    '- 说明与免责：`/about`',
     '- 单场 Markdown：`/<datasetId>/stream/<videoId>.md`',
     '- HTML 单场页在 `<head>` 里用 `rel="alternate" type="text/markdown"` 指向 Markdown。',
     '- 时间一律 JST；金额按币种分列，不做汇率换算。',

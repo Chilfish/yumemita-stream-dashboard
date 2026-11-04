@@ -22,7 +22,6 @@ export const SITEMAP_SECTIONS = [
   "trends",
   "gallery",
   "transcripts",
-  "about",
 ] as const;
 
 export type SeoDataset = {
@@ -310,6 +309,25 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
   }
 
   if (!ctx.dataset) {
+    if (ctx.section === "about") {
+      return {
+        title: `说明与免责 | ${SITE_NAME}`,
+        description: `数据来源、统计口径、会员限定公开范围、版权与非官方声明。本站与 ${GROUP_NAME}、Bushiroad 及所属事务所无隶属或合作关系。`,
+        canonical,
+        image,
+        imageAlt,
+        robots,
+        ogType: "website",
+        publishedTime: null,
+        jsonLd: [
+          breadcrumbList(ctx.origin, ctx.basePath, [
+            { name: GROUP_NAME, path: "/" },
+            { name: "说明", path: "/about" },
+          ]),
+        ],
+      };
+    }
+
     if (ctx.section === "gallery") {
       return {
         title: `全组封面墙 | ${SITE_NAME}`,
@@ -484,7 +502,7 @@ export function buildSitemap(
     .sort()
     .at(-1);
 
-  for (const path of ["/", "/gallery"]) {
+  for (const path of ["/", "/gallery", "/about"]) {
     entries.push({ loc: absoluteUrl(origin, basePath, path), lastmod: isoDateKey(latestUpdate) });
   }
 
