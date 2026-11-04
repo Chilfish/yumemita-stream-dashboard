@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTranscript, useTranscriptAvailability } from "@/hooks/use-transcript";
+import { useTranscript } from "@/hooks/use-transcript";
 import { transcriptsPath } from "@/lib/routes";
 import {
   type TranscriptFile,
@@ -312,22 +312,10 @@ export interface TranscriptViewProps {
   datasetId: string;
   videoId: string;
   className?: string;
-  hasTranscript?: boolean;
 }
 
-export function TranscriptView({
-  datasetId,
-  videoId,
-  className,
-  hasTranscript: hasTranscriptProp,
-}: TranscriptViewProps) {
+export function TranscriptView({ datasetId, videoId, className }: TranscriptViewProps) {
   const { file, status, error, retry } = useTranscript(datasetId, videoId);
-  // 远端对象不存在时 R2 的 404 可能不带 CORS 头，fetch 会变成网络错误。
-  // 页面已从数据库带出可用性时不再发客户端索引请求。
-  const availability = useTranscriptAvailability(datasetId, hasTranscriptProp == null);
-  const missing = hasTranscriptProp === false
-    || (availability.status === "ready" && !availability.hasTranscript(videoId));
-
 
   const toc = file?.toc ?? EMPTY_TOC;
   const idsByLine = useMemo(
@@ -342,9 +330,6 @@ export function TranscriptView({
 
   if (status === "idle" || status === "loading") return <TranscriptSkeleton />;
   if (status === "empty") return <TranscriptEmpty datasetId={datasetId} videoId={videoId} />;
-  if (status === "error" && missing) {
-    return <TranscriptEmpty datasetId={datasetId} videoId={videoId} />;
-  }
   if (status === "error" || !file) {
     return (
       <TranscriptError datasetId={datasetId} error={error} onRetry={retry} videoId={videoId} />

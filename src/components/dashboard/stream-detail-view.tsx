@@ -13,7 +13,6 @@ import { TranscriptView } from "@/components/dashboard/transcript-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import { useTranscriptAvailability } from "@/hooks/use-transcript";
 import type { StreamRow } from "@/lib/aggregate";
 import {
   formatDuration,
@@ -41,14 +40,13 @@ interface StreamDetailViewProps {
   view: StreamSubView;
   onViewChange: (view: StreamSubView) => void;
   onSelect: (videoId: string) => void;
-  hasTranscript?: boolean;
+  hasTranscript: boolean;
 }
 
 function renderSubview(
   view: StreamSubView,
   row: StreamRow,
   datasetId: string,
-  hasTranscript: boolean,
 ): ReactNode {
   switch (view) {
     case "timeline":
@@ -61,11 +59,7 @@ function renderSubview(
       return <StreamCommentsPanel row={row} />;
     case "transcript":
       return (
-        <TranscriptView
-          datasetId={datasetId}
-          hasTranscript={hasTranscript}
-          videoId={row.summary.videoId}
-        />
+        <TranscriptView datasetId={datasetId} videoId={row.summary.videoId} />
       );
     case "overview":
     default:
@@ -88,10 +82,7 @@ export function StreamDetailView({
   const superchatCount = pack.chat.paid.superchats.length;
 
   // 逐字稿是可选内容：没有稿的场次不显示这个分段，避免出现永远为空的标签。
-  // 页面已从数据库带出可用性时不再发客户端索引请求。
-  const availability = useTranscriptAvailability(datasetId, hasTranscriptProp == null);
-  const showTranscript = hasTranscriptProp ?? availability.hasTranscript(summary.videoId);
-  const subviews = STREAM_SUBVIEWS.filter(subview => subview !== "transcript" || showTranscript);
+  const subviews = STREAM_SUBVIEWS.filter(subview => subview !== "transcript" || hasTranscriptProp);
 
   const currentIndex = rows.findIndex(item => item.videoId === summary.videoId);
   const newer = currentIndex > 0 ? rows[currentIndex - 1] : undefined;
@@ -224,7 +215,7 @@ export function StreamDetailView({
       <Panel className="p-4 md:p-5">
         {/* 子视图互换：只做 170ms 的淡入位移，高度跳变由淡入盖住。 */}
         <div className="motion-swap" key={view}>
-          {renderSubview(view, row, datasetId, showTranscript)}
+          {renderSubview(view, row, datasetId)}
         </div>
       </Panel>
     </div>

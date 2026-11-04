@@ -210,7 +210,7 @@ function StreamBody({ dataset, rows, stream, pack, hasTranscript }: DatasetPageP
   return (
     <StreamDetailView
       datasetId={dataset.id}
-      hasTranscript={hasTranscript}
+      hasTranscript={hasTranscript ?? false}
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
       onViewChange={(next) => {
         const params = new URLSearchParams(searchParams)

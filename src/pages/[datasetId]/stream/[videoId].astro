@@ -26,7 +26,7 @@ const [data, transcript] = await Promise.all([
 
 const summary = data?.rows.find(row => row.videoId === videoId) ?? null
 const pack = summary ? await getStreamPack(db, datasetId, videoId).catch(() => null) : null
-const hasTranscript = transcript ? true : transcript === null ? false : undefined
+const hasTranscript = Boolean(transcript)
 
 if (!data || !summary) Astro.response.status = 404
 else Astro.cache.set({ maxAge: 300, swr: 600, tags: [`stream-${videoId}`, `dataset-${datasetId}`] })

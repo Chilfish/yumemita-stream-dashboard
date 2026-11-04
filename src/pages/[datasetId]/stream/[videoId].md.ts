@@ -105,7 +105,9 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
     full,
   })
 
-  context.cache.set({ maxAge: 300, swr: 600, tags: [`stream-${videoId}`, `dataset-${datasetId}`] })
+  const tags = [`stream-${videoId}`, `dataset-${datasetId}`]
+  if (transcriptMeta) tags.push('transcripts')
+  context.cache.set({ maxAge: 300, swr: 600, tags })
 
   return new Response(markdown, {
     status: 200,

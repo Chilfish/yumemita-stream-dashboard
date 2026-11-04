@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { emojiUrl } from "@/lib/data";
+import { emojiUrl } from "@/lib/media";
 import { isCustomEmojiId } from "@/lib/emoji";
 
 interface EmojiImageProps {

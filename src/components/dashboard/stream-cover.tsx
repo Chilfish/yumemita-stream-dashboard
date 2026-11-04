@@ -1,6 +1,6 @@
 import { Play } from "lucide-react";
 import { useState } from "react";
-import { thumbnailSrcSet, thumbnailUrl } from "@/lib/data";
+import { thumbnailSrcSet, thumbnailUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
 
 export interface StreamCoverProps {
