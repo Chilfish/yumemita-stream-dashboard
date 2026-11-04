@@ -2,7 +2,7 @@ import type { AstroGlobal } from 'astro'
 import type { SeoContext } from '@/lib/seo'
 import { buildSeo, type SeoMeta } from '@/lib/seo'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
-import { thumbnailUrl } from '@/lib/media'
+import { absoluteUrl, thumbnailUrl } from '@/lib/media'
 
 /** 请求级 SEO 上下文：origin / base / pathname 都从 Astro 拿。 */
 export function pageSeo(
@@ -12,7 +12,7 @@ export function pageSeo(
   const origin = astro.site?.origin ?? DEFAULT_SITE_URL
   const basePath = import.meta.env.BASE_URL.replace(/\/+$/, '')
   const image = input.imageStream
-    ? `${origin}${thumbnailUrl(input.imageStream.datasetId, input.imageStream.videoId)}`
+    ? absoluteUrl(origin, thumbnailUrl(input.imageStream.datasetId, input.imageStream.videoId))
     : input.image ?? null
 
   return buildSeo({

@@ -29,6 +29,7 @@ export function emojiUrl(datasetId: string, emojiId: string): string | null {
 }
 
 export function absoluteUrl(origin: string, path: string): string {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path)) return path
   return `${origin.replace(/\/+$/, '')}${path.startsWith('/') ? path : `/${path}`}`
 }
 
