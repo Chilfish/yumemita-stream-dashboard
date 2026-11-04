@@ -2,6 +2,7 @@
 /**
  * 手动 / 脚本调用 Worker 的内部缓存失效端点。
  *
+ *   bun scripts/purge-cache.ts --all
  *   bun scripts/purge-cache.ts --tags group,sitemap,llms
  *   bun scripts/purge-cache.ts --dataset nonoka
  *   bun scripts/purge-cache.ts --dataset nonoka --video W0bKqP-Eyj4
@@ -9,9 +10,14 @@
  *
  * 需要 SITE_URL（或 --url）与 PURGE_TOKEN；令牌只存在 Worker secret 与本地环境里。
  */
+import { readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { loadEnvFiles } from './lib/env.ts'
 import { purgeCache } from './lib/purge.ts'
+
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const { values } = parseArgs({
   options: {
@@ -21,6 +27,7 @@ const { values } = parseArgs({
     dataset: { type: 'string', multiple: true },
     video: { type: 'string', multiple: true },
     group: { type: 'boolean' },
+    all: { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
   allowPositionals: false,
@@ -33,6 +40,7 @@ const USAGE = `用法：bun scripts/purge-cache.ts [选项]
   --dataset <id>     追加 dataset-<id>、group、sitemap、llms
   --video <id>       追加 stream-<id>
   --group            追加 group、gallery、sitemap、llms
+  --all              刷新所有页面（group / gallery / datasets / streams / transcripts / sitemap / llms）
   --url <url>        覆盖 SITE_URL
   --token <token>    覆盖 PURGE_TOKEN
   -h, --help         显示本帮助`
@@ -64,9 +72,18 @@ if (values.group) {
   tags.add('sitemap')
   tags.add('llms')
 }
+if (values.all) {
+  for (const tag of ['group', 'gallery', 'datasets', 'streams', 'transcripts', 'sitemap', 'llms', 'compare'])
+    tags.add(tag)
+  const config = JSON.parse(readFileSync(join(APP_ROOT, 'data-sources.json'), 'utf8')) as {
+    datasets?: { id: string }[]
+  }
+  for (const source of config.datasets ?? [])
+    tags.add(`dataset-${source.id}`)
+}
 
 if (tags.size === 0) {
-  console.error('[purge] 没有 tag；用 --tags / --dataset / --video 指定')
+  console.error('[purge] 没有 tag；用 --all / --tags / --dataset / --video 指定')
   process.exit(1)
 }
 
