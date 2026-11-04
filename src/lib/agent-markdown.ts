@@ -1,5 +1,6 @@
 import type { StreamDatapack } from '@/types/datapack'
 import type { StreamSummary } from '@/types/dataset'
+import { absoluteUrl, thumbnailUrl } from '@/lib/media'
 import { SITE_NAME } from '@/lib/seo'
 
 export interface AgentMarkdownInput {
@@ -62,7 +63,9 @@ export function renderStreamMarkdown(input: AgentMarkdownInput): string {
   } = input
   const pageUrl = `${origin}/${datasetId}/stream/${summary.videoId}`
   const markdownUrl = `${pageUrl}.md`
-  const image = summary.thumbnail ? `${origin}/${datasetId}/${summary.thumbnail}` : null
+  const image = summary.thumbnail
+    ? absoluteUrl(origin, thumbnailUrl(datasetId, summary.videoId))
+    : null
   const description = `${datasetLabel} ${summary.date} 的直播数据总览：时长 ${duration(summary.durationSec)}，峰值同接 ${num(summary.maxConcurrent)}。`
 
   const frontmatter = [

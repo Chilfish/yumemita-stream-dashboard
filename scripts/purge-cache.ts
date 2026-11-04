@@ -52,6 +52,7 @@ for (const value of values.tags ?? []) {
 for (const datasetId of values.dataset ?? []) {
   tags.add(`dataset-${datasetId}`)
   tags.add('group')
+  tags.add('gallery')
   tags.add('sitemap')
   tags.add('llms')
 }

@@ -486,6 +486,7 @@ async function main(): Promise<void> {
     if (ingestOk) {
       purgeTags.add(`dataset-${source.id}`)
       purgeTags.add('group')
+      purgeTags.add('gallery')
       purgeTags.add('sitemap')
       purgeTags.add('llms')
       for (const id of unique([...plan.newIds, ...plan.forceIds]))

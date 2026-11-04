@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://ymmt.chilfish.top",
+          "https://ymmt-cf.chilfish.top",
+          "https://*.chilfish.top",
+          "http://localhost:4321",
+          "http://127.0.0.1:4321"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": ["*"]
+      },
+      "exposeHeaders": ["Content-Length", "Content-Type", "ETag", "Cache-Control"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

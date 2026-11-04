@@ -20,7 +20,7 @@ if (!process.env.PUBLIC_R2_BASE && !fileEnv.PUBLIC_R2_BASE) {
 
 // 开发预览：workerd 里没有真实文件系统，改由 Vite 的 Node 中间件读 temp/youtube-live。
 const liveChatRoot = fileURLToPath(new URL('./temp/youtube-live', import.meta.url))
-const liveChatEmojiBase = (process.env.PUBLIC_R2_BASE || fileEnv.PUBLIC_R2_BASE || 'https://s3.chilfish.top/stream-dashboard').replace(/\/+$/, '')
+const liveChatEmojiBase = (process.env.PUBLIC_R2_BASE || fileEnv.PUBLIC_R2_BASE || 'https://ymmt-s3.chilfish.top').replace(/\/+$/, '')
 
 function liveChatPreviewPlugin() {
   return {

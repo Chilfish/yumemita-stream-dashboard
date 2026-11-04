@@ -42,7 +42,6 @@ jobs:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      R2_PREFIX: ${{ secrets.R2_PREFIX }}
       # 有订阅就走 mihomo 代理；没配就直连（runner 的云厂商 IP 更容易被 bot 检查）。
       MIHOMO_VERSION: v1.19.30
       MIHOMO_SUB_URL: ${{ secrets.MIHOMO_SUB_URL }}

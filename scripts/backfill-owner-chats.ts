@@ -17,7 +17,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat, type ChatRecord } from './lib/live-chat.ts'
-import { createObjectStore, datapackKey, readCredentials } from './lib/object-storage.ts'
+import { archiveKey, createObjectStore, datapackKey, readCredentials } from './lib/object-storage.ts'
 import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
 import type { OwnerChat, StreamDatapack } from '../src/types/datapack.ts'
 
@@ -258,7 +258,8 @@ if (values['dry-run'])
 async function loadPack(target: Target): Promise<{ pack: StreamDatapack, from: 'remote' | 'local' } | null> {
   if (store) {
     try {
-      const text = await store.get(datapackKey(target.source.id, target.videoId))
+      const text = await store.get(archiveKey(target.source.id, target.videoId))
+        ?? await store.get(datapackKey(target.source.id, target.videoId))
       if (text)
         return { pack: JSON.parse(text) as StreamDatapack, from: 'remote' }
     }
@@ -360,7 +361,7 @@ async function processTarget(target: Target): Promise<void> {
     pack.chat.ownerMessages = chats.length
 
     if (store && !values['no-upload'])
-      await store.put(datapackKey(target.source.id, target.videoId), JSON.stringify(pack))
+      await store.put(archiveKey(target.source.id, target.videoId), JSON.stringify(pack))
 
     const localDir = resolve(APP_ROOT, target.source.datapackDir)
     mkdirSync(localDir, { recursive: true })
