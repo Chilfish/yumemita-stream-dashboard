@@ -1,6 +1,6 @@
 # Astro + Cloudflare 迁移方案
 
-> 状态：实施中。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），全量 1,897 场已入库、`dataset_insights` 已重算、`db:verify` 0 problems；逐字稿索引与可用性已改为数据库查询 + SSR。剩余：Cloudflare 线上部署与缓存实测。调研日期 2026-11-03（JST）。
+> 状态：代码实施到阶段 5（2026-11-04）。阶段 0–4 已完成（脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge），全量 1,897 场已入库、`db:verify` 0 problems。阶段 5 的清理已完成：每日任务改为数据库差集 + ingest + 资产 + purge；客户端媒体统一走 `PUBLIC_R2_BASE`；逐字稿正文改为同源 `/api/transcripts/...` 读取；`public/data/`、旧数据层与 R2 JSON 索引已删除；新增部署工作流。剩余：Cloudflare 线上部署、`Cf-Cache-Status` / purge / R2 正文实测与回滚演练。调研日期 2026-11-03（JST）。
 > 目标：把当前的 React Router 8 + Vite 静态站迁到 Astro 7 + Cloudflare Workers，数据从「R2 上的 JSON + 浏览器运行时拉取」改为「PostgreSQL 查询 + R2 存对象」，单场页改为请求期 SSR，并为 Agent 提供 `{videoId}.md` 的 Markdown 视图。
 > 本文只描述已经验证过 API 的方案，不把未验证的平台行为写成事实。
 
@@ -109,7 +109,7 @@ SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Mar
 ### R2 访问方式
 
 - **Worker 运行时**：通过 `wrangler.jsonc` 的 `r2_buckets` 绑定读取逐字稿与原始 pack，避免运行时 S3 凭据和外网往返。
-- **浏览器**：封面 / 表情走 R2 公开自定义域名；逐字稿正文不直接暴露给浏览器，由 SSR 页面渲染。
+- **浏览器**：封面 / 表情走 R2 公开自定义域名；逐字稿正文不直接暴露，由同源 `/api/transcripts/:datasetId/:videoId` 从 R2 binding 读取后再返回。
 - **发布脚本**：继续用现有 S3 兼容客户端（Bun `S3Client` / `aws4fetch`）写对象。
 - 构建期不需要 R2 凭据：页面都在请求期查库；只有 `/about` 等静态页不依赖 R2。
 
@@ -129,7 +129,7 @@ SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Mar
         │     paid_events / comments / authors
         │     stream_words / transcripts / insights
         │
-        └─ publish-assets.ts（由 publish:data 拆分）
+        └─ publish-data --assets-only（只发资产与 archive）
              逐字稿正文 / 封面 / 表情 / 原始 pack
                  │
                  ▼
@@ -202,7 +202,7 @@ SSR 页面要控制 CPU：数据库等待不计 CPU，但大表 SSR、复杂 Mar
 - **图表**：`client:visible`。D3 只算比例尺和 path，React 输出 SVG；宽度为 0 时渲染空，服务端安全。
 - **表格**：首屏行由 SSR 输出；工具条（搜索、筛选、列选择、CSV）用 `client:load`。500 行以内的成员数据可以直接作为 props 传入，筛选在客户端完成；更大的数据集再走 `/api/streams` 分页。
 - **命令面板**：`client:idle` 或首次 `⌘K` 时动态加载，不进入首屏。
-- **逐字稿**：正文用服务端 Markdown → HTML 输出；目录、时间码跳转可以在客户端增强，但不要用 `client:only` 渲染正文。
+- **逐字稿**：正文由同源 API 从 R2 binding 读取，`react-markdown` 渲染；目录、时间码跳转在客户端增强，不要 `client:only` 渲染整页。
 - **对比页**：选择器与图表 `client:load`，选中项写在 query string 里。
 
 ### 数据流
@@ -500,7 +500,7 @@ bun scripts/ingest-db.ts --batch-size 50
 - **跳过未变化**：用 `content_hash`（pack 内容的 sha256）或 `source_generated_at` 判断；未变化且 `--force` 未设置时跳过写入，只更新报告。
 - **失败隔离**：单场失败记录到 `ingest_reports.datasets[].error`，继续处理同成员其他场次；一个成员全部失败不影响其他成员。
 - **不删除旧数据**：只有 upsert 和按 stream 替换子表；下架场次用显式 `--delete` 或 `archived_at`，不要用「先 truncate 再灌」。
-- **保留 R2 发布路径**：迁移期 `publish-assets.ts` 继续上传封面/表情/逐字稿/archive，数据库出问题时可以回到 JSON 读取。
+- **保留 R2 发布路径**：`publish-data --assets-only` 上传封面/表情/archive，`publish-transcripts` 上传正文；数据库出问题时仍可用本地 pack 重建。
 
 ### 对账
 
@@ -520,17 +520,20 @@ bun scripts/ingest-db.ts --batch-size 50
 
 不写 R2 manifest 之后，几个依赖它的脚本要同步改：
 
-| 脚本 | 现状 | 改法 |
-| --- | --- | --- |
-| `scripts/daily-update.ts` | `loadManifest()` 读 R2 / 本地 `manifest.json` 做差集 | 改成 `select video_id from streams where dataset_id = $1`；`localAhead` 比 `dataset_insights.generated_at` 或最近 `ingest_reports`；发布步骤改为 `ingest-db` + `publish-assets` + purge |
-| `scripts/fetch-streams.ts` | `--restore` 从 R2 manifest / datapack 恢复本地 pack | 从 R2 `archive/<datasetId>/<videoId>.datapack.json` 恢复；没有 archive 时只抓本地缺失 |
-| `scripts/publish-transcripts.ts` | 写 R2 正文 + `transcripts/index.json`，用本地 manifest 校验 videoId | 写 R2 正文 + upsert `transcripts` 元数据；videoId 校验查库；`transcripts/index.json` 可保留为兼容产物，但页面不再读取 |
-| `scripts/validate-data.mjs` | 校验 `public/data` 的 index / manifest / insights / group-* | 保留 pack 级校验；整站校验换成 `verify-db.ts` |
-| `scripts/verify-data.ts` | 对比本地 manifest / insights / authors | 改为查询数据库后重算对比 |
-| `scripts/generate-seo.ts` | 构建期写 1,900 份 HTML + sitemap | 删除；改由 SSR + `sitemap.xml` endpoint |
-| `scripts/sync-data.mjs` | 拉 R2 数据到 `public/data` | 删除；本地开发用 fixture 适配器或 Neon dev branch |
-| `scripts/add-datapack.mjs` | 写本地 pack 并更新本地 manifest | 继续写 pack；写完后跑 `ingest-db --dataset` |
-| `scripts/smoke-routes.mjs` | 静态站路由冒烟 | 改为对 Worker 预览 / 线上域名发请求，补 `.md`、404、缓存头检查 |
+| 脚本 | 改造结果 |
+| --- | --- |
+| `scripts/daily-update.ts` | 用 `select videoId, startedAt, vstats, chatTotal from streams` 做差集；本地 pack 比 `dataset_insights.generated_at` 新时补 ingest；顺序为抓取 → 逐字稿 → `ingest-db` → `publish-data --assets-only` → purge |
+| `scripts/fetch-streams.ts` | `--restore` 从 `archive/<datasetId>/<videoId>.datapack.json` 恢复（兼容旧公开路径）；`--publish` 改为 `ingest-db` + `publish-data --assets-only` + purge |
+| `scripts/publish-data.ts` | 新增 `--assets-only`：只传 thumbs / emoji / archive，不再写 manifest / insights / group-* / index；本地仍派生 manifest 供调试 |
+| `scripts/publish-transcripts.ts` | 只写 R2 正文；元数据由 `ingest-db` 写 `transcripts` 表；不再依赖 `transcripts/index.json` |
+| `scripts/validate-data.mjs` | 保留 pack 级校验；整站对账换成 `db:verify` |
+| `scripts/verify-data.ts` | 保留历史对账；主链路以 `db:verify` / `db:query` 为准 |
+| `scripts/generate-seo.ts` | 已删除；由 SSR + `sitemap.xml` endpoint 取代 |
+| `scripts/sync-data.mjs` | 已删除；`public/data/` 一并移除 |
+| `scripts/add-datapack.mjs` | 继续写本地 pack；写完后跑 `db:ingest --dataset` |
+| `scripts/smoke-routes.mjs` | 对 Worker 预览 / 线上域名发请求，覆盖 `.md`、302、404 |
+| `scripts/purge-cache.ts` | 新增：按 tag 调用内部 purge 端点 |
+| `scripts/db-latest-video.ts` | 新增：输出数据库最新一场，供工作流 YouTube 探针 |
 
 `fetch-thumbnails.ts`、`fetch-emoji.ts`、`stream-datapack.ts`、`missing-danmaku.ts`、`enrich-chat.ts` 仍然只操作本地文件，不需要改；跑完后由 ingest 投影。
 
@@ -999,7 +1002,7 @@ Content-Type: application/json
 GitHub Actions（现有 data.yml）
   1. daily-update.ts：频道差集 → 抓新场次 / 重抓 → 本地 pack
   2. ingest-db.ts：事务 upsert → dataset_insights → ingest_reports
-  3. publish-assets.ts：逐字稿正文、封面/变体、表情、archive 写 R2
+  3. publish-data --assets-only + publish-transcripts：封面/变体、表情、archive、逐字稿正文写 R2
   4. POST /api/internal/cache/purge：按 tags 失效
   5. 可选 IndexNow：提交新 URL
   6. 失败开 issue；成功写报告
@@ -1018,12 +1021,13 @@ CI
   bun install --frozen-lockfile
   drizzle-kit generate / migrate（或部署前手动跑）
   bun run build
-  wrangler deploy
+  wrangler deploy --config dist/server/wrangler.json
   冒烟：/、/nonoka、/nonoka/stream/<id>、/nonoka/stream/<id>.md、/sitemap.xml
 ```
 
 - `astro build` 只预渲染 `/about`、404 等稳定页；构建不需要数据库或 R2。
-- `wrangler deploy` 同时上传 Worker 与静态资源；`_headers` 只作用于静态资源，Worker 渲染的响应由 middleware 设置安全头。
+- 必须用 adapter 生成的 `dist/server/wrangler.json` 部署：`main` 是 `entry.mjs`，`assets` 是 `../client`。根配置的 `assets: ./dist` 只作源配置；直接 `wrangler deploy` 会把 `server/` 与 `.dev.vars` 当静态资源上传。
+- `_headers` 只作用于静态资源，Worker 渲染的响应由 middleware 设置安全头。
 - migration 与代码部署的顺序：先加列/建表（向后兼容），再部署使用新列的代码；删除列放到下一次。
 
 ### 新增成员
@@ -1172,20 +1176,26 @@ CI
 
 ### 阶段 5：切换与清理
 
-1. 双写/双读一段时间：数据库与 R2 JSON 同时可用，随机抽样对比。
-2. 把预览域名切到 Worker；确认 canonical、OG、sitemap、404、缓存。
-3. 移除 Vercel 项目、`vercel.json`、`public/data/`、`sync-data.mjs`、`generate-seo.ts`。
-4. 更新 `README.md`、`docs/planning/architecture.md`、`docs/data/data-model.md`、`docs/engineering/deployment.md`、`docs/data/adding-data.md`、`docs/README.md`。
-5. 清理 Actions：保留抓取与 ingest；删除前端部署 Hook；新增 purge 调用。
-6. 记录一次回滚演练。
+1. [x] 双写/双读：`db:verify` 与 `db:query` 对账数据库与本地 pack；R2 JSON 索引已停止写入。
+2. [ ] 把预览域名切到 Worker；确认 canonical、OG、sitemap、404、缓存（需线上部署）。
+3. [x] 移除 Vercel 项目、`vercel.json`、`public/data/`、`sync-data.mjs`、`generate-seo.ts`。
+4. [x] 更新 `README.md`、`docs/planning/architecture.md`、`docs/data/data-model.md`、`docs/engineering/deployment.md`、`docs/data/adding-data.md`、`docs/README.md`。
+5. [x] 清理 Actions：`data.yml` 改为数据库差集 + ingest + 资产 + purge；新增 `deploy.yml`；没有前端部署 Hook。
+6. [ ] 记录一次回滚演练。
 
 验收：
 
-- 线上 sitemap 条数、canonical、OG 与新数据一致。
-- 新场次从抓取到页面可见不需要前端部署。
-- 停掉 R2 JSON 索引后页面仍正常（数据库是唯一读源）。
-- 停掉数据库时页面显示错误态，不会白屏。
-- 回滚：`wrangler rollback` 能恢复上一版；数据库能从 Neon 分支恢复。
+- [ ] 线上 sitemap 条数、canonical、OG 与新数据一致。
+- [ ] 新场次从抓取到页面可见不需要前端部署（本地数据库路径已验证）。
+- [x] 停掉 R2 JSON 索引后页面仍正常（页面只读数据库；本地已无 `public/data/`）。
+- [x] 停掉数据库时页面显示错误态，不会白屏（preview 下 transcript/DB 错误路径抽查）。
+- [ ] 回滚：`wrangler rollback` 能恢复上一版；数据库能从 Neon 分支恢复。
+
+已知偏差：
+
+- 逐字稿正文没有在 HTML SSR 里内联，而是走同源 `/api/transcripts/...` 按需读取；正文仍不经过公开 R2 域名。
+- `publish-data.ts` 用 `--assets-only` 代替单独的 `publish-assets.ts`；本地仍派生 manifest 供调试与恢复。
+- `data.yml` 的 YouTube 探针改为 `db-latest-video.ts` 查数据库，不再读 manifest。
 
 ## 14. 验收清单
 
@@ -1198,44 +1208,45 @@ CI
 - [x] `paid_events` / `comments` 条数与 pack 一致。
 - [ ] `transcripts.r2_key` 在 R2 上存在（线上 R2 实测待做）。
 - [x] 全量 ingest 可重跑，结果幂等（重跑 `processed 0 / skipped N`）。
-- [ ] 单场失败不影响同成员其他场次；报告可定位。
+- [x] 单场失败记录到 `ingest_reports`，同成员其他场次继续（重跑补齐过 partial）。
 
 ### 页面
 
-- [ ] `/` 正常，单个成员失败不阻塞其他成员。
-- [ ] 成员页、场次列表、趋势、相册、逐字稿索引、对比页返回 200。
-- [ ] 未知 dataset / videoId 返回 404。
-- [ ] 单场深链刷新、前进后退、分段 URL 可分享。
-- [ ] 首屏 HTML 含标题、指标、日期与简介。
-- [ ] 图表在服务端不执行 DOM 逻辑；水合后交互正常。
-- [ ] 主题无闪烁；移动端无横向溢出。
-- [ ] `rg "react-router" src` 为空。
+- [x] `/` 正常（`test:smoke` 200）。
+- [ ] 单个成员查询失败不阻塞其他成员（组汇总目前是单条查询，未单独验证）。
+- [x] 成员页、场次列表、趋势、相册、逐字稿索引、对比页返回 200（`test:smoke`）。
+- [x] 未知 dataset / videoId 返回 404（`test:smoke`）。
+- [x] 单场深链刷新、前进后退、分段 URL 可分享（开发日志 + 手工走查）。
+- [x] 首屏 HTML 含标题、指标、日期与简介（生产构建抽查）。
+- [x] 图表在服务端不执行 DOM 逻辑；水合后交互正常（agent-browser）。
+- [x] 主题无闪烁；移动端无横向溢出（390 / 320px 走查）。
+- [x] `rg "react-router" src` 为空（2026-11-04 复核）。
 
 ### SEO / Agent
 
-- [ ] 单场页 HTML 有 title / description / canonical / OG / JSON-LD。
-- [ ] `/sitemap.xml` 条数为 `2 + 6 × 成员数 + 单场数`。
-- [ ] `.md` 不在 sitemap，带 `X-Robots-Tag: noindex`。
-- [ ] `curl /nonoka/stream/<id>.md` 返回 `text/markdown`，frontmatter 完整。
-- [ ] 有稿场次的 `.md` 包含原始逐字稿；无稿场次有说明。
-- [ ] `llms.txt` 可访问，包含成员与 `.md` 链接。
-- [ ] HTML 单场页有 `rel="alternate" type="text/markdown"`。
+- [x] 单场页 HTML 有 title / description / canonical / OG / JSON-LD（本地 preview 抽查）。
+- [x] `/sitemap.xml` 条数为 `2 + 6 × 成员数 + 单场数`（1929 条）。
+- [x] `.md` 不在 sitemap，带 `X-Robots-Tag: noindex`。
+- [x] `curl /nonoka/stream/<id>.md` 返回 `text/markdown`，frontmatter 完整。
+- [x] 有稿场次的 `.md` 包含原始逐字稿；无稿场次有说明。
+- [x] `llms.txt` 可访问，包含成员与 `.md` 链接。
+- [x] HTML 单场页有 `rel="alternate" type="text/markdown"`。
 
 ### 缓存 / 发布
 
 - [ ] 第二次请求 `Cf-Cache-Status: HIT`（或 `REVALIDATED`）。
 - [ ] ingest 后 purge 生效，页面与 `.md` 返回新数据。
-- [ ] purge 端点拒绝无 token 请求。
+- [ ] purge 端点拒绝无 token 请求（代码路径已实现；本地未配置 token 时返回 503）。
 - [ ] 部署后缓存行为符合 `cross_version_cache` 配置。
 - [ ] `stale-if-error` 行为符合预期。
-- [ ] 新场次从抓取到页面可见不触发前端构建。
+- [ ] 新场次从抓取到页面可见不触发前端构建（数据库路径已验证，线上实测待做）。
 - [ ] 代码部署不影响已有数据；数据库 migration 向后兼容。
 
 ### 运维
 
-- [ ] `DATABASE_URL` 只在服务端读取。
-- [ ] R2 公开域名只暴露封面/表情；逐字稿通过 binding。
-- [ ] 定时任务失败会开 issue。
+- [x] `DATABASE_URL` 只在服务端读取（`wrangler deploy --dry-run` 只上传 `dist/client`）。
+- [x] R2 公开域名只暴露封面/表情；逐字稿通过 `/api/transcripts/...` + binding。
+- [x] 定时任务失败会开 issue。
 - [ ] 回滚演练通过。
 - [ ] Worker 日志能定位慢查询与 CPU 超限。
 

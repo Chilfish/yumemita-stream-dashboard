@@ -55,12 +55,12 @@
 | `FR-COMPARE-001` | P1 | 同一成员内最多 4 场对比 | `AC-COMPARE-001`：`?ids=a,b,c` 可分享；逐分钟曲线叠加；指标横表；超过 4 场有明确限制（手工） | ✅ | README |
 | `FR-COMPARE-002` | P2 | 跨成员对比 | `AC-COMPARE-002`：同一时间段 / 内容类型的横向对比可分享；样本不足时标注（手工） | 📋 | roadmap |
 | `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签（手工） | ✅ | product-direction |
-| `FR-DATA-001` | P0 | 由 pack 派生 manifest / insights | `AC-DATA-001`：`bun run publish:data` 重建 manifest + insights 并上传；manifest 不手改；`video.id` 与文件名不一致时中止（手工） | ✅ | data-model |
-| `FR-DATA-002` | P0 | 索引与数据发布到 R2 | `AC-DATA-002`：上传顺序为 thumbs → pack → manifest / insights → index；`validate:data --remote` 逐条可达（手工） | ✅ | deployment |
-| `FR-DATA-003` | P0 | 每日增量抓取与发布 | `AC-DATA-003`：`daily-update.ts` 先做频道差集；安静日不恢复、不发布；失败开 issue（手工 / Actions 日志） | ✅ | deployment |
-| `FR-DATA-004` | P1 | 数据更新后刷新缓存与 SEO 产物 | `AC-DATA-004`：`POST /api/internal/cache/purge` 按 tag 失效；sitemap 请求期生成；线上缓存实测待做 | 🚧 | astro-ssr-migration |
+| `FR-DATA-001` | P0 | 由 pack 派生 streams / insights | `AC-DATA-001`：`bun run db:ingest` 重建 `streams` + `dataset_insights`；`db:verify` 0 problems；不手改数据库（手工 / 脚本） | ✅ | data-model |
+| `FR-DATA-002` | P0 | 资产发布到 R2 | `AC-DATA-002`：`publish:assets` 上传顺序为 thumbs → emoji → archive；逐字稿单独发布；对象可达（手工） | ✅ | deployment |
+| `FR-DATA-003` | P0 | 每日增量抓取与入库 | `AC-DATA-003`：`daily-update.ts` 与 `streams` 做差集；安静日不抓取、不 ingest；失败开 issue（手工 / Actions 日志） | ✅ | deployment |
+| `FR-DATA-004` | P1 | 数据更新后刷新缓存与 SEO 产物 | `AC-DATA-004`：ingest 后调 `POST /api/internal/cache/purge` 按 tag 失效；sitemap 请求期生成；线上缓存实测待做 | 🚧 | astro-ssr-migration |
 | `FR-SEO-001` | P0 | 每页输出 metadata 与 sitemap | `AC-SEO-001`：请求期输出 title / canonical / OG；`sitemap.xml`、`llms.txt`、`robots.txt` 可访问 | ✅ | architecture |
-| `FR-SEO-002` | P1 | 新场次的静态分享卡片及时更新 | `AC-SEO-002`：新场次发布后，静态 head 与 sitemap 在可接受时间内更新；当前要等下一次构建 | 📋 | ssg-research |
+| `FR-SEO-002` | P1 | 新场次的分享卡片及时更新 | `AC-SEO-002`：新场次 ingest 后，HTML head 与 sitemap 在请求期立即使用新数据，不需要构建 | ✅ | architecture |
 | `FR-A11Y-001` | P1 | 键盘与可访问性 | `AC-A11Y-001`：焦点可见；图标按钮有可访问名称；图表有 `aria-label`；首页 / 场次 / 单场 / 对比 axe 0 violations（手工） | ✅ | roadmap |
 | `FR-THEME-001` | P0 | 深浅色主题且首屏无闪烁 | `AC-THEME-001`：切换后刷新，`<html>` 类在首屏即为正确值；图表与界面同时适配（手工） | ✅ | README |
 | `FR-KEY-001` | P1 | 快捷键 | `AC-KEY-001`：`j` / `k` 翻场、`1`–`5` 切页、`/` 聚焦搜索、`⌘K` 搜索、`⌘B` 收起侧栏；输入框内不触发（手工） | ✅ | README |

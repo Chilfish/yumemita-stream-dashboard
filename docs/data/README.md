@@ -1,6 +1,6 @@
 # 数据文档（Data）
 
-本目录记录数据模型、加数据流程与抓取进度。当前数据链路是「本地 pack → R2 JSON → 浏览器运行时读取」；迁移目标是「PostgreSQL 查询 + R2 对象」，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。
+本目录记录数据模型、加数据流程与抓取进度。当前数据链路是「本地 pack → PostgreSQL 查询 + R2 对象」，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。
 
 ## 文档索引
 
@@ -21,39 +21,41 @@
 
 ```text
 data/<id>/*.datapack.json          本地暂存（gitignore）
-        │  bun run publish:data
+        ├─ bun run db:ingest
+        │     ▼
+        │   Neon PostgreSQL（streams / details / insights / transcripts）
+        │
+        └─ bun run publish:assets + publish:transcripts
+              ▼
+            R2  <id>/thumbs/<videoId>.jpg + 480/960/1280w webp
+                emojis/<id>/*
+                archive/<id>/<videoId>.datapack.json
+                <id>/transcripts/<videoId>.json
+        │
         ▼
-R2  index.json
-    <id>/manifest.json
-    <id>/insights.json
-    <id>/<videoId>.datapack.json
-    <id>/thumbs/<videoId>.jpg + 480/960/1280w webp
-    <id>/transcripts/<videoId>.json
-    group-summary.json / group-gallery.json
-        │  页面运行时读取
-        ▼
-组首页 / 成员页 / 场次 / 单场 / 趋势 / 相册 / 对比
+请求期 SSR：组首页 / 成员页 / 场次 / 单场 / 趋势 / 相册 / 对比
 ```
 
 ## 约定
 
-1. **单一真源**：`data/<id>/*.datapack.json` 是唯一真源；manifest / insights / 组级文件全部由 `publish:data` 派生，不手改。
-2. **git 不存数据**：只有 `data-sources.json`、`data/README.md` 和手写逐字稿进 git；`data/` 其余、`public/data/`、`dist/` 都不提交。
+1. **单一真源**：`data/<id>/*.datapack.json` 是唯一真源；`streams` / `dataset_insights` 由 `db:ingest` 派生，不手改。
+2. **git 不存数据**：只有 `data-sources.json`、`data/README.md` 和手写逐字稿进 git；`data/` 其余、`dist/` 都不提交。
 3. **时间一律 JST**：`startedAt` 取开播时刻，不是公开时刻。
 4. **不换算汇率**：SC / 贴纸按币种分列。
-5. **迁移期**：PostgreSQL 表结构与 ingest 流程写在 `planning/astro-ssr-migration.md`，不要写成当前实现。
-6. **加数据后必跑**：`validate:data`；发布后 `validate:data --remote`。
+5. **表结构**：以 `src/db/schema.ts` 与 `planning/astro-ssr-migration.md` 为准。
+6. **加数据后必跑**：`db:ingest` → `db:verify`；发布资产后按 tag purge。
 
 ## 常用命令
 
 ```bash
 bun run add:datapack <id> <pack>   # 加一份 pack，更新本地 manifest
-bun run publish:data               # 重建 manifest + insights 并上传 R2
-bun run validate:data              # 校验引用链
-bun run validate:data -- --remote  # 逐条 HEAD 远端对象
+bun run db:ingest --dataset <id>   # 投影到 PostgreSQL
+bun run db:verify --dataset <id>   # 与 pack 字段级对账
+bun run publish:assets --dataset <id>  # 封面 / 表情 / archive → R2
 bun run fetch:thumbs --dataset <id>
 bun run fetch:emoji --dataset <id>
 bun run publish:transcripts
+bun run purge:cache --dataset <id> # 失效 Workers Cache
 ```
 
 补历史、重抓、补弹幕等一次性脚本见 [scripts/README.md](../../scripts/README.md)。

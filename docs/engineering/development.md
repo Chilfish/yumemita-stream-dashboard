@@ -24,17 +24,18 @@ bun run dev
 | `bun run build` | `astro build`，输出 Worker + 预渲染的 404 / 500 |
 | `bun run preview` | 本地预览构建产物（workerd） |
 | `bun run cf:preview` | 构建后预览，部署前检查 |
-| `bun run cf:deploy` | `astro build` + `wrangler deploy` |
+| `bun run cf:deploy` | `astro build` + `wrangler deploy --config dist/server/wrangler.json` |
 | `bun run db:generate` / `db:push` / `db:studio` | Drizzle 迁移工具 |
 | `bun run db:migrate` | 应用 `drizzle/` 迁移（读 `.env` 或 `.dev.vars`） |
 | `bun run db:ingest` | 本地 pack → PostgreSQL；支持 `--dataset` / `--ids` / `--limit` / `--all` / `--dry-run` |
 | `bun run db:verify` | 数据库与本地 pack 字段级对账 |
 | `bun run db:query` | 查询层冒烟：列表 / insights / 组首页 / 相册 + 本地延迟 |
 | `bun run perf:smoke` | 页面级性能冒烟：响应体大小 / 耗时中位数 / cache tag（先启动 preview 或 wrangler dev） |
-| `bun run sync:data` | 旧链路：生成 `public/data/` 兜底快照 |
-| `bun run publish:data` | 旧链路：由 pack 重建 index + manifest + insights，增量上传对象存储 |
-| `bun run validate:data` | 校验旧数据引用链（`--remote` 检查对象存储） |
-| `bun run add:datapack` | 加一份 datapack 并更新 manifest |
+| `bun run publish:assets` | 上传封面 / 表情 / archive（不写 JSON 索引） |
+| `bun run purge:cache` | 按 tag 失效 Workers Cache |
+| `bun run db:latest` | 输出数据库里最新一场（工作流探针） |
+| `bun run validate:data` | 校验 pack 级 schema |
+| `bun run add:datapack` | 加一份 datapack 并更新本地 manifest |
 | `bun run typecheck` | `astro check`（TypeScript 6） |
 | `bun run test` | Vitest 单次 |
 | `bun run test:watch` | Vitest watch |
@@ -233,6 +234,6 @@ bun run check
 bun run build
 ```
 
-- 不要提交 `public/data/`、`dist/`、`node_modules/`。
+- 不要提交 `dist/`、`node_modules/`。
 - 改了数据/字段：同时更新 `docs/data/data-model.md`。
 - 改了流程/脚本：同时更新 `README.md` 与相关 docs。

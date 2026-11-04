@@ -1,14 +1,14 @@
 # 数据模型
 
-> **2026-11-03 更新**：当前页面读 **PostgreSQL**（`src/db/schema.ts`、`src/db/queries/`），不再在运行时请求这些 JSON。本文保留 manifest / datapack 的字段口径与派生规则，供 ingest 与旧链路参考；`publish:data` 写 index / manifest / insights 的路径暂时保留，但页面不再消费。
+> **2026-11-04 更新**：页面只读 **PostgreSQL**（`src/db/schema.ts`、`src/db/queries/`）。本文保留 pack / manifest 的字段口径，供 ingest 与本地派生参考；字段到表的映射见 [astro-ssr-migration.md §6](../planning/astro-ssr-migration.md#6-数据模型)。`index.json` / `manifest.json` / `insights.json` / `group-*.json` 不再上传对象存储，也不再被页面读取。
 
-成员页消费四层 JSON：**dataset 索引 → manifest → insights → datapack**；组首页与全组相册另有 **group-summary / group-gallery** 两份精简派生文件（见第 3 节）。这些格式现在用于本地派生与归档；页面数据由 `db:ingest` 投影到数据库。
+成员页的数据来源是 **`streams` + `dataset_insights`**；组首页与全组相册由 `getGroupSummary` / `getGroupGallery` 在 SQL 里聚合。本文第 1–4 节的 JSON 只用于理解派生产物与本地调试。
 
-所有数据由 `bun run publish:data` 从本地 pack 派生并上传；git 里只有 `data-sources.json`。
+所有结构化数据由 `bun db:ingest` 从本地 pack 投影到数据库；对象存储只放封面、表情、archive 与逐字稿正文。git 里只有 `data-sources.json` 与手写逐字稿。
 
 ## 1. dataset 索引
 
-`<base>/index.json` 由 `scripts/publish-data.ts` 生成，是页面的入口。`data.ts` 启动时带时间戳请求它，避免 CDN 旧缓存；远端缺失或不可达时回退到构建时的 `public/data/index.json`。
+`index.json` 只是旧派生格式，不再上传或读取。当前成员入口由 `getDatasets()` 查 `datasets` 表生成。
 
 ```json
 {
@@ -40,7 +40,7 @@
 
 ## 2. manifest
 
-`<base>/<dataset>/manifest.json`（对象存储），由 `publish:data` 从 `data/<dataset>/*.datapack.json` 派生，页面按索引里的 `generatedAt` 作版本参数直接请求；`sync:data` 只生成 `public/data/` 兜底副本。
+`manifest.json` 只由本地 `publish:data` 派生，用于调试与恢复，不再上传。当前列表数据由 `listStreams()` 查 `streams` 表返回。
 
 ```json
 {
@@ -112,7 +112,7 @@
 - `<base>/group-summary.json`（schema `yumemita.dashboard.group-summary/v1`）：组首页，约 17 KB raw / 3.6 KB gzip。
 - `<base>/group-gallery.json`（schema `yumemita.dashboard.group-gallery/v1`）：全组相册，约 829 KB raw / 149 KB gzip，只在 `/gallery` 加载。
 
-`publish:data` 生成并上传这两份文件（与 manifest / insights 一起，index 最后）；`sync:data` 生成 `public/data/` 兜底副本。远端缺失时页面回退到构建快照，再回退到逐成员 manifest。
+这两份文件只在本地派生，不再上传。当前组数据由 `getGroupSummary()` / `getGroupGallery()` 查询生成。
 
 ### group-summary.json
 
@@ -175,7 +175,7 @@
 
 ## 4. insights
 
-`<base>/<dataset>/insights.json` 由 `publish:data` 用 `aggregateDataset` 预聚合，schema `yumemita.dashboard.insights/v1`，页面直接从对象存储请求，`sync:data` 只生成兜底副本。
+`insights.json` 由 `publish:data` / `ingest-db` 用 `aggregateDataset` 预聚合，schema `yumemita.dashboard.insights/v1`。当前页面从 `dataset_insights.totals` 读取同一份结构。
 
 ```json
 {
@@ -198,8 +198,8 @@
 - `aggregation` 标明跨场口径：`full` = 全部场次用 v2 全量字段重扫，`partial` = 部分场次全量、其余按 Top 列表相加，`top-lists` = 全部按 Top 列表相加。旧 insights 没有该字段时按 `top-lists` 理解。
 - `coverage` 给出参与全量聚合的场次数（`words` / `authors` / `total`），页面的“精确覆盖 X/Y 场”直接读它。
 - 逐场判断：v2 pack 用全量字段，v1 pack 用该场 Top 列表，不会因为少数缺失场次把整个 dataset 判成近似。
-- **生成物，不要手改**；数据更新后重新 `bun run publish:data`。
-- 列表页依赖它渲染总览；缺失时页面会提示重新发布。
+- **生成物，不要手改**；数据更新后重新 `bun run db:ingest`。
+- 列表页依赖它渲染总览；缺失时页面会显示错误态，重新 ingest 即可。
 
 ## 5. datapack
 
@@ -314,7 +314,7 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 
 ## 6. 作者索引
 
-`<base>/<dataset>/authors.json` 由 `publish:data` 从 v2 pack 派生，只在观众重叠等分析页按需加载，不参与首屏。
+`authors.json` 是旧派生格式，不再上传。当前作者数据在 `authors` / `stream_authors` 表，观众重叠以后直接查库。
 
 ```json
 {
@@ -372,7 +372,7 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 - **评论区是抓取上限内的条数**，不等于视频总评论数；`video.snapshot.comments` 是 YouTube 侧的总数。
 - **Top 列表有截断**：`topWords` 最多 40、`topAuthors` 最多 20，单场页直接用它们。
 - **英文虚词与寒暄词不进词频**：`Intl.Segmenter` 会把英文句子切成完整单词，`said` / `hi` / `the` 这类不承载内容的 token 不该挤进高频词。分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表，旧 pack 里残留的这类词在展示时也会被过滤。
-- **跨场精确聚合依赖 v2**：v2 pack 另存全量 `wordCounts` / `authors`，`publish:data` 据此重扫；v1 场次自动回退到该场的 Top 列表相加。`insights.totals.aggregation` 标出 `full` / `partial` / `top-lists` 与覆盖率，页面文案随之切换。
+- **跨场精确聚合依赖 v2**：v2 pack 另存全量 `wordCounts` / `authors`，`ingest-db` 用 `aggregateDataset` 重算；v1 场次自动回退到该场的 Top 列表相加。`dataset_insights.aggregation` 标出 `full` / `partial` / `top-lists` 与覆盖率，页面文案随之切换。
 - **频道专属表情靠频道字典补图**：`data/emoji-<dataset>.html` 覆盖该频道当前的表情，旧 pack 不需要重新归一化；字典里没有的历史表情退回占位。Unicode 表情不镜像，直接显示字符。
 - **作者身份以 `authorId` 为准**：旧 jsonl 没有该字段（显示名会改、会重名），需要归档侧重跑归一化才能补齐；缺 ID 时只能按显示名匹配，重叠结果仅供参考。
 - **会员里程碑 ≠ 入会人数**：只记录直播中出现的提示；领取赠礼同样只算直播里看到的领取，没被领走的赠礼只体现在 `paid.gifts` 的 `count` 里。
@@ -392,21 +392,19 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 ## 校验
 
 ```bash
-bun run sync:data
-bun run validate:data
+bun run db:verify       # 数据库与 pack 字段级对账
+bun run db:query        # 查询层冒烟
+bun run validate:data   # pack 级 schema 校验（旧派生文件检查已停用）
 ```
 
-`validate-data.mjs` 检查：
+`validate-data.mjs` 校验本地 pack；整站数据以 `db:verify` 为准：
 
-- `index.json`（兜底快照）存在且有 dataset；
-- 每个 manifest 有 `streams`；
-- 每个 dataset 的 `insights.json` 存在，且 `totals.streamCount` 与 manifest 场次数一致；
-- 每个 `streams[].videoId` 非空；
-- `group-summary.json` 的 `members` 覆盖全部 dataset、场次合计与 manifest 一致，`days` 的日期合法且 `(datasetId, date)` 不重复，`latest` 不含重复成员；
-- `group-gallery.json` 的 `streams` 场次数与 manifest 合计一致；
-- 加 `--remote` 时逐条 HEAD `<base>` 上的 `index.json`、`group-summary.json`、`group-gallery.json`、manifest / insights / datapack。
+- 每个 `data/<id>/<videoId>.datapack.json` 通过 `DatapackSchema`；
+- `video.id` 与文件名一致；
+- 每个 dataset 至少有一个 pack；
+- 加 `--remote` 时逐条 HEAD `<base>/archive/<id>/<videoId>.datapack.json`。
 
 datapack 的字段级校验（`schema`、`video.id === videoId`、`chat.total`、`density.perMinute` 等）
-在 `publish:data` 读取 pack 时完成：`video.id` 与文件名不一致会直接中止发布。
+在 `ingest-db` / `validate:data` 读取 pack 时完成：`video.id` 与文件名不一致会拒绝入库 / 校验失败。
 
 更严格的数据质量检查（时长、币种、JST 等）建议在生成 datapack 的 pipeline 侧完成。

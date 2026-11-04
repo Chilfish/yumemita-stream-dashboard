@@ -1,35 +1,34 @@
 # 常见问题
 
-## 页面空白 / 一直显示加载
+## 页面空白 / 一直显示错误
 
-1. 配了 `VITE_DATAPACK_BASE` 时，先确认对象存储根目录有 `index.json`：
+1. 先确认 Worker 能连数据库：
 
    ```bash
-   bun run validate:data -- --remote
+   bun run db:query
    ```
 
-   没有就先跑 `bun run publish:data`。
-
-2. 浏览器 Network 面板看 `<base>/index.json` 是否 404；远端不可达时页面会回退到同源 `data/index.json`，本地快照可用 `bun run sync:data` 生成。
-3. Astro 阶段部署在域名根路径；如以后做子路径，确认 `astro.config.mjs` 的 `base` 与访问路径一致。
+2. 看 Worker 日志里的 `x-request-id` 与 `x-response-time`；`DATABASE_URL` 缺失时页面应显示错误态而不是白屏。
+3. 确认 `DATABASE_URL` 只配在服务端（`.dev.vars` / `wrangler secret`），没有进入客户端 bundle。
 4. 硬刷新（Ctrl/Cmd + Shift + R）排除旧缓存。
 
-## “index.json 里没有可用的 dataset”
+## “数据库里没有可用的 dataset”
 
 - `data-sources.json` 为空或 `id` 不合法。
-- 远端 `index.json` 是旧版本或不存在：重新跑 `bun run publish:data`。
-- 离线开发时先跑 `bun run publish:data --no-upload` 生成 manifest，再 `bun run sync:data` 生成本地索引。
+- 还没跑 `bun run db:ingest`：`datasets` / `streams` 为空。
+- 新增成员后忘了 ingest：`bun run db:ingest --dataset <id>`。
 
-## “datapack 加载失败（HTTP 404）”
+## “找不到这场直播”（404）
 
-- 对象存储上缺这个 videoId：发布没跑完，或漏传。
-- `VITE_DATAPACK_BASE` 配错（桶不对、路径多了层级），或桶的 CORS 没放行站点源。
-- manifest 与 pack 不一致：manifest 由 `publish:data` 派生，不要手改。
+- 该 `videoId` 还没 ingest：`bun run db:ingest --dataset <id>`。
+- `datasetId` / `videoId` 拼错；`.md` 路由的 `.md` 后缀由路由处理，不要写进参数。
+- 未知单场返回真 404，且 `no-store`，不会长期缓存。
 
-```bash
-bun run publish:data               # 重新派生并上传
-bun run validate:data -- --remote  # 逐条 HEAD 确认可达
-```
+## 封面 / 表情 404
+
+- `PUBLIC_R2_BASE` 未配置或配错（桶 / 前缀 / 自定义域名），浏览器会回退到 `/data/...`，而该目录已删除。
+- 该场还没有 `fetch:thumbs` / `publish:assets`：跑对应脚本后补传。
+- R2 公开域名只用于封面与表情；逐字稿正文走 `/api/transcripts/...`，不从这里读。
 
 ## 图表是空的
 
@@ -37,19 +36,20 @@ bun run validate:data -- --remote  # 逐条 HEAD 确认可达
 - **没有 SC**：币种环图显示“本 dataset 没有 SC 记录”。
 - **没有评论**：评论区显示空状态；`comments` 可能为 `null`。
 - **词频/发言者为空**：datapack 的 `topWords` / `topAuthors` 是 Top 截断列表，场次太短可能不足阈值。
-- **趋势页仍显示“榜单相加”**：说明该 dataset 还有 v1 datapack；用 `stream-datapack.ts` 重建为 v2 后重跑 `publish:data`。只重建了一部分时 `insights.totals.aggregation` 为 `partial`，页面会显示精确覆盖的场次数；全部重建后才变成 `full`。
+- **趋势页仍显示“榜单相加”**：说明该 dataset 还有 v1 datapack；用 `stream-datapack.ts` 重建为 v2 后重跑 `db:ingest`。只重建了一部分时 `dataset_insights.aggregation` 为 `partial`，页面会显示精确覆盖的场次数；全部重建后才变成 `full`。
 
 ## 更新日历是空的
 
-- manifest 里 `date` / `startedAt` 缺失的场次不会进日历。
+- `streams.date` / `started_at` 缺失的场次不会进日历。
 - 日历按 **JST 自然日**聚合：同一天多场只算一格；切到「场次」指标时显示 1–2 是正常的。
 - 热力图在窄屏横向滚动，需要左右滑动才能看到更早的月份。
 
-## CI 报缺少 VITE_DATAPACK_BASE
+## CI / 部署报缺少变量
 
-- 在 GitHub 仓库 **Settings → Secrets and variables → Actions → Variables** 添加 `VITE_DATAPACK_BASE`，值为公开数据根地址。
-- 本地跑 CI 时用 `.env` 或 shell 环境变量；如果对象存储在桶内前缀下，地址要带同一前缀（例如 `https://example.com/stream-dashboard`）。
-- 地址变更后重新构建，`VITE_DATAPACK_BASE` 会在构建时内联进产物。
+- `DATABASE_URL`、`PURGE_TOKEN`：仓库 Secrets（数据工作流），以及 `wrangler secret put`（Worker 运行时）。
+- `PUBLIC_R2_BASE`、`SITE_URL`：仓库 Variables；`PUBLIC_R2_BASE` 在构建时内联，改了要重新部署。
+- `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`：部署工作流。
+- 本地用 `.env` 或 `.dev.vars`；不要提交真实凭据。
 
 ## 数字看起来不对
 
@@ -110,17 +110,16 @@ bun run dev -- --port 4322
 
 ## 分享卡片没有标题或封面
 
-- 静态 head 由 `scripts/generate-seo.ts` 在构建时写入 `dist/<path>/index.html`；新发布的场次要等下一次构建才有静态卡片，客户端 meta 已是最新。
-- 检查 `VITE_SITE_URL` 是否设置：canonical / `og:url` / `og:image` 需要绝对地址。
-- 用单场封面作 `og:image` 时，对象存储需要允许跨域读取或至少允许直接访问；`og:image` 走的是 `<dataset>/thumbs/<videoId>.jpg`。
-- 托管商若没有把目录索引当成文件（`/nonoka` → `/nonoka/index.html`），会命中 SPA 回退，静态 head 不生效；查看页面源代码确认 `<title>`。
-- `bun run verify:seo` 会检查 sitemap 条数、canonical、`og:image` 与 robots。
+- 单场 head 由 SSR 在请求期输出；新场次 ingest 后立即可用，不需要额外构建。
+- 检查 `SITE_URL` / `astro.config.mjs` 的 `site`：canonical / `og:url` / `og:image` 需要绝对地址。
+- `og:image` 走 `PUBLIC_R2_BASE/<dataset>/thumbs/<videoId>.jpg`；确认 R2 公开域名可访问。
+- 用 `curl -s <单场 URL> | grep -E '<title>|canonical|og:image'` 确认请求期 head 正常输出。
 
 ## 封面不显示
 
 - 先确认本地有图：`data/<datasetId>/thumbs/<videoId>.jpg`；没有就 `bun run fetch:thumbs --dataset <id>`。
-- 生产读的是 `<base>/<dataset>/thumbs/<videoId>.jpg`，需要 `publish:data` 上传；只跑 `fetch:thumbs` 不会出现在线上。
-- 图存在但显示成员色兜底：检查 `VITE_DATAPACK_BASE` 是否包含桶内前缀（`R2_PREFIX`），以及对象是否公开可读。
+- 生产读的是 `PUBLIC_R2_BASE/<dataset>/thumbs/<videoId>.jpg`，需要 `publish:assets` 上传；只跑 `fetch:thumbs` 不会出现在线上。
+- 图存在但显示成员色兜底：检查 `PUBLIC_R2_BASE` 是否包含桶内前缀（`R2_PREFIX`），以及对象是否公开可读。
 - 相册里个别卡片是兜底：说明那场没有 `video.thumbnail` 或下载失败，可加 `--force` 重抓。
 
 ## 逐字稿不出现
@@ -132,7 +131,8 @@ bun run dev -- --port 4322
 
 ## 数据更新后页面还是旧的
 
-- 发布后缓存：`data/*.json` 在 `vercel.json` 里是 300s 短缓存，对象存储侧的 manifest/insights 也是短缓存，等一会儿或强制刷新。
-- 改了本地 pack 后忘了 `bun run publish:data`，远端仍是旧索引。
-- 增量发布没传某个 pack：进度记在 `data/.publish-state.json`（上次上传的内容摘要 + 字节数）。远端对象被删、大小对不上会自动重传；怀疑进度记录有问题（例如手工改过桶里的文件）时用 `bun run publish:data --force` 全量重传。
-- 本地开发 Vite 会热更新；如果是 `preview`，重新 `bun run build && bun run preview`。
+- 页面有 60–300 秒的 Workers Cache；等 TTL 过去或按 tag purge。
+- 改了本地 pack 后忘了 `bun run db:ingest`，数据库仍是旧值。
+- 缓存未失效：跑 `bun run purge:cache --dataset <id>`；Workers Cache 需要 TTL 或 purge 才会更新。
+- 增量发布没传某个 pack：进度记在 `data/.publish-state.json`（上次上传的内容摘要 + 字节数）。远端对象被删、大小对不上会自动重传；怀疑进度记录有问题时用 `bun run publish:assets --force` 全量重传。
+- 本地 `astro dev` 会热更新；如果是 `preview`，重新 `bun run build && bun run preview`。

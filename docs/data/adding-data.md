@@ -6,7 +6,7 @@
 
 - **当前页面读 PostgreSQL**：`db:ingest` 把 `data/<datasetId>/*.datapack.json` 投影到 Neon，页面请求期查库。
 - **本地 pack 是唯一真源**：`data/<datasetId>/` 不进 git；manifest / insights 仍是本地派生物。
-- **R2 只保留对象**：封面、表情、逐字稿正文、原始 pack 归档。`publish:data` 写 index / manifest / insights 的旧链路暂时保留，但页面不再读取。
+- **R2 只保留对象**：封面、表情、逐字稿正文、原始 pack 归档。`publish:assets` 不再写 index / manifest / insights。
 - 数据更新后不需要重新构建前端；需要让缓存失效时调内部 purge 端点。
 
 ## 目录约定
@@ -22,7 +22,7 @@ data/
 
 - `datasetId`：小写字母/数字/连字符，例如 `nonoka`。
 - `videoId`：YouTube 11 位 id，也是 datapack 文件名。
-- `manifest.json` / `insights.json`：由 `publish:data` 从 pack 派生，不要手改。
+- `manifest.json` / `insights.json`：由 `publish:data` 本地派生，页面不读；不要手改。
 
 ## 加一场直播
 
@@ -44,9 +44,12 @@ bun run dev
 ### 手工加（不用脚本）
 
 1. 复制 `<videoId>.datapack.json` 到 `data/<datasetId>/`。
-2. `bun run publish:data` 重建 manifest + insights 并上传。
+2. `bun run fetch:thumbs --dataset <id>` 补封面。
+3. `bun run db:ingest --dataset <id>` 写库。
+4. `bun run publish:assets --dataset <id>` 上传封面 / 表情 / archive。
+5. `bun run purge:cache --dataset <id>` 失效缓存。
 
-不需要手写摘要：manifest 完全由 pack 派生。
+不需要手写摘要：`streams` 与 `dataset_insights` 完全由 ingest 从 pack 派生。
 
 ## 加一位成员 / 新 dataset
 
@@ -70,8 +73,9 @@ bun run dev
 }
 ```
 
-3. `bun run db:ingest -- --dataset arare` 写入成员与场次；成员入口由数据库查询生成。
-4. 刷新页面即可；不需要重新构建。
+3. `bun run db:ingest --dataset arare` 写入成员与场次；成员入口由数据库查询生成。
+4. `bun run publish:assets --dataset arare` 上传封面 / 表情 / archive。
+5. `bun run purge:cache --dataset arare`；刷新页面即可，不需要重新构建。
 
 不需要改 React 组件。
 
@@ -126,25 +130,23 @@ bun run publish:transcripts               # 增量上传
 bun run publish:transcripts --force       # 忽略 data/.publish-state.json，全量重传
 ```
 
-产物（远端优先，失败回退到构建时的 Markdown 快照，所以本地不发布也能预览）：
+产物：
 
 ```text
 <base>/<datasetId>/transcripts/<videoId>.json   # { frontmatter, markdown, updatedAt }
-<base>/transcripts/index.json                   # 有稿的场次列表，最后写
 ```
 
-- 先传正文、最后写索引：中途失败只会「索引少一篇」，不会指向不存在的文件。
+- 正文由 Worker 的 `/api/transcripts/:datasetId/:videoId` 从 R2 binding 读取；开发环境没有 R2 时回退到本地 Markdown 快照。
+- `ingest-db` 把 frontmatter 写入 `transcripts` 表；单场页与索引页查库决定「有没有稿」。
 - 单篇失败只记日志，不阻塞其余稿件；退出码仍为 1，CI 会拦住。
-- 单场页的「逐字稿」分段只在索引里有当前 `videoId` 时出现；索引页在 `/:datasetId/transcripts`。
-- 发布后刷新页面即可，不需要重新构建前端。
+- 发布后执行 `bun run purge:cache --tags transcripts`（或 `--dataset <id>`），不需要重新构建前端。
 
-## manifest 从哪来
+## 派生数据从哪来
 
-不需要手工维护。`publish:data` 用 `scripts/lib/dataset-manifest.ts` 的 `buildStreamSummary`
-从每个 pack 抽出摘要，按开播时间倒序重排 `rank`，并写回 `count` / `generatedAt`。
-`subject` / `scope` / `note` 来自 `data-sources.json`。
+不需要手工维护。`ingest-db` 用 `buildStreamSummary` 从每个 pack 抽出摘要，写入 `streams` 表；
+`aggregateDataset` 在成员全部写完时重算 `dataset_insights`。`subject` / `scope` / `note` 来自 `data-sources.json`。
 
-`rank` / `count` / `generatedAt` 只影响列表顺序和页脚显示。
+`rank` 不落库，查询时用窗口函数计算；`count` / `generatedAt` 由数据库聚合与 `ingest_reports` 体现。
 
 ## 数据检查清单
 
@@ -171,10 +173,10 @@ bun run dev
 ## 数据体积与 Git
 
 - **git 里不存数据**：只有 `data-sources.json` 和 `data/README.md`。
-- 单个 dataset 约 300 场、均 26 KB，放在对象存储；几千场也不会撑大仓库。
+- 单个 dataset 约 300 场、均 26 KB；几千场也不会撑大仓库。
 - `data/<id>/` 下的 pack、manifest、insights 都是本地暂存/派生物，已 gitignore。
-- `public/data/` 是构建生成物，同样不提交。
-- 回滚数据靠对象存储的版本控制，不是 `git revert`。
+- `public/data/` 已删除；页面不再需要构建期快照。
+- 回滚数据靠 Neon 分支 / 时间点恢复与 R2 版本控制，不是 `git revert`。
 
 ## 隐私与版权
 

@@ -60,9 +60,9 @@ feat/xxx ──●───●
 
 ```bash
 bun run check          # typecheck + test + lint
-bun run build          # sync:data + icons + tsc + vite build
-bun run validate:data  # 数据链路（改数据时必跑）
-bun run verify:seo     # 改 SEO / 路由 / 构建时必跑
+bun run build          # astro build（Worker + 预渲染 404/500/about）
+bun run db:verify      # 改 ingest / 数据时必跑
+bun run db:query       # 改查询层时必跑
 ```
 
 - 涉及页面的改动必须在 `bun run dev` 或 `vite preview` 下手工走查相关路径，并写清结果。
@@ -98,7 +98,7 @@ bun run verify:seo     # 改 SEO / 路由 / 构建时必跑
 
 ```bash
 bun run build
-# 将 dist/ 交给托管平台；数据更新单独跑 publish:data
+# 部署用 wrangler；数据更新单独跑 ingest + publish:assets + purge
 ```
 
 迁移目标是 Cloudflare Workers，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)：
@@ -106,7 +106,7 @@ bun run build
 ```bash
 bunx wrangler secret put DATABASE_URL
 bun run build
-bunx wrangler deploy
+bunx wrangler deploy --config dist/server/wrangler.json
 ```
 
 - 部署前跑通验证门禁与 [release-checklist.md](./release-checklist.md)。

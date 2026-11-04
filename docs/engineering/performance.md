@@ -4,13 +4,13 @@
 
 ## 原则
 
-1. **只传必要的数据**：首屏、组首页、相册各自加载自己的最小数据，不为了一个数字拉整份 manifest。
-2. **能预计算的在发布时算**：全期汇总、封面 key、组级文件都在 `publish:data` / `sync:data` 生成。
-3. **依赖“现在”的窗口在客户端算**：近 7 天、本月随日期变化，不能冻结在发布产物里。
-4. **缓存分层**：内存去重 → sessionStorage → HTTP / 对象存储，不同层解决不同问题。
-5. **先量再改**：入口 chunk、数据文件、字体、LCP 都有实测数字；没有数字的“优化”不进文档。
+1. **只查必要的数据**：页面只查当前视图需要的列与行，不为了一个数字扫整张表。
+2. **聚合在 SQL / ingest 里做**：`dataset_insights` 预聚合；请求期不重算 1,897 场。
+3. **首屏有上限**：列表 100 行、相册 60 张，其余由「显示更多」在已水合的岛屿里追加。
+4. **缓存分层**：Workers Cache → 浏览器 HTTP 缓存 → 图片长缓存。
+5. **先量再改**：没有数字的“优化”不进文档。
 
-## Astro SSR（2026-11-03）
+## Astro SSR（2026-11-04）
 
 当前形态是 Astro SSR + Neon PostgreSQL + Cloudflare Workers。下面的数字来自**生产构建**，用 `wrangler dev` 跑 `dist/server/entry.mjs`，不是 `astro preview`（后者是开发模式：CSS 内联、cache no-op，数字会显著偏差）。
 
@@ -46,9 +46,9 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 - `bun run db:query`（列表 + insights，全量 1,897 场）：p50 122.5 ms / p95 247.6 ms。
 - 首次请求冷，后续命中 Workers Cache 后只付边缘响应；本地 `wrangler dev` 不复现 Cache HIT，需线上观察。
 
-### 长列表首屏上限（2026-11-03）
+### 长列表首屏上限
 
-成员最多 506 场、全组 1,897 场。此前 SSR 把所有行/封面都写进 HTML，页面体积随场次线性膨胀。现在：
+成员最多 506 场、全组 1,897 场。此前 SSR 把所有行 / 封面都写进 HTML，页面体积随场次线性膨胀。现在：
 
 | 路由 | 上限前 | 上限后 | 变化 |
 | --- | ---: | ---: | ---: |
@@ -72,7 +72,7 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 
 ### 本轮改动
 
-- **CSS 外链**：`build.inlineStylesheets: 'never'`。之前 384 KB 字体/Tailwind CSS 内联在每个 HTML，生产构建下 HTML 体积约减半（如 `/nonoka` 从约 793 KB 到 409 KB）。
+- **CSS 外链**：`build.inlineStylesheets: 'never'`。之前 384 KB 字体 / Tailwind CSS 内联在每个 HTML，生产构建下 HTML 体积约减半（如 `/nonoka` 从约 793 KB 到 409 KB）。
 - **去掉重复 props**：`manifest` 不再作为岛屿 props，由 `rows` 在壳层组装；单场 / 对比的 pack 去掉全量 `authors` / `wordCounts`（视图只用 Top 列表）。
 - **查询**：成员页的 datasets / streams / insights 三个查询并行；`listStreams` 用 `count(*) over()` 一次取总数。
 - **缓存意图**：每个数据页显式 `Astro.cache.set`，tag 覆盖 `dataset-<id>` / `stream-<videoId>`；sitemap / llms / `.md` 同样带 tag。
@@ -82,70 +82,15 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 
 - **壳层流式输出**：目前整个页面（侧栏 + 页头 + 内容）是一个岛屿，Astro 必须等它 SSR 完才开始输出。把壳层拆成 Astro 布局 + `transition:persist` 的独立岛屿，内容区用 `server:defer` / 流式渲染，首字节可以更早到达。参考 [Astro streaming recipe](https://docs.astro.build/en/recipes/streaming-improve-page-performance/)。
 - **岛屿 props 体积**：列表首屏已限 100 / 60 行，但完整 `rows` 仍作为 props 序列化进 HTML；下一步按路由裁剪字段，或改成 `/api/streams` 分页。
-- **客户端数据缓存**：路由切换只依赖 Workers Cache；可以在 `sessionStorage` 缓存最近一次 `DatasetPageData`，返回时先渲染旧数据再校验。
 - **Worker 同区**：生产必须让 Worker 与 Neon 区域接近，否则每个请求固定多一个 RTT。
-
-## 旧实现（迁移前记录）
-
-下面几节是 React Router + Vite 静态站的首屏数据流、缓存与实测，保留作对照。
-
-## 首屏数据流
-
-### 组首页 `/`
-
-```text
-index.json（约 1.8 KB）
-  └─ group-summary.json（约 17 KB raw / 3.6 KB gzip）
-       members：5 位成员的全期汇总
-       days：最近 40 天有场次的按日桶（当前 93 项）
-       latest：每位成员最新一场
-       recent：全组最近 20 场
-```
-
-不再请求 5 份完整 manifest（约 2.7 MB raw / 293 KB gzip）。`days` 只保留最近 40 天：近 7 天与本月窗口最多覆盖 31 天，客户端用当前日期在这些桶上求和即可，不需要逐场明细。
-
-### 全组相册 `/gallery`
-
-`group-gallery.json`（约 829 KB raw / 149 KB gzip）包含全部 1,891 行精简场次，只在相册路由加载。组首页不碰这个文件。
-
-### 成员页 `/:datasetId`
-
-`index.json` 与 manifest / insights 并行出发。路由里已经有 `datasetId`，`DatasetIndexGate` 用 `useMatches()` 提前调用 `prefetchDataset()`，不必等索引回来再发请求。
-
-### 回退链
-
-```text
-远端 group-*.json
-  └─ 构建快照 public/data/group-*.json
-       └─ 5 份 manifest（兼容还没重新发布的对象存储）
-```
-
-远端文件缺失时不会白屏；旧部署的 manifest 仍然能渲染同样的组首页与相册。
-
-## 缓存分层
-
-| 层 | 对象 | 行为 |
-| --- | --- | --- |
-| 模块内存 | manifest / insights / group 文件 | 5 分钟 TTL + in-flight 去重；一个消费者取消不取消共享请求 |
-| sessionStorage | `index.json`、`group-summary.json` | 10 分钟 TTL，带索引版本校验；先渲染缓存，再后台校验 |
-| HTTP | `assets/*` | `Cache-Control: immutable`，文件名带 hash |
-| HTTP | 数据 JSON | manifest / insights / datapack 用 `?v=<index.generatedAt>` 换 URL；索引本身带时间戳重新取 |
-| 图片 | 封面 / 头像 | 由浏览器按 `srcset` / `sizes` 选择，长缓存 |
-
-sessionStorage 只放小文件：索引（约 1.8 KB）和组首页摘要（约 17 KB）。相册的 829 KB 不进 sessionStorage，交给版本化 URL 的 HTTP 缓存，避免占配额和额外解析。
+- **线上实测**：`Cf-Cache-Status`、purge 生效、Worker CPU 与 wall time 仍待部署后记录。
 
 ## 图片
 
 - **头像**：900×900 JPG → 128×128 JPEG（quality 82），5 张合计 631.6 KB → 29.8 KB（-95%）。界面上只显示 20–24 px，128 px 足够覆盖高 DPI。
-- **封面**：原图 1280×720 JPEG；`fetch:thumbs` 用 `Bun.Image` 生成 480 / 960 / 1280w WebP（quality 78）。列表与相册用 `srcset` 只下 480w，首屏主图用 `sizes` + `fetchPriority="high"` 下 960w/1280w。
-- 容器固定 `aspect-video`，图片解码前就预留高度，CLS 接近 0。
-
-## 代码拆分
-
-- 路由全部 `React.lazy()`；单场页、图表、逐字稿各自成 chunk。
-- `CommandPalette` 首次按 ⌘K 才动态加载，入口 chunk 从 404.8 KB 降到 364.0 KB（gzip 128.4 → 117.1 KB）。
-- `react-markdown` + `remark-gfm` 只进逐字稿 chunk；D3 按图表模块 tree-shake。
-- 相册的月份分组用 `content-visibility: auto`，长列表不一次性布局。
+- **封面**：原图 1280×720 JPEG；`fetch:thumbs` 用 `Bun.Image` 生成 480 / 960 / 1280w WebP（quality 78）。列表与相册用 `srcset` 只下 480w，首屏主图用 `sizes` + `fetchPriority="high"` 下 960w / 1280w。
+- 封面 / 表情由 `PUBLIC_R2_BASE` 直接提供，长缓存由 R2 自定义域名的 Cache Rule 控制；容器固定 `aspect-video`，图片解码前就预留高度，CLS 接近 0。
+- 逐字稿正文不公开暴露，按需走 `/api/transcripts/:datasetId/:videoId`。
 
 ## 字体
 
@@ -153,52 +98,21 @@ sessionStorage 只放小文件：索引（约 1.8 KB）和组首页摘要（约 
 - `font-display: swap`，首帧先用系统字体。
 - 没有 preload 字体：本地实测 LCP 元素是首屏封面图，提前拉 100 KB 字体会和图片抢带宽。
 
-## 实测
-
-本地 `vite preview` + 远端数据，`agent-browser vitals`：
-
-| 页面 | FCP | LCP | CLS |
-| --- | ---: | ---: | ---: |
-| 成员首页 `/:datasetId` | 144 ms | 996 ms（960w 封面） | 0.0003 |
-| 组首页 `/` | 112 ms | 2048 ms（960w 封面） | 0.0001 |
-
-组首页请求：`index.json` + `group-summary.json`，没有 manifest。相册请求：`index.json` + `group-gallery.json`。
-
-数据文件对比：
-
-| 文件 | raw | gzip |
-| --- | ---: | ---: |
-| 5 份完整 manifest | 2745 KB | 293 KB |
-| `group-summary.json` | 17 KB | 3.6 KB |
-| `group-gallery.json` | 829 KB | 149 KB |
-
 ## 回归方式
 
 ```bash
-bun run check            # typecheck + test + lint
-bun run build            # sync:data + tsc + vite + SEO 预渲染
-bun run validate:data    # index / manifest / insights / group-* 结构与场次数
-bun run verify:seo       # 预渲染页面、sitemap、robots
-```
-
-浏览器侧：
-
-```bash
-bunx vite preview --port 4173 --strictPort
-agent-browser vitals http://localhost:4173/arale --json
-agent-browser network requests
+bun run check            # astro check + test + lint
+bun run build            # astro build（Worker + 预渲染 404/500/about）
+bun run db:query         # 查询层冒烟 + P50/P95
+bun run db:verify        # 改 ingest / 数据时
+bun run perf:smoke -- --url http://127.0.0.1:8787
+bun run test:smoke       # 功能性路由冒烟
 ```
 
 重点看：
 
-- `/` 是否只请求 `index.json` + `group-summary.json`；
-- `/gallery` 才请求 `group-gallery.json`；
-- 阻断 `group-summary.json` 后刷新，sessionStorage 缓存是否仍能渲染；
-- 清空 sessionStorage 再阻断新文件，是否回退到 manifest；
+- `/` 的查询数与 HTML 体积没有反弹；
+- `/gallery` 仍只输出首批 60 张；
+- `.md` 响应体 < 200 KB（有逐字稿时按实际）；
+- 图片使用 480w 变体而不是全量原图；
 - LCP 仍然是封面图，而不是字体或大块布局。
-
-## 后续可做
-
-- 单成员 manifest 仍有未使用字段（如 `sessionDir`、`snapshotComments`、`maxConcurrentAt`、`rank`、`generatedAt`）。先审计 `src/lib/aggregate.ts` 与视图的字段使用，再决定是否裁剪 schema。
-- 如果以后统一改成 axios，可以评估 `axios-cache-interceptor`；当前 fetch 层已经覆盖它的去重、TTL、storage 与 SWR 语义，单独为缓存引入 axios 不划算。
-- 对象存储侧开启 Brotli、HTTP/2/3 与长缓存头，收益取决于托管配置。

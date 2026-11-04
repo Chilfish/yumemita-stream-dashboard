@@ -1,11 +1,11 @@
 # data/
 
-**本地暂存区，不进 git。** 真源是每个 dataset 下的 `*.datapack.json`，发布时由它们派生出
-`manifest.json`、`insights.json`，以及桶根的 `index.json`，一起上传到对象存储（R2 等）。
+**本地暂存区，不进 git。** 真源是每个 dataset 下的 `*.datapack.json`；`db:ingest` 把它们投影到
+PostgreSQL，`publish:assets` 上传封面 / 表情 / archive。`manifest.json` / `insights.json` 只作本地派生与调试。
 
 ```text
 data/
-├─ .publish-state.json           # 发布进度（publish:data 用，增量上传）
+├─ .publish-state.json           # 资产上传进度（publish:assets 用）
 └─ nonoka/
    ├─ <videoId>.datapack.json   # 每场完整数据（真源）
    ├─ manifest.json             # 由 pack 派生
@@ -15,17 +15,19 @@ data/
 
 ## 当前数据集
 
-| id | 成员 | 场次 | 时间范围 | channelId |
-| --- | --- | ---: | --- | --- |
-| `nonoka` | 宮永ののか | 287 | 2023-11-19 – 2026-10-29 | `UCGeCnpimiSN5rgiKbJzHd3A` |
-| `arale` | 仲町あられ | 286 | 2025-06-08 – 2026-10-29 | `UCWfF0DB6m_t2CE3KcOOOX7g` |
-| `ritsu` | 峰月律 | 339 | 2023-11-19 – 2026-10-27 | `UCxc0MrPoACKTFlV24GqX2sg` |
-| `miyako` | 藤都子 | 321 | 2023-11-18 – 2026-10-28 | `UCZXxRYaP7mfuglPnptnBBCA` |
-| `yuno` | 千石ユノ | 236 | 2025-05-08 – 2026-10-24 | `UC99kOG6_9RD0mR3OG4EOfxw` |
+场次以数据库 `streams` 为准（本地 pack 可能少几场未恢复的历史数据）：
+
+| id | 成员 | 场次 | channelId |
+| --- | --- | ---: | --- |
+| `nonoka` | 宮永ののか | 288 | `UCGeCnpimiSN5rgiKbJzHd3A` |
+| `arale` | 仲町あられ | 506 | `UCWfF0DB6m_t2CE3KcOOOX7g` |
+| `ritsu` | 峰月律 | 340 | `UCxc0MrPoACKTFlV24GqX2sg` |
+| `miyako` | 藤都子 | 322 | `UCZXxRYaP7mfuglPnptnBBCA` |
+| `yuno` | 千石ユノ | 441 | `UC99kOG6_9RD0mR3OG4EOfxw` |
 
 - 抓取进度、跳过判定与下一批候选见 [../docs/data/data-progress.md](../docs/data/data-progress.md)。
 - `<videoId>.datapack.json`：每场完整数据，schema `yumemita.stream-datapack/v1` 或 `/v2`（新抓取写 v2）。
-- `manifest.json` / `insights.json`：`bun run publish:data` 生成，不要手改。
+- `manifest.json` / `insights.json`：由 `publish:data` 本地派生，不要手改；页面不读它们。
 
 ## 文件命名
 
@@ -53,8 +55,9 @@ bun run add:datapack nonoka /path/to/<videoId>.datapack.json
 bun run db:ingest
 bun run db:verify
 
-# 旧链路：重建 index + manifest + insights，并增量上传到 R2
-bun run publish:data
+# 上传封面 / 表情 / archive（增量）
+bun run publish:assets
+bun run purge:cache --dataset <id>
 bun run validate:data
 ```
 
@@ -64,4 +67,4 @@ bun run validate:data
 
 - 原始视频/音频、弹幕原始 JSONL、评论原始 JSON。
 - cookie、token、邮箱、付款信息等隐私数据。
-- `public/data/`（生成物）。
+- `dist/`、`.wrangler/`、`.dev.vars`（构建产物与本地凭据）。

@@ -10,10 +10,10 @@
 | VSTATS 快照              | 平均/最大同接・最大值时刻・视聴时间・播放・点赞（YouTube 自身不提供同接历史） |
 
 产物写到本地暂存区 `data/<datasetId>/<videoId>.datapack.json`（已 gitignore），并更新该 dataset 的
-本地 `manifest.json` 摘要。正式发布用 `bun run publish:data` 重建 manifest + insights 并上传对象存储。
+本地 `manifest.json` 摘要。正式入库用 `bun run db:ingest`，资产发布用 `bun run publish:assets`。
 原始素材（视频/音频/弹幕回放/评论原文）不进本仓库。
 
-## 数据库 ingest（迁移阶段 1）
+## 数据库 ingest
 
 本地 pack 仍是唯一真源；`ingest-db.ts` 把 pack 投影到 Neon PostgreSQL。读路径走 `neon-http`，
 写入 / 事务走 `neon-serverless` 的 WebSocket Pool，不用 `postgres.js`。
@@ -100,11 +100,11 @@ bun scripts/fetch-streams.ts --dataset nonoka --root .\temp\youtube-live
 | `--ids <文件>` | 直接读视频 ID 列表（每行一个），跳过频道列表抓取 |
 | `--dry-run` | 只列出候选 |
 | `--no-build` | 只抓素材 |
-| `--restore` | 从对象存储恢复 manifest 与缺失的 datapack；本地没有 manifest 时默认开启 |
+| `--restore` | 从对象存储 `archive/<id>/` 恢复缺失的 datapack；本地没有 manifest 时默认开启 |
 | `--no-restore` | 关闭自动恢复 |
 | `--force <id[,id...]>` | 定点重抓这些场次（只跑它们，不补跑其他待抓场次）；可重复传，`all` = 全频道候选都重抓 |
-| `--publish` | 抓完调用 `publish:data` 发布；有 `--force` 时默认开启 |
-| `--no-publish` | 即使有 `--force` 也不发布 |
+| `--publish` | 抓完 `db:ingest` + `publish:assets` + `purge:cache`；有 `--force` 时默认开启 |
+| `--no-publish` | 即使有 `--force` 也不写库 / 不发布 |
 
 单场返工 / 修数据：
 
@@ -112,14 +112,15 @@ bun scripts/fetch-streams.ts --dataset nonoka --root .\temp\youtube-live
 # 重抓一场（meta → 弹幕 → 评论 → VSTATS → datapack），完成后自动增量发布
 bun scripts/fetch-streams.ts --dataset nonoka --force 5xYz1234567
 
-# 只发布本地 pack，不重抓
-bun run publish:data --dataset nonoka
+# 只把本地 pack 写库 + 发资产，不重抓
+bun run db:ingest --dataset nonoka
+bun run publish:assets --dataset nonoka
 ```
 
 `--force` 只跑点名的场次（不拉频道列表、不补跑其他待抓场次），会先删掉该场的
 `danmaku_*.jsonl` / 评论 / VSTATS / 「不可用」标记再抓，所以结果一定是这次新拉的；
 同名/时长等去重规则对强制场次不生效。任一步失败时不会发布，避免把缺数据的 pack 推上去；
-修好后手动跑 `bun run publish:data --dataset <id>` 即可。
+修好后手动跑 `bun run db:ingest --dataset <id>` 即可。
 
 监控：
 
@@ -138,17 +139,17 @@ Get-Content "<root>/.fetch-state/fetch-progress.json"
 跳过判定依赖本地 `data/<id>/`，所以空环境直接续跑会把整个频道重抓一遍。脚本在本地没有
 manifest 时会先恢复远端数据（`--restore` 可强制，`--no-restore` 可关闭）：
 
-1. 按 `DATAPACK_BASE` / `VITE_DATAPACK_BASE` 的公开地址拉 `manifest.json`；
+1. 先试 `DATAPACK_BASE` 公开地址，读 `archive/<id>/<videoId>.datapack.json`；
 2. 拉不到的 pack 再从 `R2_*` 凭据读（需要 `R2_BUCKET`，可选 `R2_PREFIX`）；
 3. 只下载本地缺失的 pack，已存在的不重复下载。
 
-恢复后再按正常的「已入库 + 已有素材」逻辑跳过。公开地址要带桶内前缀，例如
-`https://s3.example.com/stream-dashboard`。
+恢复后再按正常的「已入库 + 已有素材」逻辑跳过。没有 manifest 时也可以列桶 `archive/` 前缀。
+公开地址要带桶内前缀，例如 `https://s3.example.com/stream-dashboard`。
 
 ## 每日增量更新
 
-`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面 → 定点发布」串成一条命令，本地和 GitHub Actions 共用。
-定时任务见 [docs/engineering/deployment.md](../docs/engineering/deployment.md) 的「定时增量更新」。
+`daily-update.ts` 把「频道列表 → 定点抓取 → 补封面 → 上传逐字稿 → ingest → 资产发布 → purge」串成一条命令，本地和 GitHub Actions 共用。
+定时任务见 [docs/engineering/deployment.md](../docs/engineering/deployment.md) 的「每日数据流程」。
 
 ```powershell
 bun scripts/daily-update.ts                 # 增量；本地默认用 Firefox cookie
@@ -167,20 +168,31 @@ bun scripts/daily-update.ts --no-publish    # 只写本地，不上传对象存�
 | `--cookies <文件>` | Netscape cookie jar；CI 用这个 |
 | `--cookies-from-browser <b>` | 本地默认 firefox |
 | `--force` | 重抓最近 24 小时结束的场次（刷新播放量 / 点赞 / 评论快照） |
-| `--dry-run` | 只列候选，不抓取、不发布 |
-| `--no-publish` | 只写本地 |
-| `--bootstrap` | 远端清单读不到时也允许按全量新场次处理 |
+| `--dry-run` | 只列候选，不抓取、不写库、不发布 |
+| `--no-publish` | 只写本地，不写库、不上传 |
+| `--bootstrap` | 数据库为空时也允许按全量新场次处理 |
 
 行为：
 
-- 先拉频道 `/streams`（`-J`，带 `live_status` / 标题 / 时长），和**远端 manifest**求差集。
+- 先拉频道 `/streams`（`-J`，带 `live_status` / 标题 / 时长），和**数据库里的 `streams`** 求差集。
 - 未来场（`is_upcoming`）、正在直播（`is_live`）、同标题但短于正片 60% 的摘要不进入候选；
   它们会记在「暂缓」里，不会每天重新拉元信息。
-- 没有新场次、也没有待补数据的成员直接跳过，不恢复 datapack、不发布。
-- 有变化时只对该成员 `--restore`（补齐远端 pack，保证 insights 精确）并 `publish:data --dataset <id>`。
+- 没有新场次、本地 pack 也不比数据库新时直接跳过，不恢复 datapack、不 ingest。
+- 有变化时只对该成员 `--restore`，然后依次 `publish-transcripts`、`ingest-db`、`publish-data --assets-only`。
 - 平时会重试近期缺 VSTATS（公开场次，14 天内）或缺弹幕（7 天内）的场次；刚结束的场次不会被写成「不可用」。
-- 本地 manifest 比远端新（上次发布失败，或本地跑过 `--no-publish`）时，即使没有新场次也会补一次发布。
-- 发布前 `publish:data` 会核对远端 manifest 场次数；本地 pack 更少时拒绝覆盖（防止不完整的恢复把线上数据缩水）。
+- 本地 pack 比数据库新（上次 ingest 失败，或本地跑过 `--no-publish`）时，即使没有新场次也会补一次 ingest。
+- 数据库提交成功后按 `dataset-<id>` / `stream-<id>` / `group` / `sitemap` / `llms` / `transcripts` 调用 purge。
+
+### 缓存失效与最新场次
+
+```powershell
+bun run purge:cache --dataset nonoka --video W0bKqP-Eyj4
+bun run purge:cache --tags group,sitemap,llms
+bun run db:latest --dataset nonoka    # 数据工作流的 YouTube 探针
+```
+
+需要 `SITE_URL` 与 `PURGE_TOKEN`；未配置时脚本打印跳过，不视为失败。缓存是 Workers Cache，
+zone 级 purge 不影响它，只能走 Worker 的内部端点。
 
 ### 导出 YouTube cookie
 
@@ -264,11 +276,11 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 <base>/<datasetId>/thumbs/<videoId>.<w>.webp   # 对象存储
 ```
 
-`bun run publish:data` 的上传顺序是 **thumbs（原图 + 变体）→ pack → manifest / insights → index**：
-先保证图在，manifest 里的 `thumbnail` 出现时就一定有对应文件与全部 `srcset` 候选。要下架某张图，
+`bun run publish:assets` 的上传顺序是 **thumbs（原图 + 变体）→ emoji → archive**：
+先保证图在，页面渲染封面时一定有对应文件与全部 `srcset` 候选。要下架某张图，
 删掉本地文件后重跑发布即可；缺变体只警告，页面会退回原图。
 
-页面侧约定：`src/lib/thumb-variants.ts` 定义宽度与命名，`src/lib/data.ts` 拼 `thumbnailUrl()` /
+页面侧约定：`src/lib/thumb-variants.ts` 定义宽度与命名，`src/lib/media.ts` 拼 `thumbnailUrl()` /
 `thumbnailSrcSet()`，`StreamCover` 用 `srcset` + `sizes` 交给浏览器选档。
 
 ## 频道表情
@@ -288,7 +300,7 @@ data/<datasetId>/thumbs/<videoId>.<w>.webp     # 本地变体，w ∈ 480 / 960 
 bun run fetch:emoji --dataset yuno                   # 只补缺失
 bun run fetch:emoji --dataset yuno --force           # 重抓全部
 bun run fetch:emoji --dataset yuno --dry-run
-bun run publish:data --dataset yuno                  # 上传表情与 index.json
+bun run publish:assets --dataset yuno                # 上传表情与封面 / archive
 ```
 
 | 选项 | 说明 |
@@ -331,8 +343,9 @@ bun scripts/fetch-danmaku.ts --root "D:/projects/claude-messages/temp/youtube-li
 # 3. 用新弹幕把 v1 pack 升级成 v2
 bun scripts/enrich-chat.ts --root "D:/projects/claude-messages/temp/youtube-live"
 
-# 4. 重建 insights（本地；确认后再去掉 --no-upload 发布）
-bun run publish:data --no-upload
+# 4. 重新投影到数据库（重算 streams / dataset_insights）
+bun run db:ingest --dataset <id>
+bun run db:verify --dataset <id>
 ```
 
 多实例并行（互不重叠）：
@@ -355,8 +368,8 @@ bun scripts/fetch-danmaku.ts --root "..." --shard 4/4 --concurrency 3
 ```bash
 bun scripts/backfill-author-id.ts --root "D:/projects/claude-messages/temp/youtube-live"
 bun scripts/enrich-chat.ts --root "D:/projects/claude-messages/temp/youtube-live" --force
-bun run publish:data
-bun run verify:data --remote
+bun run db:ingest
+bun run db:verify
 ```
 
 - `scripts/backfill-author-id.ts` 只重写缺少 `authorId` 的 jsonl，已有 ID 的默认跳过；条数应与原文件一致。
@@ -385,7 +398,7 @@ bun scripts/backfill-owner-chats.ts --dataset arale --ids ids.txt --concurrency 
 | `--keep-raw` | 保留 `live_chat` 与归一化 jsonl |
 | `--dry-run` | 只列出目标 |
 
-补完后重新 `bun run publish:data`（或直接 `bun run db:ingest --dataset <id>`）让页面读到新字段。
+补完后重新 `bun run db:ingest --dataset <id>` 让页面读到新字段。
 
 ## 校验 v2 数据
 

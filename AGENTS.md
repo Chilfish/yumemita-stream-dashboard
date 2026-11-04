@@ -5,7 +5,7 @@
 
 ## 当前事实与目标形态
 
-**当前是 Astro SSR + Neon 查询形态（2026-11-03）。** 所有页面已迁到 `src/pages/*.astro`，旧 React Router 页面与依赖已删除；全量 1,897 场已入库并通过对账，剩余线上部署与缓存实测。
+**当前是 Astro SSR + Neon 查询形态（2026-11-04）。** 所有页面已迁到 `src/pages/*.astro`，旧 React Router 页面与依赖已删除；全量 1,897 场已入库并通过对账。每日任务已改为「数据库差集 → 抓取 → ingest → 资产 → purge」，客户端媒体统一走 `PUBLIC_R2_BASE`，逐字稿正文走同源 `/api/transcripts/...`。剩余线上部署与缓存 / R2 实测。
 
 | 项 | 当前 | 目标 |
 | --- | --- | --- |
@@ -16,7 +16,7 @@
 | Agent 视图 | `/{datasetId}/stream/{videoId}.md` 已实现 | 同左 |
 | 部署 | `wrangler.jsonc` 已配置，未正式部署 | Cloudflare Workers |
 
-已完成：Astro 脚手架、DB schema / ingest / 对账 / 查询层、全量 ingest（1,897 场，`db:verify` 0 problems）、全部页面与岛屿、sitemap / llms.txt / robots、`.md` 端点、内部 purge 端点、`astro check` / `test` / `build` / `preview`。剩余：Cloudflare 线上部署与缓存实测。详见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md)。
+已完成：Astro 脚手架、DB schema / ingest / 对账 / 查询层、全量 ingest（1,897 场，`db:verify` 0 problems）、全部页面与岛屿、sitemap / llms.txt / robots、`.md` 端点、逐字稿 API、内部 purge 端点、每日 ingest + purge、部署工作流、`astro check` / `test` / `build` / `preview` / `test:smoke`。剩余：Cloudflare 线上部署、`Cf-Cache-Status` / purge / R2 正文实测与回滚演练。详见 [docs/planning/astro-ssr-migration.md](./docs/planning/astro-ssr-migration.md)。
 
 ## 意图 → 文件映射（当前实现）
 
@@ -32,7 +32,7 @@
 | URL 状态 | `src/lib/table-params.ts`、`src/lib/routes.ts`、`src/lib/router-compat.tsx` | 可分享、可刷新 |
 | SEO | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | 请求期输出 head / sitemap |
 | Agent 视图 | `src/lib/agent-markdown.ts`、`src/pages/[datasetId]/stream/[videoId].md.ts` | `text/markdown` + 逐字稿 |
-| 数据发布 | `scripts/publish-data.ts`、`scripts/publish-transcripts.ts` | 先 pack / thumbs，最后 index |
+| 数据发布 | `scripts/publish-data.ts`、`scripts/publish-transcripts.ts` | `--assets-only`：thumbs / emoji / archive；逐字稿单独发 |
 | 每日增量 | `scripts/daily-update.ts`、`.github/workflows/data.yml` | 频道差集，安静日不发布 |
 | 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts` | 手写 Markdown，发布到 R2 |
@@ -74,24 +74,24 @@
 
 - Astro 7 `output: 'server'` + `@astrojs/cloudflare`；页面在 `src/pages/`，稳定页显式 `prerender = true`。
 - `src/layouts/Layout.astro` 负责 SEO、主题内联脚本、ClientRouter 与全局岛屿。
-- 旧 React Router 页面在 `src/legacy/pages/`，只作迁移参考，不进 Astro 路由；不要继续在旧页面上加功能。
-- 单场 / 对比的 datapack 仍按需加载；列表页只消费 manifest + insights（迁移阶段 1 后改查数据库）。
+- 旧 React Router 页面与 `src/legacy/` 已删除；不要在 `src/` 里重新引入 `react-router`。
+- 单场 / 对比的 pack 按需查 `/api/packs`（数据库还原）；列表页只消费查询层返回的 rows / insights。
 
 ### 📊 数据流
 
 ```text
 data/<id>/*.datapack.json
-  → publish:data 派生 manifest / insights / group-*
-  → R2
-  → 浏览器运行时读取
-  → buildSummaryRows → StreamSummary[]
-  → 单场按需拉 datapack
+  → db:ingest 事务 upsert → PostgreSQL（streams / details / insights / transcripts）
+  → publish:assets / publish:transcripts → R2（封面 / 表情 / archive / 逐字稿正文）
+  → 请求期 SSR 查库 → StreamSummary[] / DTO
+  → 单场 / 对比按需读 /api/packs（数据库还原）
 ```
 
-- 数据加载远端优先；远端不可达回退 `public/data/` 快照。
+- 页面只读数据库；R2 只放不可变对象。
+- 数据更新后按 Cache-Tag purge，不触发前端构建。
 - `vstats` / `comments` / `avgConcurrent` 可能为 `null`；图表跳过或显示「—」。
-- 单场页只请求该场 datapack；对比页最多 4 场。
-- 不要为单个数字拉完整 manifest。
+- 单场页只查该场数据；对比页最多 4 场。
+- 不要为单个数字查整张表或完整 pack。
 
 ### 🚨 三态覆盖
 
@@ -144,8 +144,8 @@ bun run validate:data  # 旧数据链路
 
 ### 🚀 发布与数据
 
-- 数据更新：`publish:data` 后刷新即可，不需要重新构建前端。
-- 新场次的静态分享卡片要等下一次构建；这是已知缺口。
+- 数据更新：`db:ingest` + `publish:assets` + `purge:cache` 后刷新即可，不需要重新构建前端。
+- 分享卡片 head 由 SSR 请求期输出，新场次 ingest 后即可用。
 - R2 凭据只在发布 / 抓取环境注入，不进入客户端 bundle。
 - 会员限定内容上线前确认公开范围。
 
@@ -168,7 +168,7 @@ bun run validate:data  # 旧数据链路
 | 反模式 | 正确做法 | 来源 |
 | --- | --- | --- |
 | 在视图里重复聚合 | 放 `src/lib/aggregate.ts`，补测试 | 分层 |
-| 为单个数字拉完整 manifest | 用 `group-summary` / insights / 当前 dataset | 性能 |
+| 为单个数字查整份 pack / 全表聚合 | 用查询层聚合 / `dataset_insights` | 性能 |
 | 把 `null` 画成 0 | 跳过或显示「—」 | 数据口径 |
 | 手写按钮 / 弹层 / 下拉 | 复用 `src/components/ui/` | UI 规范 |
 | 硬编码颜色 | CSS 变量 / Token | UI 规范 |
@@ -176,7 +176,7 @@ bun run validate:data  # 旧数据链路
 | 无 loading / empty / error 状态 | 三态覆盖 | 三态约定 |
 | 对不可信 Markdown 用 `set:html` | `react-markdown` 默认安全模式 | 安全 |
 | 在客户端模块读 R2 凭据 | 只在服务端 / 脚本读取 | 安全 |
-| 手改 manifest / insights | 由 `publish:data` 派生 | 数据 |
+| 手改 manifest / insights | 由 `db:ingest` 派生到数据库 | 数据 |
 | 把计划写成现状 | 未完成放 backlog / 阶段方案 | 写作规范 |
 | 死链、旧路径 | 合并前全局搜索并打开检查 | 文档 |
 | 带着已知失败合并 | 先修或移除 | 验证 |

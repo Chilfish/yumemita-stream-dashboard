@@ -43,11 +43,11 @@
 
 | 规则 | 自查点 | 对策 |
 | --- | --- | --- |
-| 单一真源 | manifest / insights 是否被手改 | 只由 `publish:data` 派生 |
-| 发布顺序 | 是否先传 pack / thumbs，最后写 index | 失败只多对象，不指向缺失文件 |
-| 回退可见 | 远端不可达时页面是否标明快照来源 | 保留 `public/data` 回退与提示 |
-| 增量进度 | `.publish-state.json` 是否与实际桶一致 | 怀疑漂移时 `publish:data --force` |
-| 数据缩水 | 本地 pack 少于远端时是否拒绝覆盖 | 保留完整性校验；确实下架才加 `--allow-shrink` |
+| 单一真源 | `streams` / `dataset_insights` 是否被手改 | 只由 `db:ingest` 从 pack 派生 |
+| 提交顺序 | 是否先 ingest 再 purge | 数据库提交成功后才失效缓存 |
+| 错误可见 | 数据库不可用时是否显示错误态 | 三态覆盖，不要静默空数组 |
+| 增量进度 | `.publish-state.json` 是否与实际桶一致 | 怀疑漂移时 `publish:assets --force` |
+| 数据缩水 | 本地 pack 少于数据库时 ingest 是否覆盖 | 确认下架流程，不要先 truncate 再灌 |
 | 会员限定 | 公开范围是否确认 | 不确定就不上传公开桶 |
 
 ### 3. 样式与 UI
@@ -64,10 +64,10 @@
 
 | 规则 | 自查点 | 对策 |
 | --- | --- | --- |
-| 静态 head 新鲜度 | 新场次是否等下次构建才有分享卡片 | 记录缺口；迁移后由 SSR / sitemap endpoint 解决 |
-| 环境变量内联 | `VITE_*` 改地址后是否重新构建 | 构建时注入，数据更新不用重建 |
+| 部署配置来源 | 是否用根 `wrangler.jsonc` 直接 `wrangler deploy` | 必须用 adapter 生成的 `dist/server/wrangler.json`；根配置的 `assets: ./dist` 会把 `server/` 与 `.dev.vars` 当静态资源 |
+| 构建期变量 | `PUBLIC_R2_BASE` / `SITE_URL` 改了是否重新构建 | 构建时注入；部署工作流显式设置 |
 | R2 凭据 | 发布机是否有 `R2_*` | 只在抓取 / 发布环境注入 |
-| 缓存头 | 封面 / datapack 是否长缓存，index 是否短缓存 | 由桶 / CDN 规则控制 |
+| 缓存头 | 封面 / emoji 是否长缓存，数据页是否短缓存 | 由 R2 Cache Rule 与 `Astro.cache.set` 控制 |
 | 子路径 | Astro `base` 是否同时影响路由与静态资源 | 子路径下完整冒烟 |
 
 ### 5. 验证与流程
@@ -82,17 +82,19 @@
 | 死链 | 索引是否指向不存在的文件 | 合并前逐条打开检查 |
 | 迁移双份事实 | Astro 方案是否被写成已上线 | 当前实现与目标形态分开写 |
 
-### 6. 迁移期（Astro + PostgreSQL + Workers）
+### 6. Astro + PostgreSQL + Workers
 
 | 规则 | 自查点 | 对策 |
 | --- | --- | --- |
 | 每页声明 `prerender` | 数据页是否误写 `true` | 数据页 `false`，稳定页 `true` |
 | 岛屿 props 可序列化 | 是否传函数、类实例、`Date` | 查询层统一返回字符串 / 普通对象 |
 | `client:only` 不放正文 | 首屏内容是否由 `client:only` 渲染 | 正文用 `.astro` 输出 |
-| 数据库事务 | ingest 是否用了 `neon-http` 做事务 | ingest 用 `postgres` / WebSocket Pool |
+| 数据库事务 | ingest 是否用了 `neon-http` 做事务 | ingest 用 `neon-serverless` WebSocket Pool |
 | 缓存失效范围 | 是否以为 zone purge 会清 Workers Cache | 走 Worker 内部 purge 端点 |
 | `.md` 重复收录 | `.md` 是否进了 sitemap | `X-Robots-Tag: noindex`，不进 sitemap |
 | 全量弹幕体积 | 是否把 691 万条弹幕塞进热表 | 先聚合，`chat_events` 分区后再上 |
+| 数据工作流依赖 | 加了 Drizzle / Neon import 后是否仍没装包 | 工作流显式 `bun install --frozen-lockfile` |
+| 公开桶范围 | 逐字稿正文是否走了公开 R2 域名 | 正文走同源 `/api/transcripts/...` + binding |
 
 ## 高频雷区（来自实际 postmortem）
 

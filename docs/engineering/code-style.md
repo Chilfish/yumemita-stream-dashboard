@@ -77,8 +77,8 @@ empty   → 说明「这里是什么、为什么空、下一步」
 error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 ```
 
-- `manifest` / `insights` / `datapack` 都可能失败；单个成员失败不能阻塞组首页。
-- 远端不可达时回退到 `public/data/` 快照，并在页面上标明来源。
+- 数据库查询可能失败；单个成员失败不能阻塞组首页。
+- 查询失败时显示错误态与可执行动作，不要静默返回空数组。
 - `vstats`、`comments`、`avgConcurrent` 可能是 `null`；图表跳过或显示「—」，不要画 0。
 - 不把回退成功当成配置正确；日志要说明原因。
 
@@ -121,7 +121,7 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 | 首屏渲染依赖 `window` | 放到事件或 effect |
 | 手写弹层 / 下拉 | 复用 `src/components/ui/` |
 | 对不可信 Markdown 用 `set:html` | 只渲染自有内容；`react-markdown` 默认安全模式 |
-| 提交 `data/`、`public/data/`、`dist/` | 用脚本生成，gitignore |
+| 提交 `data/`、`dist/` | 用脚本生成，gitignore |
 | `console.log` 遗留 | 移除；错误路径用 `console.error` / `console.warn` |
 
 ## 验证与诚实

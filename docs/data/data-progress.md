@@ -134,12 +134,12 @@ bun run db:verify
 已入库和已有素材的场次会自动跳过，中断后直接重跑同一条命令即可。
 
 换设备或清掉 `data/` 后不需要先跑别的脚本：本地没有 manifest 时，`fetch-streams` 会先从
-`VITE_DATAPACK_BASE`（或 `R2_*` 凭据）恢复 manifest 与缺失的 datapack，再按同样的规则跳过
+`archive/<id>/`（或 `DATAPACK_BASE` 公开地址）恢复缺失的 datapack，再按同样的规则跳过
 已抓场次。要强制刷新本地暂存区时加 `--restore`，不想联网时加 `--no-restore`。
 
 ## 口径提醒
 
-- **以远端为准**：场次数、日期范围与 VSTATS 覆盖都读对象存储上的 `manifest.json`；`data/` 是可重建的本地暂存区，不保证完整。
+- **以数据库为准**：场次数、日期范围与 VSTATS 覆盖以 `streams` 表为准；`data/` 是可重建的本地暂存区，不保证完整。
 - **同名去重**：教学/游戏系列会同一标题分多场，manifest 只保留时长正常的正片；摘要、预告、切片不进数据集。
 - **会员限定**：`availability: "subscriber_only"` 的场次需要已登录 Firefox cookie 才能取到 chat replay。
 - **评论区是抓取上限**：`commentsCaptured` 是 yt-dlp `--write-comments` 抓到的条数，不是视频总评论数。

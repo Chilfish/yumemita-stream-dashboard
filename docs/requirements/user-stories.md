@@ -100,7 +100,7 @@
 
 - **状态**：✅ 已完成（`FR-DATA-001`、`FR-DATA-002`）
 - **验收标准**：
-  - [x] 加场次只需放 pack 并 `publish:data`
+  - [x] 加场次只需放 pack 并 `db:ingest`
   - [x] 加成员只需 `data-sources.json` 与 pack 目录
   - [x] manifest / insights 由脚本派生，不手改
   - [x] `validate:data` 通过

@@ -7,9 +7,9 @@
 
 | 编号 | 任务 | 优先级 | 前置条件 | 来源 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 阶段 0–4 与全量 ingest 完成；线上部署与缓存实测待做 |
+| B1 | Astro + PostgreSQL + Workers SSR 迁移（`FR-ARCH-001`） | P1 | 方案评审通过；Neon / R2 / Workers 账号 | 迁移 | 🚧 阶段 0–5 与全量 ingest 完成；每日 ingest / 资产 / purge、数据库差集、逐字稿 API 已接；线上部署与缓存实测待做 |
 | B2 | 单场 `.md` Agent 路由（`FR-AGENT-001`） | P2 | B1 的数据库查询层 | 迁移 | ✅ 已实现 |
-| B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 缓存 purge 端点 | 已知缺口 | 🚧 端点已实现，线上实测待做 |
+| B3 | 数据更新后的缓存失效与静态 SEO 刷新（`FR-DATA-004`） | P1 | 缓存 purge 端点 | 已知缺口 | 🚧 端点与每日自动 purge 已实现，线上实测待做 |
 | B4 | 跨成员对比（`FR-COMPARE-002`） | P2 | 统一场次/时间段口径 | roadmap | 📋 |
 | B5 | 观众重叠页面（`authors.json` 已有数据） | P2 | 确认重叠算法与最小样本 | roadmap | 📋 |
 | B6 | 全量弹幕入库与检索 | P2 | B1；`chat_events` 分区方案 | 迁移 | 📋 |
@@ -113,8 +113,10 @@
 ```bash
 bun run check
 bun run build
-bun run validate:data   # 改数据时
-bun run verify:seo      # 改路由 / SEO / 构建时
+bun run validate:data   # 改 pack / 数据时
+bun run db:verify       # 改 ingest / 数据时
+bun run db:query        # 改查询层时
+bun run test:smoke      # 改路由时，先启动 preview
 ```
 
 - 涉及页面的改动必须手工走查并记录路径与结果。

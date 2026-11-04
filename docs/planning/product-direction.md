@@ -173,9 +173,9 @@ bun run transcript:import "D:/messages/archives/…/2026-10-13_ライブ振り�
 <base>/<dataset>/transcripts/<videoId>.json       # { frontmatter, markdown, updatedAt }
 ```
 
-- `bun run publish:transcripts`：解析 frontmatter → 写索引 → 上传正文 JSON；单篇失败跳过并记录，索引最后写。
-- `sync:data` 从 `content/transcripts/` 的 frontmatter 生成 `transcripts/index.json` 到 `public/data/`，作为离线兜底。
-- 页面远端优先，失败回退到构建快照。
+- `bun run publish:transcripts`：解析 frontmatter → 上传正文 JSON；单篇失败跳过并记录。
+- `ingest-db` 把 frontmatter 写入 `transcripts` 表；索引页与单场可用性查库。
+- 正文由同源 `/api/transcripts/:datasetId/:videoId` 从 R2 binding 读取；开发环境回退到本地 Markdown 快照。
 - 正文保留 Markdown 原文，客户端渲染；不预渲染 HTML，避免 sanitizer 版本与缓存问题。
 
 ### 6.3 渲染
@@ -245,7 +245,7 @@ bun run transcript:import "D:/messages/archives/…/2026-10-13_ライブ振り�
 ## 9. 维护性约束
 
 - 单一真源：封面来自 pack 的 `video.thumbnail`，逐字稿来自 `content/`；派生索引一律由发布步骤生成，不手改。
-- 增量、可续跑、单条失败不阻塞（与 `fetch-streams` / `publish:data` 一致）。
+- 增量、可续跑、单条失败不阻塞（与 `fetch-streams` / `publish:assets` 一致）。
 - 不新增常驻服务、数据库、账号体系；对象存储 + 静态托管仍是唯一运行时依赖。
 - 外部服务（YouTube、推文归档）一律可降级，不能成为首屏阻塞。
 - 新依赖需要维护性理由；封面转码用 Bun 自带的 `Bun.Image`、逐字稿不引编辑器，都是这个原则的体现。
