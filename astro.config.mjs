@@ -6,11 +6,20 @@ import { cacheCloudflare } from '@astrojs/cloudflare/cache'
 import react from '@astrojs/react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, envField } from 'astro/config'
+import { loadEnv } from 'vite'
 import { DEFAULT_SITE_URL } from './src/lib/site-defaults.ts'
+
+// Bun / CI 未必把 .env 注入 process.env；显式读一次，避免 SITE_URL 静默回退。
+const mode = process.env.NODE_ENV === 'development' ? 'development' : 'production'
+const fileEnv = loadEnv(mode, process.cwd(), '')
+const siteUrl = (process.env.SITE_URL || fileEnv.SITE_URL || DEFAULT_SITE_URL).replace(/\/+$/, '')
+if (!process.env.PUBLIC_R2_BASE && !fileEnv.PUBLIC_R2_BASE) {
+  console.warn('[astro.config] PUBLIC_R2_BASE 未设置：构建产物会回退到 /data/，线上封面 / 表情会 404')
+}
 
 // https://astro.build/config
 export default defineConfig({
-  site: process.env.SITE_URL || DEFAULT_SITE_URL,
+  site: siteUrl,
   output: 'server',
   session: false,
   adapter: cloudflare({
