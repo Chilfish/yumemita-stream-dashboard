@@ -367,6 +367,8 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 
 ## 8. 开播前 / 直播中采集
 
+消息与事件的字段级定义、事件类型、合并去重和已知限制见 [chat-events.md](./chat-events.md)。本节只保留与 pack 相关的入口。
+
 yt-dlp 的 `live_chat` 字幕只在直播结束后才存在；等待室与直播中的弹幕走 InnerTube：
 
 ```bash
@@ -385,6 +387,27 @@ bun run fetch:live-chat --video <videoId> --once   # 只拉一页（等待室历
   （仍需 `fetch:streams` 抓到 `meta/info.json`）。
 - 词频只统计消息正文，不含系统提示；主播操作通过 `chat.ownerChats`（`kind: "event"`）进入 `?view=words`，
   全部事件保留在 `chat.events`。
+- 登录态默认复用 `~/yt-cookies.txt`：首次从浏览器导出，之后直接读取；`--refresh-cookies` 强制刷新，
+  `--no-cookies` 以匿名状态抓取。CI 用 `--cookies <文件>` 或 `YT_COOKIE`。
+
+### 已结束场次的回放
+
+watch 页 `liveChatRenderer.isReplay === true` 时，拿 `reloadContinuationData` 请求
+`youtubei/v1/live_chat/get_live_chat_replay` 即可翻完整个回放（匿名可用）：
+
+```bash
+bun scripts/fetch-danmaku.ts --dataset <id> --video <videoId>   # 单场补弹幕
+bun run fetch:live-chat --video <videoId>                       # 已结束时也自动走回放
+```
+
+- 续页只认 `liveChatReplayContinuationData`；`playerSeekContinuationData` 是跳转进度，不是下一页。
+- 输出与实时采集同一套：`danmaku_<videoId>.jsonl`、`events_<videoId>.jsonl`、`emoji_<videoId>.json`；
+  已有的 `danmaku_live_` 与旧 yt-dlp jsonl 会在收尾时合并（`rendererId` 优先，旧档缺 id 时按
+  `timestampUs + 作者 + kind + text` 对齐）。
+- 回放首屏的 `Live chat replay is on` 是播放器提示，不写入事件；中断状态在
+  `work/replay-state.json`，重跑从断点续翻，`--force` 才从头重抓。
+- 回放只覆盖 YouTube 当前可见的消息；被删除 / 封禁账号的历史消息只在 yt-dlp 字幕档里。
+  需要历史完整档时对已有场次跑 `--force --engine yt-dlp`。
 
 ## 口径与限制
 

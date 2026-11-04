@@ -35,11 +35,13 @@ docs/
 ├── data/                        # 数据模型、加数据、抓取进度
 │   ├── README.md
 │   ├── data-model.md
+│   ├── chat-events.md
 │   ├── adding-data.md
 │   └── data-progress.md
 ├── ui-design/                   # 设计系统与 coss 组件规范
 │   ├── README.md
-│   └── GENERAL.md
+│   ├── GENERAL.md
+│   └── chat-visualization.md
 ├── postmortem/                  # 事故复盘与基线雷区
 │   ├── README.md
 │   └── TEMPLATE.md
@@ -48,7 +50,8 @@ docs/
 │   └── TEMPLATE.md
 ├── development-log/             # 按天开发日志
 │   ├── README.md
-│   └── 2026-11-03.md
+│   ├── 2026-11-03.md
+│   └── 2026-11-04.md
 └── archive/                     # 历史调研与已完成阶段方案
     ├── README.md
     └── ssg-research.md
@@ -69,6 +72,8 @@ docs/
 | 性能回归 | [performance.md](./engineering/performance.md) | 首屏数据流、缓存分层、实测数字 |
 | 排查页面 / 数据问题 | [troubleshooting.md](./engineering/troubleshooting.md) | 常见报错与口径 |
 | 读写数据 / 加场次 | [data-model.md](./data/data-model.md) + [adding-data.md](./data/adding-data.md) | 字段、口径、发布步骤 |
+| 弹幕 / 事件字段与事件类型 | [chat-events.md](./data/chat-events.md) | 消息记录、事件记录、去重、表情索引、已知限制 |
+| 做弹幕可视化 / 时间线 | [chat-visualization.md](./ui-design/chat-visualization.md) + [ui-design/README.md](./ui-design/README.md) | 数据契约、行类型、虚拟化、导入与正式化路径 |
 | 查看抓取进度 | [data-progress.md](./data/data-progress.md) | 已入库场次、跳过判定、下一批候选 |
 | 改 UI / 组件 | [ui-design/README.md](./ui-design/README.md) + [GENERAL.md](./ui-design/GENERAL.md) | Token、排版、coss 原子组件 |
 | 写文档 / 界面文案 | [writing-style.md](./writing-style.md) | 语气、用词、术语、反例 |

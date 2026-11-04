@@ -7,6 +7,7 @@
 | 文档 | 说明 | 何时阅读 |
 | --- | --- | --- |
 | [data-model.md](./data-model.md) | manifest / datapack / insights / group-* 的字段、口径、版本演进 | 读写 JSON、排查数据问题 |
+| [chat-events.md](./chat-events.md) | 弹幕 / 事件的完整字段、事件类型、合并去重、表情索引与限制 | 读写 jsonl、做弹幕时间线、查事件口径 |
 | [adding-data.md](./adding-data.md) | 加场次、加成员、加逐字稿、数据校验 | 数据有更新 |
 | [data-progress.md](./data-progress.md) | 五位成员的抓取进度、跳过判定、下一批候选 | 继续补历史场次 |
 
@@ -54,7 +55,8 @@ bun run db:verify --dataset <id>   # 与 pack 字段级对账
 bun run publish:assets --dataset <id>  # 封面 / 表情 / archive → R2
 bun run fetch:thumbs --dataset <id>
 bun run fetch:emoji --dataset <id>
-bun run fetch:live-chat --video <videoId>  # 开播前 / 直播中弹幕
+bun run fetch:live-chat --video <videoId>  # 开播前 / 直播中 / 已结束时抓回放
+bun scripts/fetch-danmaku.ts --dataset <id> --video <videoId>  # 单场补弹幕（回放）
 bun run publish:transcripts
 bun run purge:cache --dataset <id> # 失效 Workers Cache
 ```

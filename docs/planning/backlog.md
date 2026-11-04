@@ -17,7 +17,8 @@
 | B8 | IndexNow / sitemap 主动通知 | P3 | B3 | SEO | 📋 |
 | B9 | 200% 缩放复核（320px 已通过） | P3 | 无 | roadmap | 📋 |
 | B10 | 逐字稿索引与「这场有没有稿」改由数据库查询 + SSR（`FR-TRANSCRIPT-001`） | P2 | `transcripts` 元数据 ingest | 迁移 | ✅ 已实现 |
-| B11 | 开播前 / 直播中弹幕采集（InnerTube live chat，补齐 yt-dlp 只能拿回放的空档） | P2 | 无 | 2026-11-04 需求 | 🚧 `fetch:live-chat` 与回放合并已实现；每日任务尚未接入 |
+| B11 | 开播前 / 直播中弹幕采集（InnerTube live chat，补齐 yt-dlp 只能拿回放的空档） | P2 | 无 | 2026-11-04 需求 | 🚧 实时采集、已结束场次自动回放（`fetch:live-chat` / `fetch:danmaku --video`）与合并已实现；每日任务尚未自动接入实时采集 |
+| B12 | 弹幕与事件可视化组件（POC `/dev/live-chat`） | P2 | B6 或 R2 `danmaku_*.jsonl` 读取方案 | 2026-11-04 需求 | 🚧 POC 完成；数据源、组件化与正式入口待做 |
 
 ## 审查承接区
 

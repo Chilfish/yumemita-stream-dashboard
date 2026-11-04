@@ -137,3 +137,7 @@
 ## 9. 文案
 
 界面文案按 [writing-style.md](../writing-style.md)：按钮用动词或名词短语；空态说三件事；错误提示给可执行动作；数字带单位。
+
+## 10. 专题
+
+- [chat-visualization.md](./chat-visualization.md)：弹幕与事件可视化组件的目标形态、数据契约、虚拟化、导入与正式化路径。当前 `/dev/live-chat` 只是 POC。

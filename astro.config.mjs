@@ -8,6 +8,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, envField } from 'astro/config'
 import { loadEnv } from 'vite'
 import { DEFAULT_SITE_URL } from './src/lib/site-defaults.ts'
+import { loadPreviewData, loadEmojiIndex } from './scripts/lib/live-chat-preview-data.ts'
 
 // Bun / CI 未必把 .env 注入 process.env；显式读一次，避免 SITE_URL 静默回退。
 const mode = process.env.NODE_ENV === 'development' ? 'development' : 'production'
@@ -15,6 +16,53 @@ const fileEnv = loadEnv(mode, process.cwd(), '')
 const siteUrl = (process.env.SITE_URL || fileEnv.SITE_URL || DEFAULT_SITE_URL).replace(/\/+$/, '')
 if (!process.env.PUBLIC_R2_BASE && !fileEnv.PUBLIC_R2_BASE) {
   console.warn('[astro.config] PUBLIC_R2_BASE 未设置：构建产物会回退到 /data/，线上封面 / 表情会 404')
+}
+
+// 开发预览：workerd 里没有真实文件系统，改由 Vite 的 Node 中间件读 temp/youtube-live。
+const liveChatRoot = fileURLToPath(new URL('./temp/youtube-live', import.meta.url))
+const liveChatEmojiBase = (process.env.PUBLIC_R2_BASE || fileEnv.PUBLIC_R2_BASE || 'https://s3.chilfish.top/stream-dashboard').replace(/\/+$/, '')
+
+function liveChatPreviewPlugin() {
+  return {
+    name: 'live-chat-preview',
+    apply: 'serve',
+    /** @param {import('vite').ViteDevServer} server */
+    configureServer(server) {
+      server.middlewares.use('/dev/live-chat-emoji-index', async (req, res) => {
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        const dataset = url.searchParams.get('dataset') ?? ''
+        try {
+          const names = await loadEmojiIndex(liveChatRoot, dataset, liveChatEmojiBase)
+          res.setHeader('content-type', 'application/json; charset=utf-8')
+          res.setHeader('cache-control', 'no-store')
+          res.end(JSON.stringify({ names }))
+        }
+        catch {
+          res.setHeader('content-type', 'application/json; charset=utf-8')
+          res.end(JSON.stringify({ names: {} }))
+        }
+      })
+      server.middlewares.use('/dev/live-chat-data', async (req, res) => {
+        const url = new URL(req.url ?? '/', 'http://localhost')
+        try {
+          const data = await loadPreviewData(liveChatRoot, url.searchParams.get('session'))
+          res.setHeader('content-type', 'application/json; charset=utf-8')
+          res.setHeader('cache-control', 'no-store')
+          res.end(JSON.stringify(data))
+        }
+        catch (error) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json; charset=utf-8')
+          res.end(JSON.stringify({
+            root: liveChatRoot,
+            sessions: [],
+            session: null,
+            error: error instanceof Error ? error.message : String(error),
+          }))
+        }
+      })
+    },
+  }
 }
 
 // https://astro.build/config
@@ -96,7 +144,7 @@ export default defineConfig({
   },
   integrations: [react()],
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss(), liveChatPreviewPlugin()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

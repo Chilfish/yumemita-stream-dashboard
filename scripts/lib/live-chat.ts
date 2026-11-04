@@ -25,10 +25,26 @@ interface Renderer {
   authorBadges?: BadgeWrapper[]
   message?: { runs?: Run[] }
   header?: { liveChatSponsorshipsHeaderRenderer?: SponsorshipsHeader }
-  /** 会员入会/续费文案；普通弹幕没有。 */
-  headerSubtext?: { runs?: Run[] }
+  /** 会员留言的主文案（如 `Member for 25 months`）。 */
+  headerPrimaryText?: { runs?: Run[]; simpleText?: string }
+  /** 会员入会/续费文案或会员自定义状态；普通弹幕没有。 */
+  headerSubtext?: { runs?: Run[]; simpleText?: string }
   timestampUsec?: string
   purchaseAmountText?: { simpleText?: string }
+  sticker?: {
+    thumbnails?: { url?: string, width?: number, height?: number }[]
+    accessibility?: { accessibilityData?: { label?: string } }
+  }
+  // YouTube 把 SC / 贴纸的等级颜色直接写在 renderer 上（ARGB 整数）。
+  headerBackgroundColor?: number
+  headerTextColor?: number
+  bodyBackgroundColor?: number
+  bodyTextColor?: number
+  authorNameTextColor?: number
+  timestampColor?: number
+  moneyChipBackgroundColor?: number
+  moneyChipTextColor?: number
+  backgroundColor?: number
 }
 
 interface BadgeWrapper {
@@ -66,6 +82,23 @@ interface RawLine {
   replayChatItemAction?: { actions?: Array<{ addChatItemAction?: { item?: ChatItemWrapper } }> }
 }
 
+export interface ChatPaidColors {
+  headerBackground?: number
+  headerText?: number
+  bodyBackground?: number
+  bodyText?: number
+  authorName?: number
+  timestamp?: number
+  moneyChipBackground?: number
+  moneyChipText?: number
+  background?: number
+}
+
+export interface ChatStickerAsset {
+  name: string | null
+  url: string
+}
+
 export interface ChatRecord {
   seq: number
   video: string
@@ -85,8 +118,16 @@ export interface ChatRecord {
     timestampUs?: string
     emoji?: { id: string }[]
     badges?: string[]
-    /** 会员里程碑文案，如 `Welcome to …`（仅 `kind: 'membership'`）。 */
+    /** 会员里程碑文案或会员自定义状态；普通弹幕没有。 */
     header?: string
+    /** 会员留言的主文案（`Member for 25 months`）。 */
+    membershipPrimary?: string
+    /** 会员留言带正文时归为 text，但仍保留会员标记。 */
+    memberMessage?: boolean
+    /** SC / 贴纸的等级颜色（ARGB 整数）；旧档没有。 */
+    colors?: ChatPaidColors
+    /** 付费贴纸的图片与无障碍名称；旧档没有。 */
+    sticker?: ChatStickerAsset
     /** 一次赠送的会员个数（仅 `kind: 'gift'`）。 */
     giftCount?: number
   }
@@ -157,6 +198,48 @@ function toEmojiAsset(emoji: RawEmoji): ChatEmoji | null {
   return { id, name: label || shortcut || null, url }
 }
 
+/** `{ simpleText } | { runs[] }` 两种文案形态。 */
+function readText(value: { runs?: Run[], simpleText?: string } | undefined): string {
+  if (!value)
+    return ''
+  if (typeof value.simpleText === 'string')
+    return value.simpleText.trim()
+  return (value.runs ?? []).map(run => run.text ?? '').join('').trim()
+}
+
+function readPaidColors(renderer: Renderer): ChatPaidColors | null {
+  const entries: [keyof ChatPaidColors, number | undefined][] = [
+    ['headerBackground', renderer.headerBackgroundColor],
+    ['headerText', renderer.headerTextColor],
+    ['bodyBackground', renderer.bodyBackgroundColor],
+    ['bodyText', renderer.bodyTextColor],
+    ['authorName', renderer.authorNameTextColor],
+    ['timestamp', renderer.timestampColor],
+    ['moneyChipBackground', renderer.moneyChipBackgroundColor],
+    ['moneyChipText', renderer.moneyChipTextColor],
+    ['background', renderer.backgroundColor],
+  ]
+  const colors: ChatPaidColors = {}
+  for (const [key, value] of entries) {
+    if (typeof value === 'number')
+      colors[key] = value
+  }
+  return Object.keys(colors).length > 0 ? colors : null
+}
+
+function readSticker(renderer: Renderer): ChatStickerAsset | null {
+  const thumbs = [...(renderer.sticker?.thumbnails ?? [])]
+    .filter(thumb => typeof thumb.url === 'string' && thumb.url)
+    .sort((a, b) => (b.width ?? 0) - (a.width ?? 0))
+  const url = thumbs[0]?.url
+  if (!url)
+    return null
+  return {
+    name: renderer.sticker?.accessibility?.accessibilityData?.label?.trim() || null,
+    url: url.startsWith('//') ? `https:${url}` : url,
+  }
+}
+
 export function toRecord(
   item: ChatItemWrapper | undefined,
   videoId: string,
@@ -222,9 +305,27 @@ export function toRecord(
     timestampUs,
   }
   if (kind === 'membership') {
-    const header = (renderer.headerSubtext?.runs ?? []).map(run => run.text ?? '').join('').trim()
+    const primary = readText(renderer.headerPrimaryText)
+    const subtext = readText(renderer.headerSubtext)
+    if (primary)
+      msg.membershipPrimary = primary
+    // 老数据里会员留言（带正文）被记成 membership；新数据按普通弹幕处理，徽章仍保留成员身份。
+    if (text.trim()) {
+      kind = 'text'
+      msg.kind = 'text'
+      msg.memberMessage = true
+    }
+    const header = subtext || primary
     if (header)
       msg.header = header
+  }
+  const colors = readPaidColors(renderer)
+  if (colors)
+    msg.colors = colors
+  if (kind === 'sticker') {
+    const sticker = readSticker(renderer)
+    if (sticker)
+      msg.sticker = sticker
   }
   if (kind === 'gift') {
     const giftCount = giftCountOf(runs, text)

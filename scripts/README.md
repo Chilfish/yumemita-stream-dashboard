@@ -331,9 +331,13 @@ data/youtube/emoji/<hash>.png            # YouTube 全局表情（只存一份�
 
 ## 补缺失弹幕（v2 全量升级）
 
-只抓 `live_chat` 回放，不重新抓 meta / 评论 / VSTATS；已有 pack 的其余字段原样保留。
+只抓弹幕回放，不重新抓 meta / 评论 / VSTATS；已有 pack 的其余字段原样保留。
+默认走 InnerTube 回放（匿名可用），watch 页没有回放聊天时回退 yt-dlp 的 `live_chat` 字幕。
 
 ```bash
+# 单场补数据（最常用）
+bun scripts/fetch-danmaku.ts --dataset nonoka --video W0bKqP-Eyj4
+
 # 1. 生成缺失清单（有弹幕、但本机没有 danmaku_<id>.jsonl）
 bun scripts/missing-danmaku.ts --root "D:/projects/claude-messages/temp/youtube-live"
 
@@ -358,8 +362,14 @@ bun scripts/fetch-danmaku.ts --root "..." --shard 4/4 --concurrency 3
 ```
 
 - `--shard i/n` 按全局任务顺序取模分片，多个实例不会抢同一场；中断后重跑会跳过已有 jsonl。
+- `--engine auto`（默认）先走 InnerTube 回放，没有回放聊天时回退 yt-dlp；`--engine innertube` / `yt-dlp` 可强制单条链路。
+- InnerTube 输出 `danmaku_<id>.jsonl` + `events_<id>.jsonl` + `emoji_<id>.json`，与实时采集同一套字段；
+  中断后从 `work/replay-state.json` 续翻，`--force` 才从头重抓。
+- 已有 yt-dlp 档时按「`rendererId` + 内容」双键合并：旧档没有 id 也不会重复，历史消息不会丢。
+- 回放接口只覆盖 YouTube 当前可见的消息；被删除 / 封禁账号的旧消息只在 yt-dlp 字幕档里，
+  需要完整历史时用 `--force --engine yt-dlp` 再抓一次。
 - 建议总并发（实例数 × `--concurrency`）控制在 8–12，太高容易触发 YouTube 限流。
-- 会员限定场次需要 Firefox cookie；默认 `--cookies-from-browser firefox`，也可 `--cookies <jar>`。
+- 会员限定场次需要登录态：默认复用 `~/yt-cookies.txt`（见下节），也可 `--cookies <jar>` / `--cookie <请求头>`。
 - 没有弹幕回放的场次会写 `work/chat-unavailable.txt`，下次跳过；失败写 `data/missing-danmaku/failed*.json`。
 - `scripts/enrich-chat.ts` 只重算作者 / 词频 / 徽章 / 构成，保留 video / vstats / comments / density / paid。
 
@@ -375,26 +385,52 @@ bun run db:verify
 - `scripts/backfill-author-id.ts` 只重写缺少 `authorId` 的 jsonl，已有 ID 的默认跳过；条数应与原文件一致。
 - `scripts/enrich-chat.ts --force` 会把已是 v2 的 pack 也用新 jsonl 重新聚合。
 
+## cookie 缓存（`~/yt-cookies.txt`）
+
+抓取脚本共用一份登录态 cookie：第一次从浏览器导出，之后直接复用。
+
+```bash
+# 手动导出 / 强制刷新（平时不需要，缺失时脚本会自动导出）
+bun scripts/export-yt-cookies.ts
+bun scripts/export-yt-cookies.ts --browser edge --push
+```
+
+- 默认 `--browser firefox`，输出 `~/yt-cookies.txt`；`fetch-streams` / `fetch-danmaku` / `fetch-live-chat` /
+  `daily-update` / `backfill-owner-chats` 都会自动读取。
+- 首次导出后直接复用；需要刷新时加 `--refresh-cookies`，换路径用 `--cookie-cache <文件>`，
+  完全不使用加 `--no-cookies`。
+- 优先级：`--cookie` 请求头 > `--cookies <文件>` > `YT_COOKIE` > `~/yt-cookies.txt` > 匿名。
+- 文件是登录态凭据，等同账号密码：不要提交、不要贴到聊天里；浏览器退出登录即可失效。
+- 手工请求 watch 页只发送 youtube.com 的 cookie；混入 google.com 的 `NID` / `SIDCC` 会被降级成没有
+  `ytInitialData` 的页面。`#HttpOnly_` 是前缀不是注释，`SID` / `__Secure-*` 都会保留。
+
 ## 开播前 / 直播中采集（实时通道）
 
 `fetch-live-chat.ts` 走 InnerTube 实时聊天，补 yt-dlp 只能拿回放的盲区：等待室与直播中也能落弹幕。
+直播结束后再跑一次会**自动改走 InnerTube 回放**，写出与 `fetch-danmaku` 相同的一套文件。
 
 ```powershell
 # 跟随到结束；Ctrl-C 保存状态退出
 bun run fetch:live-chat --video fmjJNbzcr3g
 
-# 只拉一页（等待室历史 / 定时任务）
+# 已结束的场次：直接翻完整回放
+bun run fetch:live-chat --video W0bKqP-Eyj4
+
+# 只拉一页（等待室历史 / 定时任务），不会触发完整回放
 bun run fetch:live-chat --video fmjJNbzcr3g --once
 bun run fetch:live-chat --dataset yuno --ids ids.txt --once
 ```
 
 - watch 页必须带浏览器 UA + `hl=en`；continuation 优先级 reload → timed → invalidation → replay，
   等待室只给 reload。`LIVE_STREAM_OFFLINE` 不是终态。
-- 输出 `danmaku_live_<videoId>.jsonl` 与 `events_<videoId>.jsonl`；抓回放后
-  `fetch-streams` / `fetch-danmaku` 自动按 `rendererId` 合并成 `danmaku_<videoId>.jsonl`。
+- 实时采集输出 `danmaku_live_<videoId>.jsonl` 与 `events_<videoId>.jsonl`；回放输出
+  `danmaku_<videoId>.jsonl`、`events_<videoId>.jsonl` 与 `emoji_<videoId>.json`，并自动合并已有的
+  实时采集（按 `rendererId` 去重）。
 - `events` 覆盖置顶 / 投票（含票数快照）/ Q&A / 商品 / 系统 / 模式变更 / 删除 / 替换；
   ticker 是消息的滚动副本，忽略并计入 `skipped`。主播操作标 `owner: true`。
-- 会员限定场次需要 `--cookie` / `--cookies`（Netscape jar）/ `YT_COOKIE`。
+- 回放已翻完的场次再次执行会直接跳过；`--force` 重抓，`--no-replay` 只报告不抓，`--max-pages` 可限流。
+- 会话目录：优先复用已有 `_<videoId>` 目录；没有时用 pack 的 `startedAt` + 成员名新建。
+- 会员限定场次默认复用 `~/yt-cookies.txt`（见上节），也可 `--cookie` / `--cookies` / `YT_COOKIE`。
 
 ## 补主播本人发言（一次性）
 
