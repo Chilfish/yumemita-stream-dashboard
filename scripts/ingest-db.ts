@@ -391,12 +391,16 @@ async function main(): Promise<void> {
           changed = true
         }
         catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          const cause = error instanceof Error && error.cause instanceof Error ? `：${error.cause.message}` : ''
           report.failed += 1
-          report.errors.push({ videoId, message: (error as Error).message })
+          report.errors.push({ videoId, message })
+          console.warn(`[ingest] ${source.id}/${videoId} 失败：${message}${cause}`)
         }
 
-        if ((report.processed + report.skipped) % args.batchSize === 0) {
-          console.log(`[ingest] ${source.id}: ${report.processed + report.skipped}/${packs.length}`)
+        const done = report.processed + report.skipped + report.failed
+        if (done > 0 && done % args.batchSize === 0) {
+          console.log(`[ingest] ${source.id}: ${done}/${packs.length}（失败 ${report.failed}）`)
         }
       }
 
