@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { createDb } from '../src/db/connection.ts'
 import { getDatasets, getDataset } from '../src/db/queries/datasets.ts'
+import { getGroupCompareData } from '../src/db/queries/group-compare.ts'
 import { getGroupGallery, getGroupSummary } from '../src/db/queries/group.ts'
 import { getDatasetInsights } from '../src/db/queries/insights.ts'
 import {
@@ -73,6 +74,26 @@ async function main(): Promise<void> {
   const gallery = await getGroupGallery(db)
   check(gallery.streams.length > 0, 'group gallery 没有场次')
 
+  const compare = await getGroupCompareData(db)
+  check(compare.datasets.length > 0, 'group compare 没有成员')
+  check(compare.data.buckets.length > 0, 'group compare 没有聚合桶')
+  check(compare.data.months.length > 0, 'group compare 没有月份')
+  check(
+    compare.data.months.every((month, index) => index === 0 || month > compare.data.months[index - 1]),
+    'group compare 月份未升序',
+  )
+  const compareIds = new Set(compare.datasets.map(dataset => dataset.id))
+  check(
+    compare.data.buckets.every(bucket => compareIds.has(bucket.memberId)),
+    'group compare 桶里有未知成员',
+  )
+  check(
+    compare.data.buckets
+      .filter(bucket => bucket.type === 'all')
+      .every(bucket => bucket.streams > 0),
+    'group compare 桶的场次数异常',
+  )
+
   const timings: number[] = []
   for (let index = 0; index < 20; index += 1) {
     const started = performance.now()
@@ -97,6 +118,8 @@ async function main(): Promise<void> {
       latest: summary.latest.length,
       recent: summary.recent.length,
       gallery: gallery.streams.length,
+      compareBuckets: compare.data.buckets.length,
+      compareMonths: compare.data.months.length,
     },
     listAndInsightsMs: {
       p50: Number(percentile(timings, 0.5).toFixed(1)),

@@ -309,6 +309,25 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
   }
 
   if (!ctx.dataset) {
+    if (ctx.section === "compare") {
+      return {
+        title: `全员对比 | ${SITE_NAME}`,
+        description: `按同一时间段与内容类型横向对比 ${GROUP_NAME} 成员的场次、平均同接、弹幕密度与 SC 强度；样本不足时会标注。`,
+        canonical,
+        image,
+        imageAlt,
+        robots,
+        ogType: "website",
+        publishedTime: null,
+        jsonLd: [
+          breadcrumbList(ctx.origin, ctx.basePath, [
+            { name: GROUP_NAME, path: "/" },
+            { name: "全员对比", path: "/compare" },
+          ]),
+        ],
+      };
+    }
+
     if (ctx.section === "about") {
       return {
         title: `说明与免责 | ${SITE_NAME}`,

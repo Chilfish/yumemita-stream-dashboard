@@ -36,6 +36,7 @@ const meta = pageSeo(Astro, {
     ? (
         <GroupPage
           client:idle
+          compare={null}
           data={data.data}
           datasets={data.datasets}
           params={requestParams(Astro)}

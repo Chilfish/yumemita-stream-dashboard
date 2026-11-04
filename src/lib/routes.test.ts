@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_COMPARE,
   datasetPath,
+  groupComparePath,
+  groupGalleryPath,
+  groupHomePath,
+  groupSectionFromPathname,
   homePath,
   parseCompareIds,
   parseStreamSubView,
@@ -39,6 +43,14 @@ describe("route paths", () => {
     expect(streamPath("nonoka", "a/b")).toBe("/nonoka/stream/a%2Fb");
   });
 
+  it("builds group paths and resolves their sections", () => {
+    expect(groupHomePath()).toBe("/");
+    expect(groupGalleryPath()).toBe("/gallery");
+    expect(groupComparePath()).toBe("/compare");
+    expect(groupSectionFromPathname("/")).toBe("home");
+    expect(groupSectionFromPathname("/gallery")).toBe("gallery");
+    expect(groupSectionFromPathname("/compare")).toBe("compare");
+  });
 });
 
 describe("sectionFromPathname", () => {

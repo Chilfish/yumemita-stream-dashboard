@@ -14,6 +14,7 @@ const rounds = Number(args[args.indexOf('--rounds') + 1]) || 5
 const routes = [
   '/',
   '/gallery',
+  '/compare',
   '/nonoka',
   '/nonoka/streams',
   '/nonoka/trends',

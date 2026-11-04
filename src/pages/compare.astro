@@ -1,0 +1,51 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { GroupPage } from '@/components/app/group-page'
+import { db } from '@/db/client'
+import { getGroupCompareData, type GroupComparePageData } from '@/db/queries/group-compare'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+
+export const prerender = false
+
+Astro.cache.set({ maxAge: 300, swr: 600, tags: ['group', 'compare'] })
+
+let pageData: GroupComparePageData | null = null
+try {
+  pageData = await getGroupCompareData(db)
+}
+catch (error) {
+  console.error('[page] group compare failed', error)
+  Astro.response.status = 500
+}
+
+const streamCount = pageData
+  ? pageData.data.buckets
+      .filter(bucket => bucket.type === 'all')
+      .reduce((total, bucket) => total + bucket.streams, 0)
+  : null
+
+const meta = pageSeo(Astro, {
+  section: 'compare',
+  memberCount: pageData?.datasets.length ?? null,
+  streamCount,
+})
+---
+
+<Layout meta={meta}>
+  {pageData
+    ? (
+        <GroupPage
+          client:idle
+          compare={pageData.data}
+          data={null}
+          datasets={pageData.datasets}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          search={requestSearch(Astro)}
+          section="compare"
+          view="compare"
+        />
+      )
+    : <ErrorState code="500" />}
+</Layout>

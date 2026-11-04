@@ -14,6 +14,7 @@ import { groupHomePath, type GroupViewKey } from "@/lib/routes";
 const SECTION_LABELS: Record<GroupViewKey, string> = {
   home: "组首页",
   gallery: "全组相册",
+  compare: "全员对比",
   about: "说明",
 };
 

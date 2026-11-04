@@ -1,4 +1,6 @@
-import { Check } from "lucide-react";
+import { Check, GitCompare } from "lucide-react";
+import { Link } from "@/lib/router-compat";
+import { groupComparePath } from "@/lib/routes";
 import {
   Sheet,
   SheetHeader,
@@ -91,6 +93,16 @@ export function MemberSheet({
               })}
             </ul>
           )}
+          {datasets.length >= 2 ? (
+            <Link
+              className="mt-3 flex min-h-12 items-center gap-3 border-t border-hairline pt-3 text-left text-body font-medium text-foreground transition-colors duration-120 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
+              onClick={() => onOpenChange(false)}
+              to={groupComparePath()}
+            >
+              <GitCompare aria-hidden="true" className="size-5 text-member-ink" />
+              <span>全员对比</span>
+            </Link>
+          ) : null}
         </SheetPanel>
       </SheetPopup>
     </Sheet>

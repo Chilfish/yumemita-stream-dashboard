@@ -14,6 +14,8 @@ const baseUrl = (
 const routes = [
   { path: '/', status: 200 },
   { path: '/gallery', status: 200 },
+  { path: '/compare', status: 200 },
+  { path: '/compare?members=nonoka,arale&type=sing&months=3', status: 200 },
   { path: '/about', status: 200 },
   { path: '/sitemap.xml', status: 200, type: 'xml' },
   { path: '/llms.txt', status: 200 },
@@ -47,6 +49,17 @@ for (const route of routes) {
   else {
     console.log(`✓ ${route.path}: ${response.status}`)
   }
+}
+
+// 全员对比是分析页：确认 noindex，且筛选参数不会让页面变成 404。
+const compare = await fetch(`${baseUrl}/compare?members=nonoka&type=sing&months=all`)
+const compareHtml = await compare.text()
+if (!compare.ok || !compareHtml.includes('noindex')) {
+  failures += 1
+  console.error(`✗ /compare: ${compare.status} (missing noindex)`)
+}
+else {
+  console.log('✓ /compare: noindex')
 }
 
 // 从 llms.txt 里取一条 Markdown 链接，确认端点可用。

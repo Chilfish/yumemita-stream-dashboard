@@ -25,7 +25,7 @@ export type StreamSubView = (typeof STREAM_SUBVIEWS)[number];
 export const DEFAULT_STREAM_SUBVIEW: StreamSubView = "overview";
 
 /** 组级（跨成员）页面：没有 `:datasetId` 前缀，直接挂在根路由下。 */
-export const GROUP_VIEWS = ["home", "gallery", "about"] as const;
+export const GROUP_VIEWS = ["home", "gallery", "compare", "about"] as const;
 
 export type GroupViewKey = (typeof GROUP_VIEWS)[number];
 
@@ -51,12 +51,17 @@ export function groupGalleryPath(): string {
   return "/gallery";
 }
 
+export function groupComparePath(): string {
+  return "/compare";
+}
+
 export function groupAboutPath(): string {
   return "/about";
 }
 
 export function groupSectionFromPathname(pathname: string): GroupViewKey {
   if (pathname === groupGalleryPath()) return "gallery";
+  if (pathname === groupComparePath()) return "compare";
   if (pathname === groupAboutPath()) return "about";
   return "home";
 }

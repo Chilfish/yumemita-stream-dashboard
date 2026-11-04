@@ -28,6 +28,7 @@ import type { Theme } from "@/types/theme";
 import { formatInteger } from "@/lib/format";
 import {
   groupAboutPath,
+  groupComparePath,
   groupGalleryPath,
   groupHomePath,
   homePath,
@@ -67,12 +68,14 @@ interface GroupNavItem {
 const GROUP_NAV_ITEMS: GroupNavItem[] = [
   { key: "home", label: "组首页", icon: LayoutDashboard, to: groupHomePath() },
   { key: "gallery", label: "全组相册", icon: Images, to: groupGalleryPath() },
+  { key: "compare", label: "全员对比", icon: GitCompare, to: groupComparePath() },
   { key: "about", label: "说明", icon: Info, to: groupAboutPath() },
 ];
 
 const GROUP_NAV_TARGETS: Record<GroupViewKey, string> = {
   home: groupHomePath(),
   gallery: groupGalleryPath(),
+  compare: groupComparePath(),
   about: groupAboutPath(),
 };
 
@@ -193,6 +196,22 @@ export function AppSidebar({
                   </SidebarMenuItem>
                 );
               })}
+              {datasets.length >= 2 ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className={cn(
+                      ACTIVE_ITEM_CLASS,
+                      !dataset && pathname === groupComparePath() && "font-medium",
+                    )}
+                    isActive={!dataset && pathname === groupComparePath()}
+                    tooltip="全员对比"
+                    render={<NavLink to={groupComparePath()} />}
+                  >
+                    <GitCompare aria-hidden="true" />
+                    <span>全员对比</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : null}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
