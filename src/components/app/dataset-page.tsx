@@ -7,6 +7,7 @@ import { AppSidebar } from '@/components/dashboard/app-sidebar'
 import { CommandPalette } from '@/components/dashboard/command-palette'
 import { DatasetViewContext } from '@/components/dashboard/dataset-view-context'
 import { MobileTabBar } from '@/components/dashboard/mobile-tab-bar'
+import { CalendarPage } from '@/components/pages/calendar-page'
 import { GalleryPage } from '@/components/pages/gallery-page'
 import { HomePage } from '@/components/pages/home-page'
 import { StreamsPage } from '@/components/pages/streams-page'
@@ -32,6 +33,7 @@ import {
 } from '@/lib/routes'
 import { RouterProvider, useNavigate, useSearchParams } from '@/lib/router-compat'
 import type { TranscriptIndexEntry } from '@/lib/transcripts'
+import type { CalendarPageData } from '@/types/calendar'
 import type { StreamDatapack } from '@/types/datapack'
 import type { BatchManifest, DatasetIndexEntry, StreamSummary } from '@/types/dataset'
 import { useShellTheme } from './shell-theme'
@@ -39,6 +41,7 @@ import { useShellTheme } from './shell-theme'
 export type DatasetView =
   | 'home'
   | 'streams'
+  | 'calendar'
   | 'trends'
   | 'gallery'
   | 'transcripts'
@@ -49,7 +52,9 @@ export interface DatasetPageProps {
   datasets: DatasetIndexEntry[]
   dataset: DatasetIndexEntry
   rows: StreamSummary[]
-  totals: DatasetTotals
+  /** 日历页不读全量 pack，因此允许为空；正文也不需要 `DatasetViewContext`。 */
+  totals: DatasetTotals | null
+  calendar?: CalendarPageData | null
   view: DatasetView
   section: ViewKey
   pathname: string
@@ -121,7 +126,7 @@ function DatasetShell(props: DatasetPageProps) {
         跳到主要内容
       </a>
       <AppSidebar
-        chatTotal={totals.chatTotal}
+        chatTotal={totals?.chatTotal ?? null}
         dataset={dataset}
         datasets={datasets}
         onToggleTheme={onToggleTheme}
@@ -131,7 +136,7 @@ function DatasetShell(props: DatasetPageProps) {
 
       <SidebarInset className="ambient-field min-w-0" id="main-content" tabIndex={-1}>
         <AppHeader
-          chatTotal={totals.chatTotal}
+          chatTotal={totals?.chatTotal ?? null}
           dataset={dataset}
           onOpenCommand={() => setCommandOpen(true)}
           section={section}
@@ -140,11 +145,15 @@ function DatasetShell(props: DatasetPageProps) {
         />
 
         <div className="mx-auto w-full max-w-[82.5rem] px-4 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
-          <DatasetViewContext.Provider value={{ dataset, manifest, rows, totals }}>
-            <div className="motion-view" key={`${dataset.id}/${section}`}>
-              <DatasetBody {...props} />
-            </div>
-          </DatasetViewContext.Provider>
+          <div className="motion-view" key={`${dataset.id}/${section}`}>
+            {totals
+              ? (
+                  <DatasetViewContext.Provider value={{ dataset, manifest, rows, totals }}>
+                    <DatasetBody {...props} />
+                  </DatasetViewContext.Provider>
+                )
+              : <DatasetBody {...props} />}
+          </div>
         </div>
 
         <MobileTabBar
@@ -174,6 +183,8 @@ function DatasetBody(props: DatasetPageProps) {
       return <HomePage />
     case 'streams':
       return <StreamsPage />
+    case 'calendar':
+      return <CalendarPage data={props.calendar ?? null} basePath={props.pathname} />
     case 'trends':
       return <TrendsPage />
     case 'gallery':

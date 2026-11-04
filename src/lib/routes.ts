@@ -7,6 +7,7 @@ export const VIEWS = [
   "trends",
   "gallery",
   "transcripts",
+  "calendar",
 ] as const;
 
 export type ViewKey = (typeof VIEWS)[number];
@@ -25,7 +26,7 @@ export type StreamSubView = (typeof STREAM_SUBVIEWS)[number];
 export const DEFAULT_STREAM_SUBVIEW: StreamSubView = "overview";
 
 /** 组级（跨成员）页面：没有 `:datasetId` 前缀，直接挂在根路由下。 */
-export const GROUP_VIEWS = ["home", "gallery", "compare", "about"] as const;
+export const GROUP_VIEWS = ["home", "gallery", "compare", "about", "calendar"] as const;
 
 export type GroupViewKey = (typeof GROUP_VIEWS)[number];
 
@@ -59,10 +60,15 @@ export function groupAboutPath(): string {
   return "/about";
 }
 
+export function groupCalendarPath(): string {
+  return "/calendar";
+}
+
 export function groupSectionFromPathname(pathname: string): GroupViewKey {
   if (pathname === groupGalleryPath()) return "gallery";
   if (pathname === groupComparePath()) return "compare";
   if (pathname === groupAboutPath()) return "about";
+  if (pathname === groupCalendarPath()) return "calendar";
   return "home";
 }
 
@@ -99,6 +105,10 @@ export function comparePath(datasetId: string): string {
   return `${datasetPath(datasetId)}/compare`;
 }
 
+export function calendarPath(datasetId: string): string {
+  return `${datasetPath(datasetId)}/calendar`;
+}
+
 /** 「说明」是组级页面，所有成员共用同一份说明。 */
 export function aboutPath(): string {
   return groupAboutPath();
@@ -122,11 +132,14 @@ export function viewPath(datasetId: string, view: ViewKey): string {
       return comparePath(datasetId);
     case "about":
       return aboutPath();
+    case "calendar":
+      return calendarPath(datasetId);
   }
 }
 
 export function sectionFromPathname(pathname: string): ViewKey {
   if (pathname === groupAboutPath()) return "about";
+  if (pathname === groupCalendarPath()) return "calendar";
   const segment = pathname.split("/")[2];
   if (!segment) return "home";
   if (segment === "streams" || segment === "table") return "streams";
@@ -136,6 +149,7 @@ export function sectionFromPathname(pathname: string): ViewKey {
   if (segment === "transcripts") return "transcripts";
   if (segment === "compare") return "compare";
   if (segment === "about") return "about";
+  if (segment === "calendar") return "calendar";
   return "home";
 }
 

@@ -16,13 +16,15 @@ const SECTION_LABELS: Record<GroupViewKey, string> = {
   gallery: "全组相册",
   compare: "全员对比",
   about: "说明",
+  calendar: "全组日历",
 };
 
 interface GroupHeaderProps {
   section: GroupViewKey;
   memberCount: number;
   streamCount: number;
-  chatTotal: number;
+  /** 日历页不加载全量弹幕统计；null 时只显示人数与场次。 */
+  chatTotal: number | null;
 }
 
 export function GroupHeader({
@@ -52,8 +54,8 @@ export function GroupHeader({
       </Breadcrumb>
 
       <p className="ms-auto hidden shrink-0 text-caption text-ink-3 tabular-nums sm:block">
-        {formatInteger(memberCount)} 人 · {formatInteger(streamCount)} 场 ·{" "}
-        {formatInteger(chatTotal)} 条弹幕
+        {formatInteger(memberCount)} 人 · {formatInteger(streamCount)} 场
+        {chatTotal != null ? ` · ${formatInteger(chatTotal)} 条弹幕` : ""}
       </p>
     </header>
   );

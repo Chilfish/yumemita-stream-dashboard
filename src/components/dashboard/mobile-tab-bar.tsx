@@ -1,10 +1,11 @@
-import { Activity, GitCompare, Images, LayoutDashboard, Table2, Users } from "lucide-react";
+import { Activity, CalendarDays, GitCompare, Images, LayoutDashboard, Table2, Users } from "lucide-react";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "@/lib/router-compat";
 import { MemberSheet } from "@/components/dashboard/member-sheet";
 import {
   galleryPath,
+  groupCalendarPath,
   groupComparePath,
   groupGalleryPath,
   groupHomePath,
@@ -62,6 +63,7 @@ export function MobileTabBar({
       ]
     : [
         { key: "home", label: "组首页", icon: LayoutDashboard, to: groupHomePath() },
+        { key: "calendar", label: "日历", icon: CalendarDays, to: groupCalendarPath() },
         { key: "gallery", label: "相册", icon: Images, to: groupGalleryPath() },
         { key: "compare", label: "对比", icon: GitCompare, to: groupComparePath() },
       ];
@@ -74,10 +76,7 @@ export function MobileTabBar({
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <ul
-          className={cn(
-            "grid gap-1 px-2 py-1.5",
-            datasetId ? "grid-cols-5" : "grid-cols-4",
-          )}
+          className="grid grid-cols-5 gap-1 px-2 py-1.5"
         >
           {items.map(item => {
             const Icon = item.icon;

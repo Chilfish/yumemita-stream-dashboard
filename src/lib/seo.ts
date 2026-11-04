@@ -22,6 +22,7 @@ export const SITEMAP_SECTIONS = [
   "trends",
   "gallery",
   "transcripts",
+  "calendar",
 ] as const;
 
 export type SeoDataset = {
@@ -217,6 +218,13 @@ function sectionCopy(
           `${label} 的直播逐字稿索引，支持目录与时间戳跳转 YouTube 原片。`,
         ),
       };
+    case "calendar":
+      return {
+        title: `${label} 直播日历 | ${SITE_NAME}`,
+        description: clampDescription(
+          `${label} 的未来直播安排与近期场次：按 JST 自然日查看月历或议程，包含预定、直播中与已结束的场次。`,
+        ),
+      };
     case "compare":
       return {
         title: `场次对比 | ${SITE_NAME}`,
@@ -366,6 +374,25 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
       };
     }
 
+    if (ctx.section === "calendar") {
+      return {
+        title: `全组直播日历 | ${SITE_NAME}`,
+        description: `夢限大みゅーたいぷ 五位成员的未来直播安排与近期场次，按 JST 自然日查看月历或议程，可按成员筛选。`,
+        canonical,
+        image,
+        imageAlt,
+        robots,
+        ogType: "website",
+        publishedTime: null,
+        jsonLd: [
+          breadcrumbList(ctx.origin, ctx.basePath, [
+            { name: GROUP_NAME, path: "/" },
+            { name: "日历", path: "/calendar" },
+          ]),
+        ],
+      };
+    }
+
     const members = countLabel(ctx.memberCount);
     const streams = countLabel(ctx.streamCount);
     const description = clampDescription(
@@ -483,6 +510,7 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
     transcripts: "逐字稿",
     compare: "对比",
     about: "说明",
+    calendar: "日历",
   };
   const sectionName = sectionNames[ctx.section];
   if (sectionName) breadcrumb.push({ name: sectionName, path: `/${dataset.id}/${ctx.section}` });
@@ -521,7 +549,7 @@ export function buildSitemap(
     .sort()
     .at(-1);
 
-  for (const path of ["/", "/gallery", "/about"]) {
+  for (const path of ["/", "/gallery", "/calendar", "/about"]) {
     entries.push({ loc: absoluteUrl(origin, basePath, path), lastmod: isoDateKey(latestUpdate) });
   }
 

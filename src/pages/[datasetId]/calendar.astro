@@ -1,0 +1,88 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { DatasetPage } from '@/components/app/dataset-page'
+import { db } from '@/db/client'
+import { getCalendarData } from '@/db/queries/calendar'
+import { getDatasets } from '@/db/queries/datasets'
+import { toIndex } from '@/db/queries/view-data'
+import { calendarWindow, currentJstMonth, isMonthKey, monthRange } from '@/lib/calendar'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import type { CalendarMember, CalendarPageData } from '@/types/calendar'
+import type { DatasetIndexEntry } from '@/types/dataset'
+
+export const prerender = false
+
+const datasetId = Astro.params.datasetId!
+
+let datasets: DatasetIndexEntry[] = []
+let dataset: DatasetIndexEntry | null = null
+let calendar: CalendarPageData | null = null
+
+try {
+  const now = new Date()
+  const monthParam = Astro.url.searchParams.get('month')
+  const month = isMonthKey(monthParam) ? monthParam : currentJstMonth(now)
+  const window = calendarWindow(month, 6, 3)
+
+  datasets = toIndex(await getDatasets(db))
+  dataset = datasets.find(item => item.id === datasetId) ?? null
+
+  if (dataset) {
+    const members: CalendarMember[] = datasets.map(item => ({
+      id: item.id,
+      label: item.label,
+      color: item.color ?? null,
+      avatar: item.avatar ?? null,
+      streamCount: item.count,
+    }))
+
+    calendar = await getCalendarData(db, {
+      from: `${window.start}-01`,
+      to: monthRange(window.end).to,
+      window,
+      datasetId,
+      members,
+      now,
+    })
+  }
+}
+catch (error) {
+  console.error('[page] member calendar failed', error)
+  Astro.response.status = 500
+}
+
+if (!dataset) Astro.response.status = 404
+else Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`, 'schedule'] })
+
+const meta = dataset
+  ? pageSeo(Astro, {
+      section: 'calendar',
+      dataset: { id: dataset.id, label: dataset.label, count: dataset.count },
+      streamCount: dataset.count,
+    })
+  : pageSeo(Astro, { section: 'calendar', dataset: null, notFound: true })
+---
+
+<Layout meta={meta}>
+  {dataset && calendar
+    ? (
+        <DatasetPage
+          client:idle
+          calendar={calendar}
+          comparePacks={{}}
+          dataset={dataset}
+          datasets={datasets}
+          pack={null}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          rows={[]}
+          search={requestSearch(Astro)}
+          section="calendar"
+          stream={null}
+          totals={null}
+          view="calendar"
+        />
+      )
+    : <ErrorState code={dataset ? '500' : '404'} title={dataset ? '日历读取失败' : '找不到这位成员'} detail={dataset ? '可以刷新重试；场次列表和相册不受影响。' : '成员 id 可能写错了，或者还没有导入数据。'} />}
+</Layout>

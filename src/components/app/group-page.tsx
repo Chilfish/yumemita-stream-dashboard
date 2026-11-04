@@ -2,6 +2,7 @@ import { AppSidebar } from '@/components/dashboard/app-sidebar'
 import { GroupDataContext } from '@/components/dashboard/group-data-context'
 import { GroupHeader } from '@/components/dashboard/group-header'
 import { MobileTabBar } from '@/components/dashboard/mobile-tab-bar'
+import { GroupCalendarPage } from '@/components/pages/group-calendar-page'
 import { GroupComparePage } from '@/components/pages/group-compare-page'
 import { GroupGalleryPage } from '@/components/pages/group-gallery-page'
 import { GroupAboutPage } from '@/components/pages/group-about-page'
@@ -10,16 +11,18 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { homePath, type GroupViewKey } from '@/lib/routes'
 import { RouterProvider, useNavigate } from '@/lib/router-compat'
 import type { GroupData } from '@/lib/group'
+import type { CalendarPageData } from '@/types/calendar'
 import type { GroupCompareData } from '@/types/compare'
 import type { DatasetIndexEntry } from '@/types/dataset'
 import { useShellTheme } from './shell-theme'
 
-export type GroupView = 'home' | 'gallery' | 'about' | 'compare'
+export type GroupView = 'home' | 'gallery' | 'about' | 'compare' | 'calendar'
 
 export interface GroupPageProps {
   datasets: DatasetIndexEntry[]
   data: GroupData | null
   compare: GroupCompareData | null
+  calendar?: CalendarPageData | null
   view: GroupView
   section: GroupViewKey
   pathname: string
@@ -35,14 +38,20 @@ export function GroupPage(props: GroupPageProps) {
   )
 }
 
-function GroupShell({ datasets, data, compare, section }: GroupPageProps) {
+function GroupShell({ datasets, data, compare, calendar, section, pathname }: GroupPageProps) {
   const { theme, onToggleTheme } = useShellTheme()
   const navigate = useNavigate()
   const allBuckets = compare?.buckets.filter(bucket => bucket.type === 'all') ?? []
-  const streamCount = data?.totals.streamCount
-    ?? allBuckets.reduce((total, bucket) => total + bucket.streams, 0)
-  const chatTotal = data?.totals.chatTotal
-    ?? allBuckets.reduce((total, bucket) => total + bucket.chatTotal, 0)
+  const calendarStreamCount = calendar?.members.reduce(
+    (total, member) => total + member.streamCount,
+    0,
+  ) ?? 0
+  const streamCount = section === 'calendar'
+    ? calendarStreamCount
+    : data?.totals.streamCount ?? allBuckets.reduce((total, bucket) => total + bucket.streams, 0)
+  const chatTotal = section === 'calendar'
+    ? null
+    : data?.totals.chatTotal ?? allBuckets.reduce((total, bucket) => total + bucket.chatTotal, 0)
 
   return (
     <SidebarProvider>
@@ -73,8 +82,10 @@ function GroupShell({ datasets, data, compare, section }: GroupPageProps) {
           <div className="motion-view" key={section}>
             {section === 'compare' && compare
               ? <GroupComparePage data={compare} datasets={datasets} />
-              : data
-                ? (
+              : section === 'calendar' && calendar
+                ? <GroupCalendarPage basePath={pathname} calendar={calendar} />
+                : data
+                  ? (
                     <GroupDataContext.Provider value={data}>
                       {section === 'about'
                         ? <GroupAboutPage />

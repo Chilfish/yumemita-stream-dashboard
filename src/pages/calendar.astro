@@ -1,0 +1,73 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import ErrorState from '@/components/shared/ErrorState.astro'
+import { GroupPage } from '@/components/app/group-page'
+import { db } from '@/db/client'
+import { getCalendarData } from '@/db/queries/calendar'
+import { getDatasets } from '@/db/queries/datasets'
+import { toIndex } from '@/db/queries/view-data'
+import { calendarWindow, currentJstMonth, isMonthKey, monthRange } from '@/lib/calendar'
+import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import type { CalendarMember, CalendarPageData } from '@/types/calendar'
+import type { DatasetIndexEntry } from '@/types/dataset'
+
+export const prerender = false
+
+Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group', 'schedule'] })
+
+let datasets: DatasetIndexEntry[] = []
+let calendar: CalendarPageData | null = null
+
+try {
+  const now = new Date()
+  const monthParam = Astro.url.searchParams.get('month')
+  const month = isMonthKey(monthParam) ? monthParam : currentJstMonth(now)
+  const window = calendarWindow(month, 6, 3)
+
+  datasets = toIndex(await getDatasets(db))
+  const members: CalendarMember[] = datasets.map(dataset => ({
+    id: dataset.id,
+    label: dataset.label,
+    color: dataset.color ?? null,
+    avatar: dataset.avatar ?? null,
+    streamCount: dataset.count,
+  }))
+
+  calendar = await getCalendarData(db, {
+    from: `${window.start}-01`,
+    to: monthRange(window.end).to,
+    window,
+    members,
+    now,
+  })
+}
+catch (error) {
+  console.error('[page] calendar failed', error)
+  Astro.response.status = 500
+}
+
+const meta = pageSeo(Astro, {
+  section: 'calendar',
+  memberCount: datasets.length || null,
+  streamCount: datasets.reduce((total, dataset) => total + dataset.count, 0) || null,
+})
+---
+
+<Layout meta={meta}>
+  {calendar
+    ? (
+        <GroupPage
+          client:idle
+          calendar={calendar}
+          compare={null}
+          data={null}
+          datasets={datasets}
+          params={requestParams(Astro)}
+          pathname={Astro.url.pathname}
+          search={requestSearch(Astro)}
+          section="calendar"
+          view="calendar"
+        />
+      )
+    : <ErrorState code="500" />}
+</Layout>

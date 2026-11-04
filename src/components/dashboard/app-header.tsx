@@ -24,6 +24,7 @@ const SECTION_LABELS: Record<ViewKey, string> = {
   gallery: "相册",
   transcripts: "逐字稿",
   about: "说明",
+  calendar: "日历",
 };
 
 interface AppHeaderProps {
@@ -31,7 +32,8 @@ interface AppHeaderProps {
   section: ViewKey;
   stream: StreamSummary | null;
   streamCount: number;
-  chatTotal: number;
+  /** 日历页不需要加载全量弹幕统计；null 时只显示场次数。 */
+  chatTotal: number | null;
   onOpenCommand: () => void;
 }
 
@@ -71,7 +73,8 @@ export function AppHeader({
 
       <div className="ms-auto flex shrink-0 items-center gap-2">
         <p className="hidden text-caption text-ink-3 tabular-nums sm:block">
-          {formatInteger(streamCount)} 场 · {formatInteger(chatTotal)} 条弹幕
+          {formatInteger(streamCount)} 场
+          {chatTotal != null ? ` · ${formatInteger(chatTotal)} 条弹幕` : ""}
         </p>
         <Button
           aria-label="搜索场次与成员（⌘K）"

@@ -70,7 +70,7 @@ export function HomeCalendar({ rows }: HomeCalendarProps) {
           </ToggleGroup>
         }
         meta="按日本时间"
-        title="更新日历"
+        title="开播热力图"
       />
       <PanelBody>
         <CalendarHeatmap

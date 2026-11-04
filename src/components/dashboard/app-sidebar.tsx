@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   FileText,
   GitCompare,
   Images,
@@ -28,6 +29,7 @@ import type { Theme } from "@/types/theme";
 import { formatInteger } from "@/lib/format";
 import {
   groupAboutPath,
+  groupCalendarPath,
   groupComparePath,
   groupGalleryPath,
   groupHomePath,
@@ -51,6 +53,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "首页", icon: LayoutDashboard },
   { key: "streams", label: "场次", icon: Table2 },
+  { key: "calendar", label: "日历", icon: CalendarDays },
   { key: "trends", label: "趋势", icon: TrendingUp },
   { key: "compare", label: "对比", icon: GitCompare },
   { key: "gallery", label: "相册", icon: Images },
@@ -67,6 +70,7 @@ interface GroupNavItem {
 
 const GROUP_NAV_ITEMS: GroupNavItem[] = [
   { key: "home", label: "组首页", icon: LayoutDashboard, to: groupHomePath() },
+  { key: "calendar", label: "全组日历", icon: CalendarDays, to: groupCalendarPath() },
   { key: "gallery", label: "全组相册", icon: Images, to: groupGalleryPath() },
   { key: "compare", label: "全员对比", icon: GitCompare, to: groupComparePath() },
   { key: "about", label: "说明", icon: Info, to: groupAboutPath() },
@@ -74,6 +78,7 @@ const GROUP_NAV_ITEMS: GroupNavItem[] = [
 
 const GROUP_NAV_TARGETS: Record<GroupViewKey, string> = {
   home: groupHomePath(),
+  calendar: groupCalendarPath(),
   gallery: groupGalleryPath(),
   compare: groupComparePath(),
   about: groupAboutPath(),
@@ -87,7 +92,8 @@ interface AppSidebarProps {
   dataset: DatasetIndexEntry | null;
   section: ViewKey | GroupViewKey;
   datasets: DatasetIndexEntry[];
-  chatTotal: number;
+  /** 日历页不加载全量弹幕统计；null 时改显示场次数。 */
+  chatTotal: number | null;
   theme: Theme;
   onToggleTheme: () => void;
 }
@@ -146,7 +152,9 @@ export function AppSidebar({
                 <span className="truncate font-semibold text-body">ゆめみた 配信数据台</span>
                 <span className="truncate text-caption text-muted-foreground">
                   {dataset
-                    ? `${formatInteger(chatTotal)} 条弹幕`
+                    ? chatTotal != null
+                      ? `${formatInteger(chatTotal)} 条弹幕`
+                      : `${formatInteger(dataset.count)} 场`
                     : `${datasets.length} 位成员`}
                 </span>
               </span>

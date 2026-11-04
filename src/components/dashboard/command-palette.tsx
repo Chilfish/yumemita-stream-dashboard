@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDate, formatDuration } from "@/lib/format";
-import { homePath, streamPath } from "@/lib/routes";
+import { calendarPath, homePath, streamPath } from "@/lib/routes";
 import type { DatasetIndexEntry, StreamSummary } from "@/types/dataset";
 import { assetUrl, cn } from "@/lib/utils";
 
@@ -21,7 +21,7 @@ interface CommandPaletteProps {
 
 interface CommandEntry {
   id: string;
-  group: "成员" | "场次";
+  group: "页面" | "成员" | "场次";
   label: string;
   meta: string;
   avatar?: string | null;
@@ -43,6 +43,16 @@ export function CommandPalette({
 
   const entries = useMemo<CommandEntry[]>(() => {
     const needle = query.trim().toLowerCase();
+
+    const pages: CommandEntry[] = needle && !"日历 排期 未来场次".includes(needle)
+      ? []
+      : [{
+          id: "page:calendar",
+          group: "页面" as const,
+          label: "日历",
+          meta: "未来场次与排期",
+          run: () => navigate(calendarPath(datasetId)),
+        }];
 
     const members = datasets
       .filter(member => !needle || member.label.toLowerCase().includes(needle))
@@ -69,7 +79,7 @@ export function CommandPalette({
         run: () => navigate(streamPath(datasetId, row.videoId)),
       }));
 
-    return [...members, ...streams];
+    return [...pages, ...members, ...streams];
   }, [datasetId, datasets, navigate, query, rows]);
 
   useEffect(() => {

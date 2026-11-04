@@ -80,7 +80,9 @@ export default defineConfig({
   routeRules: {
     '/': { maxAge: 60, swr: 300, tags: ['group'] },
     '/gallery': { maxAge: 300, swr: 600, tags: ['group', 'gallery'] },
+    '/calendar': { maxAge: 60, swr: 300, tags: ['group', 'schedule'] },
     '/[datasetId]': { maxAge: 60, swr: 300, tags: ['datasets'] },
+    '/[datasetId]/calendar': { maxAge: 60, swr: 300, tags: ['datasets', 'schedule'] },
     '/[datasetId]/streams': { maxAge: 60, swr: 300, tags: ['datasets'] },
     '/[datasetId]/trends': { maxAge: 300, swr: 600, tags: ['datasets'] },
     '/[datasetId]/gallery': { maxAge: 300, swr: 600, tags: ['datasets'] },

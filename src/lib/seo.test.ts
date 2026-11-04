@@ -220,8 +220,10 @@ describe("sitemap", () => {
     ]);
 
     const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
-    expect(locs).toHaveLength(9);
+    expect(locs).toHaveLength(11);
     expect(locs).toContain("https://example.com/dashboard/about");
+    expect(locs).toContain("https://example.com/dashboard/calendar");
+    expect(locs).toContain("https://example.com/dashboard/nonoka/calendar");
     expect(locs).toContain("https://example.com/dashboard/nonoka/trends");
     expect(locs).toContain("https://example.com/dashboard/nonoka/stream/a&amp;b");
     expect(locs.some(loc => loc.includes("/nonoka/about"))).toBe(false);

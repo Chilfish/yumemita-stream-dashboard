@@ -14,6 +14,9 @@ const baseUrl = (
 const routes = [
   { path: '/', status: 200 },
   { path: '/gallery', status: 200 },
+  { path: '/calendar', status: 200 },
+  { path: '/calendar?month=2026-10', status: 200 },
+  { path: '/calendar?month=2026-10&view=agenda', status: 200 },
   { path: '/compare', status: 200 },
   { path: '/compare?members=nonoka,arale&type=sing&months=3', status: 200 },
   { path: '/about', status: 200 },
@@ -22,6 +25,8 @@ const routes = [
   { path: '/robots.txt', status: 200 },
   { path: '/nonoka', status: 200 },
   { path: '/nonoka/streams', status: 200 },
+  { path: '/nonoka/calendar', status: 200 },
+  { path: '/nonoka/calendar?month=2026-10', status: 200 },
   { path: '/nonoka/trends', status: 200 },
   { path: '/nonoka/gallery', status: 200 },
   { path: '/nonoka/transcripts', status: 200 },
@@ -32,6 +37,7 @@ const routes = [
   { path: '/nonoka/stream', status: 302 },
   { path: '/nonoka/stream/nope', status: 404 },
   { path: '/nope', status: 404 },
+  { path: '/nope/calendar', status: 404 },
   { path: '/nonoka/stream/nope.md', status: 404 },
 ]
 
