@@ -206,9 +206,14 @@ Top 列表排序稳定化后，`public_totals` 需要随派生口径刷新；本
 
 ### 上线步骤
 
-- 目标库执行 `bun run db:migrate` 应用 `drizzle/0004_big_satana.sql`；部署工作流不含迁移步骤。
-- 目标库执行 `bun scripts/refresh-public-totals.ts` 刷新派生汇总（Top 列表排序已稳定化）。
-- 部署后确认响应头 `cache-tag` 仍包含 `dataset-<id>` / `stream-<videoId>`；首次部署会从冷缓存开始。
+- [x] 目标库执行 `bun run db:migrate` 应用 `drizzle/0004_big_satana.sql`；部署工作流不含迁移步骤。2026-11-05 已对 Neon `neondb` 执行。
+- [x] 目标库执行 `bun scripts/refresh-public-totals.ts` 刷新派生汇总（Top 列表排序已稳定化）。2026-11-05 结果：arale 507、miyako 323、nonoka 289、ritsu 342、yuno 443。
+- [x] 部署后确认 tag。线上响应头只暴露 `Cf-Cache-Status` / `x-response-time`，`Cache-Tag` 不对外；用构建产物验证：
+      `bunx wrangler dev --config dist/server/wrangler.json` 后 `/nonoka` 返回
+      `cache-tag: datasets,dataset-nonoka,astro-path:/nonoka`，单场返回
+      `streams,stream-jZbWoJ7n54Q,dataset-nonoka,astro-path:...`，`/api/packs` 同样带 `stream-<videoId>`。
+      线上首次请求 `MISS`、再次 `HIT`，说明 Workers Cache 生效；首次部署从冷缓存开始。
+- 部署路径：GitHub `Deploy` workflow 因仓库缺少 `CLOUDFLARE_API_TOKEN` secret 在「Check configuration」失败；本次用本地 `bun run cf:deploy` 发布（version `86f395ec`）。补上 secret 后可继续走 workflow。
 
 ### 未做
 
