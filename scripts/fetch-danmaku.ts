@@ -356,7 +356,9 @@ async function collectWithYtdlp(videoId: string, danmakuDir: string): Promise<'d
   if (!existsSync(rawPath))
     return 'unavailable'
 
-  await normalizeLiveChat(rawPath, jsonlPath, videoId)
+  const normalized = await normalizeLiveChat(rawPath, jsonlPath, videoId)
+  if (normalized.duplicates > 0)
+    console.log(`[fetch:danmaku] ${videoId} 字幕内重复 ${normalized.duplicates} 条已按 rendererId 去重`)
   const livePath = join(danmakuDir, `danmaku_live_${videoId}.jsonl`)
   if (existsSync(livePath)) {
     try {

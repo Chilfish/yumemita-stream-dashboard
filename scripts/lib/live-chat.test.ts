@@ -172,6 +172,43 @@ describe('normalizeLiveChat', () => {
     ])
   })
 
+  it('同一份 yt-dlp 字幕里直播段与回放段重复时按 rendererId 去重', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'live-chat-dedupe-'))
+    const input = join(dir, 'dedupe.live_chat.json')
+    const output = join(dir, 'danmaku_dedupe.jsonl')
+    const sc = chatLine({
+      liveChatPaidMessageRenderer: {
+        id: 'SC-DUP',
+        timestampUsec: '1774876000000000',
+        authorName: { simpleText: '@sc' },
+        purchaseAmountText: { simpleText: '¥500' },
+        message: { runs: [{ text: 'hi' }] },
+      },
+    })
+    const text = chatLine({
+      liveChatTextMessageRenderer: {
+        id: 'TEXT-DUP',
+        timestampUsec: '1774876001000000',
+        authorName: { simpleText: '@viewer' },
+        message: { runs: [{ text: 'hello' }] },
+      },
+    })
+    writeFileSync(input, [sc, text, sc, text].join('\n'), 'utf8')
+
+    const result = await normalizeLiveChat(input, output, 'dedupe')
+
+    expect(result.duplicates).toBe(2)
+    expect(result.total).toBe(2)
+    expect(result.counts.superchat).toBe(1)
+    expect(result.counts.text).toBe(1)
+
+    const records = readFileSync(output, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as { rendererId?: string })
+    expect(records.map(record => record.rendererId)).toEqual(['SC-DUP', 'TEXT-DUP'])
+  })
+
   it('会员留言按普通弹幕处理，并保留 SC 颜色 / 贴纸资源', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'live-chat-paid-'))
     const input = join(dir, 'paid.live_chat.json')

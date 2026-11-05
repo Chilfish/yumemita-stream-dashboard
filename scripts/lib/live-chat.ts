@@ -11,6 +11,7 @@
 import { createWriteStream, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
+import { DanmakuKeySet } from './danmaku-merge.ts'
 
 /** 赠送会员公告的作者/文案在 `header` 里，不在 renderer 顶层。 */
 interface SponsorshipsHeader {
@@ -148,6 +149,8 @@ export interface NormalizeResult {
   skipped: number
   /** 被丢弃的 renderer 类型 → 条数；用来发现还没收录的事件类型。 */
   skippedKinds: Record<string, number>
+  /** 同一份字幕里重复出现的消息条数（直播段 + 回放段），按 `rendererId` 去重。 */
+  duplicates: number
   /** 本场出现过的频道专属表情数（写入 `emoji_<videoId>.json`）。 */
   emojis: number
 }
@@ -373,8 +376,10 @@ export async function normalizeLiveChat(
   }
   const skippedKinds: Record<string, number> = {}
   const emojis = new Map<string, ChatEmoji>()
+  const seen = new DanmakuKeySet()
   let seq = 0
   let skipped = 0
+  let duplicates = 0
   const noteSkipped = (kind: string) => {
     skipped += 1
     skippedKinds[kind] = (skippedKinds[kind] ?? 0) + 1
@@ -400,6 +405,13 @@ export async function normalizeLiveChat(
           noteSkipped(Object.keys(item).find(key => key.endsWith('Renderer')) ?? '(unknown item)')
         continue
       }
+      // yt-dlp 的 live_chat 字幕会先写直播段，再从头写一遍回放段（`REPLAY_VEM*` 之后），
+      // 同一 renderer 会出现两次；按 id 去重，旧档缺 id 时退回内容键。
+      if (seen.has(record)) {
+        duplicates += 1
+        continue
+      }
+      seen.add(record)
       counts[record.msg.kind] += 1
       stream.write(`${JSON.stringify(record)}\n`)
     }
@@ -416,6 +428,7 @@ export async function normalizeLiveChat(
     counts,
     skipped,
     skippedKinds,
+    duplicates,
     emojis: emojis.size,
   }
 }
@@ -482,5 +495,5 @@ if (import.meta.main) {
   const skippedDetail = Object.entries(result.skippedKinds)
     .map(([kind, count]) => `${kind.replace(/^liveChat|Renderer$/g, '')} ${count}`)
     .join(' / ')
-  console.log(`[live-chat] ${result.total} 条（SC ${result.counts.superchat} / 贴纸 ${result.counts.sticker} / 会员 ${result.counts.membership} / 赠出会员 ${result.counts.gift} / 领取赠礼 ${result.counts.giftRedemption}；表情 ${result.emojis}；跳过 ${result.skipped}${skippedDetail ? `：${skippedDetail}` : ''}）→ ${outputPath}`)
+  console.log(`[live-chat] ${result.total} 条（SC ${result.counts.superchat} / 贴纸 ${result.counts.sticker} / 会员 ${result.counts.membership} / 赠出会员 ${result.counts.gift} / 领取赠礼 ${result.counts.giftRedemption}；表情 ${result.emojis}；重复 ${result.duplicates}；跳过 ${result.skipped}${skippedDetail ? `：${skippedDetail}` : ''}）→ ${outputPath}`)
 }

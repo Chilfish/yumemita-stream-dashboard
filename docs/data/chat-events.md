@@ -230,9 +230,11 @@
 | --- | --- | --- | --- |
 | 等待室 / 直播中 | `danmaku_live_*.jsonl` | `events_*.jsonl` | 实时写入，按 `rendererId` / 内容键去重 |
 | InnerTube 回放 | `danmaku_*.jsonl` | `events_*.jsonl` | 可续页；与实时文件合并 |
-| yt-dlp 回放 | `danmaku_*.jsonl` | 无 | 与实时文件合并 |
+| yt-dlp 回放 | `danmaku_*.jsonl` | 无 | 同一份字幕内先按 `rendererId` 去重，再与实时文件合并 |
 
 `fetch:live-chat` 在直播结束后默认调用回放采集器；`fetch:danmaku` 直接走回放。两者最终都会把 `danmaku_live_*.jsonl` 合并进 `danmaku_*.jsonl`。
+
+yt-dlp 的 `live_chat` 字幕可能同时含「直播段」和「从开头重写的回放段」（回放段前有 `REPLAY_VEM*` 播放器提示），同一条消息会出现两次。`normalizeLiveChat` 在写文件时就用 `DanmakuKeySet` 去重，只保留第一次出现的记录，重复条数记在 `NormalizeResult.duplicates`。
 
 ### 6.2 去重键
 
