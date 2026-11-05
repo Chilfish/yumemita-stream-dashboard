@@ -22,7 +22,7 @@ import {
   formatWeekday,
 } from "@/lib/format";
 import { STREAM_SUBVIEWS, type StreamSubView } from "@/lib/routes";
-import type { StreamSummary } from "@/types/dataset";
+import type { StreamNavItem } from "@/types/dataset";
 
 const SUBVIEW_LABELS: Record<StreamSubView, string> = {
   overview: "概览",
@@ -35,7 +35,7 @@ const SUBVIEW_LABELS: Record<StreamSubView, string> = {
 
 interface StreamDetailViewProps {
   datasetId: string;
-  rows: StreamSummary[];
+  rows: StreamNavItem[];
   row: StreamRow;
   view: StreamSubView;
   onViewChange: (view: StreamSubView) => void;

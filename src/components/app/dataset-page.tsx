@@ -1,10 +1,9 @@
 import type { CSSProperties } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { PackStatus } from '@/types/datapack'
 import { TriangleAlert } from 'lucide-react'
 import { AppHeader } from '@/components/dashboard/app-header'
 import { AppSidebar } from '@/components/dashboard/app-sidebar'
-import { CommandPalette } from '@/components/dashboard/command-palette'
 import { DatasetViewContext } from '@/components/dashboard/dataset-view-context'
 import { MobileTabBar } from '@/components/dashboard/mobile-tab-bar'
 import { CalendarPage } from '@/components/pages/calendar-page'
@@ -35,8 +34,14 @@ import { RouterProvider, useNavigate, useSearchParams } from '@/lib/router-compa
 import type { TranscriptIndexEntry } from '@/lib/transcripts'
 import type { CalendarPageData } from '@/types/calendar'
 import type { StreamDatapack } from '@/types/datapack'
-import type { BatchManifest, DatasetIndexEntry, StreamSummary } from '@/types/dataset'
+import type { BatchManifest, DatasetIndexEntry, StreamNavItem, StreamSummary } from '@/types/dataset'
 import { useShellTheme } from './shell-theme'
+
+// 命令面板只在 ⌘K 打开时渲染，先按需加载，避免把 autocomplete / dialog 塞进首屏包。
+const CommandPalette = lazy(() =>
+  import('@/components/dashboard/command-palette').then(module => ({
+    default: module.CommandPalette,
+  })))
 
 export type DatasetView =
   | 'home'
@@ -61,8 +66,10 @@ export interface DatasetPageProps {
   search: string
   params: Record<string, string>
   stream: StreamSummary | null
+  /** 单场页只传标题级索引；其余页面缺省时直接复用 `rows`。 */
+  navItems?: StreamNavItem[]
   pack: StreamDatapack | null
-  comparePacks: Record<string, StreamDatapack>
+  compareDensities: Record<string, number[]>
   transcripts?: TranscriptIndexEntry[]
   transcriptError?: string | null
   hasTranscript?: boolean
@@ -79,7 +86,8 @@ export function DatasetPage(props: DatasetPageProps) {
 }
 
 function DatasetShell(props: DatasetPageProps) {
-  const { dataset, datasets, rows, totals, section, stream } = props
+  const { dataset, datasets, rows, totals, section, stream, navItems } = props
+  const navigation = navItems ?? rows
   const { theme, onToggleTheme } = useShellTheme()
   const navigate = useNavigate()
   const [commandOpen, setCommandOpen] = useState(false)
@@ -99,9 +107,15 @@ function DatasetShell(props: DatasetPageProps) {
     streams: rows,
   }), [dataset, rows])
 
+  // Provider value 必须稳定：否则打开命令面板或切换主题会让正文与图表整页重算。
+  const viewValue = useMemo(
+    () => (totals ? { dataset, manifest, rows, totals } : null),
+    [dataset, manifest, rows, totals],
+  )
+
   useKeyboardShortcuts({
     datasetId: dataset.id,
-    rows,
+    rows: navigation,
     onCommandPalette: () => setCommandOpen(true),
   })
 
@@ -141,14 +155,14 @@ function DatasetShell(props: DatasetPageProps) {
           onOpenCommand={() => setCommandOpen(true)}
           section={section}
           stream={stream}
-          streamCount={rows.length}
+          streamCount={navigation.length}
         />
 
         <div className="mx-auto w-full max-w-[82.5rem] px-4 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
           <div className="motion-view" key={`${dataset.id}/${section}`}>
-            {totals
+            {viewValue
               ? (
-                  <DatasetViewContext.Provider value={{ dataset, manifest, rows, totals }}>
+                  <DatasetViewContext.Provider value={viewValue}>
                     <DatasetBody {...props} />
                   </DatasetViewContext.Provider>
                 )
@@ -161,17 +175,21 @@ function DatasetShell(props: DatasetPageProps) {
           activeSection={section}
           datasetId={dataset.id}
           datasets={datasets}
-          latestVideoId={rows[0]?.videoId ?? null}
+          latestVideoId={navigation[0]?.videoId ?? null}
           onMemberSelect={next => navigate(`/${next.id}`)}
         />
 
-        <CommandPalette
-          datasetId={dataset.id}
-          datasets={datasets}
-          onOpenChange={setCommandOpen}
-          open={commandOpen}
-          rows={rows}
-        />
+        {commandOpen ? (
+          <Suspense fallback={null}>
+            <CommandPalette
+              datasetId={dataset.id}
+              datasets={datasets}
+              onOpenChange={setCommandOpen}
+              open
+              rows={navigation}
+            />
+          </Suspense>
+        ) : null}
       </SidebarInset>
     </SidebarProvider>
   )
@@ -240,9 +258,9 @@ function StreamBody({ dataset, rows, stream, pack, hasTranscript, locked }: Data
   )
 }
 
-function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
+function CompareBody({ dataset, rows, compareDensities }: DatasetPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [packs, setPacks] = useState(() => new Map(Object.entries(comparePacks)))
+  const [densities, setDensities] = useState(() => new Map(Object.entries(compareDensities)))
   const [status, setStatus] = useState<PackStatus>('ready')
   const [packError, setPackError] = useState<string | null>(null)
 
@@ -261,10 +279,10 @@ function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
     setSearchParams(params, { replace: true })
   }, [searchParams, setSearchParams])
 
-  // 切换对比场次时只按需拉缺失的 pack，首屏已经带上的不再请求。
+  // 切换对比场次时只按需拉缺失的逐分钟密度，首屏已经带上的不再请求。
   useEffect(() => {
     const missing = (selectedKey ? selectedKey.split(',') : []).filter((id) => {
-      if (packs.has(id)) return false
+      if (densities.has(id)) return false
       if (accessKey) return true
       const row = rows.find(item => item.videoId === id)
       return !isMemberOnly(row?.availability)
@@ -276,20 +294,17 @@ function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
     setStatus('loading')
     setPackError(null)
 
-    Promise.all(
-      missing.map(async videoId => {
-        const response = await fetch(
-          `/api/packs/${encodeURIComponent(dataset.id)}/${encodeURIComponent(videoId)}${accessSuffix}`,
-        )
-        if (!response.ok) throw new Error(`加载 ${videoId} 失败`)
-        return [videoId, (await response.json()) as StreamDatapack] as const
-      }),
-    )
-      .then((entries) => {
+    const query = missing.map(encodeURIComponent).join(',')
+    fetch(`/api/densities/${encodeURIComponent(dataset.id)}?ids=${query}${accessSuffix}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error('逐分钟明细加载失败')
+        return (await response.json()) as Record<string, number[]>
+      })
+      .then((payload) => {
         if (cancelled) return
-        setPacks((previous) => {
+        setDensities((previous) => {
           const next = new Map(previous)
-          for (const [videoId, pack] of entries) next.set(videoId, pack)
+          for (const videoId of missing) next.set(videoId, payload[videoId] ?? [])
           return next
         })
         setStatus('ready')
@@ -303,16 +318,16 @@ function CompareBody({ dataset, rows, comparePacks }: DatasetPageProps) {
     return () => {
       cancelled = true
     }
-  }, [accessKey, accessSuffix, dataset.id, packs, rows, selectedKey])
+  }, [accessKey, accessSuffix, dataset.id, densities, rows, selectedKey])
 
   return (
     <CompareView
       datasetLabel={dataset.label}
+      densities={densities}
       onReset={() => writeIds([])}
       onToggle={videoId => writeIds(toggleCompareId(selectedIds, videoId))}
       packError={packError}
       packStatus={status}
-      packs={packs}
       rows={rows}
       selectedIds={selectedIds}
     />

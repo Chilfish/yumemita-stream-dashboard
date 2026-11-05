@@ -2,7 +2,7 @@ import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
 import type { DatasetTotals } from '@/lib/aggregate'
 import { buildGroupDataFromStreams, buildGroupDataFromSummary, type GroupData } from '@/lib/group'
-import type { DatasetIndexEntry, StreamSummary } from '@/types/dataset'
+import type { DatasetIndexEntry, StreamNavItem, StreamSummary } from '@/types/dataset'
 import type { StreamDatapack } from '@/types/datapack'
 import {
   getDatasets,
@@ -21,10 +21,22 @@ import { mapPublicTotals, selectPublicTotalsQuery, type PublicTotalsRow } from '
 import {
   assembleStreamPack,
   buildStreamPackQueries,
+  getCompareDensities,
   getStreamPacks,
+  type CompareDensityMap,
   type StreamPackParts,
 } from './packs'
-import { buildStreamListQuery, mapStreamList, type StreamListRow } from './streams'
+import {
+  buildStreamListQuery,
+  buildStreamNavQuery,
+  buildStreamSummariesQuery,
+  mapStreamList,
+  mapStreamRow,
+  selectStreamQuery,
+  type StreamListRow,
+  type StreamQueryRow,
+} from './streams'
+import { toIso } from './shared'
 import {
   mapTranscriptMeta,
   selectTranscriptMetaQuery,
@@ -84,6 +96,68 @@ export async function getDatasetPageData(
   }
 }
 
+export interface StreamPageData {
+  datasets: DatasetIndexEntry[]
+  dataset: DatasetIndexEntry
+  totals: DatasetTotals | null
+  summary: StreamSummary
+  /** `[较新, 较早]` 的 videoId；邻场摘要与 pack 放在第二轮同一批查询。 */
+  neighborIds: [string | null, string | null]
+  /** 标题级索引，供命令面板、键盘导航与场次数使用。 */
+  navItems: StreamNavItem[]
+}
+
+/**
+ * 单场页：不再为 1 行 summary 拉回整成员的 34 列摘要。
+ * 第一轮取成员、导航索引、当前场次与汇总；第二轮只补邻场摘要（最多 2 行）。
+ */
+export async function getStreamPageData(
+  db: Db,
+  datasetId: string,
+  videoId: string,
+): Promise<StreamPageData | null> {
+  const [datasetRows, navRows, summaryRows, totalsRows] = await runBatch<[
+    DatasetQueryRow[],
+    Awaited<ReturnType<typeof buildStreamNavQuery>>,
+    StreamQueryRow[],
+    PublicTotalsRow[],
+  ]>(db, [
+    selectDatasetsQuery(db, undefined),
+    buildStreamNavQuery(db, datasetId),
+    selectStreamQuery(db, datasetId, videoId),
+    selectPublicTotalsQuery(db, datasetId),
+  ])
+
+  const datasets = toIndex(datasetRows.map(mapDataset))
+  const dataset = datasets.find(item => item.id === datasetId)
+  const summaryRow = summaryRows[0]
+  if (!dataset || !summaryRow) return null
+
+  const summary = mapStreamRow(summaryRow)
+  const navItems: StreamNavItem[] = navRows.map(row => ({
+    videoId: row.videoId,
+    title: row.title,
+    date: row.date ?? '',
+    startedAt: toIso(row.startedAt),
+    durationSec: row.durationSec,
+  }))
+
+  const index = navItems.findIndex(item => item.videoId === videoId)
+  const neighborIds: [string | null, string | null] = [
+    index > 0 ? navItems[index - 1]?.videoId ?? null : null,
+    index >= 0 && index < navItems.length - 1 ? navItems[index + 1]?.videoId ?? null : null,
+  ]
+
+  return {
+    datasets,
+    dataset,
+    totals: mapPublicTotals(datasetId, totalsRows[0]),
+    summary,
+    neighborIds,
+    navItems,
+  }
+}
+
 export async function getGroupPageData(
   db: Db,
   view: 'home' | 'gallery',
@@ -122,19 +196,55 @@ export async function getComparePacks(
   return Object.fromEntries(await getStreamPacks(db, datasetId, videoIds))
 }
 
+/** 对比页首屏只需要逐分钟密度；整份 pack 留给 API 与单场页。 */
+export function getCompareDensityMap(
+  db: Db,
+  datasetId: string,
+  videoIds: string[],
+  options: { includeMemberOnly?: boolean } = {},
+): Promise<CompareDensityMap> {
+  return getCompareDensities(db, datasetId, videoIds, options)
+}
+
 /** 单场正文的第二轮查询：逐字稿元数据 + pack，放在同一个 batch。 */
 export async function getStreamPageExtras(
   db: Db,
   datasetId: string,
   videoId: string,
-): Promise<{ transcript: TranscriptMeta | null, pack: StreamDatapack | null }> {
-  const [transcriptRows, ...parts] = await runBatch<[TranscriptMetaRow[], ...StreamPackParts]>(db, [
+  neighborIds: (string | null)[] = [],
+): Promise<{
+  transcript: TranscriptMeta | null
+  pack: StreamDatapack | null
+  neighbors: StreamSummary[]
+}> {
+  const ids = neighborIds.filter((id): id is string => Boolean(id))
+  const neighborQuery = ids.length > 0 ? buildStreamSummariesQuery(db, datasetId, ids) : null
+
+  if (!neighborQuery) {
+    const [transcriptRows, ...parts] = await runBatch<[TranscriptMetaRow[], ...StreamPackParts]>(db, [
+      selectTranscriptMetaQuery(db, datasetId, videoId),
+      ...buildStreamPackQueries(db, datasetId, videoId, { words: 40, authors: 20 }),
+    ])
+    return {
+      transcript: mapTranscriptMeta(transcriptRows[0]),
+      pack: assembleStreamPack(parts),
+      neighbors: [],
+    }
+  }
+
+  const [transcriptRows, neighborRows, ...parts] = await runBatch<[
+    TranscriptMetaRow[],
+    Awaited<ReturnType<typeof buildStreamSummariesQuery>>,
+    ...StreamPackParts,
+  ]>(db, [
     selectTranscriptMetaQuery(db, datasetId, videoId),
+    neighborQuery,
     ...buildStreamPackQueries(db, datasetId, videoId, { words: 40, authors: 20 }),
   ])
 
   return {
     transcript: mapTranscriptMeta(transcriptRows[0]),
     pack: assembleStreamPack(parts),
+    neighbors: neighborRows.map(row => mapStreamRow(row)),
   }
 }

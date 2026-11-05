@@ -55,6 +55,45 @@ export interface DatasetInsightDto {
 }
 
 /** 查询层内部使用的行投影，避免把 Drizzle 类型漏到页面。 */
+/** 列表 / 岛屿只需要摘要字段；`id`、`content_hash`、`ingest_batch_id` 等不进入读路径。 */
+export type StreamSummaryRow = Pick<
+  StreamDbRow,
+  | 'date'
+  | 'videoId'
+  | 'title'
+  | 'url'
+  | 'startedAt'
+  | 'endedAt'
+  | 'durationSec'
+  | 'durationHms'
+  | 'availability'
+  | 'avgConcurrent'
+  | 'maxConcurrent'
+  | 'maxConcurrentAt'
+  | 'watchTimeHours'
+  | 'vstatsViews'
+  | 'vstatsLikes'
+  | 'snapshotViews'
+  | 'snapshotLikes'
+  | 'snapshotComments'
+  | 'chatTotal'
+  | 'chatByKind'
+  | 'pureEmojiOnly'
+  | 'uniqueAuthors'
+  | 'superchats'
+  | 'stickers'
+  | 'memberships'
+  | 'gifts'
+  | 'giftedMemberships'
+  | 'scTotalsByCurrency'
+  | 'commentsCaptured'
+  | 'chatPer1000AvgViewers'
+  | 'likesPer1000Views'
+  | 'scPerHour'
+  | 'thumbnailKey'
+  | 'sourceGeneratedAt'
+>
+
 export interface StreamDbRow {
   id: number
   datasetId: string

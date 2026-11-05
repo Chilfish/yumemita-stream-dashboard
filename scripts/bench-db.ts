@@ -37,9 +37,11 @@ import {
   selectTranscriptMetaQuery,
 } from '../src/db/queries/transcripts.ts'
 import {
+  getCompareDensityMap,
   getComparePacks,
   getDatasetPageData,
   getGroupPageData,
+  getStreamPageData,
   getStreamPageExtras,
 } from '../src/db/queries/view-data.ts'
 import { calendarWindow, currentJstMonth, monthRange } from '../src/lib/calendar.ts'
@@ -127,10 +129,11 @@ const scenarios: Scenario[] = [
   },
   {
     name: 'stream-page',
-    run: ({ db, datasetId, videoId }) => Promise.all([
-      getDatasetPageData(db, datasetId),
-      getStreamPageExtras(db, datasetId, videoId),
-    ]),
+    run: async ({ db, datasetId, videoId }) => {
+      const data = await getStreamPageData(db, datasetId, videoId)
+      const extras = await getStreamPageExtras(db, datasetId, videoId, data?.neighborIds ?? [])
+      return { data, extras }
+    },
   },
   {
     name: 'stream-md',
@@ -160,6 +163,13 @@ const scenarios: Scenario[] = [
     run: ({ db, datasetId, compareIds }) => Promise.all([
       getDatasetPageData(db, datasetId),
       getComparePacks(db, datasetId, compareIds),
+    ]),
+  },
+  {
+    name: 'compare-3-density',
+    run: ({ db, datasetId, compareIds }) => Promise.all([
+      getDatasetPageData(db, datasetId),
+      getCompareDensityMap(db, datasetId, compareIds),
     ]),
   },
   {

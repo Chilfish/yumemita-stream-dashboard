@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
+import { isMemberOnly } from '@/lib/visibility'
 import {
   authors,
   comments,
@@ -374,6 +375,38 @@ export async function getDatasetPacks(
     )
   }
   return packs
+}
+
+/** 对比页只需要逐分钟弹幕，不必还原整份 pack。 */
+export type CompareDensityMap = Record<string, number[]>
+
+export async function getCompareDensities(
+  db: Db,
+  datasetId: string,
+  videoIds: string[],
+  options: { includeMemberOnly?: boolean } = {},
+): Promise<CompareDensityMap> {
+  if (videoIds.length === 0) return {}
+
+  const rows = await db
+    .select({
+      videoId: streams.videoId,
+      availability: streams.availability,
+      density: streamDetails.density,
+    })
+    .from(streams)
+    .leftJoin(streamDetails, eq(streamDetails.streamId, streams.id))
+    .where(and(eq(streams.datasetId, datasetId), inArray(streams.videoId, videoIds)))
+
+  const densities: CompareDensityMap = {}
+  for (const row of rows) {
+    if (!options.includeMemberOnly && isMemberOnly(row.availability)) continue
+    const density = (row.density ?? {}) as { perMinute?: unknown }
+    densities[row.videoId] = Array.isArray(density.perMinute)
+      ? density.perMinute.filter((value): value is number => typeof value === 'number')
+      : []
+  }
+  return densities
 }
 
 export type StreamPackParts = [

@@ -44,6 +44,12 @@ export interface StreamSummary {
   generatedAt: string;
 }
 
+/** 命令面板 / 键盘导航 / 上一场下一场所需的最小字段。 */
+export type StreamNavItem = Pick<
+  StreamSummary,
+  "videoId" | "title" | "date" | "startedAt" | "durationSec"
+>;
+
 export interface BatchManifest {
   schema: string;
   generatedAt: string;

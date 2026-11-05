@@ -13,7 +13,6 @@ import type { PackStatus } from "@/types/datapack";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatDate, formatDuration, formatInteger, formatPercent } from "@/lib/format";
 import { MAX_COMPARE } from "@/lib/routes";
-import type { StreamDatapack } from "@/types/datapack";
 import type { StreamSummary } from "@/types/dataset";
 import { isMemberOnly } from "@/lib/visibility";
 import { cn } from "@/lib/utils";
@@ -25,7 +24,7 @@ interface CompareViewProps {
   selectedIds: string[];
   onToggle: (videoId: string) => void;
   onReset?: () => void;
-  packs: Map<string, StreamDatapack>;
+  densities: Map<string, number[]>;
   packStatus: PackStatus;
   packError: string | null;
 }
@@ -112,7 +111,7 @@ export function CompareView({
   selectedIds,
   onToggle,
   onReset,
-  packs,
+  densities,
   packStatus,
   packError,
 }: CompareViewProps) {
@@ -128,18 +127,18 @@ export function CompareView({
     () =>
       selected
         .map((row): ChartSeries | null => {
-          const pack = packs.get(row.videoId);
-          if (!pack) return null;
+          const values = densities.get(row.videoId);
+          if (!values || values.length === 0) return null;
           return {
             id: row.videoId,
             label: `${formatDate(row.startedAt)} ${row.title}`,
             shortLabel: formatDate(row.startedAt),
-            values: pack.chat.density.perMinute,
+            values,
             color: CHART_COLORS[selected.indexOf(row) % CHART_COLORS.length],
           };
         })
         .filter((item): item is ChartSeries => item != null),
-    [selected, packs],
+    [selected, densities],
   );
 
   const atLimit = selectedIds.length >= MAX_COMPARE;

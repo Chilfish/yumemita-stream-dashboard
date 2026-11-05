@@ -1,6 +1,6 @@
 import type { ChatByKind, CurrencyTotals } from '@/types/datapack'
 import type { StreamSummary } from '@/types/dataset'
-import type { StreamDbRow } from '@/types/db'
+import type { StreamSummaryRow } from '@/types/db'
 import { isMemberOnly } from '@/lib/visibility'
 
 export function toNumber(value: string | number | null | undefined): number | null {
@@ -20,7 +20,7 @@ export function toIso(value: Date | string | null | undefined): string | null {
   return Number.isNaN(time) ? null : new Date(time).toISOString()
 }
 
-export function mapStreamSummary(row: StreamDbRow, rank: number): StreamSummary {
+export function mapStreamSummary(row: StreamSummaryRow, rank: number): StreamSummary {
   return {
     rank,
     date: row.date ?? '',

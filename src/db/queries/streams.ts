@@ -1,17 +1,55 @@
-import { and, eq, getTableColumns, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
 import { streams } from '@/db/schema'
 import type { StreamSummary } from '@/types/dataset'
-import type { StreamListOptions, StreamListResult } from '@/types/db'
+import type { StreamListOptions, StreamListResult, StreamSummaryRow } from '@/types/db'
 import { mapStreamSummary, maskMemberOnlyMetrics } from './shared'
 
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
 
-function toSummary(row: typeof streams.$inferSelect, rank: number): StreamSummary {
+/** 岛屿摘要用到的列；不要退回 `select()`，否则会多带 content_hash 等写路径字段。 */
+export const SUMMARY_COLUMNS = {
+  date: streams.date,
+  videoId: streams.videoId,
+  title: streams.title,
+  url: streams.url,
+  startedAt: streams.startedAt,
+  endedAt: streams.endedAt,
+  durationSec: streams.durationSec,
+  durationHms: streams.durationHms,
+  availability: streams.availability,
+  avgConcurrent: streams.avgConcurrent,
+  maxConcurrent: streams.maxConcurrent,
+  maxConcurrentAt: streams.maxConcurrentAt,
+  watchTimeHours: streams.watchTimeHours,
+  vstatsViews: streams.vstatsViews,
+  vstatsLikes: streams.vstatsLikes,
+  snapshotViews: streams.snapshotViews,
+  snapshotLikes: streams.snapshotLikes,
+  snapshotComments: streams.snapshotComments,
+  chatTotal: streams.chatTotal,
+  chatByKind: streams.chatByKind,
+  pureEmojiOnly: streams.pureEmojiOnly,
+  uniqueAuthors: streams.uniqueAuthors,
+  superchats: streams.superchats,
+  stickers: streams.stickers,
+  memberships: streams.memberships,
+  gifts: streams.gifts,
+  giftedMemberships: streams.giftedMemberships,
+  scTotalsByCurrency: streams.scTotalsByCurrency,
+  commentsCaptured: streams.commentsCaptured,
+  chatPer1000AvgViewers: streams.chatPer1000AvgViewers,
+  likesPer1000Views: streams.likesPer1000Views,
+  scPerHour: streams.scPerHour,
+  thumbnailKey: streams.thumbnailKey,
+  sourceGeneratedAt: streams.sourceGeneratedAt,
+}
+
+function toSummary(row: StreamSummaryRow, rank: number): StreamSummary {
   return mapStreamSummary(row, rank)
 }
 
-function toPublicSummary(row: typeof streams.$inferSelect, rank: number): StreamSummary {
+function toPublicSummary(row: StreamSummaryRow, rank: number): StreamSummary {
   return maskMemberOnlyMetrics(toSummary(row, rank))
 }
 
@@ -30,7 +68,7 @@ export function buildStreamListQuery(
   // 需要 total 时用一次窗口函数；页面只渲染当前页，传 withTotal: false 让查询提前结束。
   return db
     .select({
-      ...getTableColumns(streams),
+      ...SUMMARY_COLUMNS,
       total: options.withTotal === false
         ? sql<number>`0`
         : sql<number>`count(*) over()::int`,
@@ -58,6 +96,29 @@ export async function listStreams(
 ): Promise<StreamListResult> {
   const offset = Math.max(options.offset ?? 0, 0)
   return mapStreamList(await buildStreamListQuery(db, datasetId, options), offset)
+}
+
+/** 单场页的导航索引：命令面板与 j/k 切换只需要标题级字段。 */
+export function buildStreamNavQuery(db: Db, datasetId: string) {
+  return db
+    .select({
+      videoId: streams.videoId,
+      title: streams.title,
+      date: streams.date,
+      startedAt: streams.startedAt,
+      durationSec: streams.durationSec,
+    })
+    .from(streams)
+    .where(eq(streams.datasetId, datasetId))
+    .orderBy(NEWEST_FIRST)
+}
+
+/** 上一场 / 下一场的完整摘要；最多 2 行。 */
+export function buildStreamSummariesQuery(db: Db, datasetId: string, videoIds: string[]) {
+  return db
+    .select(SUMMARY_COLUMNS)
+    .from(streams)
+    .where(and(eq(streams.datasetId, datasetId), inArray(streams.videoId, videoIds)))
 }
 
 /** sitemap：一次取回全部成员的定位信息，避免每个成员一次 HTTP 往返。 */
@@ -96,7 +157,7 @@ export function selectStreamQuery(db: Db, datasetId: string, videoId: string) {
 
 export type StreamQueryRow = Awaited<ReturnType<typeof selectStreamQuery>>[number]
 
-export function mapStreamRow(row: StreamQueryRow): StreamSummary {
+export function mapStreamRow(row: StreamSummaryRow): StreamSummary {
   return toSummary(row, 0)
 }
 

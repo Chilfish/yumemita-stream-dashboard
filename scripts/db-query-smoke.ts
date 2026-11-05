@@ -10,6 +10,7 @@ import {
   listStreams,
 } from '../src/db/queries/streams.ts'
 import { getTranscriptIndex, getTranscriptMeta } from '../src/db/queries/transcripts.ts'
+import { getCompareDensityMap } from '../src/db/queries/view-data.ts'
 import { calendarWindow, currentJstMonth, monthRange } from '../src/lib/calendar.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 
@@ -111,6 +112,13 @@ async function main(): Promise<void> {
       .filter(bucket => bucket.type === 'all')
       .every(bucket => bucket.streams > 0),
     'group compare 桶的场次数异常',
+  )
+
+  const densityIds = list.streams.slice(0, 3).map(row => row.videoId)
+  const densities = await getCompareDensityMap(db, 'nonoka', densityIds)
+  check(
+    densityIds.every(videoId => Array.isArray(densities[videoId])),
+    'getCompareDensityMap 缺少所选场次的密度数组',
   )
 
   const timings: number[] = []

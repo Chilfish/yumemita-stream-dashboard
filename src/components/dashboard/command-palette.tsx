@@ -8,7 +8,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDate, formatDuration } from "@/lib/format";
 import { calendarPath, homePath, streamPath } from "@/lib/routes";
-import type { DatasetIndexEntry, StreamSummary } from "@/types/dataset";
+import type { DatasetIndexEntry, StreamNavItem } from "@/types/dataset";
 import { assetUrl, cn } from "@/lib/utils";
 
 interface CommandPaletteProps {
@@ -16,7 +16,7 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
   datasetId: string;
   datasets: DatasetIndexEntry[];
-  rows: StreamSummary[];
+  rows: StreamNavItem[];
 }
 
 interface CommandEntry {

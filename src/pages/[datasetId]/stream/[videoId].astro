@@ -3,10 +3,11 @@ import Layout from '@/layouts/Layout.astro'
 import ErrorState from '@/components/shared/ErrorState.astro'
 import { DatasetPage } from '@/components/app/dataset-page'
 import { db } from '@/db/client'
-import { getDatasetPageData, getStreamPageExtras } from '@/db/queries/view-data'
+import { getStreamPageData, getStreamPageExtras } from '@/db/queries/view-data'
 import { memberOnlyCachePolicy } from '@/lib/member-access'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 import { isMemberOnly } from '@/lib/visibility'
+import type { StreamSummary } from '@/types/dataset'
 
 export const prerender = false
 
@@ -15,23 +16,30 @@ const videoId = Astro.params.videoId!
 const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
 
 let failed = false
-const data = await getDatasetPageData(db, datasetId).catch(error => {
+const data = await getStreamPageData(db, datasetId, videoId).catch(error => {
   console.error('[page] stream failed', error)
   failed = true
   return null
 })
 
-const summary = data?.rows.find(row => row.videoId === videoId) ?? null
+const summary = data?.summary ?? null
 // 会员限定场的封面、标题与时间公开，弹幕 / 评论 / SC 等明细要带访问参数才放行。
 const locked = summary !== null && isMemberOnly(summary.availability) && !unlocked
 
 // 第二轮：逐字稿元数据 + pack 在同一个 batch（1 次 HTTP 请求）。
 const extras = summary && !locked
-  ? await getStreamPageExtras(db, datasetId, videoId)
+  ? await getStreamPageExtras(db, datasetId, videoId, data?.neighborIds ?? [])
   : null
 const transcript = extras?.transcript ?? null
 const pack = extras?.pack ?? null
 const hasTranscript = Boolean(transcript)
+const neighborById = new Map((extras?.neighbors ?? []).map(item => [item.videoId, item]))
+const rows: StreamSummary[] = []
+if (data && summary) {
+  const newer = data.neighborIds[0] ? neighborById.get(data.neighborIds[0]) : undefined
+  const older = data.neighborIds[1] ? neighborById.get(data.neighborIds[1]) : undefined
+  for (const item of [newer, summary, older]) if (item) rows.push(item)
+}
 
 if (locked) {
   if (!keyed) Astro.cache.set({ maxAge: 3600, swr: 86400, tags: [`stream-${videoId}`, `dataset-${datasetId}`] })
@@ -61,7 +69,7 @@ const baseMeta = locked && summary
         chatTotal: null,
         superchats: null,
       },
-      streamCount: data?.rows.length ?? null,
+      streamCount: data?.navItems.length ?? null,
       memberCount: data?.datasets.length ?? null,
       updatedAt: summary.startedAt,
       imageStream: { datasetId, videoId },
@@ -80,7 +88,7 @@ const baseMeta = locked && summary
           chatTotal: summary.chatTotal,
           superchats: summary.superchats,
         },
-        streamCount: data.rows.length,
+        streamCount: data.navItems.length,
         memberCount: data.datasets.length,
         updatedAt: summary.startedAt,
         imageStream: { datasetId, videoId },
@@ -117,15 +125,16 @@ const markdownHref = summary && !locked
     ? (
         <DatasetPage
           client:idle
-          comparePacks={{}}
+          compareDensities={{}}
           dataset={data.dataset}
           datasets={data.datasets}
           hasTranscript={hasTranscript}
           locked={locked}
+          navItems={data.navItems}
           pack={pack}
           params={requestParams(Astro)}
           pathname={Astro.url.pathname}
-          rows={data.rows}
+          rows={rows}
           search={requestSearch(Astro)}
           section="stream"
           stream={summary}
