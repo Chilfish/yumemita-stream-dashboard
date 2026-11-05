@@ -22,6 +22,13 @@
       "when": 1793802485348,
       "tag": "0002_public_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793861327451,
+      "tag": "0003_peaceful_zaran",
+      "breakpoints": true
     }
   ]
 }

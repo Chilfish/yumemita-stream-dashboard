@@ -21,6 +21,9 @@
 | B12 | 弹幕与事件可视化组件（POC `/dev/live-chat`） | P2 | B6 或 R2 `danmaku_*.jsonl` 读取方案 | 2026-11-04 需求 | 🚧 POC 完成；数据源、组件化与正式入口待做 |
 | B13 | 组首页成员活跃：近 100 天出勤、成员榜指标切换、近 20 场趋势 | P2 | 无（复用 group summary） | 2026-11-04 讨论 | ✅ 已实现（`FR-HOME-002`）；复用 group summary，无新增查询 |
 | B14 | 直播日历：未来场次、手工日程与月历视图（`FR-CAL-001`–`FR-CAL-009`） | P2 | 无（新表 `scheduled_streams`） | 2026-11-04 需求 | 🚧 读取、月历 / 议程、自动同步与缓存已实现；手工日程与 ICS 暂缓；方案见 [live-calendar.md](live-calendar.md) |
+| B15 | yt-dlp 字幕的直播段 + 回放段重复：`normalizeLiveChat` 按 `rendererId` 去重 | P1 | 无 | 2026-11-05 反馈 | ✅ `normalizeLiveChat` 去重 + `duplicates` 计数 + 单测；`fmjJNbzcr3g` 已重新生成（32,343 → 22,058）；见 [postmortem 001](../postmortem/001-yt-dlp-chat-duplicate.md) |
+| B16 | 页面汇总改为读 `dataset_insights.public_totals`，不再每次渲染拉整库明细 | P0 | `db:ingest` 重算 insights | 2026-11-05 Neon 账单 | ✅ 单页数据库出流量 3.5–10.5 MB → 约 0.2–0.4 MB；见 [postmortem 002](../postmortem/002-dataset-packs-per-render.md) |
+| B17 | 本地开发数据库：Scoop Postgres + Neon HTTP 代理 + 初始化脚本 | P1 | 无 | 2026-11-05 成本控制 | ✅ `bun run dev:db` / `dev:db:proxy` / `dev:seed`；见 [local-database.md](../engineering/local-database.md) |
 
 ## 审查承接区
 

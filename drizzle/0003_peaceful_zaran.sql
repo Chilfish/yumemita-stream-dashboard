@@ -1,0 +1,1 @@
+ALTER TABLE "dataset_insights" ADD COLUMN "public_totals" jsonb;

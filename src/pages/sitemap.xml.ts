@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 import { db } from '@/db/client'
 import { getDatasets } from '@/db/queries/datasets'
-import { listStreams } from '@/db/queries/streams'
+import { listStreamRefs } from '@/db/queries/streams'
 import { buildSitemap } from '@/lib/seo'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
 import { isMemberOnly } from '@/lib/visibility'
@@ -14,12 +14,12 @@ export const GET: APIRoute = async (context) => {
   const datasets = await getDatasets(db)
   const entries = await Promise.all(
     datasets.map(async dataset => {
-      const list = await listStreams(db, dataset.id, { limit: 2000 })
+      const streams = await listStreamRefs(db, dataset.id)
       return {
         id: dataset.id,
         updatedAt: dataset.generatedAt,
         // 会限单场是 noindex，不进 sitemap。
-        streams: list.streams
+        streams: streams
           .filter(stream => !isMemberOnly(stream.availability))
           .map(stream => ({
             videoId: stream.videoId,

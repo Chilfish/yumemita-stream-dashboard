@@ -175,7 +175,11 @@
 
 ## 4. insights
 
-`insights.json` 由 `publish:data` / `ingest-db` 用 `aggregateDataset` 预聚合，schema `yumemita.dashboard.insights/v1`。当前页面从 `dataset_insights.totals` 读取同一份结构。
+`insights.json` 由 `publish:data` / `ingest-db` 用 `aggregateDataset` 预聚合，schema `yumemita.dashboard.insights/v1`。页面汇总读 `dataset_insights.public_totals`，不在请求期从 pack 重算。
+
+- `totals`：含会员限定场的全量口径，供本地核对与 `db:verify` 使用。
+- `public_totals`：公开页面口径。会员限定场只计入 `streamCount` / `memberOnlyCount`，其余指标按公开场次计算；由 ingest 用 `aggregateDataset` 生成。旧数据没有该列时回退 `totals`。
+- 请求期不再加载 `stream_details` / comments / paid / words / authors；一次页面汇总查询只有一行 JSON（约 15–22 KB）。
 
 ```json
 {

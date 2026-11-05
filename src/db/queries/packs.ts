@@ -309,7 +309,7 @@ async function loadChildren(db: Db, ids: number[]) {
   return { details, paid, comments: commentRows, words, authorRows }
 }
 
-/** 批量还原一个 dataset 的全部 pack，供 aggregateDataset / compare 使用。 */
+/** 批量还原一个 dataset 的全部 pack；只给离线 ingest 计算汇总用，不要在请求期调用。 */
 export async function getDatasetPacks(
   db: Db,
   datasetId: string,

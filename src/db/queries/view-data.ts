@@ -1,18 +1,19 @@
 import type { Db } from '@/db/connection'
-import { aggregateDataset, type DatasetTotals, type StreamRow as AggregateStreamRow } from '@/lib/aggregate'
+import type { DatasetTotals } from '@/lib/aggregate'
 import { buildGroupDataFromStreams, buildGroupDataFromSummary, type GroupData } from '@/lib/group'
 import type { DatasetIndexEntry, StreamSummary } from '@/types/dataset'
 import type { StreamDatapack } from '@/types/datapack'
 import { getDatasets } from './datasets'
 import { getGroupGallery, getGroupSummary } from './group'
-import { getDatasetPacks, getStreamPack } from './packs'
+import { getDatasetPublicTotals } from './insights'
+import { getStreamPack } from './packs'
 import { listStreams } from './streams'
 
 export interface DatasetPageData {
   datasets: DatasetIndexEntry[]
   dataset: DatasetIndexEntry
   rows: StreamSummary[]
-  totals: DatasetTotals
+  totals: DatasetTotals | null
 }
 
 export interface GroupPageData {
@@ -34,23 +35,6 @@ export function toIndex(rows: Awaited<ReturnType<typeof getDatasets>>): DatasetI
   }))
 }
 
-async function resolveTotals(
-  db: Db,
-  datasetId: string,
-  rows: StreamSummary[],
-): Promise<DatasetTotals> {
-  // insights 的口径包含会员限定；公开页面的指标必须按公开场次重算。
-  const packs = await getDatasetPacks(db, datasetId)
-  const aggregateRows: AggregateStreamRow[] = rows
-    .map(summary => {
-      const pack = packs.get(summary.videoId)
-      return pack ? { summary, pack } : null
-    })
-    .filter((row): row is AggregateStreamRow => row !== null)
-
-  return aggregateDataset(aggregateRows)
-}
-
 export async function getDatasetPageData(
   db: Db,
   datasetId: string,
@@ -65,7 +49,8 @@ export async function getDatasetPageData(
   const dataset = datasets.find(item => item.id === datasetId)
   if (!dataset) return null
 
-  const totals = await resolveTotals(db, datasetId, list.streams)
+  // 汇总由 db:ingest 预聚合，请求期只读一行 JSON；不要再加载整份明细。
+  const totals = await getDatasetPublicTotals(db, datasetId)
 
   return {
     datasets,

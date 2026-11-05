@@ -4,6 +4,7 @@ import process from 'node:process'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
 import { createDb } from '../src/db/connection.ts'
+import { computeDatasetPublicTotals } from '../src/db/queries/dataset-totals.ts'
 import {
   comments,
   datasetInsights,
@@ -221,6 +222,15 @@ async function main(): Promise<void> {
       }
       else if (!jsonEqual(insight.totals, expected)) {
         problems.push({ scope: source.id, message: 'dataset_insights.totals 与重算结果不一致' })
+      }
+
+      // 页面汇总读 public_totals；它必须与数据库当前状态一致。
+      const expectedPublic = await computeDatasetPublicTotals(db, source.id)
+      if (!insight?.publicTotals) {
+        problems.push({ scope: source.id, message: '缺少 dataset_insights.public_totals' })
+      }
+      else if (!jsonEqual(insight.publicTotals, expectedPublic)) {
+        problems.push({ scope: source.id, message: 'dataset_insights.public_totals 与数据库重算结果不一致' })
       }
     }
     else {

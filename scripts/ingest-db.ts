@@ -5,7 +5,8 @@ import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
 import { isStopword } from '../src/lib/stopwords.ts'
-import { createWriteDb } from '../src/db/connection.ts'
+import { createDb, createWriteDb } from '../src/db/connection.ts'
+import { computeDatasetPublicTotals } from '../src/db/queries/dataset-totals.ts'
 import {
   authors,
   comments,
@@ -42,7 +43,24 @@ interface Args {
   dryRun: boolean
   force: boolean
   batchSize: number
+  help: boolean
 }
+
+const USAGE = `用法：bun scripts/ingest-db.ts [选项]
+
+从 data/<dataset>/*.datapack.json 投影到 PostgreSQL；只处理本地 pack。
+
+选项：
+  --dataset <id>     只处理指定 dataset；省略会处理全部成员
+  --ids <文件>       只处理文件里列出的 videoId（每行一个）
+  --limit <n>        每个 dataset 最多处理前 n 份 pack；跳过 insights 重算
+  --force            内容 hash 不变也重写
+  --all              等同上 --force（历史参数）
+  --batch-size <n>   每处理 n 份打印进度，默认 50
+  --dry-run          只校验 pack，不连数据库
+  -h, --help         显示本帮助
+
+注意：未识别的参数会被忽略；补数据时务必带 --dataset / --ids，避免误跑全量。`
 
 interface DatasetReport {
   id: string
@@ -56,7 +74,7 @@ interface DatasetReport {
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { all: false, dryRun: false, force: false, batchSize: 50 }
+  const args: Args = { all: false, dryRun: false, force: false, batchSize: 50, help: false }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--dataset') args.dataset = argv[++index]
@@ -66,6 +84,8 @@ function parseArgs(argv: string[]): Args {
     else if (arg === '--all') { args.all = true; args.force = true }
     else if (arg === '--force') args.force = true
     else if (arg === '--dry-run') args.dryRun = true
+    else if (arg === '--help' || arg === '-h') args.help = true
+    else console.warn(`[ingest] 忽略未知参数：${arg}`)
   }
   return args
 }
@@ -258,6 +278,10 @@ function buildInsights(packs: { pack: StreamDatapack, rel: string }[]) {
 async function main(): Promise<void> {
   loadEnvFiles()
   const args = parseArgs(process.argv.slice(2))
+  if (args.help) {
+    console.log(USAGE)
+    return
+  }
   const sources = JSON.parse(readFileSync('data-sources.json', 'utf8')) as { datasets: DataSource[] }
   const selected = sources.datasets.filter(item => !args.dataset || item.id === args.dataset)
   if (selected.length === 0) throw new Error(`找不到 dataset: ${args.dataset}`)
@@ -270,11 +294,15 @@ async function main(): Promise<void> {
   const reports: DatasetReport[] = []
   let db: ReturnType<typeof createWriteDb>['db'] | null = null
   let pool: ReturnType<typeof createWriteDb>['pool'] | null = null
+  let readDb: ReturnType<typeof createDb> | null = null
 
   if (!args.dryRun) {
-    const connection = createWriteDb(requireEnv('DATABASE_URL'))
+    const url = requireEnv('DATABASE_URL')
+    const connection = createWriteDb(url)
     db = connection.db
     pool = connection.pool
+    // 汇总从入库后的数据库状态重算；只在离线 ingest 里读整份明细。
+    readDb = createDb(url)
   }
 
   let batchId: number | null = null
@@ -407,7 +435,7 @@ async function main(): Promise<void> {
       // 上次可能在写完 streams 后中断，重跑时所有 pack 都会 skip。
       // 用数据库里的实际场次数判断 insights 是否过期，避免必须 --all 才能补汇总。
       const [insightRow] = await db
-        .select({ totals: datasetInsights.totals })
+        .select({ totals: datasetInsights.totals, publicTotals: datasetInsights.publicTotals })
         .from(datasetInsights)
         .where(eq(datasetInsights.datasetId, source.id))
         .limit(1)
@@ -417,7 +445,9 @@ async function main(): Promise<void> {
         .where(eq(streams.datasetId, source.id))
       const insightTotals = (insightRow?.totals ?? {}) as { streamCount?: unknown }
       const insightCount = typeof insightTotals.streamCount === 'number' ? insightTotals.streamCount : null
+      // 没有 public_totals 说明是旧数据；即使本次没有 pack 变化也要补算。
       const insightsStale = insightCount !== Number(countRow?.count ?? 0)
+        || insightRow?.publicTotals == null
 
       if (args.limit) {
         console.log(`[ingest] ${source.id}: 小批量模式，跳过 dataset_insights 重算`)
@@ -428,16 +458,20 @@ async function main(): Promise<void> {
           rel: `data/${source.id}/${basename(file)}`,
         }))
         const totals = buildInsights(all)
+        const publicTotals = await computeDatasetPublicTotals(readDb!, source.id)
         await db.insert(datasetInsights).values({
           datasetId: source.id,
           totals,
+          publicTotals,
           aggregation: totals.aggregation ?? null,
           generatedAt: new Date(),
         }).onConflictDoUpdate({
           target: datasetInsights.datasetId,
-          set: { totals, aggregation: totals.aggregation ?? null, generatedAt: new Date() },
+          set: { totals, publicTotals, aggregation: totals.aggregation ?? null, generatedAt: new Date() },
         })
-        console.log(`[ingest] ${source.id}: insights 已更新（${all.length} 场）`)
+        console.log(
+          `[ingest] ${source.id}: insights 已更新（${all.length} 场；public_totals ${publicTotals.streamCount} 场 / ${JSON.stringify(publicTotals).length} B）`,
+        )
       }
 
       const transcriptCount = await syncTranscripts(db, source.id)

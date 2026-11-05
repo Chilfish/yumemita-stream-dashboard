@@ -223,6 +223,11 @@ export const datasetInsights = pgTable('dataset_insights', {
     .primaryKey()
     .references(() => datasets.id, { onDelete: 'cascade' }),
   totals: jsonb('totals').notNull(),
+  /**
+   * 公开页面口径：会员限定场只计场次数，派生指标按公开场次聚合。
+   * 请求期只读这一行，避免再加载整份详情。
+   */
+  publicTotals: jsonb('public_totals'),
   aggregation: jsonb('aggregation'),
   generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
 })

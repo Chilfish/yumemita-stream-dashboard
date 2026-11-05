@@ -3,7 +3,7 @@ import type { Db } from '@/db/connection'
 import { streams, streamDetails } from '@/db/schema'
 import type { StreamSummary } from '@/types/dataset'
 import type { StreamListOptions, StreamListResult, StreamNeighbors, StreamDetailDto } from '@/types/db'
-import { mapStreamSummary, maskMemberOnlyMetrics, toNumber } from './shared'
+import { mapStreamSummary, maskMemberOnlyMetrics, toIso, toNumber } from './shared'
 
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
 
@@ -43,6 +43,28 @@ export async function listStreams(
     streams: rows.map((row, index) => toPublicSummary(row, offset + index + 1)),
     total: rows[0]?.total ?? 0,
   }
+}
+
+/** sitemap 等只需要定位信息的场景：不要返回整行（含 jsonb 指标）。 */
+export async function listStreamRefs(
+  db: Db,
+  datasetId: string,
+): Promise<{ videoId: string, startedAt: string | null, availability: string | null }[]> {
+  const rows = await db
+    .select({
+      videoId: streams.videoId,
+      startedAt: streams.startedAt,
+      availability: streams.availability,
+    })
+    .from(streams)
+    .where(eq(streams.datasetId, datasetId))
+    .orderBy(NEWEST_FIRST)
+
+  return rows.map(row => ({
+    videoId: row.videoId,
+    startedAt: toIso(row.startedAt),
+    availability: row.availability,
+  }))
 }
 
 export async function getStream(

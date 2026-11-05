@@ -21,9 +21,10 @@
 
 | 编号 | 主题 | 级别 | 分类 | 状态 | 根因（一句话） |
 | --- | --- | --- | --- | --- | --- |
-| （暂无） | | | | | |
+| [001](./001-yt-dlp-chat-duplicate.md) | yt-dlp 字幕的直播段与回放段重复，弹幕 / SC 双倍入库 | SEV-2 | 缺陷 | Mitigated | 归一化只渲染不去重，去重被放到「两份文件合并」且该步骤可能不执行 |
+| [002](./002-dataset-packs-per-render.md) | 每次渲染 dataset 页面都全量拉取明细，Neon 网络出流量异常增长 | SEV-3 | 架构 | Mitigated | 页面汇总复用了单场详情的完整 pack 查询，7 类路由每次冷渲染读 3.5–10.5 MB |
 
-> 尚无 postmortem。首次踩坑后按 [TEMPLATE.md](./TEMPLATE.md) 新增，并在此登记。
+> 新增 postmortem 按 [TEMPLATE.md](./TEMPLATE.md) 复制填写，并在此登记。
 
 ## 基线雷区（写码前自查）
 
@@ -47,6 +48,7 @@
 | 提交顺序 | 是否先 ingest 再 purge | 数据库提交成功后才失效缓存 |
 | 错误可见 | 数据库不可用时是否显示错误态 | 三态覆盖，不要静默空数组 |
 | 增量进度 | `.publish-state.json` 是否与实际桶一致 | 怀疑漂移时 `publish:assets --force` |
+| 来源内部重复 | yt-dlp `live_chat` 是否同时含直播段与回放段 | `normalizeLiveChat` 按 `rendererId` 去重，不依赖后续合并 |
 | 数据缩水 | 本地 pack 少于数据库时 ingest 是否覆盖 | 确认下架流程，不要先 truncate 再灌 |
 | 会员限定 | 公开范围是否确认 | 不确定就不上传公开桶 |
 
@@ -95,6 +97,8 @@
 | 全量弹幕体积 | 是否把 691 万条弹幕塞进热表 | 先聚合，`chat_events` 分区后再上 |
 | 数据工作流依赖 | 加了 Drizzle / Neon import 后是否仍没装包 | 工作流显式 `bun install --frozen-lockfile` |
 | 公开桶范围 | 逐字稿正文是否走了公开 R2 域名 | 正文走同源 `/api/transcripts/...` + binding |
+| 页面汇总查询粒度 | 是否为一个汇总数字加载整份明细 / 全部子表 | 汇总走 `dataset_insights` 预聚合或 SQL 聚合，只返回小结果 |
+| 查询结果体积 | 单次渲染从数据库读了多少字节 | 用窄列查询；估算方法：dataset 明细体积 ÷ 页面数 |
 
 ## 高频雷区（来自实际 postmortem）
 
