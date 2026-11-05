@@ -108,6 +108,12 @@ export default defineConfig({
         access: 'secret',
         optional: true,
       }),
+      /** 本地开发：指向 `bun run dev:db:proxy` 的 Neon HTTP 兼容端点。 */
+      NEON_HTTP_ENDPOINT: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
       R2_ACCOUNT_ID: envField.string({
         context: 'server',
         access: 'secret',

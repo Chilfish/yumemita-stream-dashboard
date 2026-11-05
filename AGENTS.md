@@ -51,6 +51,7 @@
 | 架构级变更 | [docs/planning/architecture.md](./docs/planning/architecture.md) |
 | 规划下一阶段 | [docs/planning/backlog.md](./docs/planning/backlog.md) |
 | 写代码 | [docs/engineering/code-style.md](./docs/engineering/code-style.md) |
+| 本地开发数据库 | [docs/engineering/local-database.md](./docs/engineering/local-database.md) |
 | Commit / PR | [docs/engineering/git-workflow.md](./docs/engineering/git-workflow.md) |
 | 发布 | [docs/engineering/release-checklist.md](./docs/engineering/release-checklist.md) |
 | 改 UI | [docs/ui-design/README.md](./docs/ui-design/README.md) + [GENERAL.md](./docs/ui-design/GENERAL.md) |
@@ -140,6 +141,17 @@ bun run test:smoke     # 路由冒烟（先启动 preview）
 bun run validate:data  # 旧数据链路
 ```
 
+本地开发默认连本机 Postgres，避免开发流量计入 Neon 出流量：
+
+```bash
+bun run dev:db        # 建库 + 迁移 + 写 .env.local
+bun run dev:db:proxy  # workerd 用的本地 Neon HTTP 代理
+bun run dev:seed      # 从本地 pack 灌数据
+```
+
+`.dev.vars` 需要 `DATABASE_URL` 与 `NEON_HTTP_ENDPOINT`；步骤与排查见
+[docs/engineering/local-database.md](./docs/engineering/local-database.md)。
+
 - 纯逻辑放 `src/lib/` 并配 `.test.ts`。
 - 路由冒烟：`bun run test:smoke`（先启动 dev / preview）。
 - 不把「构建通过」当作功能已验证；未执行的检查标注「未验证」。
@@ -171,6 +183,7 @@ bun run validate:data  # 旧数据链路
 | --- | --- | --- |
 | 在视图里重复聚合 | 放 `src/lib/aggregate.ts`，补测试 | 分层 |
 | 为单个数字查整份 pack / 全表聚合 | 用查询层聚合 / `dataset_insights` | 性能 |
+| 页面汇总复用单场详情查询，拉回全部明细 | 读 `dataset_insights.public_totals` 或写窄列 SQL 聚合 | 查询粒度（postmortem 002） |
 | 把 `null` 画成 0 | 跳过或显示「—」 | 数据口径 |
 | 手写按钮 / 弹层 / 下拉 | 复用 `src/components/ui/` | UI 规范 |
 | 硬编码颜色 | CSS 变量 / Token | UI 规范 |

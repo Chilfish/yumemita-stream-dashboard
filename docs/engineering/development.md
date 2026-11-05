@@ -16,6 +16,16 @@ bun run dev
 # http://localhost:4321
 ```
 
+本地开发建议用本机 Postgres，避免把开发流量算进 Neon 出流量。完整步骤见
+[local-database.md](./local-database.md)，最短路径：
+
+```bash
+bun run dev:db        # 建库 + 迁移 + 写 .env.local
+bun run dev:db:proxy  # 终端 A：workerd 用的 Neon HTTP 兼容代理
+bun run dev           # 终端 B
+bun run dev:seed      # 可选：从本地 pack 灌数据
+```
+
 ## 脚本
 
 | 命令 | 作用 |
@@ -25,8 +35,11 @@ bun run dev
 | `bun run preview` | 本地预览构建产物（workerd） |
 | `bun run cf:preview` | 构建后预览，部署前检查 |
 | `bun run cf:deploy` | `astro build` + `wrangler deploy --config dist/server/wrangler.json` |
+| `bun run dev:db` | 创建本地库、应用迁移、写 `.env.local`（见 [local-database.md](./local-database.md)） |
+| `bun run dev:db:proxy` | 本地 Neon HTTP 兼容代理（workerd → 本机 Postgres） |
+| `bun run dev:seed` | 本地灌数据；参数同 `db:ingest` |
 | `bun run db:generate` / `db:push` / `db:studio` | Drizzle 迁移工具 |
-| `bun run db:migrate` | 应用 `drizzle/` 迁移（读 `.env` 或 `.dev.vars`） |
+| `bun run db:migrate` | 应用 `drizzle/` 迁移（读 `.env` / `.dev.vars` / `.env.local`） |
 | `bun run db:ingest` | 本地 pack → PostgreSQL；支持 `--dataset` / `--ids` / `--limit` / `--all` / `--dry-run` |
 | `bun run db:verify` | 数据库与本地 pack 字段级对账 |
 | `bun run db:query` | 查询层冒烟：列表 / insights / 组首页 / 相册 + 本地延迟 |
@@ -49,15 +62,18 @@ bun run dev
 - Schema：`src/db/schema.ts`；迁移产物在 `drizzle/`，用 `bun run db:migrate` 应用。
 - 读连接：`src/db/connection.ts` 的 `createDb()`，`drizzle-orm/neon-http`；Worker 用 `src/db/client.ts`。
 - 写连接：同文件的 `createWriteDb()`，`drizzle-orm/neon-serverless` 的 WebSocket Pool；只在脚本里用。
-- 不用 `postgres.js` 或 `pg`：Neon 官方方案是 HTTP 读 + WebSocket 事务，Bun 自带 WebSocket。
+- 本地开发：`DATABASE_URL` 指向 `localhost` 时，脚本自动切 `pg`；workerd 不能直连 TCP，需设置 `NEON_HTTP_ENDPOINT` 并运行 `bun run dev:db:proxy`。见 [local-database.md](./local-database.md)。
+- 生产仍是 HTTP 读 + WebSocket 事务；不要把 `pg` 静态引入 Worker 产物。
 - ingest：`scripts/ingest-db.ts`，一场一个事务，`content_hash` 增量；小批量 `--limit` 跳过 insights。
   - 全量回填可按 `--dataset <id>` 一个 dataset 一个进程并行；每个进程独立算该成员的 insights，互不覆盖。
+  - `dataset_insights.public_totals` 由 ingest 读数据库现算后写入，页面汇总只读它；请求期不再加载明细。
 - 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表；`dataset_insights` 用 `scripts/lib/json-equal.ts` 深比较（`jsonb` 不保留键顺序）。
-- `DATABASE_URL` 从 `.env` / `.dev.vars` 读取；本地脚本缺失时直接报错，不静默回退。
+- `DATABASE_URL` 从 `.env` / `.dev.vars` / `.env.local` 读取，优先级为真实环境 > `.env.local` > `.dev.vars` > `.env`；缺失时直接报错，不静默回退。
 - 查询层：`src/db/queries/`，函数接收 `Db` 作为第一个参数（页面 / 脚本共用）；DTO 在 `src/types/db.ts`。
   - `datasets.ts`：`getDatasets` / `getDataset`
-  - `streams.ts`：`listStreams`（`count(*) over()` 一次取总数）/ `getStream` / `getLatestStream` / `getStreamNeighbors` / `getStreamDetail`
-  - `insights.ts`：`getDatasetInsights`
+  - `streams.ts`：`listStreams`（`count(*) over()` 一次取总数）/ `listStreamRefs`（sitemap 窄查询）/ `getStream` / `getLatestStream` / `getStreamNeighbors` / `getStreamDetail`
+  - `insights.ts`：`getDatasetPublicTotals`
+  - `dataset-totals.ts`：`computeDatasetPublicTotals`（仅供 ingest 离线重算）
   - `group.ts`：`getGroupSummary` / `getGroupGallery`
   - `transcripts.ts`：`getTranscriptIndex` / `getTranscriptMeta`（索引页与单场可用性）
 - `numeric` 列统一在查询层转成 `number | null`；时间列统一转成 ISO 字符串，不把 `Date` 传给岛屿。

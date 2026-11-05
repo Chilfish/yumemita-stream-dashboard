@@ -11,6 +11,9 @@
   },
   "scripts": {
     "dev": "astro dev",
+    "dev:db": "bun scripts/dev-db.ts",
+    "dev:db:proxy": "bun scripts/dev-db-proxy.ts",
+    "dev:seed": "bun scripts/ingest-db.ts",
     "build": "astro build",
     "preview": "astro preview",
     "cf:preview": "astro build && astro preview",
@@ -81,10 +84,12 @@
     "@types/bun": "^1.4.4",
     "@types/d3": "^7.4.3",
     "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "drizzle-kit": "^0.31.11",
     "oxlint": "^1.90.0",
+    "pg": "^8.23.1",
     "typescript": "^6.0.0",
     "vitest": "^5.0.5",
     "wrangler": "^4.50.0"

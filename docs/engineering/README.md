@@ -10,6 +10,7 @@
 | [git-workflow.md](./git-workflow.md) | 分支模型、Commit 规范、验证门禁、PR 与审查 | 每次 commit / PR |
 | [release-checklist.md](./release-checklist.md) | 里程碑发布清单：验证、冒烟、数据、文档、回滚 | 发布前 |
 | [development.md](./development.md) | 本地环境、脚本、coss ui、D3 图表写法、测试 | 日常开发 |
+| [local-database.md](./local-database.md) | 本地 Postgres、Neon HTTP 代理、灌数据与排查 | 本地开发不连线上库 |
 | [deployment.md](./deployment.md) | 当前静态托管、R2 发布、子路径、缓存、CI | 上线与数据发布 |
 | [performance.md](./performance.md) | 首屏数据流、缓存分层、图片 / 字体 / 拆包与实测数字 | 改加载逻辑或排查性能 |
 | [troubleshooting.md](./troubleshooting.md) | 常见报错、数据异常与口径问题 | 页面空白 / 图表为空 |

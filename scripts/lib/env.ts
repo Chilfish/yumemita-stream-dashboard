@@ -2,10 +2,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /**
- * 本地脚本读取 .env / .dev.vars。
+ * 本地脚本读取 .env / .dev.vars / .env.local。
  * Bun 只会自动加载 .env，`.dev.vars` 是 Cloudflare 的本地约定，需要手动读。
+ * 后面的文件覆盖前面的（`.env.local` 优先级最高），但真实进程环境始终优先。
  */
 export function loadEnvFiles(cwd = process.cwd()): void {
+  const fromFile = new Set<string>()
+
   for (const name of ['.env', '.dev.vars', '.env.local']) {
     const path = resolve(cwd, name)
     if (!existsSync(path)) continue
@@ -23,7 +26,9 @@ export function loadEnvFiles(cwd = process.cwd()): void {
       ) {
         value = value.slice(1, -1)
       }
-      if (!(key in process.env)) process.env[key] = value
+      if (key in process.env && !fromFile.has(key)) continue
+      process.env[key] = value
+      fromFile.add(key)
     }
   }
 }

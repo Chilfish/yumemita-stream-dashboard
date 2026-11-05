@@ -84,6 +84,18 @@ bun run dev
 
 打开 <http://localhost:4321>。构建与本地预览使用 `bun run build` / `bun run preview`（Cloudflare workerd）。
 
+本地开发建议用本机 Postgres，避免开发流量计入 Neon 出流量：
+
+```bash
+bun run dev:db        # 建库 + 迁移 + 写 .env.local
+bun run dev:db:proxy  # 终端 A：workerd 用的本地 Neon HTTP 代理
+bun run dev           # 终端 B
+bun run dev:seed      # 可选：从本地 pack 灌数据
+```
+
+`.dev.vars` 需要 `DATABASE_URL` 与 `NEON_HTTP_ENDPOINT`，详见
+[docs/engineering/local-database.md](docs/engineering/local-database.md)。
+
 ### 配置
 
 复制 `.env.example` 为 `.env`，至少填写数据库与公开资源地址：
@@ -149,6 +161,9 @@ bun run check                # astro check + test + lint
 bun run ci                   # check + build
 
 # 数据库
+bun run dev:db               # 本地库初始化（建库 + 迁移）
+bun run dev:db:proxy         # 本地 Neon HTTP 代理（workerd 用）
+bun run dev:seed             # 本地灌数据（参数同 db:ingest）
 bun run db:migrate           # 应用 Drizzle 迁移
 bun run db:ingest            # 本地 pack → PostgreSQL（增量）
 bun run db:verify            # 数据库与 pack 字段级对账

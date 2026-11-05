@@ -29,6 +29,7 @@ docs/
 │   ├── git-workflow.md
 │   ├── release-checklist.md
 │   ├── development.md
+│   ├── local-database.md
 │   ├── deployment.md
 │   ├── performance.md
 │   ├── troubleshooting.md
@@ -68,7 +69,7 @@ docs/
 | 迁移到 Astro / PostgreSQL | [astro-ssr-migration.md](./planning/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 目标架构、数据模型、`.md` 路由、缓存与发布 |
 | 规划 / 实现直播日历 | [live-calendar.md](./planning/live-calendar.md) | 未来场次、手工日程、月历与议程视图、缓存与验收 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
-| 本地开发 / 测试 | [development.md](./engineering/development.md) | 环境、脚本、D3、测试 |
+| 本地开发 / 测试 | [development.md](./engineering/development.md) + [local-database.md](./engineering/local-database.md) | 环境、脚本、D3、测试；本地 Postgres 与开发代理 |
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |
 | 发布 | [release-checklist.md](./engineering/release-checklist.md) + [deployment.md](./engineering/deployment.md) | 验证、冒烟、部署、回滚 |
 | 性能回归 | [performance.md](./engineering/performance.md) | 首屏数据流、缓存分层、实测数字 |
