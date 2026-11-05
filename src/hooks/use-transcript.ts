@@ -11,10 +11,14 @@ import {
  * 逐字稿正文：Worker 代理 R2 读取，浏览器只请求同源 API。
  * 构建期把 `content/transcripts/` 的 Markdown 当离线兜底（Astro dev / R2 不可达时）。
  */
-const LOCAL_TRANSCRIPT_FILES = import.meta.glob("/content/transcripts/**/*.md", {
-  query: "?raw",
-  import: "default",
-}) as Record<string, () => Promise<string>>;
+// 只在开发环境打包本地 Markdown：生产构建的 chunk 路径可由 videoId 推导，
+// 会员限定场次的正文不能作为静态资源公开。
+const LOCAL_TRANSCRIPT_FILES = import.meta.env.DEV
+  ? (import.meta.glob("/content/transcripts/**/*.md", {
+      query: "?raw",
+      import: "default",
+    }) as Record<string, () => Promise<string>>)
+  : {};
 
 export type TranscriptFileStatus = "idle" | "loading" | "ready" | "empty" | "error";
 
