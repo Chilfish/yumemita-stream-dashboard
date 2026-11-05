@@ -1,7 +1,7 @@
 import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
-import { useId, useState } from "react";
-import type { PointerEvent } from "react";
+import { useId } from "react";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { useThrottledHover } from "@/hooks/use-throttled-hover";
 import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import {
   AreaGradient,
@@ -20,23 +20,14 @@ interface ChatDensityProps {
   row: StreamRow;
 }
 
-function pointerHoverIndex(
-  event: PointerEvent<SVGRectElement>,
-  scale: { invert: (value: number) => number },
-  length: number,
-): number {
-  const bounds = event.currentTarget.getBoundingClientRect();
-  const index = Math.round(scale.invert(event.clientX - bounds.left));
-  return Math.min(Math.max(index, 0), Math.max(0, length - 1));
-}
-
 function clamp(value: number, min: number, maxValue: number): number {
   return Math.min(Math.max(value, min), Math.max(min, maxValue));
 }
 
 export function ChatDensity({ row }: ChatDensityProps) {
   const gradientId = useId();
-  const [hover, setHover] = useState<number | null>(null);
+  const hoverState = useThrottledHover();
+  const hover = hoverState.index;
   const { perMinute, perMinuteSc, peakMinute } = row.pack.chat.density;
   const hasData = perMinute.some(value => value > 0);
 
@@ -205,10 +196,11 @@ export function ChatDensity({ row }: ChatDensityProps) {
             <rect
               fill="transparent"
               height={scTop + scStripHeight}
-              onPointerCancel={() => setHover(null)}
-              onPointerDown={event => setHover(pointerHoverIndex(event, x, perMinute.length))}
-              onPointerLeave={() => setHover(null)}
-              onPointerMove={event => setHover(pointerHoverIndex(event, x, perMinute.length))}
+              onPointerCancel={hoverState.clear}
+              onPointerDown={event => hoverState.down(event, x, perMinute.length)}
+              onPointerEnter={hoverState.enter}
+              onPointerLeave={hoverState.clear}
+              onPointerMove={event => hoverState.move(event, x, perMinute.length)}
               // 窄屏图表可横向滚动：让浏览器接管双指/横滑，点按仍能出读数。
               style={{ touchAction: "pan-x pan-y" }}
               width={innerWidth}

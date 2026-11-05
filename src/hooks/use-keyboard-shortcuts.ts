@@ -6,11 +6,11 @@ import {
   streamNeighborIndex,
 } from "@/lib/keyboard";
 import { VIEWS, sectionFromPathname, streamPath, viewPath } from "@/lib/routes";
-import type { StreamSummary } from "@/types/dataset";
+import type { StreamNavItem } from "@/types/dataset";
 
 interface UseKeyboardShortcutsOptions {
   datasetId: string | null;
-  rows: StreamSummary[];
+  rows: StreamNavItem[];
   onCommandPalette?: () => void;
 }
 

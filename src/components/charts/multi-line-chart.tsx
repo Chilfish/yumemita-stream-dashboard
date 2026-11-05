@@ -1,7 +1,7 @@
 import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
-import { useId, useState } from "react";
-import type { PointerEvent } from "react";
+import { useId, useMemo, useState } from "react";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { useThrottledHover } from "@/hooks/use-throttled-hover";
 import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import {
   AreaGradient,
@@ -58,16 +58,6 @@ function clamp(value: number, min: number, maxValue: number): number {
   return Math.min(Math.max(value, min), Math.max(min, maxValue));
 }
 
-function pointerHoverIndex(
-  event: PointerEvent<SVGRectElement>,
-  scale: { invert: (value: number) => number },
-  length: number,
-): number {
-  const bounds = event.currentTarget.getBoundingClientRect();
-  const index = Math.round(scale.invert(event.clientX - bounds.left));
-  return Math.min(Math.max(index, 0), Math.max(0, length - 1));
-}
-
 function seriesColor(item: ChartSeries, index: number): string {
   return item.color ?? CHART_COLORS[index % CHART_COLORS.length];
 }
@@ -97,15 +87,22 @@ export function MultiLineChart({
   emptyMessage = "所选场次没有逐分钟弹幕数据，换一批场次再试。",
 }: MultiLineChartProps) {
   const gradientId = useId();
-  const [hover, setHover] = useState<number | null>(null);
+  const hoverState = useThrottledHover();
+  const hover = hoverState.index;
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const visible = series.filter(item => item.values.some(value => isValue(value) && value > 0));
+  const visible = useMemo(
+    () => series.filter(item => item.values.some(value => isValue(value) && value > 0)),
+    [series],
+  );
   // 筛选变化后 activeId 可能已不在图里，避免把剩下的折线全部压暗。
   const highlightedId =
     activeId != null && visible.some(item => item.id === activeId) ? activeId : null;
-  const maxMinutes = max(visible, item => item.values.length - 1) ?? 1;
-  const maxValue = max(visible.flatMap(item => item.values.filter(isValue))) ?? 1;
+  const maxMinutes = useMemo(() => max(visible, item => item.values.length - 1) ?? 1, [visible]);
+  const maxValue = useMemo(
+    () => max(visible.flatMap(item => item.values.filter(isValue))) ?? 1,
+    [visible],
+  );
   const direct = visible.length > 0 && visible.length <= DIRECT_LABEL_LIMIT;
 
   if (visible.length === 0) {
@@ -306,10 +303,11 @@ export function MultiLineChart({
             <rect
               fill="transparent"
               height={innerHeight}
-              onPointerCancel={() => setHover(null)}
-              onPointerDown={event => setHover(pointerHoverIndex(event, x, maxMinutes + 1))}
-              onPointerLeave={() => setHover(null)}
-              onPointerMove={event => setHover(pointerHoverIndex(event, x, maxMinutes + 1))}
+              onPointerCancel={hoverState.clear}
+              onPointerDown={event => hoverState.down(event, x, maxMinutes + 1)}
+              onPointerEnter={hoverState.enter}
+              onPointerLeave={hoverState.clear}
+              onPointerMove={event => hoverState.move(event, x, maxMinutes + 1)}
               // 窄屏图表可横向滚动：让浏览器接管双指/横滑，点按仍能出读数。
               style={{ touchAction: "pan-x pan-y" }}
               width={innerWidth}

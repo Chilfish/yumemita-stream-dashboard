@@ -37,13 +37,13 @@ export interface StreamsViewProps {
   onParamsChange: (next: TableParams) => void;
 }
 
-function sortValue(row: StreamSummary, key: TableSortKey): number | null {
+function sortValue(row: StreamSummary, key: TableSortKey, dateMs: number | null): number | null {
   // 会限只公开场次与日期；指标排序时把这一行推到最后。
   if (isMemberOnly(row.availability) && key !== "date" && key !== "duration") return null;
 
   switch (key) {
     case "date":
-      return row.startedAt ? Date.parse(row.startedAt) : null;
+      return dateMs;
     case "duration":
       return row.durationSec;
     case "avg":
@@ -134,6 +134,15 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
     ];
   }, [rows]);
 
+  // 日期排序只解析一次：比较器里每次 Date.parse 会让 500 场排序变成上万次解析。
+  const startTimes = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const row of rows) {
+      map.set(row.videoId, row.startedAt ? Date.parse(row.startedAt) : null);
+    }
+    return map;
+  }, [rows]);
+
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const filtered = rows.filter(row => {
@@ -147,14 +156,14 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
     });
 
     return [...filtered].sort((a, b) => {
-      const left = sortValue(a, sort);
-      const right = sortValue(b, sort);
+      const left = sortValue(a, sort, startTimes.get(a.videoId) ?? null);
+      const right = sortValue(b, sort, startTimes.get(b.videoId) ?? null);
       if (left == null && right == null) return 0;
       if (left == null) return 1;
       if (right == null) return -1;
       return dir === "asc" ? left - right : right - left;
     });
-  }, [rows, q, typeFilter, onlyVstats, onlyMember, sort, dir]);
+  }, [rows, startTimes, q, typeFilter, onlyVstats, onlyMember, sort, dir]);
 
   // 初次只渲染一部分行：500 场全铺进 HTML 会让首字节膨胀到 MB 级。
   // 筛选条件变化时回到首批，避免旧上限让结果看起来是空的。

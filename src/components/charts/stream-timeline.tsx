@@ -1,8 +1,8 @@
 import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
-import { useId, useState } from "react";
-import type { PointerEvent } from "react";
+import { useId } from "react";
 import { AxisLabel, YAxis } from "@/components/charts/axis";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { useThrottledHover } from "@/hooks/use-throttled-hover";
 import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import { EmptyChart } from "@/components/charts/chart-card";
 import { CHART_COLORS } from "@/lib/chart-colors";
@@ -20,16 +20,6 @@ export interface StreamTimelineProps {
   height?: number;
 }
 
-function pointerIndex(
-  event: PointerEvent<SVGRectElement>,
-  scale: { invert: (value: number) => number },
-  length: number,
-): number {
-  const bounds = event.currentTarget.getBoundingClientRect();
-  const index = Math.round(scale.invert(event.clientX - bounds.left));
-  return Math.min(Math.max(index, 0), Math.max(0, length - 1));
-}
-
 /**
  * 单场双轨时间轴：弹幕面积（主）+ SC 刻度（次）+ 峰值标记，悬停十字线带实时读数。
  * 坐标系由 D3 计算，DOM 由 React 拥有。
@@ -41,7 +31,8 @@ export function StreamTimeline({
   ariaLabel,
   height = 300,
 }: StreamTimelineProps) {
-  const [hover, setHover] = useState<number | null>(null);
+  const hoverState = useThrottledHover();
+  const hover = hoverState.index;
   const gradientId = `stream-timeline-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   if (minutes.length === 0) {
@@ -242,10 +233,11 @@ export function StreamTimeline({
               <rect
                 fill="transparent"
                 height={trackBottom}
-                onPointerCancel={() => setHover(null)}
-                onPointerDown={event => setHover(pointerIndex(event, x, minutes.length))}
-                onPointerLeave={() => setHover(null)}
-                onPointerMove={event => setHover(pointerIndex(event, x, minutes.length))}
+                onPointerCancel={hoverState.clear}
+                onPointerDown={event => hoverState.down(event, x, minutes.length)}
+                onPointerEnter={hoverState.enter}
+                onPointerLeave={hoverState.clear}
+                onPointerMove={event => hoverState.move(event, x, minutes.length)}
                 // 窄屏图表可横向滚动：让浏览器接管双指/横滑，点按仍能出读数。
                 style={{ touchAction: "pan-x pan-y" }}
                 width={innerWidth}

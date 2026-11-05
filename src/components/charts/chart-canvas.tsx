@@ -55,7 +55,8 @@ export function ChartCanvas({
         scrollable ? { maskImage: SCROLL_FADE, WebkitMaskImage: SCROLL_FADE } : undefined
       }
     >
-      <div ref={ref} style={scrollable ? { minWidth } : undefined}>
+      {/* 测量完成前先占住高度，避免图表在水合后弹入、把下面的内容推下去。 */}
+      <div ref={ref} style={{ minHeight: height, minWidth: scrollable ? minWidth : undefined }}>
         {width > 0 ? (
           <svg
             aria-label={ariaLabel}

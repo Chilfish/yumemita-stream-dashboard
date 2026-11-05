@@ -7,7 +7,7 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -109,8 +109,31 @@ function isDefaultParams(params: TableParams): boolean {
  * 场次页工具条：无卡片、无边框，只靠间距与字阶分组。
  * 窄屏横向折行，低频筛选收进底部 Sheet，不删除功能。
  */
+const SEARCH_DEBOUNCE_MS = 200;
+
 export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsToolbarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // 搜索输入先留在本地：每次按键都写 URL 会触发全量过滤 + 排序 + 表格重渲。
+  const [query, setQuery] = useState(params.q);
+  const paramsRef = useRef(params);
+  const committedQuery = useRef(params.q);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    paramsRef.current = params;
+  }, [params]);
+
+  useEffect(() => {
+    // URL 被其他入口改写（重置、前进后退）时同步输入框。
+    if (params.q === committedQuery.current) return;
+    committedQuery.current = params.q;
+    setQuery(params.q);
+  }, [params.q]);
+
+  useEffect(() => () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+  }, []);
+
   const dirty = !isDefaultParams(params);
   const hiddenFilterCount = Number(params.vstats) + Number(params.member);
   // 桌面端的内容类型以 chip 常驻显示，只有收进弹层的条件才计数；
@@ -125,7 +148,21 @@ export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsTool
     onParamsChange({ ...params, type: value });
   }
 
+  function changeQuery(value: string): void {
+    setQuery(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      searchTimer.current = null;
+      committedQuery.current = value;
+      onParamsChange({ ...paramsRef.current, q: value });
+    }, SEARCH_DEBOUNCE_MS);
+  }
+
   function resetParams(): void {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = null;
+    committedQuery.current = DEFAULT_TABLE_PARAMS.q;
+    setQuery(DEFAULT_TABLE_PARAMS.q);
     onParamsChange({ ...DEFAULT_TABLE_PARAMS });
   }
 
@@ -254,10 +291,10 @@ export function StreamsToolbar({ params, onParamsChange, onExport }: StreamsTool
           <InputGroup>
             <InputGroupInput
               aria-label="搜索直播"
-              onChange={event => onParamsChange({ ...params, q: event.target.value })}
+              onChange={event => changeQuery(event.target.value)}
               placeholder="搜索标题或日期"
               type="search"
-              value={params.q}
+              value={query}
             />
             <InputGroupAddon align="inline-end">
               <Search aria-hidden="true" />
