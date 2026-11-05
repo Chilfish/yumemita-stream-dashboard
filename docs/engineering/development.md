@@ -16,27 +16,28 @@ bun run dev
 # http://localhost:4321
 ```
 
-本地开发建议用本机 Postgres，避免把开发流量算进 Neon 出流量。完整步骤见
-[local-database.md](./local-database.md)，最短路径：
+本地开发默认用本机 Postgres，避免把开发流量算进 Neon 出流量。一条命令即可拉起整条链路
+（Postgres → 建库 / 迁移 → Neon HTTP 代理 → Astro）：
 
 ```bash
-bun run dev:db        # 建库 + 迁移 + 写 .env.local
-bun run dev:db:proxy  # 终端 A：workerd 用的 Neon HTTP 兼容代理
-bun run dev           # 终端 B
+bun run dev           # Postgres / 代理缺失时自动启动，已有则复用
 bun run dev:seed      # 可选：从本地 pack 灌数据
 ```
+
+Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整说明与排查见
+[local-database.md](./local-database.md)。
 
 ## 脚本
 
 | 命令 | 作用 |
 | --- | --- |
-| `bun run dev` | Astro 开发服务器（Cloudflare workerd） |
+| `bun run dev` | 开发入口：准备本地 Postgres / 库 / 代理，再用 Node 启动 Astro |
 | `bun run build` | `astro build`，输出 Worker + 预渲染的 404 / 500 |
-| `bun run preview` | 本地预览构建产物（workerd） |
+| `bun run preview` | 本地预览构建产物（workerd；复用后台的本地服务） |
 | `bun run cf:preview` | 构建后预览，部署前检查 |
 | `bun run cf:deploy` | `astro build` + `wrangler deploy --config dist/server/wrangler.json` |
-| `bun run dev:db` | 创建本地库、应用迁移、写 `.env.local`（见 [local-database.md](./local-database.md)） |
-| `bun run dev:db:proxy` | 本地 Neon HTTP 兼容代理（workerd → 本机 Postgres） |
+| `bun run dev:db` | 只做本地库初始化：建库、应用迁移、写 `.env.local`（见 [local-database.md](./local-database.md)） |
+| `bun run dev:db:proxy` | 单独前台启动本地 Neon HTTP 兼容代理（`dev` 会自动处理） |
 | `bun run dev:seed` | 本地灌数据；参数同 `db:ingest` |
 | `bun run db:generate` / `db:push` / `db:studio` | Drizzle 迁移工具 |
 | `bun run db:migrate` | 应用 `drizzle/` 迁移（读 `.env` / `.dev.vars` / `.env.local`） |
@@ -62,7 +63,7 @@ bun run dev:seed      # 可选：从本地 pack 灌数据
 - Schema：`src/db/schema.ts`；迁移产物在 `drizzle/`，用 `bun run db:migrate` 应用。
 - 读连接：`src/db/connection.ts` 的 `createDb()`，`drizzle-orm/neon-http`；Worker 用 `src/db/client.ts`。
 - 写连接：同文件的 `createWriteDb()`，`drizzle-orm/neon-serverless` 的 WebSocket Pool；只在脚本里用。
-- 本地开发：`DATABASE_URL` 指向 `localhost` 时，脚本自动切 `pg`；workerd 不能直连 TCP，需设置 `NEON_HTTP_ENDPOINT` 并运行 `bun run dev:db:proxy`。见 [local-database.md](./local-database.md)。
+- 本地开发：`DATABASE_URL` 指向 `localhost` 时，脚本自动切 `pg`；workerd 不能直连 TCP，`bun run dev` 会自动准备 `NEON_HTTP_ENDPOINT` 与代理。见 [local-database.md](./local-database.md)。
 - 生产仍是 HTTP 读 + WebSocket 事务；不要把 `pg` 静态引入 Worker 产物。
 - ingest：`scripts/ingest-db.ts`，一场一个事务，`content_hash` 增量；小批量 `--limit` 跳过 insights。
   - 全量回填可按 `--dataset <id>` 一个 dataset 一个进程并行；每个进程独立算该成员的 insights，互不覆盖。
@@ -70,12 +71,15 @@ bun run dev:seed      # 可选：从本地 pack 灌数据
 - 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表；`dataset_insights` 用 `scripts/lib/json-equal.ts` 深比较（`jsonb` 不保留键顺序）。
 - `DATABASE_URL` 从 `.env` / `.dev.vars` / `.env.local` 读取，优先级为真实环境 > `.env.local` > `.dev.vars` > `.env`；缺失时直接报错，不静默回退。
 - 查询层：`src/db/queries/`，函数接收 `Db` 作为第一个参数（页面 / 脚本共用）；DTO 在 `src/types/db.ts`。
-  - `datasets.ts`：`getDatasets` / `getDataset`
-  - `streams.ts`：`listStreams`（`count(*) over()` 一次取总数）/ `listStreamRefs`（sitemap 窄查询）/ `getStream` / `getLatestStream` / `getStreamNeighbors` / `getStreamDetail`
-  - `insights.ts`：`getDatasetPublicTotals`
-  - `dataset-totals.ts`：`computeDatasetPublicTotals`（仅供 ingest 离线重算）
-  - `group.ts`：`getGroupSummary` / `getGroupGallery`
-  - `transcripts.ts`：`getTranscriptIndex` / `getTranscriptMeta`（索引页与单场可用性）
+  - `batch.ts`：`runBatch()`，Neon HTTP 下用 `db.batch` 把多条只读 SQL 放进一次请求；本地 `pg` 回退并行。
+  - `datasets.ts`：`selectDatasetsQuery` / `getDatasets` / `getDataset`
+  - `streams.ts`：`buildStreamListQuery` / `listStreams`（需要总数时 `withTotal: true`）/ `buildAllStreamRefsQuery`（sitemap）/ `buildAllStreamHeadsQuery`（llms）/ `selectStreamQuery` / `getStream` / `getLatestStream`
+  - `insights.ts`：`selectPublicTotalsQuery` / `getDatasetPublicTotals`
+  - `packs.ts`：`getStreamPack`（单场 6 条查询一个 batch）/ `getStreamPacks`（多场一次 `inArray`）/ `getDatasetPacks`（仅供 ingest 离线重算）
+  - `dataset-totals.ts`：`computeDatasetPublicTotals`（仅供 ingest 离线重算，超过 2,000 场自动翻页）
+  - `group.ts`：`getGroupSummary` / `getGroupGallery`，查询构造函数供页面组合 batch
+  - `transcripts.ts`：`getTranscriptIndex` / `getTranscriptMeta` / `selectTranscriptMetaQuery`（索引页与单场可用性）
+  - `view-data.ts`：页面级组合（`getDatasetPageData` / `getGroupPageData` / `getComparePacks` / `getStreamPageExtras`）。
 - `numeric` 列统一在查询层转成 `number | null`；时间列统一转成 ISO 字符串，不把 `Date` 传给岛屿。
 
 ## 代码组织

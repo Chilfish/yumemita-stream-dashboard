@@ -19,6 +19,7 @@ if (!isLocalDatabaseUrl(databaseUrl)) {
 }
 
 const port = Number(process.env.DEV_DB_PROXY_PORT ?? 4444)
+const target = new URL(databaseUrl)
 
 const pool = new Pool({
   connectionString: databaseUrl,
@@ -39,6 +40,7 @@ interface QueryResult {
 }
 
 let queryCount = 0
+let requestCount = 0
 
 async function runQuery(request: QueryRequest): Promise<QueryResult> {
   queryCount += 1
@@ -61,12 +63,20 @@ const server = Bun.serve({
   async fetch(request) {
     const url = new URL(request.url)
     if (url.pathname === '/health') {
-      return Response.json({ ok: true, database: new URL(databaseUrl).pathname.slice(1), queries: queryCount })
+      return Response.json({
+        ok: true,
+        pid: process.pid,
+        host: target.host,
+        database: target.pathname.slice(1),
+        queries: queryCount,
+        requests: requestCount,
+      })
     }
     if (request.method !== 'POST' || url.pathname !== '/sql') {
       return new Response('not found', { status: 404 })
     }
 
+    requestCount += 1
     try {
       const body = await request.json() as QueryRequest & { queries?: QueryRequest[] }
       if (Array.isArray(body.queries)) {

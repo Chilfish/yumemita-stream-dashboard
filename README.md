@@ -84,16 +84,16 @@ bun run dev
 
 打开 <http://localhost:4321>。构建与本地预览使用 `bun run build` / `bun run preview`（Cloudflare workerd）。
 
-本地开发建议用本机 Postgres，避免开发流量计入 Neon 出流量：
+本地开发默认用本机 Postgres，避免开发流量计入 Neon 出流量。`bun run dev` 会自动准备
+Postgres、建库 / 迁移和 Neon HTTP 代理，已有服务则直接复用：
 
 ```bash
-bun run dev:db        # 建库 + 迁移 + 写 .env.local
-bun run dev:db:proxy  # 终端 A：workerd 用的本地 Neon HTTP 代理
-bun run dev           # 终端 B
+bun run dev           # Postgres + 代理 + Astro（一条命令）
 bun run dev:seed      # 可选：从本地 pack 灌数据
 ```
 
-`.dev.vars` 需要 `DATABASE_URL` 与 `NEON_HTTP_ENDPOINT`，详见
+Astro 退出或被 kill 后，Postgres 与代理继续在后台运行。`.dev.vars` 缺失时脚本会自动补写
+`DATABASE_URL` 与 `NEON_HTTP_ENDPOINT`；完整说明见
 [docs/engineering/local-database.md](docs/engineering/local-database.md)。
 
 ### 配置
@@ -154,15 +154,15 @@ data/<id>/*.datapack.json            本地暂存
 
 ```bash
 # 开发与构建
-bun run dev                  # Astro 开发服务器（Cloudflare workerd）
+bun run dev                  # 开发入口：准备本地 Postgres / 代理，再启动 Astro（workerd）
 bun run build                # 构建 Worker 与预渲染 404 / 500
 bun run preview              # 本地预览构建产物
 bun run check                # astro check + test + lint
 bun run ci                   # check + build
 
 # 数据库
-bun run dev:db               # 本地库初始化（建库 + 迁移）
-bun run dev:db:proxy         # 本地 Neon HTTP 代理（workerd 用）
+bun run dev:db               # 只做本地库初始化（建库 + 迁移）
+bun run dev:db:proxy         # 单独前台启动本地 Neon HTTP 代理（dev 会自动处理）
 bun run dev:seed             # 本地灌数据（参数同 db:ingest）
 bun run db:migrate           # 应用 Drizzle 迁移
 bun run db:ingest            # 本地 pack → PostgreSQL（增量）
