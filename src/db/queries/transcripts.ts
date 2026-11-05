@@ -69,15 +69,25 @@ export async function getTranscriptIndex(
   return rows.map(toIndexEntry)
 }
 
+export function selectTranscriptMetaQuery(db: Db, datasetId: string, videoId: string) {
+  return db
+    .select()
+    .from(transcripts)
+    .where(and(eq(transcripts.datasetId, datasetId), eq(transcripts.videoId, videoId)))
+    .limit(1)
+}
+
+export type TranscriptMetaRow = Awaited<ReturnType<typeof selectTranscriptMetaQuery>>[number]
+
+export function mapTranscriptMeta(row: TranscriptMetaRow | undefined): TranscriptMeta | null {
+  return row ? toMeta(row) : null
+}
+
 export async function getTranscriptMeta(
   db: Db,
   datasetId: string,
   videoId: string,
 ): Promise<TranscriptMeta | null> {
-  const [row] = await db
-    .select()
-    .from(transcripts)
-    .where(and(eq(transcripts.datasetId, datasetId), eq(transcripts.videoId, videoId)))
-    .limit(1)
-  return row ? toMeta(row) : null
+  const [row] = await selectTranscriptMetaQuery(db, datasetId, videoId)
+  return mapTranscriptMeta(row)
 }

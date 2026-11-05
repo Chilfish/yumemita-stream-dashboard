@@ -9,12 +9,18 @@ import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 export const prerender = false
 
 const datasetId = Astro.params.datasetId!
+let failed = false
 const data = await getDatasetPageData(db, datasetId).catch(error => {
   console.error('[page] trends failed', error)
+  failed = true
   return null
 })
-if (!data) Astro.response.status = 404
-else Astro.cache.set({ maxAge: 300, swr: 600, tags: [`dataset-${datasetId}`] })
+if (failed) Astro.response.status = 500
+else if (!data) {
+  Astro.response.status = 404
+  Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`] })
+}
+else Astro.cache.set({ maxAge: 3600, swr: 86400, tags: [`dataset-${datasetId}`] })
 
 const latest = data?.rows[0] ?? null
 const meta = data
@@ -48,5 +54,11 @@ const meta = data
           view="trends"
         />
       )
-    : <ErrorState code="404" title="找不到这位成员" detail="成员 id 可能写错了，或者还没有导入数据。" />}
+    : (
+        <ErrorState
+          code={failed ? '500' : '404'}
+          title={failed ? '数据读取失败' : '找不到这位成员'}
+          detail={failed ? '可以刷新重试；其他页面不受影响。' : '成员 id 可能写错了，或者还没有导入数据。'}
+        />
+      )}
 </Layout>

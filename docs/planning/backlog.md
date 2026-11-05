@@ -23,7 +23,8 @@
 | B14 | 直播日历：未来场次、手工日程与月历视图（`FR-CAL-001`–`FR-CAL-009`） | P2 | 无（新表 `scheduled_streams`） | 2026-11-04 需求 | 🚧 读取、月历 / 议程、自动同步与缓存已实现；手工日程与 ICS 暂缓；方案见 [live-calendar.md](live-calendar.md) |
 | B15 | yt-dlp 字幕的直播段 + 回放段重复：`normalizeLiveChat` 按 `rendererId` 去重 | P1 | 无 | 2026-11-05 反馈 | ✅ `normalizeLiveChat` 去重 + `duplicates` 计数 + 单测；`fmjJNbzcr3g` 已重新生成（32,343 → 22,058）；见 [postmortem 001](../postmortem/001-yt-dlp-chat-duplicate.md) |
 | B16 | 页面汇总改为读 `dataset_insights.public_totals`，不再每次渲染拉整库明细 | P0 | `db:ingest` 重算 insights | 2026-11-05 Neon 账单 | ✅ 单页数据库出流量 3.5–10.5 MB → 约 0.2–0.4 MB；见 [postmortem 002](../postmortem/002-dataset-packs-per-render.md) |
-| B17 | 本地开发数据库：Scoop Postgres + Neon HTTP 代理 + 初始化脚本 | P1 | 无 | 2026-11-05 成本控制 | ✅ `bun run dev:db` / `dev:db:proxy` / `dev:seed`；见 [local-database.md](../engineering/local-database.md) |
+| B17 | 本地开发数据库：Scoop Postgres + Neon HTTP 代理 + 初始化脚本 | P1 | 无 | 2026-11-05 成本控制 | ✅ `bun run dev` 一条命令拉起 Postgres / 库 / 代理；Astro 退出后服务继续后台运行。`dev:db` / `dev:db:proxy` / `dev:seed` 保留；见 [local-database.md](../engineering/local-database.md) |
+| B18 | 数据库读路径优化：合并查询、窄列、缓存 TTL 与本地压测 | P0 | 本地库 | 2026-11-05 成本控制 | ✅ 冷渲染 HTTP 往返压到 ≤2（多数 1 次）；`bun run db:bench` 可复测；见 [db-optimization.md](db-optimization.md) |
 
 ## 审查承接区
 

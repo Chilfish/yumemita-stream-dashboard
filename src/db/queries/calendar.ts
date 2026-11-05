@@ -1,4 +1,5 @@
 import { and, eq, gte, isNull, lt, lte, or } from "drizzle-orm";
+import { runBatch } from "@/db/batch";
 import type { Db } from "@/db/connection";
 import { scheduledStreams, streams } from "@/db/schema";
 import {
@@ -13,7 +14,7 @@ import type {
   CalendarPageData,
   CalendarWindow,
 } from "@/types/calendar";
-import { getDatasets } from "./datasets";
+import { mapDataset, selectDatasetsQuery, type DatasetQueryRow } from "./datasets";
 import { toIso } from "./shared";
 
 export interface GetCalendarDataOptions {
@@ -27,7 +28,7 @@ export interface GetCalendarDataOptions {
   now?: Date;
 }
 
-function toMember(row: Awaited<ReturnType<typeof getDatasets>>[number]): CalendarMember {
+function toMember(row: ReturnType<typeof mapDataset>): CalendarMember {
   return {
     id: row.id,
     label: row.label,
@@ -46,64 +47,79 @@ export async function getCalendarData(
   options: GetCalendarDataOptions,
 ): Promise<CalendarPageData> {
   const now = options.now ?? new Date();
-  const members = options.members
-    ?? (await getDatasets(db)).map(toMember);
 
   const fromTime = new Date(`${options.from}T00:00:00+09:00`);
   const toTime = new Date(`${addDays(options.to, 1)}T00:00:00+09:00`);
 
-  const [streamRows, scheduleRows] = await Promise.all([
-    db
-      .select({
-        datasetId: streams.datasetId,
-        videoId: streams.videoId,
-        title: streams.title,
-        url: streams.url,
-        date: streams.date,
-        startedAt: streams.startedAt,
-        endedAt: streams.endedAt,
-        durationSec: streams.durationSec,
-        availability: streams.availability,
-      })
-      .from(streams)
-      .where(
-        and(
-          options.datasetId ? eq(streams.datasetId, options.datasetId) : undefined,
-          gte(streams.date, options.from),
-          lte(streams.date, options.to),
-        ),
-      )
-      .orderBy(streams.startedAt),
+  const streamRowsQuery = db
+    .select({
+      datasetId: streams.datasetId,
+      videoId: streams.videoId,
+      title: streams.title,
+      url: streams.url,
+      date: streams.date,
+      startedAt: streams.startedAt,
+      endedAt: streams.endedAt,
+      durationSec: streams.durationSec,
+      availability: streams.availability,
+    })
+    .from(streams)
+    .where(
+      and(
+        options.datasetId ? eq(streams.datasetId, options.datasetId) : undefined,
+        gte(streams.date, options.from),
+        lte(streams.date, options.to),
+      ),
+    )
+    .orderBy(streams.startedAt)
 
-    db
-      .select({
-        datasetId: scheduledStreams.datasetId,
-        eventKey: scheduledStreams.eventKey,
-        videoId: scheduledStreams.videoId,
-        title: scheduledStreams.title,
-        url: scheduledStreams.url,
-        scheduledAt: scheduledStreams.scheduledAt,
-        expectedMinutes: scheduledStreams.expectedMinutes,
-        cancelledAt: scheduledStreams.cancelledAt,
-        availability: scheduledStreams.availability,
-        source: scheduledStreams.source,
-        lastLiveAt: scheduledStreams.lastLiveAt,
-      })
-      .from(scheduledStreams)
-      .where(
-        and(
-          options.datasetId ? eq(scheduledStreams.datasetId, options.datasetId) : undefined,
-          or(
-            and(
-              gte(scheduledStreams.scheduledAt, fromTime),
-              lt(scheduledStreams.scheduledAt, toTime),
-            ),
-            isNull(scheduledStreams.scheduledAt),
+  const scheduleRowsQuery = db
+    .select({
+      datasetId: scheduledStreams.datasetId,
+      eventKey: scheduledStreams.eventKey,
+      videoId: scheduledStreams.videoId,
+      title: scheduledStreams.title,
+      url: scheduledStreams.url,
+      scheduledAt: scheduledStreams.scheduledAt,
+      expectedMinutes: scheduledStreams.expectedMinutes,
+      cancelledAt: scheduledStreams.cancelledAt,
+      availability: scheduledStreams.availability,
+      source: scheduledStreams.source,
+      lastLiveAt: scheduledStreams.lastLiveAt,
+    })
+    .from(scheduledStreams)
+    .where(
+      and(
+        options.datasetId ? eq(scheduledStreams.datasetId, options.datasetId) : undefined,
+        or(
+          and(
+            gte(scheduledStreams.scheduledAt, fromTime),
+            lt(scheduledStreams.scheduledAt, toTime),
           ),
+          isNull(scheduledStreams.scheduledAt),
         ),
-      )
-      .orderBy(scheduledStreams.scheduledAt),
-  ]);
+      ),
+    )
+    .orderBy(scheduledStreams.scheduledAt)
+
+  let members: CalendarMember[]
+  let streamRows: Awaited<typeof streamRowsQuery>
+  let scheduleRows: Awaited<typeof scheduleRowsQuery>
+
+  if (options.members) {
+    members = options.members;
+    [streamRows, scheduleRows] = await Promise.all([streamRowsQuery, scheduleRowsQuery]);
+  }
+  else {
+    const [datasetRows, rows, schedules] = await runBatch<[
+      DatasetQueryRow[],
+      Awaited<typeof streamRowsQuery>,
+      Awaited<typeof scheduleRowsQuery>,
+    ]>(db, [selectDatasetsQuery(db, undefined), streamRowsQuery, scheduleRowsQuery]);
+    members = datasetRows.map(row => toMember(mapDataset(row)));
+    streamRows = rows;
+    scheduleRows = schedules;
+  }
 
   const streamKeys = new Set<string>();
   const streamEvents: CalendarEventInput[] = [];

@@ -1,3 +1,4 @@
+import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
 import { streams } from '@/db/schema'
 import { buildCompareBuckets, type CompareStreamRow } from '@/lib/compare'
@@ -5,7 +6,7 @@ import { MIN_COMPARE_SAMPLE } from '@/lib/compare-params'
 import { isMemberOnly } from '@/lib/visibility'
 import type { GroupCompareData } from '@/types/compare'
 import type { DatasetIndexEntry } from '@/types/dataset'
-import { getDatasets } from './datasets'
+import { mapDataset, selectDatasetsQuery, type DatasetQueryRow } from './datasets'
 import { toIso, toNumber } from './shared'
 import { toIndex } from './view-data'
 
@@ -24,22 +25,27 @@ export interface GroupComparePageData {
  * 因此只把公开场次送进桶子；场次/日期类统计仍由首页与相册负责。
  */
 export async function getGroupCompareData(db: Db): Promise<GroupComparePageData> {
-  const [datasetRows, rows] = await Promise.all([
-    getDatasets(db),
-    db
-      .select({
-        datasetId: streams.datasetId,
-        availability: streams.availability,
-        title: streams.title,
-        date: streams.date,
-        startedAt: streams.startedAt,
-        durationSec: streams.durationSec,
-        avgConcurrent: streams.avgConcurrent,
-        chatTotal: streams.chatTotal,
-        superchats: streams.superchats,
-        commentsCaptured: streams.commentsCaptured,
-      })
-      .from(streams),
+  const rowsQuery = db
+    .select({
+      datasetId: streams.datasetId,
+      availability: streams.availability,
+      title: streams.title,
+      date: streams.date,
+      startedAt: streams.startedAt,
+      durationSec: streams.durationSec,
+      avgConcurrent: streams.avgConcurrent,
+      chatTotal: streams.chatTotal,
+      superchats: streams.superchats,
+      commentsCaptured: streams.commentsCaptured,
+    })
+    .from(streams)
+
+  const [datasetRows, rows] = await runBatch<[
+    DatasetQueryRow[],
+    Awaited<typeof rowsQuery>,
+  ]>(db, [
+    selectDatasetsQuery(db, undefined),
+    rowsQuery,
   ])
 
   const leanRows: CompareStreamRow[] = rows
@@ -61,7 +67,7 @@ export async function getGroupCompareData(db: Db): Promise<GroupComparePageData>
     .sort((left, right) => left.localeCompare(right))
 
   return {
-    datasets: toIndex(datasetRows),
+    datasets: toIndex(datasetRows.map(mapDataset)),
     data: { buckets, months, sampleMin: MIN_COMPARE_SAMPLE },
   }
 }

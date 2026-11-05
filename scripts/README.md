@@ -35,6 +35,10 @@ bun run db:ingest -- --all
 # 对账：行数、chat_total、SC、评论、作者、insights
 bun run db:verify -- --dataset nonoka --limit 30
 
+# 聚合口径 / Top 排序变化后，重算派生汇总
+bun scripts/refresh-public-totals.ts --dataset arale
+bun scripts/refresh-public-totals.ts
+
 # 查询层冒烟 + 本地延迟（成员列表 / insights / 组首页 / 相册）
 bun run db:query
 
@@ -46,6 +50,7 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 - 增量判断：`streams.content_hash`（pack 的 sha256）。
 - 小批量模式（`--limit`）跳过 `dataset_insights` 重算，避免用不完整场次覆盖汇总。
 - `--dry-run` 只解析与校验，不连数据库写入。
+- `refresh-public-totals.ts` 只更新 `dataset_insights.public_totals`；`totals` 仍由 `db:ingest` 从 pack 重算。
 
 ## 用法
 

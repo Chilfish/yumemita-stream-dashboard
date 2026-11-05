@@ -140,7 +140,7 @@ export function AppSidebar({
             <SidebarMenuButton
               size="lg"
               tooltip="ゆめみた 配信数据台"
-              render={<Link to={groupHomePath()} />}
+              render={<Link data-astro-prefetch to={groupHomePath()} />}
             >
               <img
                 alt=""
@@ -213,7 +213,7 @@ export function AppSidebar({
                     )}
                     isActive={!dataset && pathname === groupComparePath()}
                     tooltip="全员对比"
-                    render={<NavLink to={groupComparePath()} />}
+                    render={<NavLink data-astro-prefetch to={groupComparePath()} />}
                   >
                     <GitCompare aria-hidden="true" />
                     <span>全员对比</span>
@@ -237,7 +237,7 @@ export function AppSidebar({
                           className={cn(ACTIVE_ITEM_CLASS, isActive(item.key) && "font-medium")}
                           isActive={item.key === activeSection}
                           tooltip={item.label}
-                          render={<NavLink to={viewPath(dataset.id, item.key)} />}
+                          render={<NavLink data-astro-prefetch to={viewPath(dataset.id, item.key)} />}
                         >
                           <Icon aria-hidden="true" />
                           <span>{item.label}</span>
@@ -256,7 +256,7 @@ export function AppSidebar({
                           )}
                           isActive={item.key === activeSection}
                           tooltip={item.label}
-                          render={<NavLink to={item.to} />}
+                          render={<NavLink data-astro-prefetch to={item.to} />}
                         >
                           <Icon aria-hidden="true" />
                           <span>{item.label}</span>

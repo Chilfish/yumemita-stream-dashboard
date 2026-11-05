@@ -21,6 +21,8 @@ export interface StreamListOptions {
   limit?: number
   offset?: number
   availability?: string
+  /** 默认 true；页面只渲染当前页时关掉窗口计数，让查询提前结束。 */
+  withTotal?: boolean
 }
 
 export interface StreamListResult {

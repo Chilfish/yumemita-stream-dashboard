@@ -7,7 +7,6 @@ import { getGroupGallery, getGroupSummary } from '../src/db/queries/group.ts'
 import { getDatasetInsights } from '../src/db/queries/insights.ts'
 import {
   getLatestStream,
-  getStreamNeighbors,
   listStreams,
 } from '../src/db/queries/streams.ts'
 import { getTranscriptIndex, getTranscriptMeta } from '../src/db/queries/transcripts.ts'
@@ -72,12 +71,6 @@ async function main(): Promise<void> {
     counts[event.state] = (counts[event.state] ?? 0) + 1
     return counts
   }, {})
-
-  const middle = list.streams[Math.floor(list.streams.length / 2)]
-  if (middle) {
-    const neighbors = await getStreamNeighbors(db, 'nonoka', middle.videoId)
-    check(Boolean(neighbors.previous || neighbors.next), 'getStreamNeighbors 没有邻居')
-  }
 
   const insights = await getDatasetInsights(db, 'nonoka')
   check(insights === null || insights.totals.streamCount > 0, 'dataset_insights 数据异常')

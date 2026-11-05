@@ -3,6 +3,23 @@ import { aggregateDataset, type DatasetTotals, type StreamRow } from '@/lib/aggr
 import { getDatasetPacks } from './packs'
 import { listStreams } from './streams'
 
+const PAGE_SIZE = 2000
+
+/** 汇总需要该 dataset 的全部场次；超过单页上限时继续翻页，避免静默截断。 */
+async function listAllStreams(db: Db, datasetId: string) {
+  const streams = []
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const page = await listStreams(db, datasetId, {
+      limit: PAGE_SIZE,
+      offset,
+      withTotal: false,
+    })
+    streams.push(...page.streams)
+    if (page.streams.length < PAGE_SIZE) break
+  }
+  return streams
+}
+
 /**
  * 按数据库当前状态重算公开口径汇总。
  *
@@ -13,12 +30,12 @@ export async function computeDatasetPublicTotals(
   db: Db,
   datasetId: string,
 ): Promise<DatasetTotals> {
-  const [list, packs] = await Promise.all([
-    listStreams(db, datasetId, { limit: 2000 }),
+  const [summaries, packs] = await Promise.all([
+    listAllStreams(db, datasetId),
     getDatasetPacks(db, datasetId),
   ])
 
-  const rows: StreamRow[] = list.streams
+  const rows: StreamRow[] = summaries
     .map(summary => {
       const pack = packs.get(summary.videoId)
       return pack ? { summary, pack } : null

@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
 import {
   authors,
@@ -33,11 +34,36 @@ import type {
 import { toIso, toNumber } from './shared'
 
 type StreamRow = typeof streams.$inferSelect
-type DetailRow = typeof streamDetails.$inferSelect
+type DetailRow = Omit<typeof streamDetails.$inferSelect, 'rawDetail'>
 type PaidRow = typeof paidEvents.$inferSelect
 type CommentRow = typeof comments.$inferSelect
 type WordRow = typeof streamWords.$inferSelect
-type AuthorRow = { authorId: string, name: string | null, messages: number, superchats: number, stickers: number, memberships: number }
+type AuthorRow = { streamId: number, authorId: string, name: string | null, messages: number, superchats: number, stickers: number, memberships: number }
+
+/** `raw_detail` 没有写入方，请求期不取。 */
+const DETAIL_COLUMNS = {
+  streamId: streamDetails.streamId,
+  density: streamDetails.density,
+  coveragePct: streamDetails.coveragePct,
+  timeRange: streamDetails.timeRange,
+  badges: streamDetails.badges,
+  hashtags: streamDetails.hashtags,
+  emojiKinds: streamDetails.emojiKinds,
+  ownerChats: streamDetails.ownerChats,
+  emojis: streamDetails.emojis,
+  events: streamDetails.events,
+  videoExtra: streamDetails.videoExtra,
+}
+
+const AUTHOR_COLUMNS = {
+  streamId: streamAuthors.streamId,
+  authorId: streamAuthors.authorId,
+  name: authors.name,
+  messages: streamAuthors.messages,
+  superchats: streamAuthors.superchats,
+  stickers: streamAuthors.stickers,
+  memberships: streamAuthors.memberships,
+}
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : []
@@ -158,7 +184,7 @@ function buildChat(
 
   const topAuthors: TopAuthor[] = authorRows
     .slice()
-    .sort((a, b) => b.messages - a.messages)
+    .sort((a, b) => b.messages - a.messages || a.authorId.localeCompare(b.authorId))
     .slice(0, 20)
     .map(author => ({
       author: author.name ?? author.authorId,
@@ -170,7 +196,9 @@ function buildChat(
       badges: [],
     }))
 
-  const sortedWords = words.slice().sort((a, b) => b.count - a.count)
+  const sortedWords = words
+    .slice()
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
   const topWords: TopWord[] = sortedWords.slice(0, 40).map(word => ({
     word: word.word,
     count: word.count,
@@ -286,24 +314,16 @@ async function loadChildren(db: Db, ids: number[]) {
   }
 
   const [details, paid, commentRows, words, authorRows] = await Promise.all([
-    db.select().from(streamDetails).where(inArray(streamDetails.streamId, ids)),
-    db.select().from(paidEvents).where(inArray(paidEvents.streamId, ids)).orderBy(paidEvents.at),
-    db.select().from(comments).where(inArray(comments.streamId, ids)).orderBy(desc(comments.likes)),
-    db.select().from(streamWords).where(inArray(streamWords.streamId, ids)),
+    db.select(DETAIL_COLUMNS).from(streamDetails).where(inArray(streamDetails.streamId, ids)),
+    db.select().from(paidEvents).where(inArray(paidEvents.streamId, ids)).orderBy(paidEvents.at, paidEvents.id),
+    db.select().from(comments).where(inArray(comments.streamId, ids)).orderBy(desc(comments.likes), comments.id),
+    db.select().from(streamWords).where(inArray(streamWords.streamId, ids)).orderBy(desc(streamWords.count), asc(streamWords.word)),
     db
-      .select({
-        streamId: streamAuthors.streamId,
-        authorId: streamAuthors.authorId,
-        name: authors.name,
-        messages: streamAuthors.messages,
-        superchats: streamAuthors.superchats,
-        stickers: streamAuthors.stickers,
-        memberships: streamAuthors.memberships,
-      })
+      .select(AUTHOR_COLUMNS)
       .from(streamAuthors)
       .leftJoin(authors, eq(authors.authorId, streamAuthors.authorId))
       .where(inArray(streamAuthors.streamId, ids))
-      .orderBy(desc(streamAuthors.messages)),
+      .orderBy(desc(streamAuthors.messages), asc(streamAuthors.authorId)),
   ])
 
   return { details, paid, comments: commentRows, words, authorRows }
@@ -356,24 +376,129 @@ export async function getDatasetPacks(
   return packs
 }
 
+export type StreamPackParts = [
+  StreamRow[],
+  DetailRow[],
+  PaidRow[],
+  CommentRow[],
+  WordRow[],
+  AuthorRow[],
+]
+
+/**
+ * 单场 pack 的 6 条查询。子表用 `stream_id in (select id ...)` 定位，
+ * 因此可以和历史行查询放进同一个 batch，不需要先拿到 stream id。
+ */
+export function buildStreamPackQueries(
+  db: Db,
+  datasetId: string,
+  videoId: string,
+  limits: { words: number, authors: number } | null,
+) {
+  const where = and(eq(streams.datasetId, datasetId), eq(streams.videoId, videoId))
+  const ids = () => db.select({ id: streams.id }).from(streams).where(where)
+
+  const words = db
+    .select()
+    .from(streamWords)
+    .where(inArray(streamWords.streamId, ids()))
+    .orderBy(desc(streamWords.count), asc(streamWords.word))
+  const authorRows = db
+    .select(AUTHOR_COLUMNS)
+    .from(streamAuthors)
+    .leftJoin(authors, eq(authors.authorId, streamAuthors.authorId))
+    .where(inArray(streamAuthors.streamId, ids()))
+    .orderBy(desc(streamAuthors.messages), asc(streamAuthors.authorId))
+
+  return [
+    db.select().from(streams).where(where),
+    db.select(DETAIL_COLUMNS).from(streamDetails).where(inArray(streamDetails.streamId, ids())),
+    db.select().from(paidEvents).where(inArray(paidEvents.streamId, ids())).orderBy(paidEvents.at, paidEvents.id),
+    db.select().from(comments).where(inArray(comments.streamId, ids())).orderBy(desc(comments.likes), comments.id),
+    limits ? words.limit(limits.words) : words,
+    limits ? authorRows.limit(limits.authors) : authorRows,
+  ] as const
+}
+
+export function assembleStreamPack([
+  rows,
+  details,
+  paid,
+  commentRows,
+  words,
+  authorRows,
+]: StreamPackParts): StreamDatapack | null {
+  const row = rows[0]
+  if (!row) return null
+
+  return buildPack(row, details[0], paid, commentRows, words, authorRows)
+}
+
 export async function getStreamPack(
   db: Db,
   datasetId: string,
   videoId: string,
 ): Promise<StreamDatapack | null> {
-  const [row] = await db
-    .select()
-    .from(streams)
-    .where(and(eq(streams.datasetId, datasetId), eq(streams.videoId, videoId)))
-  if (!row) return null
-
-  const { details, paid, comments: commentRows, words, authorRows } = await loadChildren(db, [row.id])
-  return buildPack(
-    row,
-    details[0],
-    paid,
-    commentRows,
-    words,
-    authorRows.map(item => ({ ...item, streamId: row.id })),
+  const parts = await runBatch<StreamPackParts>(
+    db,
+    buildStreamPackQueries(db, datasetId, videoId, { words: 40, authors: 20 }),
   )
+  return assembleStreamPack(parts)
+}
+
+/** 对比页 / API：一次取回多场，SQL 条数不随场次数增长。 */
+export async function getStreamPacks(
+  db: Db,
+  datasetId: string,
+  videoIds: string[],
+): Promise<Map<string, StreamDatapack>> {
+  if (videoIds.length === 0) return new Map()
+
+  const where = and(eq(streams.datasetId, datasetId), inArray(streams.videoId, videoIds))
+  const ids = () => db.select({ id: streams.id }).from(streams).where(where)
+  const [rows, details, paid, commentRows, words, authorRows] = await runBatch<StreamPackParts>(db, [
+    db.select().from(streams).where(where),
+    db.select(DETAIL_COLUMNS).from(streamDetails).where(inArray(streamDetails.streamId, ids())),
+    db.select().from(paidEvents).where(inArray(paidEvents.streamId, ids())).orderBy(paidEvents.at, paidEvents.id),
+    db.select().from(comments).where(inArray(comments.streamId, ids())).orderBy(desc(comments.likes), comments.id),
+    db.select().from(streamWords).where(inArray(streamWords.streamId, ids())).orderBy(desc(streamWords.count), asc(streamWords.word)),
+    db
+      .select(AUTHOR_COLUMNS)
+      .from(streamAuthors)
+      .leftJoin(authors, eq(authors.authorId, streamAuthors.authorId))
+      .where(inArray(streamAuthors.streamId, ids()))
+      .orderBy(desc(streamAuthors.messages), asc(streamAuthors.authorId)),
+  ])
+
+  const byStream = <T extends { streamId: number }>(items: T[]) => {
+    const map = new Map<number, T[]>()
+    for (const item of items) {
+      const list = map.get(item.streamId)
+      if (list) list.push(item)
+      else map.set(item.streamId, [item])
+    }
+    return map
+  }
+
+  const detailByStream = new Map(details.map(item => [item.streamId, item]))
+  const paidByStream = byStream(paid)
+  const commentsByStream = byStream(commentRows)
+  const wordsByStream = byStream(words)
+  const authorsByStream = byStream(authorRows)
+
+  const packs = new Map<string, StreamDatapack>()
+  for (const row of rows) {
+    packs.set(
+      row.videoId,
+      buildPack(
+        row,
+        detailByStream.get(row.id),
+        paidByStream.get(row.id) ?? [],
+        commentsByStream.get(row.id) ?? [],
+        wordsByStream.get(row.id) ?? [],
+        authorsByStream.get(row.id) ?? [],
+      ),
+    )
+  }
+  return packs
 }

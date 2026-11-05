@@ -47,6 +47,38 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 - `bun run db:query`（列表 + insights，全量场次）：p50 122.5 ms / p95 247.6 ms。
 - 首次请求冷，后续命中 Workers Cache 后只付边缘响应；本地 `wrangler dev` 不复现 Cache HIT，需线上观察。
 
+### 数据库读路径（2026-11-05）
+
+本地库：1,901 场、5 个成员、`stream_words` 10.3 万行、`stream_authors` 6.1 万行、库大小 59 MB。
+`bun run db:bench` 经本机 Neon HTTP 代理（与 workerd 相同的 `neon-http` 驱动）统计冷渲染的 SQL 条数、`/sql` 请求数与 p50/p95。
+
+| 场景 | 改造前 SQL / HTTP | 改造后 SQL / HTTP | 改造后 p50 / p95 |
+| --- | ---: | ---: | ---: |
+| 成员首页 `dataset-home` | 3 / 3 | 3 / 1 | 6.8 / 27.6 ms |
+| 成员逐字稿 `dataset-transcripts` | 4 / 4 | 4 / 2 | 6.0 / 7.7 ms |
+| 单场页 `stream-page` | 10 / 10 | 10 / 2 | 6.5 / 8.8 ms |
+| 单场 `.md` | 9 / 9 | 9 / 2 | 3.9 / 4.8 ms |
+| `/api/packs` | 7 / 7 | 7 / 1 | 3.3 / 4.7 ms |
+| 对比页（3 场） | 21 / 21 | 9 / 2 | 9.6 / 12.1 ms |
+| 组首页 | 5 / 5 | 5 / 1 | 8.9 / 10.2 ms |
+| 组相册 | 2 / 2 | 2 / 1 | 10.3 / 12.7 ms |
+| 组对比 | 2 / 2 | 2 / 1 | 8.5 / 10.5 ms |
+| 组日历 | 3 / 3 | 3 / 1 | 3.3 / 4.2 ms |
+| `sitemap.xml` | 6 / 6 | 2 / 1 | 3.6 / 5.1 ms |
+| `llms.txt` | 6 / 6 | 2 / 1 | 6.3 / 26.3 ms |
+
+- 改造前为 10 轮、改造后为 20 轮；本机没有跨区 RTT，毫秒数只用于同机对比，**请求数**才是线上费用的主信号。
+- 对比页的 SQL 从 21 条降到 9 条：`getStreamPacks()` 用 `inArray` 一次取回多场，SQL 条数不再随场次数增长。
+- 组相册 p50 从 33.2 ms 降到 10.3 ms，来自窄列查询（只取 14 个字段，不再 `select *`）。
+
+复现：
+
+```bash
+bun run dev:db
+bun run db:bench -- --rounds 20 --label after
+bun run db:query
+```
+
 ### 长列表首屏上限
 
 成员最多约 500 场、全组约 1,900 场（以数据库为准）。此前 SSR 把所有行 / 封面都写进 HTML，页面体积随场次线性膨胀。现在：
@@ -75,7 +107,7 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 
 - **CSS 外链**：`build.inlineStylesheets: 'never'`。之前 384 KB 字体 / Tailwind CSS 内联在每个 HTML，生产构建下 HTML 体积约减半（如 `/nonoka` 从约 793 KB 到 409 KB）。
 - **去掉重复 props**：`manifest` 不再作为岛屿 props，由 `rows` 在壳层组装；单场 / 对比的 pack 去掉全量 `authors` / `wordCounts`（视图只用 Top 列表）。
-- **查询**：成员页的 datasets / streams / insights 三个查询并行；`listStreams` 用 `count(*) over()` 一次取总数。
+- **查询**：成员页的 datasets / streams / insights 三个查询通过 `db.batch` 放进一次 Neon HTTP 请求；`listStreams` 需要总数时才用 `count(*) over()`，页面传 `withTotal: false`。
 - **缓存意图**：每个数据页显式 `Astro.cache.set`，tag 覆盖 `dataset-<id>` / `stream-<videoId>`；sitemap / llms / `.md` 同样带 tag。
 - **岛屿水合**：页面岛屿改为 `client:idle`，先完成 HTML 替换，交互在水合后接管。
 
@@ -85,6 +117,8 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 - **岛屿 props 体积**：列表首屏已限 100 / 60 行，但完整 `rows` 仍作为 props 序列化进 HTML；下一步按路由裁剪字段，或改成 `/api/streams` 分页。
 - **Worker 同区**：生产必须让 Worker 与 Neon 区域接近，否则每个请求固定多一个 RTT。
 - **线上实测**：`Cf-Cache-Status`、purge 生效、Worker CPU 与 wall time 仍待部署后记录。
+- **预聚合进 ingest**：`datasets.stream_count` 与组首页 summary 目前仍在请求期计算，场次继续增长后可像 `public_totals` 一样落库。
+- **分页替代 2,000 上限**：`getDatasetPageData()` 仍一次取当前成员全部场次；超过上限需要服务端分页或按路由裁剪 props。
 
 ## 图片
 
@@ -105,6 +139,7 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 bun run check            # astro check + test + lint
 bun run build            # astro build（Worker + 预渲染 404/500/about）
 bun run db:query         # 查询层冒烟 + P50/P95
+bun run db:bench         # 冷渲染 SQL / HTTP 往返与 p50/p95（本地库）
 bun run db:verify        # 改 ingest / 数据时
 bun run perf:smoke -- --url http://127.0.0.1:8787
 bun run test:smoke       # 功能性路由冒烟

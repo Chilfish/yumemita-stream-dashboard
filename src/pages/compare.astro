@@ -8,7 +8,7 @@ import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 
 export const prerender = false
 
-Astro.cache.set({ maxAge: 300, swr: 600, tags: ['group', 'compare'] })
+Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group', 'compare'] })
 
 let pageData: GroupComparePageData | null = null
 try {

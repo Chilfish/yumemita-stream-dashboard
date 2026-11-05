@@ -28,6 +28,7 @@
 | 新增 coss 组件 | `src/components/ui/` | 用 shadcn CLI + `@coss` registry，不手写业务 |
 | 数据加载 | `src/db/queries/*`、`src/types/db.ts` | 页面先查库，再传给岛屿 |
 | 数据库 / ingest | `src/db/schema.ts`、`scripts/ingest-db.ts`、`scripts/verify-db.ts` | `bun run db:ingest` / `db:verify` |
+| 数据库读路径 / 压测 | `src/db/batch.ts`、`src/db/queries/*`、`scripts/bench-db.ts` | 先跑 `bun run db:bench`；方案见 [db-optimization.md](./docs/planning/db-optimization.md) |
 | 聚合 / 纯函数 | `src/lib/aggregate.ts`、`format.ts`、`classify.ts` | 配对应 `.test.ts` |
 | URL 状态 | `src/lib/table-params.ts`、`src/lib/routes.ts`、`src/lib/router-compat.tsx` | 可分享、可刷新 |
 | SEO | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | 请求期输出 head / sitemap |
@@ -137,19 +138,20 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 bun run check          # astro check + test + lint
 bun run build          # astro build（Worker + 预渲染 404/500）
 bun run db:query       # 查询层冒烟（需要 DATABASE_URL）
+bun run db:bench       # 冷渲染 SQL / HTTP 往返与 p50/p95（本地库）
 bun run test:smoke     # 路由冒烟（先启动 preview）
 bun run validate:data  # 旧数据链路
 ```
 
-本地开发默认连本机 Postgres，避免开发流量计入 Neon 出流量：
+本地开发默认连本机 Postgres，避免开发流量计入 Neon 出流量。`bun run dev` 会准备
+Postgres、建库 / 迁移与 Neon HTTP 代理，已有服务则复用；Astro 退出后两者继续后台运行：
 
 ```bash
-bun run dev:db        # 建库 + 迁移 + 写 .env.local
-bun run dev:db:proxy  # workerd 用的本地 Neon HTTP 代理
-bun run dev:seed      # 从本地 pack 灌数据
+bun run dev          # 一条命令：Postgres + 代理 + Astro
+bun run dev:seed     # 从本地 pack 灌数据
 ```
 
-`.dev.vars` 需要 `DATABASE_URL` 与 `NEON_HTTP_ENDPOINT`；步骤与排查见
+`.dev.vars` / `.env.local` 缺失时脚本会自动补写；步骤与排查见
 [docs/engineering/local-database.md](./docs/engineering/local-database.md)。
 
 - 纯逻辑放 `src/lib/` 并配 `.test.ts`。
@@ -209,6 +211,7 @@ bun run dev:seed      # 从本地 pack 灌数据
    bun run build
    bun run db:verify       # 改 ingest / 数据时
    bun run db:query        # 改查询层时
+   bun run db:bench        # 改查询组合 / 索引时
    bun run test:smoke      # 改路由时，先启动 preview
    ```
 

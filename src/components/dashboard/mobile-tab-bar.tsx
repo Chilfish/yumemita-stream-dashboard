@@ -87,6 +87,7 @@ export function MobileTabBar({
                 <Link
                   aria-current={active ? "page" : undefined}
                   className={cn(ITEM_CLASS, active ? "text-member-ink" : "text-muted-foreground")}
+                  data-astro-prefetch
                   to={item.to}
                 >
                   <Icon aria-hidden="true" className="size-[22px]" />

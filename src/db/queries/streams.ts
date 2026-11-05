@@ -1,9 +1,9 @@
-import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm'
+import { and, eq, getTableColumns, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
-import { streams, streamDetails } from '@/db/schema'
+import { streams } from '@/db/schema'
 import type { StreamSummary } from '@/types/dataset'
-import type { StreamListOptions, StreamListResult, StreamNeighbors, StreamDetailDto } from '@/types/db'
-import { mapStreamSummary, maskMemberOnlyMetrics, toIso, toNumber } from './shared'
+import type { StreamListOptions, StreamListResult } from '@/types/db'
+import { mapStreamSummary, maskMemberOnlyMetrics } from './shared'
 
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
 
@@ -15,11 +15,11 @@ function toPublicSummary(row: typeof streams.$inferSelect, rank: number): Stream
   return maskMemberOnlyMetrics(toSummary(row, rank))
 }
 
-export async function listStreams(
+export function buildStreamListQuery(
   db: Db,
   datasetId: string,
   options: StreamListOptions = {},
-): Promise<StreamListResult> {
+) {
   const limit = Math.min(options.limit ?? 500, 2000)
   const offset = Math.max(options.offset ?? 0, 0)
   const where = and(
@@ -27,44 +27,77 @@ export async function listStreams(
     options.availability ? eq(streams.availability, options.availability) : undefined,
   )
 
-  // 一次窗口函数取回总数与当前页，避免多一次 HTTP 往返。
-  const rows = await db
+  // 需要 total 时用一次窗口函数；页面只渲染当前页，传 withTotal: false 让查询提前结束。
+  return db
     .select({
       ...getTableColumns(streams),
-      total: sql<number>`count(*) over()::int`,
+      total: options.withTotal === false
+        ? sql<number>`0`
+        : sql<number>`count(*) over()::int`,
     })
     .from(streams)
     .where(where)
     .orderBy(NEWEST_FIRST)
     .limit(limit)
     .offset(offset)
+}
 
+export type StreamListRow = Awaited<ReturnType<typeof buildStreamListQuery>>[number]
+
+export function mapStreamList(rows: StreamListRow[], offset = 0): StreamListResult {
   return {
     streams: rows.map((row, index) => toPublicSummary(row, offset + index + 1)),
     total: rows[0]?.total ?? 0,
   }
 }
 
-/** sitemap 等只需要定位信息的场景：不要返回整行（含 jsonb 指标）。 */
-export async function listStreamRefs(
+export async function listStreams(
   db: Db,
   datasetId: string,
-): Promise<{ videoId: string, startedAt: string | null, availability: string | null }[]> {
-  const rows = await db
+  options: StreamListOptions = {},
+): Promise<StreamListResult> {
+  const offset = Math.max(options.offset ?? 0, 0)
+  return mapStreamList(await buildStreamListQuery(db, datasetId, options), offset)
+}
+
+/** sitemap：一次取回全部成员的定位信息，避免每个成员一次 HTTP 往返。 */
+export function buildAllStreamRefsQuery(db: Db) {
+  return db
     .select({
+      datasetId: streams.datasetId,
       videoId: streams.videoId,
       startedAt: streams.startedAt,
       availability: streams.availability,
     })
     .from(streams)
-    .where(eq(streams.datasetId, datasetId))
-    .orderBy(NEWEST_FIRST)
+    .orderBy(streams.datasetId, NEWEST_FIRST)
+}
 
-  return rows.map(row => ({
-    videoId: row.videoId,
-    startedAt: toIso(row.startedAt),
-    availability: row.availability,
-  }))
+/** llms.txt：一次取回全部成员的最新场次标题，避免每个成员一次 HTTP 往返。 */
+export function buildAllStreamHeadsQuery(db: Db) {
+  return db
+    .select({
+      datasetId: streams.datasetId,
+      videoId: streams.videoId,
+      title: streams.title,
+      date: streams.date,
+      availability: streams.availability,
+    })
+    .from(streams)
+    .orderBy(streams.datasetId, NEWEST_FIRST)
+}
+
+export function selectStreamQuery(db: Db, datasetId: string, videoId: string) {
+  return db
+    .select()
+    .from(streams)
+    .where(and(eq(streams.datasetId, datasetId), eq(streams.videoId, videoId)))
+}
+
+export type StreamQueryRow = Awaited<ReturnType<typeof selectStreamQuery>>[number]
+
+export function mapStreamRow(row: StreamQueryRow): StreamSummary {
+  return toSummary(row, 0)
 }
 
 export async function getStream(
@@ -72,10 +105,7 @@ export async function getStream(
   datasetId: string,
   videoId: string,
 ): Promise<StreamSummary | null> {
-  const [row] = await db
-    .select()
-    .from(streams)
-    .where(and(eq(streams.datasetId, datasetId), eq(streams.videoId, videoId)))
+  const [row] = await selectStreamQuery(db, datasetId, videoId)
   return row ? toSummary(row, 0) : null
 }
 
@@ -90,68 +120,4 @@ export async function getLatestStream(
     .orderBy(NEWEST_FIRST)
     .limit(1)
   return row ? toPublicSummary(row, 1) : null
-}
-
-export async function getStreamNeighbors(
-  db: Db,
-  datasetId: string,
-  videoId: string,
-): Promise<StreamNeighbors> {
-  const ordered = await db
-    .select({ videoId: streams.videoId })
-    .from(streams)
-    .where(eq(streams.datasetId, datasetId))
-    .orderBy(NEWEST_FIRST)
-
-  const index = ordered.findIndex(row => row.videoId === videoId)
-  if (index === -1) return { previous: null, next: null }
-
-  const previousId = ordered[index - 1]?.videoId
-  const nextId = ordered[index + 1]?.videoId
-  const ids = [previousId, nextId].filter((value): value is string => Boolean(value))
-  if (ids.length === 0) return { previous: null, next: null }
-
-  const rows = await db
-    .select()
-    .from(streams)
-    .where(and(eq(streams.datasetId, datasetId), inArray(streams.videoId, ids)))
-  const byVideo = new Map(rows.map(row => [row.videoId, row]))
-
-  const previous = previousId ? byVideo.get(previousId) : undefined
-  const next = nextId ? byVideo.get(nextId) : undefined
-
-  return {
-    previous: previous ? toPublicSummary(previous, index) : null,
-    next: next ? toPublicSummary(next, index + 2) : null,
-  }
-}
-
-export async function getStreamDetail(
-  db: Db,
-  datasetId: string,
-  videoId: string,
-): Promise<StreamDetailDto | null> {
-  const [row] = await db
-    .select()
-    .from(streams)
-    .where(and(eq(streams.datasetId, datasetId), eq(streams.videoId, videoId)))
-  if (!row) return null
-
-  const [detail] = await db
-    .select()
-    .from(streamDetails)
-    .where(eq(streamDetails.streamId, row.id))
-
-  return {
-    summary: toSummary(row, 0),
-    density: detail?.density ?? null,
-    coveragePct: toNumber(detail?.coveragePct),
-    timeRange: detail?.timeRange ?? null,
-    badges: detail?.badges ?? null,
-    hashtags: detail?.hashtags ?? null,
-    emojiKinds: detail?.emojiKinds ?? null,
-    ownerChats: detail?.ownerChats ?? null,
-    emojis: detail?.emojis ?? null,
-    videoExtra: detail?.videoExtra ?? null,
-  }
 }

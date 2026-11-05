@@ -1,10 +1,15 @@
 import type { APIRoute } from 'astro'
 import { env } from 'cloudflare:workers'
+import { runBatch } from '@/db/batch'
 import { db } from '@/db/client'
-import { getDataset } from '@/db/queries/datasets'
+import { mapDataset, selectDatasetsQuery, type DatasetQueryRow } from '@/db/queries/datasets'
 import { getStreamPack } from '@/db/queries/packs'
-import { getStream } from '@/db/queries/streams'
-import { getTranscriptMeta } from '@/db/queries/transcripts'
+import { getStream, mapStreamRow, selectStreamQuery, type StreamQueryRow } from '@/db/queries/streams'
+import {
+  mapTranscriptMeta,
+  selectTranscriptMetaQuery,
+  type TranscriptMetaRow,
+} from '@/db/queries/transcripts'
 import { memberOnlyAccess } from '@/lib/member-access'
 import { thumbnailUrl } from '@/lib/media'
 import { renderStreamMarkdown } from '@/lib/agent-markdown'
@@ -81,12 +86,26 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
   const videoId = rawVideoId.replace(/\.md$/, '')
   if (!datasetId || !videoId) return notFound()
 
-  const summary = await getStream(db, datasetId, videoId)
+  // 第一轮：场次 + 成员 + 逐字稿元数据放进同一个 batch。
+  const [streamRows, datasetRows, transcriptRows] = await runBatch<[
+    StreamQueryRow[],
+    DatasetQueryRow[],
+    TranscriptMetaRow[],
+  ]>(db, [
+    selectStreamQuery(db, datasetId, videoId),
+    selectDatasetsQuery(db, datasetId),
+    selectTranscriptMetaQuery(db, datasetId, videoId),
+  ])
+
+  const summary = streamRows[0] ? mapStreamRow(streamRows[0]) : null
   if (!summary) return notFound()
 
   const origin = context.site?.origin ?? DEFAULT_SITE_URL
   const { unlocked, keyed } = memberOnlyAccess(context.url)
   if (keyed) context.cache.set(false)
+
+  const transcriptMeta = mapTranscriptMeta(transcriptRows[0])
+  const dataset = datasetRows[0] ? mapDataset(datasetRows[0]) : null
 
   // 会员限定：只给标题与封面，和 HTML 页面的公开范围保持一致。
   if (isMemberOnly(summary.availability) && !unlocked) {
@@ -108,18 +127,15 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
         'content-type': 'text/markdown; charset=utf-8',
         'cache-control': keyed
           ? 'private, no-store'
-          : 'public, max-age=300, stale-while-revalidate=600',
+          : 'public, max-age=3600, stale-while-revalidate=86400',
         'x-robots-tag': 'noindex',
         'content-signal': 'ai-train=no, search=yes, ai-input=yes',
       },
     })
   }
 
-  const [dataset, pack, transcriptMeta] = await Promise.all([
-    getDataset(db, datasetId),
-    getStreamPack(db, datasetId, videoId),
-    getTranscriptMeta(db, datasetId, videoId),
-  ])
+  // 第二轮：pack 的 6 条查询在同一个 batch 里。
+  const pack = await getStreamPack(db, datasetId, videoId)
 
   const transcript = await readTranscriptBody(transcriptMeta?.r2Key)
 
@@ -140,13 +156,13 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
 
   const tags = [`stream-${videoId}`, `dataset-${datasetId}`]
   if (transcriptMeta) tags.push('transcripts')
-  if (!keyed) context.cache.set({ maxAge: 300, swr: 600, tags })
+  if (!keyed) context.cache.set({ maxAge: 3600, swr: 86400, tags })
 
   return new Response(markdown, {
     status: 200,
     headers: {
       'content-type': 'text/markdown; charset=utf-8',
-      'cache-control': keyed ? 'private, no-store' : 'public, max-age=300',
+      'cache-control': keyed ? 'private, no-store' : 'public, max-age=3600',
       'x-robots-tag': 'noindex',
       'content-signal': 'ai-train=no, search=yes, ai-input=yes',
       'link': `<${origin}/${datasetId}/stream/${videoId}>; rel="alternate"; type="text/html"`,
@@ -155,6 +171,31 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
 }
 
 export const HEAD: APIRoute = async (context) => {
-  const response = await GET(context)
-  return new Response(null, { status: response.status, headers: response.headers })
+  const datasetId = context.params.datasetId
+  const videoId = (context.params.videoId ?? '').replace(/\.md$/, '')
+  const headers = {
+    'content-type': 'text/markdown; charset=utf-8',
+    'x-robots-tag': 'noindex',
+    'content-signal': 'ai-train=no, search=yes, ai-input=yes',
+  }
+  if (!datasetId || !videoId) {
+    return new Response(null, { status: 404, headers: { ...headers, 'cache-control': 'no-store' } })
+  }
+
+  const summary = await getStream(db, datasetId, videoId).catch((error) => {
+    console.error('[md] head lookup failed', error)
+    return null
+  })
+  if (!summary) {
+    return new Response(null, { status: 404, headers: { ...headers, 'cache-control': 'no-store' } })
+  }
+
+  const { keyed } = memberOnlyAccess(context.url)
+  return new Response(null, {
+    status: 200,
+    headers: {
+      ...headers,
+      'cache-control': keyed ? 'private, no-store' : 'public, max-age=3600',
+    },
+  })
 }

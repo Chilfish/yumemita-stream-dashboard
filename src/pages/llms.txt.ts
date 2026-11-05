@@ -1,16 +1,26 @@
 import type { APIRoute } from 'astro'
+import { runBatch } from '@/db/batch'
 import { db } from '@/db/client'
-import { getDatasets } from '@/db/queries/datasets'
-import { listStreams } from '@/db/queries/streams'
+import { mapDataset, selectDatasetsQuery, type DatasetQueryRow } from '@/db/queries/datasets'
+import { buildAllStreamHeadsQuery } from '@/db/queries/streams'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
 import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
 export const GET: APIRoute = async (context) => {
-  context.cache.set({ maxAge: 300, swr: 600, tags: ['llms'] })
+  context.cache.set({ maxAge: 3600, swr: 86400, tags: ['llms'] })
   const origin = context.site?.origin ?? DEFAULT_SITE_URL
-  const datasets = await getDatasets(db)
+
+  // 全部成员的最新场次标题一次取回，再按成员分组。
+  const [datasetRows, streamRows] = await runBatch<[
+    DatasetQueryRow[],
+    Awaited<ReturnType<typeof buildAllStreamHeadsQuery>>,
+  ]>(db, [
+    selectDatasetsQuery(db, undefined),
+    buildAllStreamHeadsQuery(db),
+  ])
+  const datasets = datasetRows.map(mapDataset)
 
   const lines: string[] = [
     '# ゆめみた 配信数据台',
@@ -26,17 +36,26 @@ export const GET: APIRoute = async (context) => {
   }
 
   lines.push('', '## 最近场次', '')
-  const recent = await Promise.all(
-    datasets.map(async dataset => {
-      const list = await listStreams(db, dataset.id, { limit: 20 })
-      return list.streams
-        .filter(stream => !isMemberOnly(stream.availability))
-        .slice(0, 5)
-        .map(stream => ({ dataset, stream }))
-    }),
+
+  const byDataset = new Map<string, typeof streamRows>()
+  for (const row of streamRows) {
+    const list = byDataset.get(row.datasetId)
+    if (list) {
+      if (list.length < 20) list.push(row)
+    }
+    else {
+      byDataset.set(row.datasetId, [row])
+    }
+  }
+
+  const recent = datasets.flatMap(dataset =>
+    (byDataset.get(dataset.id) ?? [])
+      .filter(stream => !isMemberOnly(stream.availability))
+      .slice(0, 5)
+      .map(stream => ({ dataset, stream })),
   )
 
-  for (const { dataset, stream } of recent.flat().slice(0, 20)) {
+  for (const { dataset, stream } of recent.slice(0, 20)) {
     lines.push(
       `- ${dataset.label} · ${stream.date} · ${stream.title} — ${origin}/${dataset.id}/stream/${stream.videoId}.md`,
     )

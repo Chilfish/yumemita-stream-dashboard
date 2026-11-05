@@ -19,6 +19,7 @@ docs/
 │   ├── architecture.md
 │   ├── backlog.md
 │   ├── astro-ssr-migration.md
+│   ├── db-optimization.md
 │   ├── live-calendar.md
 │   ├── product-direction.md
 │   ├── ui-refactor.md
@@ -68,6 +69,7 @@ docs/
 | 规划下一阶段 | [backlog.md](./planning/backlog.md) | 未决任务、优先级、前置条件 |
 | 迁移到 Astro / PostgreSQL | [astro-ssr-migration.md](./planning/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 目标架构、数据模型、`.md` 路由、缓存与发布 |
 | 规划 / 实现直播日历 | [live-calendar.md](./planning/live-calendar.md) | 未来场次、手工日程、月历与议程视图、缓存与验收 |
+| 优化数据库读路径 | [db-optimization.md](./planning/db-optimization.md) | 查询条数、往返、传输量、缓存与压测 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
 | 本地开发 / 测试 | [development.md](./engineering/development.md) + [local-database.md](./engineering/local-database.md) | 环境、脚本、D3、测试；本地 Postgres 与开发代理 |
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |
@@ -120,6 +122,7 @@ requirements/ planning/ → engineering/ → 代码 → postmortem/ reviews/ dev
 bun run check          # astro check + vitest + oxlint
 bun run build          # astro build（Worker + 预渲染 404/500）
 bun run preview        # Cloudflare workerd 预览
+bun run db:bench       # 冷渲染 SQL / HTTP 往返与 p50/p95（本地库）
 bun run validate:data  # 校验旧数据链路的 index / manifest / insights / group-*
 ```
 

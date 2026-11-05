@@ -78,27 +78,30 @@ export default defineConfig({
     provider: cacheCloudflare(),
   },
   routeRules: {
-    '/': { maxAge: 60, swr: 300, tags: ['group'] },
-    '/gallery': { maxAge: 300, swr: 600, tags: ['group', 'gallery'] },
+    // 数据只在 ingest 时变，ingest 成功后会按 tag purge；TTL 只做兜底。
+    // 日历依赖请求时刻的直播状态，保持短 TTL。
+    '/': { maxAge: 3600, swr: 86400, tags: ['group'] },
+    '/gallery': { maxAge: 3600, swr: 86400, tags: ['group', 'gallery'] },
     '/calendar': { maxAge: 60, swr: 300, tags: ['group', 'schedule'] },
-    '/[datasetId]': { maxAge: 60, swr: 300, tags: ['datasets'] },
+    '/[datasetId]': { maxAge: 3600, swr: 86400, tags: ['datasets'] },
     '/[datasetId]/calendar': { maxAge: 60, swr: 300, tags: ['datasets', 'schedule'] },
-    '/[datasetId]/streams': { maxAge: 60, swr: 300, tags: ['datasets'] },
-    '/[datasetId]/trends': { maxAge: 300, swr: 600, tags: ['datasets'] },
-    '/[datasetId]/gallery': { maxAge: 300, swr: 600, tags: ['datasets'] },
+    '/[datasetId]/streams': { maxAge: 3600, swr: 86400, tags: ['datasets'] },
+    '/[datasetId]/trends': { maxAge: 3600, swr: 86400, tags: ['datasets'] },
+    '/[datasetId]/gallery': { maxAge: 3600, swr: 86400, tags: ['datasets'] },
     '/about': { maxAge: 3600, swr: 86400, tags: ['group'] },
-    '/[datasetId]/transcripts': { maxAge: 300, swr: 600, tags: ['transcripts'] },
-    '/[datasetId]/stream/[videoId]': { maxAge: 300, swr: 600, tags: ['streams'] },
-    '/[datasetId]/stream/[videoId].md': { maxAge: 300, swr: 600, tags: ['streams'] },
-    '/sitemap.xml': { maxAge: 300, swr: 600, tags: ['sitemap'] },
-    '/llms.txt': { maxAge: 300, swr: 600, tags: ['llms'] },
+    '/[datasetId]/transcripts': { maxAge: 3600, swr: 86400, tags: ['transcripts'] },
+    '/[datasetId]/stream/[videoId]': { maxAge: 3600, swr: 86400, tags: ['streams'] },
+    '/[datasetId]/stream/[videoId].md': { maxAge: 3600, swr: 86400, tags: ['streams'] },
+    '/sitemap.xml': { maxAge: 3600, swr: 86400, tags: ['sitemap'] },
+    '/llms.txt': { maxAge: 3600, swr: 86400, tags: ['llms'] },
   },
   build: {
     // 字体与 Tailwind 的 CSS 体积较大；外链后由浏览器跨路由复用并长期缓存。
     inlineStylesheets: 'never',
   },
   prefetch: {
-    prefetchAll: true,
+    // 只预取显式标记的导航链接；prefetchAll 会让侧栏每次悬停都触发一轮 SSR。
+    prefetchAll: false,
     defaultStrategy: 'hover',
   },
   env: {

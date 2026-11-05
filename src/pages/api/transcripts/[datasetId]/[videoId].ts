@@ -66,8 +66,8 @@ export const GET: APIRoute = async (context) => {
 
     if (!keyed) {
       context.cache.set({
-        maxAge: 300,
-        swr: 600,
+        maxAge: 3600,
+        swr: 86400,
         tags: [`stream-${videoId}`, `dataset-${datasetId}`, 'transcripts'],
       })
     }

@@ -8,7 +8,7 @@ import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 
 export const prerender = false
 
-Astro.cache.set({ maxAge: 300, swr: 600, tags: ['group', 'gallery'] })
+Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group', 'gallery'] })
 
 let data: GroupPageData | null = null
 try {

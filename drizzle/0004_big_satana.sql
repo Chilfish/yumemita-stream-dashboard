@@ -1,0 +1,2 @@
+CREATE INDEX "scheduled_streams_dataset_at_idx" ON "scheduled_streams" USING btree ("dataset_id","scheduled_at");--> statement-breakpoint
+CREATE INDEX "transcripts_dataset_date_idx" ON "transcripts" USING btree ("dataset_id","date" DESC NULLS LAST);

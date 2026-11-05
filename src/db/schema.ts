@@ -116,6 +116,7 @@ export const scheduledStreams = pgTable(
       .on(table.datasetId, table.videoId)
       .where(sql`${table.videoId} is not null`),
     index('scheduled_streams_at_idx').on(table.scheduledAt),
+    index('scheduled_streams_dataset_at_idx').on(table.datasetId, table.scheduledAt),
   ],
 )
 
@@ -247,7 +248,10 @@ export const transcripts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     contentHash: text('content_hash'),
   },
-  table => [primaryKey({ columns: [table.datasetId, table.videoId] })],
+  table => [
+    primaryKey({ columns: [table.datasetId, table.videoId] }),
+    index('transcripts_dataset_date_idx').on(table.datasetId, table.date.desc()),
+  ],
 )
 
 export const ingestReports = pgTable('ingest_reports', {

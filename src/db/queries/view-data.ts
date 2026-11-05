@@ -1,13 +1,36 @@
+import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
 import type { DatasetTotals } from '@/lib/aggregate'
 import { buildGroupDataFromStreams, buildGroupDataFromSummary, type GroupData } from '@/lib/group'
 import type { DatasetIndexEntry, StreamSummary } from '@/types/dataset'
 import type { StreamDatapack } from '@/types/datapack'
-import { getDatasets } from './datasets'
-import { getGroupGallery, getGroupSummary } from './group'
-import { getDatasetPublicTotals } from './insights'
-import { getStreamPack } from './packs'
-import { listStreams } from './streams'
+import {
+  getDatasets,
+  mapDataset,
+  selectDatasetsQuery,
+  type DatasetQueryRow,
+} from './datasets'
+import {
+  assembleGroupSummary,
+  buildGroupGalleryQuery,
+  buildGroupSummaryQueries,
+  mapGroupStreams,
+  type GroupSummaryParts,
+} from './group'
+import { mapPublicTotals, selectPublicTotalsQuery, type PublicTotalsRow } from './insights'
+import {
+  assembleStreamPack,
+  buildStreamPackQueries,
+  getStreamPacks,
+  type StreamPackParts,
+} from './packs'
+import { buildStreamListQuery, mapStreamList, type StreamListRow } from './streams'
+import {
+  mapTranscriptMeta,
+  selectTranscriptMetaQuery,
+  type TranscriptMeta,
+  type TranscriptMetaRow,
+} from './transcripts'
 
 export interface DatasetPageData {
   datasets: DatasetIndexEntry[]
@@ -39,24 +62,25 @@ export async function getDatasetPageData(
   db: Db,
   datasetId: string,
 ): Promise<DatasetPageData | null> {
-  // 两个查询并行发出；Neon HTTP 每个查询一次往返，并行能把等待压到一轮。
-  const [all, list] = await Promise.all([
-    getDatasets(db),
-    listStreams(db, datasetId, { limit: 2000 }),
+  // 三条查询互不依赖，放进同一个 Neon HTTP batch（本地 pg 回退并行）。
+  const [datasetRows, listRows, totalsRows] = await runBatch<
+    [DatasetQueryRow[], StreamListRow[], PublicTotalsRow[]]
+  >(db, [
+    selectDatasetsQuery(db, undefined),
+    buildStreamListQuery(db, datasetId, { limit: 2000, withTotal: false }),
+    selectPublicTotalsQuery(db, datasetId),
   ])
 
-  const datasets = toIndex(all)
+  const datasets = toIndex(datasetRows.map(mapDataset))
   const dataset = datasets.find(item => item.id === datasetId)
   if (!dataset) return null
-
-  // 汇总由 db:ingest 预聚合，请求期只读一行 JSON；不要再加载整份明细。
-  const totals = await getDatasetPublicTotals(db, datasetId)
 
   return {
     datasets,
     dataset,
-    rows: list.streams,
-    totals,
+    rows: mapStreamList(listRows).streams,
+    // 汇总由 db:ingest 预聚合，请求期只读一行 JSON；不要再加载整份明细。
+    totals: mapPublicTotals(datasetId, totalsRows[0]),
   }
 }
 
@@ -64,14 +88,29 @@ export async function getGroupPageData(
   db: Db,
   view: 'home' | 'gallery',
 ): Promise<GroupPageData> {
-  const datasets = toIndex(await getDatasets(db))
-
   if (view === 'gallery') {
-    const gallery = await getGroupGallery(db)
-    return { datasets, data: buildGroupDataFromStreams(datasets, gallery.streams) }
+    const [datasetRows, streamRows] = await runBatch<[
+      DatasetQueryRow[],
+      Awaited<ReturnType<typeof buildGroupGalleryQuery>>,
+    ]>(db, [
+      selectDatasetsQuery(db, undefined),
+      buildGroupGalleryQuery(db),
+    ])
+    const datasets = toIndex(datasetRows.map(mapDataset))
+    return {
+      datasets,
+      data: buildGroupDataFromStreams(datasets, mapGroupStreams(streamRows)),
+    }
   }
 
-  const summary = await getGroupSummary(db)
+  const [datasetRows, members, days, latest, recent] = await runBatch<
+    [DatasetQueryRow[], ...GroupSummaryParts]
+  >(db, [
+    selectDatasetsQuery(db, undefined),
+    ...buildGroupSummaryQueries(db),
+  ])
+  const datasets = toIndex(datasetRows.map(mapDataset))
+  const summary = assembleGroupSummary(members, days, latest, recent)
   return { datasets, data: buildGroupDataFromSummary(datasets, summary) }
 }
 
@@ -80,15 +119,22 @@ export async function getComparePacks(
   datasetId: string,
   videoIds: string[],
 ): Promise<Record<string, StreamDatapack>> {
-  const entries = await Promise.all(
-    videoIds.map(async videoId => {
-      const pack = await getStreamPack(db, datasetId, videoId)
-      return pack ? ([videoId, pack] as const) : null
-    }),
-  )
-  return Object.fromEntries(
-    entries.filter((entry): entry is readonly [string, StreamDatapack] => entry !== null),
-  )
+  return Object.fromEntries(await getStreamPacks(db, datasetId, videoIds))
 }
 
-export { getStreamPack }
+/** 单场正文的第二轮查询：逐字稿元数据 + pack，放在同一个 batch。 */
+export async function getStreamPageExtras(
+  db: Db,
+  datasetId: string,
+  videoId: string,
+): Promise<{ transcript: TranscriptMeta | null, pack: StreamDatapack | null }> {
+  const [transcriptRows, ...parts] = await runBatch<[TranscriptMetaRow[], ...StreamPackParts]>(db, [
+    selectTranscriptMetaQuery(db, datasetId, videoId),
+    ...buildStreamPackQueries(db, datasetId, videoId, { words: 40, authors: 20 }),
+  ])
+
+  return {
+    transcript: mapTranscriptMeta(transcriptRows[0]),
+    pack: assembleStreamPack(parts),
+  }
+}

@@ -4,7 +4,7 @@ import { datasets, streams } from '@/db/schema'
 import type { DatasetSummary } from '@/types/db'
 import { toIso } from './shared'
 
-async function selectDatasets(db: Db, datasetId: string | undefined) {
+export function selectDatasetsQuery(db: Db, datasetId: string | undefined) {
   const joinCondition = eq(streams.datasetId, datasets.id)
 
   return db
@@ -27,7 +27,9 @@ async function selectDatasets(db: Db, datasetId: string | undefined) {
     .orderBy(datasets.id)
 }
 
-function mapDataset(row: Awaited<ReturnType<typeof selectDatasets>>[number]): DatasetSummary {
+export type DatasetQueryRow = Awaited<ReturnType<typeof selectDatasetsQuery>>[number]
+
+export function mapDataset(row: DatasetQueryRow): DatasetSummary {
   return {
     id: row.id,
     label: row.label,
@@ -43,7 +45,7 @@ function mapDataset(row: Awaited<ReturnType<typeof selectDatasets>>[number]): Da
 }
 
 export async function getDatasets(db: Db): Promise<DatasetSummary[]> {
-  const rows = await selectDatasets(db, undefined)
+  const rows = await selectDatasetsQuery(db, undefined)
   return rows.map(mapDataset)
 }
 
@@ -51,7 +53,7 @@ export async function getDataset(
   db: Db,
   datasetId: string,
 ): Promise<DatasetSummary | null> {
-  const rows = await selectDatasets(db, datasetId)
+  const rows = await selectDatasetsQuery(db, datasetId)
   const row = rows[0]
   return row ? mapDataset(row) : null
 }

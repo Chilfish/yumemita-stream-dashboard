@@ -9,7 +9,7 @@ import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
-Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group'] })
+Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group'] })
 
 let data: GroupPageData | null = null
 try {

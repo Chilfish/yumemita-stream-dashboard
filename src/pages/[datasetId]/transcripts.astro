@@ -13,9 +13,11 @@ export const prerender = false
 const datasetId = Astro.params.datasetId!
 // 场次元数据公开；逐字稿正文与索引仍按访问参数放行。
 const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
+let failed = false
 const [data, transcriptResult] = await Promise.all([
   getDatasetPageData(db, datasetId).catch(error => {
     console.error('[page] transcripts failed', error)
+    failed = true
     return null
   }),
   getTranscriptIndex(db, datasetId, { includeMemberOnly: unlocked })
@@ -28,8 +30,12 @@ const [data, transcriptResult] = await Promise.all([
       }
     }),
 ])
-if (!data) Astro.response.status = 404
-else if (!keyed) Astro.cache.set({ maxAge: 300, swr: 600, tags: [`dataset-${datasetId}`, 'transcripts'] })
+if (failed) Astro.response.status = 500
+else if (!data) {
+  Astro.response.status = 404
+  Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`] })
+}
+else if (!keyed) Astro.cache.set({ maxAge: 3600, swr: 86400, tags: [`dataset-${datasetId}`, 'transcripts'] })
 
 const latest = data?.rows[0] ?? null
 const meta = data
@@ -65,5 +71,11 @@ const meta = data
           view="transcripts"
         />
       )
-    : <ErrorState code="404" title="找不到这位成员" detail="成员 id 可能写错了，或者还没有导入数据。" />}
+    : (
+        <ErrorState
+          code={failed ? '500' : '404'}
+          title={failed ? '数据读取失败' : '找不到这位成员'}
+          detail={failed ? '可以刷新重试；其他页面不受影响。' : '成员 id 可能写错了，或者还没有导入数据。'}
+        />
+      )}
 </Layout>
