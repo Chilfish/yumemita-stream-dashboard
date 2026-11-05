@@ -79,6 +79,48 @@ bun run db:bench -- --rounds 20 --label after
 bun run db:query
 ```
 
+### 客户端与单场页（2026-11-05 收尾）
+
+这一轮的目标不是继续压 SQL 往返，而是削减首屏字节与客户端代码。实测：
+
+| 项 | 改造前 | 改造后 | 说明 |
+| --- | ---: | ---: | --- |
+| 客户端 JS | 30 chunk / 1.52 MB | 20 chunk / 0.98 MB | 逐字稿 glob 只在 DEV 打包；命令面板改为按需加载 |
+| 逐字稿 client chunk | 12 个 | 0 | 生产构建不再包含 `content/transcripts/**` 原文 |
+| 单场页 HTML（生产 preview） | 696 KB | 281 KB | 不再为 1 行 summary 拉回整成员 34 列 |
+| 成员对比页 HTML（生产 preview） | 1.22 MB | 1.15 MB | 只传逐分钟密度，不再传整份 pack |
+| 对比页 3 场查询 | 9 SQL / 2 HTTP | 4 SQL / 2 HTTP | `compare-3-density` |
+| 单场页查询 | 10 SQL / 2 HTTP | 12 SQL / 2 HTTP | 多 2 条窄查询，传输量显著下降 |
+
+- 单场页第一轮取「成员 + 标题级导航索引 + 当前场次 + 公开汇总」，第二轮把「逐字稿元数据 + pack + 最多 2 行邻场摘要」放进同一个 batch；往返仍是 2 次。SQL 从 10 增到 12，但不再传输整成员摘要，线上按传输计费时更划算。
+- `/api/densities/:dataset?ids=...` 只返回 `perMinute` 数组；对比页切换场次时按需补拉，会员限定场沿用同一套公开范围判断。
+- 成员列表查询改为显式 34 列，去掉了 `content_hash`、`source_schema`、`ingest_batch_id` 等写路径字段。
+- 交互侧：场次搜索 200 ms 防抖；`DatasetViewContext` 的 value 做了 memo；图表 hover 合并到 rAF 且索引未变时不重渲；图表测量前预留高度。
+
+复现：
+
+```bash
+bun run build
+bun run preview -- --port 4322
+bun run db:bench -- --rounds 10 --label after-client-perf-3
+```
+
+生产 preview 的页面体积：
+
+```text
+/nonoka/stream/<videoId>   281.4 KB
+/nonoka/compare            1152.8 KB
+/nonoka                    896.3 KB
+/nonoka/streams            1177.0 KB
+```
+
+浏览器实测（agent-browser，生产 preview）：
+
+- 场次页输入「歌」：URL 立即不变，约 200 ms 后变为 `?q=%E6%AD%8C`，表格从 100 行降到 21 行。
+- `Control+K`：命令面板按需加载后打开，成员与场次条目正常；console 无报错。
+- 单场 `?view=timeline`：指针移动后读数出现（示例 `第 126 分 · 6 条 · SC 0 笔`）。
+- 对比页从 2 场加到 3 场：发出 `/api/densities/nonoka?ids=...`，200，曲线从 2 条变 3 条。
+
 ### 长列表首屏上限
 
 成员最多约 500 场、全组约 1,900 场（以数据库为准）。此前 SSR 把所有行 / 封面都写进 HTML，页面体积随场次线性膨胀。现在：
@@ -114,7 +156,8 @@ bun run db:query
 ### 仍待优化
 
 - **壳层流式输出**：目前整个页面（侧栏 + 页头 + 内容）是一个岛屿，Astro 必须等它 SSR 完才开始输出。把壳层拆成 Astro 布局 + `transition:persist` 的独立岛屿，内容区用 `server:defer` / 流式渲染，首字节可以更早到达。参考 [Astro streaming recipe](https://docs.astro.build/en/recipes/streaming-improve-page-performance/)。
-- **岛屿 props 体积**：列表首屏已限 100 / 60 行，但完整 `rows` 仍作为 props 序列化进 HTML；下一步按路由裁剪字段，或改成 `/api/streams` 分页。
+- **按视图拆岛屿**：`DatasetPage` / `GroupPage` 仍静态引入全部视图。直接改 `React.lazy` 会让 SSR 输出 Suspense fallback，单场与成员页丢失正文；正确做法是把壳层移出 React 岛屿，再按视图挂独立岛屿，属于结构性改造，暂缓。
+- **岛屿 props 体积**：列表首屏已限 100 / 60 行，但完整 `rows` 仍作为 props 序列化进成员列表页；下一步按路由裁剪字段，或改成 `/api/streams` 分页。对比页仍带着该成员全部 `rows`，密度已经单独取。
 - **Worker 同区**：生产必须让 Worker 与 Neon 区域接近，否则每个请求固定多一个 RTT。
 - **线上实测**：`Cf-Cache-Status`、purge 生效、Worker CPU 与 wall time 仍待部署后记录。
 - **预聚合进 ingest**：`datasets.stream_count` 与组首页 summary 目前仍在请求期计算，场次继续增长后可像 `public_totals` 一样落库。

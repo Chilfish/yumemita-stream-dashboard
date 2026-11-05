@@ -20,6 +20,7 @@ docs/
 │   ├── backlog.md
 │   ├── astro-ssr-migration.md
 │   ├── db-optimization.md
+│   ├── performance-audit.md
 │   ├── live-calendar.md
 │   ├── product-direction.md
 │   ├── ui-refactor.md
@@ -75,6 +76,7 @@ docs/
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |
 | 发布 | [release-checklist.md](./engineering/release-checklist.md) + [deployment.md](./engineering/deployment.md) | 验证、冒烟、部署、回滚 |
 | 性能回归 | [performance.md](./engineering/performance.md) | 首屏数据流、缓存分层、实测数字 |
+| 做全栈性能优化 | [performance-audit.md](./planning/performance-audit.md) | 岛屿拆分、props 收敛、交互热点、ingest / publish 与优先级 |
 | 排查页面 / 数据问题 | [troubleshooting.md](./engineering/troubleshooting.md) | 常见报错与口径 |
 | 读写数据 / 加场次 | [data-model.md](./data/data-model.md) + [adding-data.md](./data/adding-data.md) | 字段、口径、发布步骤 |
 | 弹幕 / 事件字段与事件类型 | [chat-events.md](./data/chat-events.md) | 消息记录、事件记录、去重、表情索引、已知限制 |

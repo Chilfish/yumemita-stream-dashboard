@@ -74,7 +74,7 @@ data/<dataset>/*.datapack.json        本地暂存（gitignore，唯一真源）
 2. `publish-data --assets-only` 上传封面、表情与 archive；`publish-transcripts` 上传逐字稿正文。
 3. 数据库提交后调用 `POST /api/internal/cache/purge`，按 `stream-<id>` / `dataset-<id>` / `group` / `sitemap` / `llms` / `transcripts` 失效。
 4. 页面请求：`.astro` frontmatter 查库 → DTO → 服务端输出正文 → 岛屿接管交互。
-5. 单场 / 对比需要完整 pack 时走 `/api/packs/:datasetId/:videoId`（从数据库还原），不读 R2。
+5. 单场正文的完整 pack 由服务端查询后随 SSR 下发；对比页只取 `stream_details.density.perMinute`，切换场次时走 `/api/densities/:datasetId?ids=...` 补拉。`/api/packs/:datasetId/:videoId` 保留给确实需要完整 pack 的调用方，不读 R2。
 
 ### 封面图
 

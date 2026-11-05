@@ -78,7 +78,7 @@
 - Astro 7 `output: 'server'` + `@astrojs/cloudflare`；页面在 `src/pages/`，稳定页显式 `prerender = true`。
 - `src/layouts/Layout.astro` 负责 SEO、主题内联脚本、ClientRouter 与全局岛屿。
 - 旧 React Router 页面与 `src/legacy/` 已删除；不要在 `src/` 里重新引入 `react-router`。
-- 单场 / 对比的 pack 按需查 `/api/packs`（数据库还原）；列表页只消费查询层返回的 rows / insights。
+- 单场正文的 pack 由 SSR 查询；对比页只取逐分钟密度，切换场次走 `/api/densities`；`/api/packs` 保留给需要完整 pack 的调用方。列表页只消费查询层返回的 rows / insights。
 
 ### 📊 数据流
 

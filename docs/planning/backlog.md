@@ -25,6 +25,7 @@
 | B16 | 页面汇总改为读 `dataset_insights.public_totals`，不再每次渲染拉整库明细 | P0 | `db:ingest` 重算 insights | 2026-11-05 Neon 账单 | ✅ 单页数据库出流量 3.5–10.5 MB → 约 0.2–0.4 MB；见 [postmortem 002](../postmortem/002-dataset-packs-per-render.md) |
 | B17 | 本地开发数据库：Scoop Postgres + Neon HTTP 代理 + 初始化脚本 | P1 | 无 | 2026-11-05 成本控制 | ✅ `bun run dev` 一条命令拉起 Postgres / 库 / 代理；Astro 退出后服务继续后台运行。`dev:db` / `dev:db:proxy` / `dev:seed` 保留；见 [local-database.md](../engineering/local-database.md) |
 | B18 | 数据库读路径优化：合并查询、窄列、缓存 TTL 与本地压测 | P0 | 本地库 | 2026-11-05 成本控制 | ✅ 冷渲染 HTTP 往返压到 ≤2（多数 1 次）；`bun run db:bench` 可复测；见 [db-optimization.md](db-optimization.md) |
+| B19 | 全栈性能审计：岛屿拆分、props 收敛、对比页窄查询、交互热点与 ingest / publish 批量化 | P1 | 无 | 2026-11-05 巡检 | 🚧 P0 大部分落地：逐字稿 DEV 守卫（会员稿不再进 client chunk）、列表窄列、对比页密度 API、单场页取数收敛、搜索防抖、context memo、图表 hover 节流。客户端 JS 1.52 → 0.98 MB，单场页 HTML 696 → 281 KB，对比页 3 场 9 → 4 SQL。剩余：props 收敛、壳层重构、ingest / publish 批量化；见 [performance-audit.md](performance-audit.md) 与 [performance.md](../engineering/performance.md) |
 
 ## 审查承接区
 
