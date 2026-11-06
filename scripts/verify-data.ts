@@ -16,14 +16,14 @@
  * 远端检查（--remote）：
  *   - insights.json 的 aggregation 与本地一致
  *   - 本地有 authors.json 时，远端也必须存在且内容规模一致
- *   - 抽一场 v2 pack 检查远端 schema
+ *   - 抽一场 v2 pack 检查远端 schema（优先 `archive/`，兼容旧的 `<dataset>/`）
  *   - manifest.count 与本地 pack 数一致
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { createObjectStore, readCredentials, remoteBase } from './lib/object-storage.ts'
+import { archiveKey, createObjectStore, readCredentials, remoteBase } from './lib/object-storage.ts'
 import { isStopword } from '../src/lib/stopwords.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -65,7 +65,7 @@ if (values.remote) {
   const credentials = readCredentials()
   store = credentials ? createObjectStore(credentials) : null
   if (!store && !remoteBase()) {
-    console.error('[verify] --remote 需要 R2_* 凭据或 DATAPACK_BASE')
+    console.error('[verify] --remote 需要 R2_* 凭据、DATAPACK_BASE 或 LOCAL=1')
     process.exit(1)
   }
 }
@@ -218,7 +218,11 @@ for (const ds of datasets) {
     }
 
     if (sample) {
-      const remotePack = parse<{ schema?: string }>(await readRemote(`${ds}/${sample}.datapack.json`))
+      // publish 只把 pack 归档到 archive/；旧路径只用于迁移前的远端数据。
+      const archived = await readRemote(archiveKey(ds, sample))
+      const remotePack = parse<{ schema?: string }>(
+        archived ?? await readRemote(`${ds}/${sample}.datapack.json`),
+      )
       check(`${ds}: 远端 pack`, remotePack?.schema === V2, `${sample} schema=${remotePack?.schema ?? 'missing'}`)
     }
   }
