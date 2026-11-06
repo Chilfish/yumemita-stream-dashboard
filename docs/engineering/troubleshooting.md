@@ -128,6 +128,7 @@ bun run dev -- --port 4322
 - 单场页的「逐字稿」分段只在索引里有该 `videoId` 时出现；先 `bun run publish:transcripts --no-upload` 看校验是否通过。
 - 本地开发会回退到构建期快照，但新增文件需要 Vite 重新加载（保存一次或重启 dev）。
 - 线上还看不到：检查 `<base>/transcripts/index.json` 是否已更新；发布时索引最后写，失败会保留旧索引。
+- 详情页有稿但列表没有：列表是 SSR + Workers Cache（`transcripts` tag，1 小时）。`publish:transcripts` 成功会自动 purge；若日志出现「缓存失效跳过：未配置 SITE_URL / PURGE_TOKEN」，手动跑 `bun run purge:cache --tags transcripts`。
 - `videoId` 写错不会拦发布，但会和场次对不上；用 `transcript:new` / `transcript:import` 从 manifest 匹配可避免。
 
 ## 数据更新后页面还是旧的

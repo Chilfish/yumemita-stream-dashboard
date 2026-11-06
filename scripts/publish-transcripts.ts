@@ -44,6 +44,7 @@ import {
 } from './lib/publish-state.ts'
 import { publishStatePath } from './lib/local-config.ts'
 import { logEnvironment } from './lib/env.ts'
+import { purgeCache } from './lib/purge.ts'
 import { syncTranscripts } from './lib/transcripts-db.ts'
 
 interface DatasetSource {
@@ -312,6 +313,7 @@ const indexDigest = digestBody(indexBody)
 const indexUnchanged = !values.force
   && isUnchanged(state.objects[TRANSCRIPT_INDEX_KEY], indexDigest, remote, TRANSCRIPT_INDEX_KEY)
 
+let indexWritten = false
 if (transcripts.length === 0 && failures.length > 0) {
   warn('没有可发布的稿，保留远端现有索引不动')
 }
@@ -323,6 +325,7 @@ else {
     await store.put(TRANSCRIPT_INDEX_KEY, indexBody)
     state.objects[TRANSCRIPT_INDEX_KEY] = { ...indexDigest, uploadedAt: new Date().toISOString() }
     writePublishState(STATE_PATH, state)
+    indexWritten = true
     log(`已写入 ${TRANSCRIPT_INDEX_KEY}（${entries.length} 条）`)
   }
   catch (error) {
@@ -357,6 +360,17 @@ if (!values['no-db'] && failures.length === 0) {
 }
 else if (failures.length > 0) {
   warn('有上传失败项，跳过数据库元数据同步')
+}
+
+// 逐字稿页是 SSR + Workers Cache；发布成功就立刻失效，不等 TTL 自然过期。
+if (failures.length === 0 && (indexWritten || metadataSynced > 0)) {
+  const result = await purgeCache({ tags: ['transcripts'] })
+  if (result.skipped)
+    log(`缓存失效跳过：${result.reason}`)
+  else if (result.success)
+    log('缓存失效：transcripts')
+  else
+    failures.push(`缓存失效失败：${result.reason ?? `HTTP ${result.status ?? '?'}`}`)
 }
 
 const base = remoteBase()

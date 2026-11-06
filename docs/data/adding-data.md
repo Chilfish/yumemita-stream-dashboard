@@ -184,7 +184,7 @@ bun run publish:transcripts --force       # 忽略 data/.publish-state.json，�
 - 正文由 Worker 的 `/api/transcripts/:datasetId/:videoId` 从 R2 binding 读取；开发环境没有 R2 时回退到本地 Markdown 快照。
 - `ingest-db` 把 frontmatter 写入 `transcripts` 表；单场页与索引页查库决定「有没有稿」。
 - 单篇失败只记日志，不阻塞其余稿件；退出码仍为 1，CI 会拦住。
-- 发布后执行 `bun run purge:cache --tags transcripts`（或 `--dataset <id>`），不需要重新构建前端。
+- 发布成功后脚本会自动 `purge:cache --tags transcripts`；只有缺少 `SITE_URL` / `PURGE_TOKEN` 被跳过时，才需要手动补一次，不需要重新构建前端。
 
 ## 派生数据从哪来
 
