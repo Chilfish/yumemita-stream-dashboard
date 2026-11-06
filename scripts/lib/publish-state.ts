@@ -102,17 +102,28 @@ export function writePublishState(path: string, state: PublishState): void {
   renameSync(temp, path)
 }
 
+export interface UnchangedOptions {
+  /**
+   * 本地没有进度记录（换机器 / 首次同步）时，远端大小与本地一致就视为未变化。
+   * 只用于补齐初始状态，避免把远端已有的全部对象重传一遍；已有记录仍按摘要判断。
+   */
+  adoptRemoteSize?: boolean
+}
+
 /**
  * 能否跳过上传：本地摘要一致，且远端对得上。
  * `remote` 为 `null` 表示列桶失败、远端状态未知——这时只信本地进度。
+ * `adoptRemoteSize` 只在没有本地记录时按大小对齐，不会覆盖已有摘要的变更判断。
  */
 export function isUnchanged(
   entry: PublishStateEntry | undefined,
   digest: BodyDigest,
   remote: ReadonlyMap<string, number> | null,
   key: string,
+  options: UnchangedOptions = {},
 ): boolean {
-  if (!entry || entry.sha256 !== digest.sha256 || entry.size !== digest.size)
-    return false
-  return remote === null || remote.get(key) === digest.size
+  if (entry)
+    return entry.sha256 === digest.sha256 && entry.size === digest.size
+      && (remote === null || remote.get(key) === digest.size)
+  return Boolean(options.adoptRemoteSize && remote?.get(key) === digest.size)
 }

@@ -229,6 +229,24 @@ function localPackState(source: DatasetSource): { count: number, newest: number 
   return { count, newest }
 }
 
+/** 最近 N 天改过的 pack；没有明确 new/force ID 时，用它做定点 ingest / publish。 */
+function recentPackIds(source: DatasetSource, days = 7): string[] {
+  const dir = resolve(APP_ROOT, source.datapackDir)
+  if (!existsSync(dir)) return []
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+  return readdirSync(dir)
+    .filter(name => name.endsWith(PACK_SUFFIX))
+    .filter((name) => {
+      try {
+        return statSync(join(dir, name)).mtimeMs >= cutoff
+      }
+      catch {
+        return false
+      }
+    })
+    .map(name => name.slice(0, -PACK_SUFFIX.length))
+}
+
 interface ChannelList {
   entries: ChannelEntry[]
   /** 频道列表没拿到（网络 / bot 检查 / 没缓存）：本次可能漏掉新场次，要记失败。 */
@@ -518,6 +536,15 @@ async function main(): Promise<void> {
       }
     }
 
+    // 本次真正会变动的 ID：计划里的新场 / 重抓场；没有明确 ID 时退回最近 7 天改过的 pack。
+    // 把它传给 ingest / publish，避免每次都扫全量 pack、查全量 hash。
+    const changedIds = thumbIds.length > 0 ? thumbIds : recentPackIds(source)
+    const changedFile = changedIds.length > 0
+      ? join(stateDir, `daily-changed-${source.id}.txt`)
+      : null
+    if (changedFile)
+      writeFileSync(changedFile, `${changedIds.join('\n')}\n`, 'utf8')
+
     // 逐字稿先上传正文，随后 ingest 才会把新稿的元数据同步进数据库。
     if (!transcriptsPublished) {
       console.log('[update] 发布逐字稿…')
@@ -533,7 +560,10 @@ async function main(): Promise<void> {
     }
 
     console.log(`[update] ${source.id} 写入数据库…`)
-    const ingestCode = await runScript(INGEST_SCRIPT, ['--dataset', source.id])
+    const ingestCode = await runScript(INGEST_SCRIPT, [
+      '--dataset', source.id,
+      ...(changedFile ? ['--ids', changedFile] : []),
+    ])
     const ingestOk = ingestCode === 0
     if (!ingestOk) {
       datasetFailed = true
@@ -541,7 +571,11 @@ async function main(): Promise<void> {
     }
 
     console.log(`[update] ${source.id} 发布资产…`)
-    const publishCode = await runScript(PUBLISH_SCRIPT, ['--dataset', source.id, '--assets-only'])
+    const publishCode = await runScript(PUBLISH_SCRIPT, [
+      '--dataset', source.id,
+      '--assets-only',
+      ...(changedFile ? ['--ids', changedFile] : []),
+    ])
     if (publishCode !== 0) {
       datasetFailed = true
       console.warn(`[update] ${source.id} 资产发布失败（exit ${publishCode}）`)
@@ -554,7 +588,7 @@ async function main(): Promise<void> {
       purgeTags.add('gallery')
       purgeTags.add('sitemap')
       purgeTags.add('llms')
-      for (const id of unique([...plan.newIds, ...plan.forceIds]))
+      for (const id of changedIds)
         purgeTags.add(`stream-${id}`)
       published += 1
     }

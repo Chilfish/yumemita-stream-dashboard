@@ -163,6 +163,7 @@ bun run dev:seed     # 从本地 pack 灌数据
 ### 🚀 发布与数据
 
 - 数据更新：`db:ingest` + `publish:assets` + `purge:cache` 后刷新即可，不需要重新构建前端。
+- 本地同步线上用 `bun run sync:remote`：默认只新增最近 7 天开播的缺失场次；刷新旧场次才加 `--update-existing`。
 - 分享卡片 head 由 SSR 请求期输出，新场次 ingest 后即可用。
 - R2 凭据只在发布 / 抓取环境注入，不进入客户端 bundle。
 - 会员限定内容上线前确认公开范围。

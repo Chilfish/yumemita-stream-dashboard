@@ -72,9 +72,11 @@ const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
 const { values } = parseArgs({
   options: {
     dataset: { type: 'string' },
+    ids: { type: 'string' },
     'no-upload': { type: 'boolean' },
     'assets-only': { type: 'boolean' },
     force: { type: 'boolean' },
+    'adopt-remote': { type: 'boolean' },
     'allow-shrink': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
@@ -87,9 +89,11 @@ const USAGE = `用法：bun scripts/publish-data.ts [选项]
 
 选项：
   --dataset <id>   只发布指定 dataset
+  --ids <文件>     只上传文件里列出的 videoId（每行一个）；索引仍会刷新
   --assets-only    只上传封面 / 表情 / archive，不写 JSON 索引
   --no-upload      只生成本地文件，不上传
   --force          忽略 data/.publish-state.json 的进度，全量重传
+  --adopt-remote   本地没有进度记录时，远端对象大小与本地一致就跳过（首次同步不重传）
   --allow-shrink   允许本地场次少于远端（确实要下架场次时才用）
   -h, --help       显示本帮助
 
@@ -100,6 +104,12 @@ if (values.help) {
   console.log(USAGE)
   process.exit(0)
 }
+
+const adoptRemote = Boolean(values['adopt-remote'])
+const unchangedOptions = { adoptRemoteSize: adoptRemote }
+const onlyIds = values.ids
+  ? new Set(readFileSync(values.ids, 'utf8').split(/\s+/).filter(Boolean))
+  : undefined
 
 function fail(message: string): never {
   console.error(`[publish-data] ${message}`)
@@ -163,7 +173,7 @@ interface ThumbCollection {
  * 本地 `data/<id>/thumbs/<videoId>.jpg` 与 `<videoId>.<width>.webp` → 上传项。
  * 文件是谁生成的不要紧，key 由 dataset + videoId（+ 变体宽度）决定。
  */
-function collectThumbs(source: DatasetSource): ThumbCollection {
+function collectThumbs(source: DatasetSource, onlyIds?: ReadonlySet<string>): ThumbCollection {
   const dir = join(resolve(APP_ROOT, source.datapackDir), 'thumbs')
   const uploads: ThumbUpload[] = []
   const present = new Set<string>()
@@ -174,6 +184,8 @@ function collectThumbs(source: DatasetSource): ThumbCollection {
   for (const name of readdirSync(dir)) {
     if (name.endsWith(THUMB_SUFFIX)) {
       const videoId = name.slice(0, -THUMB_SUFFIX.length)
+      if (onlyIds && !onlyIds.has(videoId))
+        continue
       present.add(videoId)
       uploads.push({
         key: thumbsKey(source.id, videoId),
@@ -189,6 +201,8 @@ function collectThumbs(source: DatasetSource): ThumbCollection {
     const [, videoId, rawWidth] = match
     const width = Number(rawWidth)
     if (!videoId || !(THUMB_VARIANTS as readonly number[]).includes(width))
+      continue
+    if (onlyIds && !onlyIds.has(videoId))
       continue
     uploads.push({
       key: thumbVariantKey(source.id, videoId, width),
@@ -320,12 +334,15 @@ for (const source of selected) {
   if (authorIndex)
     writeJson(join(dir, 'authors.json'), authorIndex)
 
-  const thumbs = collectThumbs(source)
+  const thumbs = collectThumbs(source, onlyIds)
   thumbUploads.push(...thumbs.uploads)
   const emojiAssets = collectEmoji(source)
   emojiUploads.push(...emojiAssets)
   // manifest 说“有封面”但本地没文件时只警告：缺图的场次页面走兜底，不该挡住发布。
-  const missingThumbs = streams.filter(stream => stream.thumbnail && !thumbs.present.has(stream.videoId))
+  const relevantStreams = onlyIds
+    ? streams.filter(stream => onlyIds.has(stream.videoId))
+    : streams
+  const missingThumbs = relevantStreams.filter(stream => stream.thumbnail && !thumbs.present.has(stream.videoId))
   if (missingThumbs.length > 0) {
     const preview = missingThumbs.slice(0, 3).map(stream => stream.videoId).join(', ')
     const rest = missingThumbs.length > 3 ? ` 等 ${missingThumbs.length} 场` : ''
@@ -354,8 +371,11 @@ for (const source of selected) {
     console.warn(`[publish-data]   ! ${source.id} 还有 v1 datapack，跳过作者索引；全量数据可精确聚合与观众重叠`)
   }
 
-  for (const pack of packs)
+  for (const pack of packs) {
+    if (onlyIds && !onlyIds.has(pack.video.id))
+      continue
     packUploads.push({ key: archiveKey(source.id, pack.video.id as string), body: JSON.stringify(pack) })
+  }
   if (!assetsOnly) {
     indexUploads.push({ key: manifestKey(source.id), body: JSON.stringify(manifest) })
     indexUploads.push({ key: insightsKey(source.id), body: JSON.stringify(insights) })
@@ -481,15 +501,18 @@ if (!values.force) {
     console.warn(`[publish-data]   ! 列远端对象失败（${detail}），只按本地进度判断；要全量重传加 --force`)
   }
 }
+if (adoptRemote)
+  console.log('[publish-data] --adopt-remote：本地没有进度记录时按远端大小对齐，只补差异')
 
 // 封面与表情先传：manifest / pack 指向这些 key，先有图再更新摘要才不会出现破图。
 const plannedThumbs = [...thumbUploads, ...emojiUploads].map((item) => {
   const digest = digestBytes(item.body)
-  const unchanged = isUnchanged(state.objects[item.key], digest, remote, item.key)
+  const unchanged = isUnchanged(state.objects[item.key], digest, remote, item.key, unchangedOptions)
   return { ...item, digest, skip: !values.force && unchanged }
 })
 const pendingThumbs = plannedThumbs.filter(item => !item.skip)
 const skippedThumbs = plannedThumbs.length - pendingThumbs.length
+const adoptedThumbs = plannedThumbs.filter(item => item.skip && !state.objects[item.key]).length
 
 if (plannedThumbs.length === 0) {
   console.log('[publish-data] 本地没有封面或表情，跳过（先运行 bun run fetch:thumbs / fetch:emoji）')
@@ -498,7 +521,8 @@ else if (values.force) {
   console.log(`[publish-data] --force：忽略本地进度，全量上传 ${pendingThumbs.length} 个封面 / 变体 / 表情...`)
 }
 else if (skippedThumbs > 0) {
-  console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体 / 表情（跳过 ${skippedThumbs} 个未变化）...`)
+  const adopted = adoptedThumbs > 0 ? `，其中 ${adoptedThumbs} 个按远端大小对齐` : ''
+  console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体 / 表情（跳过 ${skippedThumbs} 个未变化${adopted}）...`)
 }
 else {
   console.log(`[publish-data] 上传 ${pendingThumbs.length} 个封面 / 变体 / 表情...`)
@@ -521,16 +545,19 @@ finally {
 
 const planned = packUploads.map((item) => {
   const digest = digestBody(item.body)
-  const unchanged = isUnchanged(state.objects[item.key], digest, remote, item.key)
+  const unchanged = isUnchanged(state.objects[item.key], digest, remote, item.key, unchangedOptions)
   return { ...item, digest, skip: !values.force && unchanged }
 })
 const pending = planned.filter(item => !item.skip)
 const skipped = planned.length - pending.length
+const adoptedPacks = planned.filter(item => item.skip && !state.objects[item.key]).length
 
 if (values.force)
   console.log(`[publish-data] --force：忽略本地进度，全量上传 ${pending.length} 个 datapack...`)
-else if (skipped > 0)
-  console.log(`[publish-data] 上传 ${pending.length} 个 datapack（跳过 ${skipped} 个未变化）...`)
+else if (skipped > 0) {
+  const adopted = adoptedPacks > 0 ? `，其中 ${adoptedPacks} 个按远端大小对齐` : ''
+  console.log(`[publish-data] 上传 ${pending.length} 个 datapack（跳过 ${skipped} 个未变化${adopted}）...`)
+}
 else
   console.log(`[publish-data] 上传 ${pending.length} 个 datapack...`)
 
@@ -552,15 +579,45 @@ finally {
 
 // 索引最后写：即使中途失败，也是“多一个 pack”而不是“指向不存在的 pack”。
 if (indexUploads.length > 0) {
-  console.log(`[publish-data] 上传 ${indexUploads.length} 个 manifest / insights / 组级数据...`)
-  await runPool(indexUploads, 2, async (item) => {
-    await store.put(item.key, item.body)
+  const plannedIndex = indexUploads.map((item) => {
+    const digest = digestBody(item.body)
+    // 索引很小，且内容变化可能不改变字节数；不用大小对齐，按摘要判断。
+    const unchanged = isUnchanged(state.objects[item.key], digest, remote, item.key)
+    return { ...item, digest, skip: !values.force && unchanged }
   })
+  const pendingIndex = plannedIndex.filter(item => !item.skip)
+  const adoptedIndex = plannedIndex.filter(item => item.skip && !state.objects[item.key]).length
+  const suffix = adoptedIndex > 0 ? `，其中 ${adoptedIndex} 个按远端大小对齐` : ''
+  console.log(`[publish-data] 上传 ${pendingIndex.length} 个 manifest / insights / 组级数据（跳过 ${plannedIndex.length - pendingIndex.length} 个未变化${suffix}）...`)
+
+  let indexUploaded = 0
+  try {
+    await runPool(pendingIndex, 2, async (item) => {
+      await store.put(item.key, item.body)
+      state.objects[item.key] = { ...item.digest, uploadedAt: new Date().toISOString() }
+      indexUploaded += 1
+    })
+  }
+  finally {
+    if (indexUploaded > 0)
+      writePublishState(statePath, state)
+  }
 }
 
 if (datasetIndex) {
-  console.log(`[publish-data] 上传 dataset 索引 ${INDEX_KEY}（${datasetIndex.datasets.length} 个 dataset）...`)
-  await store.put(INDEX_KEY, JSON.stringify(datasetIndex))
+  const body = JSON.stringify(datasetIndex)
+  const digest = digestBody(body)
+  const unchanged = !values.force
+    && isUnchanged(state.objects[INDEX_KEY], digest, remote, INDEX_KEY)
+  if (unchanged) {
+    console.log(`[publish-data] dataset 索引未变化，跳过 ${INDEX_KEY}`)
+  }
+  else {
+    console.log(`[publish-data] 上传 dataset 索引 ${INDEX_KEY}（${datasetIndex.datasets.length} 个 dataset）...`)
+    await store.put(INDEX_KEY, body)
+    state.objects[INDEX_KEY] = { ...digest, uploadedAt: new Date().toISOString() }
+    writePublishState(statePath, state)
+  }
 }
 
 const base = remoteBase()

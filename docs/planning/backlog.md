@@ -29,6 +29,7 @@
 | B20 | 脚本层重复读写：成员状态批量查询、逐字稿按 hash 跳过、公开汇总窄 SQL、日程批量 upsert、对账 batch、逐字稿发布稳定 mtime | P1 | 无 | 2026-11-06 实测日志 | ✅ `daily-update` 状态 2N → 2 SQL；`syncTranscripts` 未变跳过；`computeDatasetPublicTotals` 改窄 SQL（词/作者 `sum + group by`，不再还原 pack）；新增 `streams.paid_share_pct`；日程与对账各 1 次 batch；逐字稿不再每天全量重传。任一 pack 变化仍会全量重算该成员 insights，见 [db-optimization.md](db-optimization.md) §8 |
 | B21 | 全本地开发开关：`LOCAL=1` 同时切数据库、对象存储与媒体地址 | P1 | 安装 PostgreSQL、[SILO](https://silo.pgsty.com/zh/download/#server-windows) | 2026-11-06 成本控制 | ✅ 脚本与 dev 共用 `LOCAL=1`；数据库走本机 Postgres + `/sql` 代理，对象存储走 SILO，`PUBLIC_R2_BASE` 指向本地桶，发布进度按 `local/` 隔离，purge 跳过；见 [local-database.md](../engineering/local-database.md) |
 | B22 | `~/yt-cookies.txt` 长期复用后失效：yt-dlp 撞 bot 检查，`--cookies-from-browser` 却正常 | P1 | 无 | 2026-11-07 yt-dlp 反馈 | ✅ 每次运行从浏览器重新导出，导出失败才退回旧缓存；移除 `--refresh-cookies`；`--no-cookies` 不再回退浏览器 cookie。见 [开发日志](../development-log/2026-11-07.md) 与 [postmortem 003](../postmortem/003-stale-yt-cookies-cache.md) |
+| B23 | 本地最新数据一键同步线上 | P1 | `.env` 线上凭据 | 2026-11-06 同步需求 | ✅ `bun run sync:remote` 只读 `.env`、强制 `LOCAL=0`；默认只新增（查线上 videoId，窗口最近 7 天开播），`--update-existing` 才刷新旧场次；`daily-update` 把 new/force ID 直接传给 ingest / publish；见 [adding-data.md](../data/adding-data.md) |
 
 ## 审查承接区
 

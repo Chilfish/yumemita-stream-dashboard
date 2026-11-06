@@ -51,6 +51,45 @@ bun run dev
 
 不需要手写摘要：`streams` 与 `dataset_insights` 完全由 ingest 从 pack 派生。
 
+## 本地已最新，同步到线上
+
+本地 pack、封面、逐字稿都齐了以后，用一条命令按线上目标跑完整链路。**默认只同步新增场次**：
+
+```bash
+bun run sync:remote -- --dry-run             # 看目标、新增数量与步骤
+bun run sync:remote                          # 只新增缺失场次
+bun run sync:remote -- --dataset nonoka      # 只同步一位
+bun run sync:remote -- --update-existing     # 允许按 hash 刷新已有场次
+bun run sync:remote -- --recent-days 30 --update-existing
+```
+
+它只读 `.env` 的线上 `DATABASE_URL` / `R2_*`，刻意忽略 `.env.local` 与 `.dev.vars`，并在子进程里设置 `LOCAL=0`；`.env` 指向本机时直接拒绝执行。
+
+默认策略：
+
+- 先查线上已有 `streams.video_id`，只把本地缺失的 ID 传给 ingest / verify / publish；已有场次不读不写。
+- 候选窗口默认最近 7 天开播的 pack（`video.startedAt`）；历史场次视为已同步。`--recent-days 0` 检查全部。
+- `--update-existing` 才按 `content_hash` 重写已有场次；`--force` 等价于全量重写。
+- 逐字稿独立处理：数量有差异时用空 ID 文件只同步 `transcripts` 元数据，不碰 pack。
+
+执行前会做一次只读的数量对比：本地 pack / 封面 / 表情 / 逐字稿 vs 线上 `streams`、`transcripts` 与对象存储 `list()`。`--skip-compare` 可跳过列桶，但仍会查新增 ID。
+
+顺序固定为：
+
+1. `db:migrate`：先应用 `drizzle/` 迁移，线上库 schema 可能落后于本地；
+2. `publish:transcripts`：正文先上传，ingest 才能把稿件元数据写进库；
+3. `ingest-db --ids <新增>`：只投影新增场次（`--update-existing` 时带最近窗口内的候选 ID）；
+4. `refresh-public-totals`：重算受影响成员的 `public_totals`；
+5. `verify-db --ids <新增>`：只对本次写入的场次对账；
+6. `publish:data --ids <新增>`：只上传这些场次的封面 / 表情 / archive，并刷新索引；
+7. `purge-cache`：只失效受影响的 dataset。
+
+上传是增量的：本地摘要 + 远端对象大小核对；本地没有摘要记录时按远端大小对齐。本地模式用的是单独的 `.publish-state.local.json`，不会影响线上增量记录。
+
+可用 `--skip-migrate` / `--skip-transcripts` / `--skip-ingest` / `--skip-refresh` / `--skip-verify` / `--skip-publish` / `--skip-purge` / `--skip-compare` 跳过单步。缓存失效需要 `.env` 里有 `SITE_URL` 与 `PURGE_TOKEN`；缺任一时该步会跳过并提示。
+
+`verify` 默认只警告并继续发布（`--strict-verify` 才中止）：如果本地 pack 在 ingest 之后又被更新，线上库会暂时落后，但不该因此挡住封面 / archive 上传；补完 ingest 后重跑一次 verify 即可。
+
 ## 加一位成员 / 新 dataset
 
 1. 新建目录 `data/<id>/`，放入所有 `<videoId>.datapack.json`。
@@ -93,6 +132,8 @@ bun run transcript:new W0bKqP-Eyj4 --dataset nonoka
 bun run transcript:import "D:/messages/archives/2026-10-13_ライブ振り返り.md" --dataset nonoka
 bun run transcript:import "<path>" --dataset nonoka --video-id W0bKqP-Eyj4
 ```
+
+导入会按 manifest 补 `date` / `title`，剔除 `<!-- archive-only:start -->` … `<!-- archive-only:end -->` 之间的归档段落；会员限定场次默认拒绝，确需例外加 `--allow-member-only`。
 
 落到 `content/transcripts/<datasetId>/<videoId>.md`；以 `_` / `.` 开头的文件是草稿，不参与发布。
 目标文件已存在时默认拒绝，`--force` 才覆盖。

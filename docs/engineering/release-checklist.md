@@ -79,10 +79,12 @@
 
 ## 数据发布
 
-- [ ] `bun run db:ingest` 成功；`bun run db:verify` 0 problems
-- [ ] `bun run publish:assets` 成功；封面 / 表情 / archive 已上传
-- [ ] 逐字稿有更新时 `bun run publish:transcripts` 成功
-- [ ] `bun run purge:cache` 成功；页面与 `.md` 返回新数据
+- [ ] `bun run sync:remote -- --dry-run` 确认目标不是本机、新增数量符合预期
+- [ ] 有 schema 变更时，`sync:remote` 的 `migrate` 步骤成功（或手动 `bun run db:migrate`）
+- [ ] `bun run sync:remote` 成功（默认只新增；需要刷新旧场次时加 `--update-existing`）
+- [ ] `bun run db:verify` 通过（改 ingest / 数据时）
+- [ ] 逐字稿有更新时 `bun run publish:transcripts` 成功（`sync:remote` 已包含）
+- [ ] `bun run purge:cache` 成功；页面与 `.md` 返回新数据（`sync:remote` 已包含）
 - [ ] `data-sources.json` 与新增成员 / 场次一致
 - [ ] 会员限定场次的公开范围已确认（元数据公开，弹幕 / 评论 / SC 等明细默认隐藏）
 

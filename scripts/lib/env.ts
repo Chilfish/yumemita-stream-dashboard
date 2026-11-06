@@ -9,6 +9,36 @@ import {
 } from './local-config.ts'
 
 /**
+ * 解析 `.env` 格式的文本；不做变量展开，只处理注释、空行与成对引号。
+ * `KEY=a=b` 只按第一个 `=` 切分，值里可以再出现 `=`。
+ */
+export function parseEnvContent(content: string): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const separator = trimmed.indexOf('=')
+    if (separator === -1) continue
+    const key = trimmed.slice(0, separator).trim()
+    if (!key) continue
+    let value = trimmed.slice(separator + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"'))
+      || (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+    values[key] = value
+  }
+  return values
+}
+
+/** 只读一个环境文件，不写入 `process.env`；用于「只认线上凭据」的同步脚本。 */
+export function readEnvFile(path: string): Record<string, string> {
+  return parseEnvContent(readFileSync(path, 'utf8'))
+}
+
+/**
  * 本地脚本读取 .env / .dev.vars / .env.local。
  * Bun 只会自动加载 .env，`.dev.vars` 是 Cloudflare 的本地约定，需要手动读。
  * 后面的文件覆盖前面的（`.env.local` 优先级最高），但真实进程环境始终优先。
@@ -20,19 +50,7 @@ export function loadEnvFiles(cwd = process.cwd()): void {
     const path = resolve(cwd, name)
     if (!existsSync(path)) continue
 
-    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const separator = trimmed.indexOf('=')
-      if (separator === -1) continue
-      const key = trimmed.slice(0, separator).trim()
-      let value = trimmed.slice(separator + 1).trim()
-      if (
-        (value.startsWith('"') && value.endsWith('"'))
-        || (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1)
-      }
+    for (const [key, value] of Object.entries(readEnvFile(path))) {
       if (key in process.env && !fromFile.has(key)) continue
       process.env[key] = value
       fromFile.add(key)

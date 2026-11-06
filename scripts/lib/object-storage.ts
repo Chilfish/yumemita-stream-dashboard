@@ -101,24 +101,24 @@ interface Credentials {
   endpoint: string
 }
 
-export function readCredentials(): Credentials | null {
-  const prefix = (process.env.R2_PREFIX ?? '').replace(/^\/+|\/+$/g, '')
+export function readCredentials(env: Record<string, string | undefined> = process.env): Credentials | null {
+  const prefix = (env.R2_PREFIX ?? '').replace(/^\/+|\/+$/g, '')
 
-  if (isLocalMode()) {
+  if (isLocalMode(env)) {
     return {
       accountId: '',
-      accessKeyId: process.env.S3_ACCESS_KEY_ID ?? process.env.MINIO_ROOT_USER ?? DEFAULT_LOCAL_ACCESS_KEY,
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? process.env.MINIO_ROOT_PASSWORD ?? DEFAULT_LOCAL_SECRET_KEY,
-      bucket: localBucket(),
+      accessKeyId: env.S3_ACCESS_KEY_ID ?? env.MINIO_ROOT_USER ?? DEFAULT_LOCAL_ACCESS_KEY,
+      secretAccessKey: env.S3_SECRET_ACCESS_KEY ?? env.MINIO_ROOT_PASSWORD ?? DEFAULT_LOCAL_SECRET_KEY,
+      bucket: localBucket(env),
       prefix,
-      endpoint: localEndpoint(),
+      endpoint: localEndpoint(env),
     }
   }
 
-  const accountId = process.env.R2_ACCOUNT_ID
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
-  const bucket = process.env.R2_BUCKET
+  const accountId = env.R2_ACCOUNT_ID
+  const accessKeyId = env.R2_ACCESS_KEY_ID
+  const secretAccessKey = env.R2_SECRET_ACCESS_KEY
+  const bucket = env.R2_BUCKET
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket)
     return null
   return {

@@ -15,6 +15,7 @@
     "dev:db:proxy": "bun scripts/dev-db-proxy.ts",
     "dev:storage": "bun scripts/dev-storage.ts",
     "dev:seed": "bun scripts/ingest-db.ts",
+    "sync:remote": "bun scripts/sync-remote.ts",
     "build": "astro build",
     "preview": "astro preview",
     "cf:preview": "astro build && astro preview",

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { eq, sql } from 'drizzle-orm'
-import { basename, join, resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
 import { isStopword } from '../src/lib/stopwords.ts'
@@ -18,11 +18,11 @@ import {
   streamDetails,
   streams,
   streamWords,
-  transcripts,
 } from '../src/db/schema.ts'
 import type { StreamDatapack } from '../src/types/datapack.ts'
 import { buildStreamSummary } from './lib/dataset-manifest.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
+import { syncTranscripts } from './lib/transcripts-db.ts'
 
 interface DataSource {
   id: string
@@ -42,6 +42,7 @@ interface Args {
   all: boolean
   dryRun: boolean
   force: boolean
+  newOnly: boolean
   batchSize: number
   help: boolean
 }
@@ -55,6 +56,7 @@ const USAGE = `用法：bun scripts/ingest-db.ts [选项]
   --ids <文件>       只处理文件里列出的 videoId（每行一个）
   --limit <n>        每个 dataset 最多处理前 n 份 pack；跳过 insights 重算
   --force            内容 hash 不变也重写
+  --new-only         只插入数据库里还没有的场次，不改写已有行（避免大批量回写）
   --all              等同上 --force（历史参数）
   --batch-size <n>   每处理 n 份打印进度，默认 50
   --dry-run          只校验 pack，不连数据库
@@ -74,7 +76,7 @@ interface DatasetReport {
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { all: false, dryRun: false, force: false, batchSize: 50, help: false }
+  const args: Args = { all: false, dryRun: false, force: false, newOnly: false, batchSize: 50, help: false }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--dataset') args.dataset = argv[++index]
@@ -83,6 +85,7 @@ function parseArgs(argv: string[]): Args {
     else if (arg === '--batch-size') args.batchSize = Math.max(1, Number(argv[++index]) || 50)
     else if (arg === '--all') { args.all = true; args.force = true }
     else if (arg === '--force') args.force = true
+    else if (arg === '--new-only') args.newOnly = true
     else if (arg === '--dry-run') args.dryRun = true
     else if (arg === '--help' || arg === '-h') args.help = true
     else console.warn(`[ingest] 忽略未知参数：${arg}`)
@@ -194,86 +197,6 @@ function collectWords(pack: StreamDatapack): { word: string, count: number }[] {
   return source
     .filter(entry => entry.count >= 3 && !isStopword(entry.word))
     .sort((a, b) => b.count - a.count)
-}
-
-function parseFrontmatter(raw: string): Record<string, string | string[]> {
-  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/)
-  if (!match?.[1]) return {}
-  const result: Record<string, string | string[]> = {}
-  for (const line of match[1].split(/\r?\n/)) {
-    const separator = line.indexOf(':')
-    if (separator === -1) continue
-    const key = line.slice(0, separator).trim()
-    let value = line.slice(separator + 1).trim()
-    if (!key) continue
-    if (value.startsWith('[') && value.endsWith(']')) {
-      result[key] = value.slice(1, -1).split(',').map(item => item.trim()).filter(Boolean)
-      continue
-    }
-    if (
-      (value.startsWith('"') && value.endsWith('"'))
-      || (value.startsWith('\'') && value.endsWith('\''))
-    ) {
-      value = value.slice(1, -1)
-    }
-    result[key] = value
-  }
-  return result
-}
-
-async function syncTranscripts(
-  db: NonNullable<ReturnType<typeof createWriteDb>['db']>,
-  datasetId: string,
-): Promise<number> {
-  const dir = resolve('content', 'transcripts', datasetId)
-  if (!existsSync(dir)) return 0
-
-  const existingRows = await db
-    .select({ videoId: transcripts.videoId, contentHash: transcripts.contentHash })
-    .from(transcripts)
-    .where(eq(transcripts.datasetId, datasetId))
-  const existing = new Map(existingRows.map(row => [row.videoId, row.contentHash]))
-
-  let count = 0
-  for (const name of readdirSync(dir)) {
-    if (!name.endsWith('.md') || name.startsWith('_') || name.startsWith('.')) continue
-    const file = join(dir, name)
-    const raw = readFileSync(file, 'utf8')
-    const hash = contentHash(raw)
-    const meta = parseFrontmatter(raw)
-    const videoId = typeof meta.videoId === 'string' && meta.videoId
-      ? meta.videoId
-      : basename(name, '.md')
-    if (existing.get(videoId) === hash) continue
-
-    const tags = Array.isArray(meta.tags) ? meta.tags : []
-    const dateValue = typeof meta.date === 'string' ? meta.date.slice(0, 10) : null
-
-    await db.insert(transcripts).values({
-      datasetId,
-      videoId,
-      r2Key: `${datasetId}/transcripts/${videoId}.json`,
-      title: typeof meta.title === 'string' ? meta.title : null,
-      date: dateValue && /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : null,
-      summary: typeof meta.summary === 'string' ? meta.summary : null,
-      tags,
-      contentHash: hash,
-      updatedAt: new Date(),
-    }).onConflictDoUpdate({
-      target: [transcripts.datasetId, transcripts.videoId],
-      set: {
-        r2Key: `${datasetId}/transcripts/${videoId}.json`,
-        title: typeof meta.title === 'string' ? meta.title : null,
-        date: dateValue && /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : null,
-        summary: typeof meta.summary === 'string' ? meta.summary : null,
-        tags,
-        contentHash: hash,
-        updatedAt: new Date(),
-      },
-    })
-    count += 1
-  }
-  return count
 }
 
 function buildInsights(packs: { pack: StreamDatapack, rel: string }[]) {
@@ -413,8 +336,12 @@ async function main(): Promise<void> {
           continue
         }
 
-        const hash = contentHash(raw)
         const previous = existing.get(videoId)
+        if (args.newOnly && previous != null) {
+          report.skipped += 1
+          continue
+        }
+        const hash = contentHash(raw)
         if (!args.force && previous === hash) {
           report.skipped += 1
           continue

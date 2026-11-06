@@ -17,6 +17,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { createWriteDb } from '../src/db/connection.ts'
 import {
   TRANSCRIPT_INDEX_KEY,
   TRANSCRIPT_INDEX_SCHEMA,
@@ -42,6 +43,7 @@ import {
   writePublishState,
 } from './lib/publish-state.ts'
 import { publishStatePath } from './lib/local-config.ts'
+import { syncTranscripts } from './lib/transcripts-db.ts'
 
 interface DatasetSource {
   id: string
@@ -72,6 +74,7 @@ const USAGE = `用法：bun scripts/publish-transcripts.ts [选项]
 
 选项：
   --no-upload      只校验，不上传
+  --no-db          只传对象存储，不写 transcripts 元数据
   --force          忽略 data/.publish-state.json 的进度，全量重传
   -h, --help       显示本帮助
 
@@ -81,6 +84,7 @@ const USAGE = `用法：bun scripts/publish-transcripts.ts [选项]
 const { values } = parseArgs({
   options: {
     'no-upload': { type: 'boolean' },
+    'no-db': { type: 'boolean' },
     force: { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
@@ -323,9 +327,40 @@ else {
   }
 }
 
+// 正文与索引都成功后，再写数据库元数据；列表页 / 单场页的「有没有稿」读的是这张表。
+let metadataSynced = 0
+if (!values['no-db'] && failures.length === 0) {
+  const url = process.env.DATABASE_URL
+  if (!url) {
+    warn('DATABASE_URL 未配置，跳过 transcripts 元数据同步')
+  }
+  else {
+    try {
+      const datasetIds = [...new Set(transcripts.map(item => item.datasetId))]
+      const { db, pool } = createWriteDb(url)
+      try {
+        for (const datasetId of datasetIds)
+          metadataSynced += await syncTranscripts(db, datasetId)
+      }
+      finally {
+        await pool.end()
+      }
+      log(`数据库元数据：写入 ${metadataSynced} 篇`)
+    }
+    catch (error) {
+      failures.push(`数据库元数据同步失败：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+}
+else if (failures.length > 0) {
+  warn('有上传失败项，跳过数据库元数据同步')
+}
+
 const base = remoteBase()
 log(
-  `完成：上传 ${uploaded} 篇，跳过 ${skippedBodies} 篇${failures.length > 0 ? `，失败 ${failures.length} 个` : ''}${base ? ` → ${base}` : ''}`,
+  `完成：上传 ${uploaded} 篇，跳过 ${skippedBodies} 篇`
+  + `${metadataSynced > 0 ? `，元数据 ${metadataSynced} 篇` : ''}`
+  + `${failures.length > 0 ? `，失败 ${failures.length} 个` : ''}${base ? ` → ${base}` : ''}`,
 )
 if (failures.length > 0)
   console.warn('[transcripts] 有失败项，修完重新运行即可（增量发布，只会补传变化的部分）')
