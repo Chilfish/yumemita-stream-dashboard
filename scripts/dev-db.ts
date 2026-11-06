@@ -5,6 +5,7 @@ import {
   ensureDevDatabase,
   ensureDevVars,
   ensureEnvLocal,
+  ensurePostgresRunning,
 } from './lib/dev-services.ts'
 
 export interface DevDbOptions {
@@ -21,6 +22,7 @@ function parseArgs(argv: string[]): DevDbOptions {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2))
+  ensurePostgresRunning(options.url)
   ensureEnvLocal(options.url)
   await ensureDevDatabase(options.url)
   await applyMigrations(options.url)

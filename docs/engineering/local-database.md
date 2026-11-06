@@ -80,7 +80,7 @@ bun run dev:db --url postgres://postgres@localhost:5433/ymmt_dev
 bun run dev:db:proxy                                  # 只起代理（前台）
 ```
 
-`dev:db` 只负责写 `.env.local`、建库、应用迁移；`dev:db:proxy` 需要自己另开终端，`bun run dev` 一般不需要它。
+`dev:db` 会拉起 Postgres（未运行时）、写 `.env.local`、建库并应用迁移，但不起代理；`dev:db:proxy` 需要自己另开终端，`bun run dev` 一般不需要它。
 
 ## 灌入数据
 
