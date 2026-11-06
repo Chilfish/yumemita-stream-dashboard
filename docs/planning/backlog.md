@@ -30,6 +30,7 @@
 | B21 | 全本地开发开关：`LOCAL=1` 同时切数据库、对象存储与媒体地址 | P1 | 安装 PostgreSQL、[SILO](https://silo.pgsty.com/zh/download/#server-windows) | 2026-11-06 成本控制 | ✅ 脚本与 dev 共用 `LOCAL=1`；数据库走本机 Postgres + `/sql` 代理，对象存储走 SILO，`PUBLIC_R2_BASE` 指向本地桶，发布进度按 `local/` 隔离，purge 跳过；见 [local-database.md](../engineering/local-database.md) |
 | B22 | `~/yt-cookies.txt` 长期复用后失效：yt-dlp 撞 bot 检查，`--cookies-from-browser` 却正常 | P1 | 无 | 2026-11-07 yt-dlp 反馈 | ✅ 每次运行从浏览器重新导出，导出失败才退回旧缓存；移除 `--refresh-cookies`；`--no-cookies` 不再回退浏览器 cookie。见 [开发日志](../development-log/2026-11-07.md) 与 [postmortem 003](../postmortem/003-stale-yt-cookies-cache.md) |
 | B23 | 本地最新数据一键同步线上 | P1 | `.env` 线上凭据 | 2026-11-06 同步需求 | ✅ `bun run sync:remote` 只读 `.env`、强制 `LOCAL=0`；默认只新增（查线上 videoId，窗口最近 7 天开播），`--update-existing` 才刷新旧场次；`daily-update` 把 new/force ID 直接传给 ingest / publish；见 [adding-data.md](../data/adding-data.md) |
+| B24 | 脚本启动时先打印目标环境（本地 / 线上、数据库、存储桶） | P3 | 无 | 2026-11-06 使用反馈 | ✅ `describeEnvironment()` 统一输出，`loadEnvFiles()` 与 publish / fetch / verify 入口共用；不用等跑完才看到地址。见 [scripts/README.md](../../scripts/README.md)「运行环境提示」 |
 
 ## 审查承接区
 

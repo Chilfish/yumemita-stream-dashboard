@@ -5,6 +5,7 @@ import {
   DEFAULT_LOCAL_DATABASE_URL,
   DEFAULT_LOCAL_ENDPOINT,
   DEFAULT_LOCAL_PROXY_ENDPOINT,
+  describeEnvironment,
   isLocalMode,
   isLocalUrl,
   localBucket,
@@ -69,6 +70,36 @@ describe('isLocalUrl', () => {
     expect(isLocalUrl('postgres://user@ep-xxx.neon.tech/db')).toBe(false)
     expect(isLocalUrl(undefined)).toBe(false)
     expect(isLocalUrl('not a url')).toBe(false)
+  })
+})
+
+describe('describeEnvironment', () => {
+  it('本地模式列出本机数据库与 SILO 地址', () => {
+    expect(describeEnvironment({
+      LOCAL: '1',
+      DATABASE_URL: 'postgres://postgres@localhost:5432/ymmt_dev',
+    })).toBe('本地模式（LOCAL=1） · 数据库 localhost:5432/ymmt_dev · 对象存储 http://127.0.0.1:9000/yumemita-data')
+  })
+
+  it('本地模式下即使环境里是远程库，也显示实际会用的本机库', () => {
+    expect(describeEnvironment({
+      LOCAL: '1',
+      DATABASE_URL: 'postgres://user:secret@ep-xxx.neon.tech/neondb',
+    })).toBe('本地模式（LOCAL=1） · 数据库 localhost:5432/ymmt_dev · 对象存储 http://127.0.0.1:9000/yumemita-data')
+  })
+
+  it('线上模式显示桶与前缀，不泄露账号密码', () => {
+    const text = describeEnvironment({
+      DATABASE_URL: 'postgres://user:secret@ep-xxx.neon.tech/neondb',
+      R2_BUCKET: 'yumemita-data',
+      R2_PREFIX: '/prod/',
+    })
+    expect(text).toBe('线上模式 · 数据库 ep-xxx.neon.tech/neondb · 对象存储 R2 yumemita-data/prod')
+    expect(text).not.toContain('secret')
+  })
+
+  it('没配置的部分直接省略', () => {
+    expect(describeEnvironment({})).toBe('线上模式')
   })
 })
 

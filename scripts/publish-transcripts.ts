@@ -43,6 +43,7 @@ import {
   writePublishState,
 } from './lib/publish-state.ts'
 import { publishStatePath } from './lib/local-config.ts'
+import { logEnvironment } from './lib/env.ts'
 import { syncTranscripts } from './lib/transcripts-db.ts'
 
 interface DatasetSource {
@@ -108,6 +109,8 @@ if (values.help) {
   console.log(USAGE)
   process.exit(0)
 }
+
+logEnvironment('transcripts')
 
 const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as { datasets?: DatasetSource[] }
 const datasets = config.datasets ?? []

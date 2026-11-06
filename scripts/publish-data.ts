@@ -53,6 +53,7 @@ import {
 } from './lib/object-storage.ts'
 import { digestBody, digestBytes, isUnchanged, readPublishState, writePublishState } from './lib/publish-state.ts'
 import { publishStatePath } from './lib/local-config.ts'
+import { logEnvironment } from './lib/env.ts'
 
 interface DatasetSource {
   id: string
@@ -104,6 +105,8 @@ if (values.help) {
   console.log(USAGE)
   process.exit(0)
 }
+
+logEnvironment('publish-data')
 
 const adoptRemote = Boolean(values['adopt-remote'])
 const unchangedOptions = { adoptRemoteSize: adoptRemote }

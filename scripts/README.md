@@ -13,6 +13,18 @@
 本地 `manifest.json` 摘要。正式入库用 `bun run db:ingest`，资产发布用 `bun run publish:assets`。
 原始素材（视频/音频/弹幕回放/评论原文）不进本仓库。
 
+## 运行环境提示
+
+脚本在开始做事前先打印一行目标环境，不用等跑完才知道连的是本机还是线上：
+
+```text
+[env] 本地模式（LOCAL=1） · 数据库 localhost:5432/ymmt_dev · 对象存储 http://127.0.0.1:9000/yumemita-data
+[publish-data] 线上模式 · 数据库 ep-xxx.neon.tech/neondb · 对象存储 R2 yumemita-data
+```
+
+`describeEnvironment()`（`scripts/lib/local-config.ts`）是唯一实现，`loadEnvFiles()` 与各脚本入口共用；
+只输出模式、数据库主机 / 库名与桶名，不带账号密码。
+
 ## 数据库 ingest
 
 本地 pack 仍是唯一真源；`ingest-db.ts` 把 pack 投影到 Neon PostgreSQL。读路径走 `neon-http`，

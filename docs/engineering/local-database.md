@@ -80,6 +80,8 @@ Scoop 的 `apps/silo/current/silo.exe`，再回退到已安装的 `minio`（CLI 
 - 浏览器封面 / 表情、逐字稿 API 的 DEV 回退都改读 SILO；生产仍走 R2 binding。
 - `purge:cache` 直接跳过，不会去动线上 Workers Cache。
 - `DATAPACK_BASE` 未设置时，`remoteBase()` 返回本地桶地址，`fetch-streams` 的远端恢复也读 SILO。
+- 脚本开始做事前先打印目标环境（`[env]` / `[ingest]` / `[publish-data]` 等），
+  一行列出模式、数据库与存储桶；`describeEnvironment()` 是唯一实现，本地模式下显示实际会用的本机库和 SILO 地址。
 
 ## 启动开发：一条命令
 
@@ -105,6 +107,7 @@ bun run dev --local    # 开启 LOCAL=1：Postgres + 代理 + SILO + 本地媒�
 输出示例：
 
 ```text
+[env] 本地模式（LOCAL=1） · 数据库 localhost:5432/ymmt_dev · 对象存储 http://127.0.0.1:9000/yumemita-data
 [dev] Postgres 已在运行（D:\Scoop\apps\postgresql\current\data）
 [dev] 代理就绪（pid 925604）：http://127.0.0.1:4444/sql -> localhost:5432/ymmt_dev
 [dev] SILO 就绪：http://127.0.0.1:9000（数据 I:\dev\yumemita-stream-dashboard\temp\silo-data）

@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import {
   DEFAULT_LOCAL_DATABASE_URL,
   DEFAULT_LOCAL_PROXY_ENDPOINT,
+  describeEnvironment,
   isLocalMode,
   isLocalUrl,
   localPublicBase,
@@ -58,6 +59,15 @@ export function loadEnvFiles(cwd = process.cwd()): void {
   }
 
   applyLocalOverrides()
+  logEnvironment('env')
+}
+
+/**
+ * 在脚本入口打印本次运行的目标环境。
+ * 放在加载环境之后、开始做事之前，避免跑完才发现连的是本机还是线上。
+ */
+export function logEnvironment(prefix: string, env: Record<string, string | undefined> = process.env): void {
+  console.log(`[${prefix}] ${describeEnvironment(env)}`)
 }
 
 /** `LOCAL=1` 是总开关：文件里写着线上地址也强制切回本机。 */
