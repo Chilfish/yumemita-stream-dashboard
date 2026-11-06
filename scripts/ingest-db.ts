@@ -228,15 +228,24 @@ async function syncTranscripts(
   const dir = resolve('content', 'transcripts', datasetId)
   if (!existsSync(dir)) return 0
 
+  const existingRows = await db
+    .select({ videoId: transcripts.videoId, contentHash: transcripts.contentHash })
+    .from(transcripts)
+    .where(eq(transcripts.datasetId, datasetId))
+  const existing = new Map(existingRows.map(row => [row.videoId, row.contentHash]))
+
   let count = 0
   for (const name of readdirSync(dir)) {
     if (!name.endsWith('.md') || name.startsWith('_') || name.startsWith('.')) continue
     const file = join(dir, name)
     const raw = readFileSync(file, 'utf8')
+    const hash = contentHash(raw)
     const meta = parseFrontmatter(raw)
     const videoId = typeof meta.videoId === 'string' && meta.videoId
       ? meta.videoId
       : basename(name, '.md')
+    if (existing.get(videoId) === hash) continue
+
     const tags = Array.isArray(meta.tags) ? meta.tags : []
     const dateValue = typeof meta.date === 'string' ? meta.date.slice(0, 10) : null
 
@@ -248,7 +257,7 @@ async function syncTranscripts(
       date: dateValue && /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : null,
       summary: typeof meta.summary === 'string' ? meta.summary : null,
       tags,
-      contentHash: contentHash(raw),
+      contentHash: hash,
       updatedAt: new Date(),
     }).onConflictDoUpdate({
       target: [transcripts.datasetId, transcripts.videoId],
@@ -258,7 +267,7 @@ async function syncTranscripts(
         date: dateValue && /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : null,
         summary: typeof meta.summary === 'string' ? meta.summary : null,
         tags,
-        contentHash: contentHash(raw),
+        contentHash: hash,
         updatedAt: new Date(),
       },
     })
@@ -433,21 +442,22 @@ async function main(): Promise<void> {
       }
 
       // 上次可能在写完 streams 后中断，重跑时所有 pack 都会 skip。
-      // 用数据库里的实际场次数判断 insights 是否过期，避免必须 --all 才能补汇总。
+      // 用数据库里的实际场次数判断 insights 是否过期；一次查询同时取行数和现有汇总。
       const [insightRow] = await db
-        .select({ totals: datasetInsights.totals, publicTotals: datasetInsights.publicTotals })
+        .select({
+          totals: datasetInsights.totals,
+          publicTotals: datasetInsights.publicTotals,
+          streamCount: sql<number>`(select count(*)::int from ${streams} where ${streams.datasetId} = ${source.id})`,
+        })
         .from(datasetInsights)
         .where(eq(datasetInsights.datasetId, source.id))
         .limit(1)
-      const [countRow] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(streams)
-        .where(eq(streams.datasetId, source.id))
       const insightTotals = (insightRow?.totals ?? {}) as { streamCount?: unknown }
       const insightCount = typeof insightTotals.streamCount === 'number' ? insightTotals.streamCount : null
-      // 没有 public_totals 说明是旧数据；即使本次没有 pack 变化也要补算。
-      const insightsStale = insightCount !== Number(countRow?.count ?? 0)
-        || insightRow?.publicTotals == null
+      // 没有 public_totals 说明是旧数据；没有 insight 行时也要补算。
+      const insightsStale = !insightRow
+        || insightRow.publicTotals == null
+        || insightCount !== Number(insightRow.streamCount ?? 0)
 
       if (args.limit) {
         console.log(`[ingest] ${source.id}: 小批量模式，跳过 dataset_insights 重算`)
@@ -562,6 +572,7 @@ async function ingestPack(
       chatPer1000AvgViewers: numeric(pack.derived?.chatPer1000AvgViewers),
       likesPer1000Views: numeric(pack.derived?.likesPer1000Views),
       scPerHour: numeric(pack.derived?.scPerHour),
+      paidSharePct: numeric(pack.chat.paid.paidSharePct),
       thumbnailKey: video.id && video.thumbnail ? `thumbs/${video.id}.jpg` : null,
       sourceGeneratedAt: toTimestamp(pack.generatedAt),
       sourceSchema: pack.schema,
@@ -602,6 +613,7 @@ async function ingestPack(
         chatPer1000AvgViewers: numeric(pack.derived?.chatPer1000AvgViewers),
         likesPer1000Views: numeric(pack.derived?.likesPer1000Views),
         scPerHour: numeric(pack.derived?.scPerHour),
+        paidSharePct: numeric(pack.chat.paid.paidSharePct),
         thumbnailKey: video.id && video.thumbnail ? `thumbs/${video.id}.jpg` : null,
         sourceGeneratedAt: toTimestamp(pack.generatedAt),
         sourceSchema: pack.schema,

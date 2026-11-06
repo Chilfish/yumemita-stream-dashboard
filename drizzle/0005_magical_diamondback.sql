@@ -1,0 +1,1 @@
+ALTER TABLE "streams" ADD COLUMN "paid_share_pct" numeric;

@@ -67,6 +67,7 @@ export const streams = pgTable(
     chatPer1000AvgViewers: numeric('chat_per_1000_avg_viewers'),
     likesPer1000Views: numeric('likes_per_1000_views'),
     scPerHour: numeric('sc_per_hour'),
+    paidSharePct: numeric('paid_share_pct'),
     thumbnailKey: text('thumbnail_key'),
     sourceGeneratedAt: timestamp('source_generated_at', { withTimezone: true }),
     sourceSchema: text('source_schema'),
