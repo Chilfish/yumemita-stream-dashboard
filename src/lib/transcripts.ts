@@ -271,6 +271,69 @@ export function extractToc(markdown: string): TranscriptHeading[] {
 }
 
 // ---------------------------------------------------------------------------
+// 仅归档的段落
+// ---------------------------------------------------------------------------
+
+const ARCHIVE_BLOCK_START = /^[ \t]*<!--\s*archive-only:start\s*-->[ \t]*$/;
+const ARCHIVE_BLOCK_END = /^[ \t]*<!--\s*archive-only:end\s*-->[ \t]*$/;
+/** 没写标记时的兜底：整节 `## 与既有档案的互证` 直到下一个一级/二级标题。 */
+const ARCHIVE_SECTION_HEADING = /^##[ \t]+与既有档案的互证[ \t]*$/;
+const TOP_LEVEL_HEADING = /^#{1,2}[ \t]/;
+
+/**
+ * 去掉稿件里只供归档的段落：`<!-- archive-only:start -->` 与
+ * `<!-- archive-only:end -->` 之间，以及没加标记时的「与既有档案的互证」整节。
+ *
+ * 删除后会压平多余空行、去掉重复的 `---` 分隔线，让正文直接接上附录。
+ */
+export function stripArchiveBlock(markdown: string): string {
+  const lines = markdown.split("\n");
+  const kept: string[] = [];
+  let mode: "none" | "block" | "section" = "none";
+
+  for (const line of lines) {
+    if (mode === "none") {
+      if (ARCHIVE_BLOCK_START.test(line)) {
+        mode = "block";
+        continue;
+      }
+      if (ARCHIVE_SECTION_HEADING.test(line)) {
+        mode = "section";
+        continue;
+      }
+      kept.push(line);
+      continue;
+    }
+    if (mode === "block") {
+      if (ARCHIVE_BLOCK_END.test(line)) mode = "none";
+      continue;
+    }
+    if (TOP_LEVEL_HEADING.test(line)) {
+      mode = "none";
+      kept.push(line);
+    }
+  }
+
+  const collapsed: string[] = [];
+  for (const line of kept) {
+    const previous = collapsed[collapsed.length - 1];
+    if (line.trim() === "" && previous !== undefined && previous.trim() === "") continue;
+    collapsed.push(line);
+  }
+
+  const deduped = collapsed.filter((line, index) => {
+    if (line.trim() !== "---") return true;
+    let previous = index - 1;
+    while (previous >= 0 && collapsed[previous]?.trim() === "") previous -= 1;
+    return collapsed[previous]?.trim() !== "---";
+  });
+
+  while (deduped.length > 0 && (deduped[0] ?? "").trim() === "") deduped.shift();
+  while (deduped.length > 0 && (deduped[deduped.length - 1] ?? "").trim() === "") deduped.pop();
+  return deduped.join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // 时间码
 // ---------------------------------------------------------------------------
 

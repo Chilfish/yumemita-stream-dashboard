@@ -7,9 +7,11 @@
  *   bun scripts/transcript-import.ts <path> --dataset nonoka --force
  *
  * 1. videoId 来源顺序：frontmatter → `--video-id` → 文件名日期在 manifest 里的唯一匹配；
- * 2. 复制到 `content/transcripts/<datasetId>/<videoId>.md`，正文不改写；
- * 3. 缺 videoId / date / title 时补进 frontmatter（只补缺的字段）；
- * 4. 目标文件已存在时默认拒绝，加 `--force` 才覆盖。
+ * 2. 去掉只供归档的段落（`<!-- archive-only:start/end -->` 之间，或整节「与既有档案的互证」）；
+ * 3. 复制到 `content/transcripts/<datasetId>/<videoId>.md`，其余正文不改写；
+ * 4. 缺 videoId / date / title 时按 manifest 补进 frontmatter（只补缺的字段）；
+ * 5. 会员限定场次默认拒绝导入（逐字稿只留在归档侧），确需例外时加 `--allow-member-only`；
+ * 6. 目标文件已存在时默认拒绝，加 `--force` 才覆盖。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
@@ -19,6 +21,7 @@ import {
   normalizeFrontmatter,
   parseFrontmatter,
   parseTranscriptFile,
+  stripArchiveBlock,
 } from '../src/lib/transcripts.ts'
 import type { BatchManifest } from '../src/types/dataset.ts'
 
@@ -38,15 +41,17 @@ const USAGE = `用法：bun scripts/transcript-import.ts <path> --dataset <id> [
 把写好的 Markdown 复制进 content/transcripts/<datasetId>/<videoId>.md。
 
 选项：
-  --dataset <id>     目标成员（必须是 data-sources.json 里的 id）
-  --video-id <id>    frontmatter 没有 videoId 时用它兜底
-  --force            目标文件已存在时覆盖
-  -h, --help         显示本帮助`
+  --dataset <id>        目标成员（必须是 data-sources.json 里的 id）
+  --video-id <id>       frontmatter 没有 videoId 时用它兜底
+  --allow-member-only   会员限定场次默认拒绝导入，加此项才放行
+  --force               目标文件已存在时覆盖
+  -h, --help            显示本帮助`
 
 const { values, positionals } = parseArgs({
   options: {
     dataset: { type: 'string' },
     'video-id': { type: 'string' },
+    'allow-member-only': { type: 'boolean' },
     force: { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
@@ -204,7 +209,20 @@ if (!videoId) {
 if (!/^[\w-]{6,}$/.test(videoId))
   warn(`videoId 看起来不像 YouTube id：${videoId}`)
 
-const supplemented = ensureFrontmatter(text, {
+const stream = readManifest()?.streams?.find(item => item.videoId === videoId) ?? null
+if (stream) {
+  if (stream.availability === 'subscriber_only' && !values['allow-member-only'])
+    fail(`${videoId} 是会员限定场次：逐字稿只留在 archives，不导入站点。确需导入请加 --allow-member-only`)
+  if (frontmatter.date && stream.date && frontmatter.date !== stream.date)
+    warn(`frontmatter date ${frontmatter.date} 与 manifest ${stream.date} 不一致`)
+  if (frontmatter.title && stream.title && frontmatter.title !== stream.title)
+    warn('frontmatter title 与 manifest 不一致（title 取原片日文标题）')
+  resolvedDate = resolvedDate ?? stream.date ?? null
+  resolvedTitle = resolvedTitle ?? stream.title ?? null
+}
+
+const body = stripArchiveBlock(text)
+const supplemented = ensureFrontmatter(body, {
   videoId,
   date: resolvedDate,
   title: resolvedTitle,
@@ -229,6 +247,8 @@ writeFileSync(targetPath, output, 'utf8')
 
 const originLabel = { frontmatter: 'frontmatter', flag: '--video-id', manifest: '文件名日期匹配 manifest' }[origin]
 log(`已写入 ${relative(APP_ROOT, targetPath)}（videoId ${videoId}，来源：${originLabel}）`)
+if (body !== text)
+  log('  已去掉仅供归档的段落')
 for (const line of supplemented.added)
   log(`  补了 frontmatter：${line}`)
 if (parsed.frontmatter.title)

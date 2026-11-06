@@ -7,6 +7,7 @@ import {
   rewriteTimecodes,
   slugifyHeading,
   sortTranscriptEntries,
+  stripArchiveBlock,
   timecodeSeconds,
   toIndexEntry,
   transcriptObjectKey,
@@ -190,5 +191,68 @@ describe("index helpers", () => {
     const groups = groupTranscriptsByMonth(sorted);
     expect(groups.map(group => group.key)).toEqual(["2026-10", "2026-09"]);
     expect(groups[0]?.label).toBe("2026 年 10 月");
+  });
+});
+
+describe("stripArchiveBlock", () => {
+  it("removes a marked block and joins the body to the appendix", () => {
+    const source = [
+      "## 1. 开场",
+      "",
+      "正文。",
+      "",
+      "<!-- archive-only:start -->",
+      "## 与既有档案的互证",
+      "",
+      "1. 只有归档才需要的一条。",
+      "<!-- archive-only:end -->",
+      "",
+      "---",
+      "",
+      "## 附录：中日对照字幕（整理版）",
+      "",
+      "### ① 开场",
+    ].join("\n");
+
+    expect(stripArchiveBlock(source)).toBe(
+      [
+        "## 1. 开场",
+        "",
+        "正文。",
+        "",
+        "---",
+        "",
+        "## 附录：中日对照字幕（整理版）",
+        "",
+        "### ① 开场",
+      ].join("\n"),
+    );
+  });
+
+  it("falls back to the section heading when the markers are missing", () => {
+    const source = [
+      "## 1. 开场",
+      "",
+      "正文。",
+      "",
+      "---",
+      "",
+      "## 与既有档案的互证",
+      "",
+      "1. 未确认项。",
+      "",
+      "---",
+      "",
+      "## 附录：中日对照字幕（整理版）",
+    ].join("\n");
+
+    expect(stripArchiveBlock(source)).toBe(
+      ["## 1. 开场", "", "正文。", "", "---", "", "## 附录：中日对照字幕（整理版）"].join("\n"),
+    );
+  });
+
+  it("leaves a clean document untouched", () => {
+    const source = ["## 1. 开场", "", "正文。", "", "## 附录：中日对照字幕（整理版）"].join("\n");
+    expect(stripArchiveBlock(source)).toBe(source);
   });
 });

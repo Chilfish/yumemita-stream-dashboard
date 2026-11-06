@@ -34,6 +34,7 @@ tweets: []
 - `members` / `tags` / `tweets` 用行内数组 `[a, b]`；字符串里有冒号或 `#` 时用双引号包起来。
 - 行首的 `[12:34]` / `[1:02:03]` 会自动变成指向原视频对应秒数的链接；代码块里的不动。
 - 标题用 `##` / `###`，会生成右侧目录；`#` 一级标题也会按二级渲染，避免和页面结构打架。
+- 只供归档、不进正文的段落用 `<!-- archive-only:start -->` / `<!-- archive-only:end -->` 包住，导入时整段剔除。
 
 ## 命令
 
@@ -47,6 +48,8 @@ bun run transcript:import "D:/messages/.../2026-10-13_ライブ振り返り.md" 
 # 校验 + 发布到对象存储；加 --no-upload 只校验
 bun run publish:transcripts
 ```
+
+导入会按 manifest 补 `date` / `title`，去掉 `archive-only` 段落，并拒绝会员限定场次（逐字稿只留在归档侧；确需例外加 `--allow-member-only`）。
 
 发布产物：
 
