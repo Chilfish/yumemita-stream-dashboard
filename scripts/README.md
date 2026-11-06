@@ -25,13 +25,16 @@
 `describeEnvironment()`（`scripts/lib/local-config.ts`）是唯一实现，`loadEnvFiles()` 与各脚本入口共用；
 只输出模式、数据库主机 / 库名与桶名，不带账号密码。
 
+写入目标由 `LOCAL` 决定：`LOCAL=1` 才采用 `.env.local` / `.dev.vars` 里的本机数据库与代理地址，
+未开时只认 `.env`（线上 Neon + R2）。`bun run dev` 是例外，它始终准备本机库。
+
 ## 数据库 ingest
 
 本地 pack 仍是唯一真源；`ingest-db.ts` 把 pack 投影到 Neon PostgreSQL。读路径走 `neon-http`，
 写入 / 事务走 `neon-serverless` 的 WebSocket Pool，不用 `postgres.js`。
 
 ```powershell
-# 建表 / 升级（读取 .env 或 .dev.vars 的 DATABASE_URL）
+# 建表 / 升级（LOCAL=1 读本机库，否则读 .env 的 Neon）
 bun run db:migrate
 
 # 增量：内容哈希没变的场次跳过

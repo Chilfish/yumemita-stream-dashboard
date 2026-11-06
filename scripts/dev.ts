@@ -18,7 +18,8 @@ if (process.argv.includes('--local')) {
   process.argv = process.argv.filter(arg => arg !== '--local')
 }
 
-loadEnvFiles()
+// 开发服务器始终连本机库；`LOCAL` 只决定对象存储与媒体地址是否也切到本机。
+loadEnvFiles({ devServer: true })
 
 try {
   await ensureDevServices()

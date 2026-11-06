@@ -74,9 +74,10 @@ Scoop 的 `apps/silo/current/silo.exe`，再回退到已安装的 `minio`（CLI 
 - `DATABASE_URL` / `NEON_HTTP_ENDPOINT` 不是本机地址时，强制切到本地默认值。
 - 对象存储改为指向 SILO；发布进度的 `target` 带 `local/` 前缀，与线上 R2 的记录分开，
   不会互相误判「已上传」而跳过。
-- `.env.local` 与 `.dev.vars` 自动写入 `LOCAL=1` 与本地 `DATABASE_URL`（以及代理端点）；
+- `.env.local` 与 `.dev.vars` 自动写入 `LOCAL=1` 与本地 `DATABASE_URL`（以及代理端点），
+  但这些本机地址只在 `LOCAL=1` 时被脚本采用；`LOCAL=0` 会回到 `.env` 的线上库。
   `astro.config.mjs` 在 `LOCAL=1` 时把 `import.meta.env.PUBLIC_R2_BASE` 定义为本地桶地址，
-  不把派生的媒体地址落进文件，关掉开关就自动回到 `.env` / `.dev.vars` 的线上值。
+  不把派生的媒体地址落进文件，关掉开关就自动回到线上值。
 - 浏览器封面 / 表情、逐字稿 API 的 DEV 回退都改读 SILO；生产仍走 R2 binding。
 - `purge:cache` 直接跳过，不会去动线上 Workers Cache。
 - `DATAPACK_BASE` 未设置时，`remoteBase()` 返回本地桶地址，`fetch-streams` 的远端恢复也读 SILO。
@@ -91,12 +92,16 @@ bun run dev --local    # 开启 LOCAL=1：Postgres + 代理 + SILO + 本地媒�
 ```
 
 `--local` 会把 `LOCAL=1` 写进 `.env.local` / `.dev.vars`，之后普通 `bun run dev` 与
-`db:ingest` / `publish:*` / `fetch:*` 等脚本都会读到。要切回线上，删掉这两个文件里的
-`LOCAL=1` 即可（媒体地址与数据库会自动回到 `.env` / `.dev.vars` 的值）。
+`db:ingest` / `publish:*` / `fetch:*` 等脚本都会读到。要切回线上，把 `LOCAL` 改成 `0`
+（或删掉这两行）：对象存储、媒体地址与数据库都会回到 `.env` 的值。
+
+开发服务器与开关无关：`bun run dev` 始终准备并连本机库，`LOCAL` 只决定对象存储、
+媒体地址是否也切到本机。所以 `.env.local` 里留本地 `DATABASE_URL` 不会让脚本误连本机库。
 
 它会依次：
 
-1. 按 `.env` → `.dev.vars` → `.env.local`（后者覆盖前者，真实进程环境最高）解析 `DATABASE_URL`；
+1. 按 `.env` → `.dev.vars` → `.env.local`（后者覆盖前者）解析 `DATABASE_URL`；开发服务器
+   无条件采用其中的本机地址，普通脚本只在 `LOCAL=1` 时采用，见下方「与线上环境的关系」；
 2. `DATABASE_URL` 是本机地址时，启动 Postgres（已在运行则跳过）、创建 `ymmt_dev`、应用 `drizzle/` 迁移；
 3. 缺少 `.env.local` / `.dev.vars` 时补写本地地址与 `NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql`；
    `LOCAL=1` 时把 `LOCAL=1` 写回这两个文件（`.env.local` 里已有 `DATABASE_URL` 也会被覆盖成本机）；
@@ -150,7 +155,8 @@ bun run dev:seed
 bun run dev:seed --dataset nonoka
 ```
 
-脚本读 `.env.local`（优先于 `.env`），所以 `db:ingest` / `db:verify` / `db:query` 都指向本地库。
+灌数据默认写哪张库由 `LOCAL` 决定：`LOCAL=1` 时 `db:ingest` / `db:verify` / `db:query` 指向本地库，
+未开时（`LOCAL=0` 或不设）读 `.env` 的 Neon。本地调试请先设 `LOCAL=1`（见下方说明）。
 
 `db:ingest` 会同时写 `dataset_insights.totals` 与 `public_totals`，页面汇总只读后者。
 
@@ -162,10 +168,16 @@ bun run dev:seed --dataset nonoka
 | `.env.local` | 本地开发覆盖（优先于 `.env`） | 否 |
 | `.dev.vars` | workerd（dev / preview）运行时变量 | 否 |
 
-- `loadEnvFiles()` 的优先级：真实进程环境 > `.env.local` > `.dev.vars` > `.env`。
+- `loadEnvFiles()` 的优先级：`.env.local` > `.dev.vars` > `.env`，以它读到的文件为准。
+  `LOCAL` 是例外：运行环境（命令行 / `bun run dev --local`）设了就覆盖文件。
+- Bun 启动时会先把 `.env*` 灌进 `process.env` 且「先读到的赢」（`.env` 会盖住 `.env.local`），
+  所以脚本不能靠「变量已存在就跳过」，否则文件优先级形同虚设。
+- `DATABASE_URL` / `NEON_HTTP_ENDPOINT` 这两项决定「数据写到哪」：`LOCAL=1` 才采用
+  `.env.local` / `.dev.vars` 的本机地址，`LOCAL=0` 只认 `.env`。其余键仍按文件顺序覆盖。
+- 开发服务器（`bun run dev`）不走上面的判定：它始终采用本机地址准备 Postgres / 代理。
 - `LOCAL=1` 打开后，即使文件里写着线上地址，`DATABASE_URL` / `NEON_HTTP_ENDPOINT` / `PUBLIC_R2_BASE` 也会在加载后强制切到本机。
 - `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` 只在 `LOCAL=1` 时生效；线上仍用 `R2_*`。
-- 发布资产、每日任务、部署必须用 `.env` 里的线上库；执行前确认 `LOCAL` 没开、`DATABASE_URL` 不是本机地址。
+- 发布资产、每日任务、部署必须用 `.env` 里的线上库；执行前看脚本首行的目标环境，确认是 Neon 而不是 `localhost`。
 - `.dev.vars` 改成线上库即可让 dev / preview 直接连 Neon；脚本会提示，但不建议日常这么做。
 
 ## 停止
