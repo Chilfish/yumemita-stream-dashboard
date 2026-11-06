@@ -67,7 +67,7 @@ Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整�
 - 生产仍是 HTTP 读 + WebSocket 事务；不要把 `pg` 静态引入 Worker 产物。
 - ingest：`scripts/ingest-db.ts`，一场一个事务，`content_hash` 增量；小批量 `--limit` 跳过 insights。
   - 全量回填可按 `--dataset <id>` 一个 dataset 一个进程并行；每个进程独立算该成员的 insights，互不覆盖。
-  - `dataset_insights.public_totals` 由 ingest 读数据库现算后写入，页面汇总只读它；请求期不再加载明细。
+  - `dataset_insights.public_totals` 由 ingest 用窄 SQL 聚合写入，页面汇总只读它；请求期不再加载明细。
 - 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表；`dataset_insights` 用 `scripts/lib/json-equal.ts` 深比较（`jsonb` 不保留键顺序）。
 - `DATABASE_URL` 从 `.env` / `.dev.vars` / `.env.local` 读取，优先级为真实环境 > `.env.local` > `.dev.vars` > `.env`；缺失时直接报错，不静默回退。
 - 查询层：`src/db/queries/`，函数接收 `Db` 作为第一个参数（页面 / 脚本共用）；DTO 在 `src/types/db.ts`。
@@ -75,8 +75,8 @@ Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整�
   - `datasets.ts`：`selectDatasetsQuery` / `getDatasets` / `getDataset`
   - `streams.ts`：`buildStreamListQuery` / `listStreams`（需要总数时 `withTotal: true`）/ `buildAllStreamRefsQuery`（sitemap）/ `buildAllStreamHeadsQuery`（llms）/ `selectStreamQuery` / `getStream` / `getLatestStream`
   - `insights.ts`：`selectPublicTotalsQuery` / `getDatasetPublicTotals`
-  - `packs.ts`：`getStreamPack`（单场 6 条查询一个 batch）/ `getStreamPacks`（多场一次 `inArray`）/ `getDatasetPacks`（仅供 ingest 离线重算）
-  - `dataset-totals.ts`：`computeDatasetPublicTotals`（仅供 ingest 离线重算，超过 2,000 场自动翻页）
+  - `packs.ts`：`getStreamPack`（单场 6 条查询一个 batch）/ `getStreamPacks`（多场一次 `inArray`）
+  - `dataset-totals.ts`：`computeDatasetPublicTotals`（仅供 ingest / verify / refresh；窄 SQL 聚合词频、作者与汇总列，不还原 pack）
   - `group.ts`：`getGroupSummary` / `getGroupGallery`，查询构造函数供页面组合 batch
   - `transcripts.ts`：`getTranscriptIndex` / `getTranscriptMeta` / `selectTranscriptMetaQuery`（索引页与单场可用性）
   - `view-data.ts`：页面级组合（`getDatasetPageData` / `getGroupPageData` / `getComparePacks` / `getStreamPageExtras`）。

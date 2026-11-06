@@ -214,6 +214,7 @@ Top 列表排序稳定化后，`public_totals` 需要随派生口径刷新；本
       `streams,stream-jZbWoJ7n54Q,dataset-nonoka,astro-path:...`，`/api/packs` 同样带 `stream-<videoId>`。
       线上首次请求 `MISS`、再次 `HIT`，说明 Workers Cache 生效；首次部署从冷缓存开始。
 - 部署路径：GitHub `Deploy` workflow 因仓库缺少 `CLOUDFLARE_API_TOKEN` secret 在「Check configuration」失败；本次用本地 `bun run cf:deploy` 发布（version `86f395ec`）。补上 secret 后可继续走 workflow。
+- [ ] 2026-11-06 新增 `drizzle/0005_magical_diamondback.sql`（`streams.paid_share_pct`）。目标库需先 `bun run db:migrate`，再跑 `bun scripts/refresh-public-totals.ts`；之后新 ingest 会自然写入精确付费占比。
 
 ### 未做
 
@@ -221,3 +222,30 @@ Top 列表排序稳定化后，`public_totals` 需要随派生口径刷新；本
 - 成员页仍一次取回全部场次（上限 2,000），超过后需要服务端分页或按路由裁剪 props。
 - 未开启 `cross_version_cache`：每次部署仍冷缓存一次，避免旧 HTML 引用已下线的哈希资源。
 - 全量弹幕（B6）未入库。
+
+## 8. 脚本层增量（2026-11-06）
+
+P0 / P1 只覆盖请求期读路径；每日任务与离线脚本仍有重复读写。本轮按实测日志补齐：
+
+| 项 | 改动 | 文件 |
+| --- | --- | --- |
+| 成员状态 | 所有成员的 `streams` / `dataset_insights` 合并为 2 条 SQL，Neon 下 1 次 HTTP；不再每成员各查 2 条 | `scripts/daily-update.ts` |
+| 逐字稿写入 | 先读 `transcripts.content_hash`，内容未变直接跳过；不再每次 upsert 全部稿件并刷新 `updated_at` | `scripts/ingest-db.ts` |
+| insights 过期判断 | 场次数改成标量子查询，与 `totals` / `public_totals` 一次取回；每成员少 1 条查询 | `scripts/ingest-db.ts` |
+| 公开汇总 | `computeDatasetPublicTotals()` 改为窄 SQL：`streams` 只取汇总列；词频 / 作者在 SQL 里 `sum + group by`；评论 / 贴纸按场聚合；`stream_details` 只取 badges / hashtags / emojiKinds / `density->'perMinute'`。不再还原 pack | `src/db/queries/dataset-totals.ts` |
+| 付费占比 | 新增 `streams.paid_share_pct`，ingest 直接写入；单场 pack 与汇总复用精确值，旧行没有值时按每分钟序列近似 | `src/db/schema.ts`、`scripts/ingest-db.ts`、`src/db/queries/packs.ts`、`drizzle/0005_magical_diamondback.sql` |
+| 日程同步 | 未来场从逐条 upsert 改成一次多行 upsert；缺时刻时仍用 `coalesce` 保留旧值 | `scripts/lib/schedule-sync.ts` |
+| 对账 | 只取对账所需 5 列；4 条 group by 放进同一 `runBatch`，Neon 下 1 次 HTTP | `scripts/verify-db.ts` |
+| 逐字稿发布 | 文件内容不变时复用上次 `contentUpdatedAt`，不再因 CI checkout 改 mtime 而全量重传；索引 `generatedAt` 取条目最新时间，内容不变时索引也不变 | `scripts/publish-transcripts.ts`、`scripts/lib/publish-state.ts` |
+
+验证：
+
+- `bun run check`：astro check 0 error、323 tests 通过、oxlint 0 warning。
+- 用本地 pack 的全量 `aggregateDataset()` 与新 SQL 汇总逐字段比较：除 `topWords` 的低频词尾差外全部一致；`paidSharePct` 由新列恢复为精确值。
+- 本地库执行 `bun run db:migrate`（`0005_magical_diamondback.sql`）并用 `bun scripts/refresh-public-totals.ts` 刷新；arale / miyako / nonoka / ritsu 的 `bun run db:verify` 均为 0 problems。线上库需在部署前应用同一迁移并刷新一次。
+
+仍保留的成本：
+
+- 任一 pack 变化仍会触发该成员的全量 insights 重算，但现在只读汇总列与 SQL 聚合结果，不再拉 3.5–10.5 MB 的完整明细；`totals` 仍从本地 pack 全量聚合一次。
+- `topWords` 与本地全量聚合存在极小尾差：ingest 只把 `count >= 3` 且非停用词的词写入 `stream_words`，低频词跨场累计后的贡献无法从库里还原。
+- `daily-update` 仍按成员分别 spawn `ingest-db` / `publish-data`；两份脚本各自 parse 一遍本地 pack 是进程隔离的代价，本轮不合并。

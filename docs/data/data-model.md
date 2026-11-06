@@ -84,6 +84,7 @@
 | `chatPer1000AvgViewers` | number \| null | 每千同接弹幕 |
 | `likesPer1000Views` | number \| null | 千播放点赞 |
 | `scPerHour` | number \| null | SC 笔/小时 |
+| `paidSharePct` | number \| null | 付费条目（SC / 贴纸 / 会员 / 赠送）占时间轴内消息的比例；写入 `streams.paid_share_pct`，汇总按场平均 |
 | `thumbnail` | string \| null | 封面原图相对 key（`thumbs/<videoId>.jpg`，WebP 变体由宽度后缀推导）；旧 pack 或没有封面时为 `null` |
 | `sessionDir` | string | 原始会话目录（归档侧） |
 | `datapack` | string | 归档侧相对路径 |
