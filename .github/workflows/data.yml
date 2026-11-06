@@ -73,7 +73,7 @@ jobs:
 
       # yt-dlp 解 YouTube 的 JS challenge 需要一个 JS runtime；deno 与本地保持一致。
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@v2.0.5
         with:
           deno-version: v2.x
 
