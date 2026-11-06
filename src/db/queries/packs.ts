@@ -182,6 +182,7 @@ function buildChat(
 
   const paidInfo = groupPaid(paid)
   paidInfo.scTotalsByCurrency = (row.scTotalsByCurrency ?? {}) as CurrencyTotals
+  paidInfo.paidSharePct = toNumber(row.paidSharePct)
 
   const topAuthors: TopAuthor[] = authorRows
     .slice()
@@ -301,80 +302,6 @@ function buildPack(
       vstatsVsYtdlpViews: null,
     },
   }
-}
-
-async function loadChildren(db: Db, ids: number[]) {
-  if (ids.length === 0) {
-    return {
-      details: [] as DetailRow[],
-      paid: [] as PaidRow[],
-      comments: [] as CommentRow[],
-      words: [] as WordRow[],
-      authorRows: [] as (AuthorRow & { streamId: number })[],
-    }
-  }
-
-  const [details, paid, commentRows, words, authorRows] = await Promise.all([
-    db.select(DETAIL_COLUMNS).from(streamDetails).where(inArray(streamDetails.streamId, ids)),
-    db.select().from(paidEvents).where(inArray(paidEvents.streamId, ids)).orderBy(paidEvents.at, paidEvents.id),
-    db.select().from(comments).where(inArray(comments.streamId, ids)).orderBy(desc(comments.likes), comments.id),
-    db.select().from(streamWords).where(inArray(streamWords.streamId, ids)).orderBy(desc(streamWords.count), asc(streamWords.word)),
-    db
-      .select(AUTHOR_COLUMNS)
-      .from(streamAuthors)
-      .leftJoin(authors, eq(authors.authorId, streamAuthors.authorId))
-      .where(inArray(streamAuthors.streamId, ids))
-      .orderBy(desc(streamAuthors.messages), asc(streamAuthors.authorId)),
-  ])
-
-  return { details, paid, comments: commentRows, words, authorRows }
-}
-
-/** 批量还原一个 dataset 的全部 pack；只给离线 ingest 计算汇总用，不要在请求期调用。 */
-export async function getDatasetPacks(
-  db: Db,
-  datasetId: string,
-): Promise<Map<string, StreamDatapack>> {
-  const rows = await db
-    .select()
-    .from(streams)
-    .where(eq(streams.datasetId, datasetId))
-  const { details, paid, comments: commentRows, words, authorRows } = await loadChildren(
-    db,
-    rows.map(row => row.id),
-  )
-
-  const byStream = <T extends { streamId: number }>(items: T[]) => {
-    const map = new Map<number, T[]>()
-    for (const item of items) {
-      const list = map.get(item.streamId)
-      if (list) list.push(item)
-      else map.set(item.streamId, [item])
-    }
-    return map
-  }
-
-  const detailByStream = new Map(details.map(item => [item.streamId, item]))
-  const paidByStream = byStream(paid)
-  const commentsByStream = byStream(commentRows)
-  const wordsByStream = byStream(words)
-  const authorsByStream = byStream(authorRows)
-
-  const packs = new Map<string, StreamDatapack>()
-  for (const row of rows) {
-    packs.set(
-      row.videoId,
-      buildPack(
-        row,
-        detailByStream.get(row.id),
-        paidByStream.get(row.id) ?? [],
-        commentsByStream.get(row.id) ?? [],
-        wordsByStream.get(row.id) ?? [],
-        authorsByStream.get(row.id) ?? [],
-      ),
-    )
-  }
-  return packs
 }
 
 /** 对比页只需要逐分钟弹幕，不必还原整份 pack。 */

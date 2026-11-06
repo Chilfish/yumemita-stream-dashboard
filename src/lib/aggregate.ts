@@ -217,13 +217,23 @@ export function buildStreamShape(
   rows: Pick<StreamRow, "pack">[],
   bucketCount = STREAM_SHAPE_BUCKETS,
 ): StreamShape | null {
+  return buildStreamShapeFromSeries(
+    rows.map(({ pack }) => pack.chat.density?.perMinute ?? []),
+    bucketCount,
+  );
+}
+
+/** 与 `buildStreamShape()` 同一套算法，输入换成逐场的每分钟序列。 */
+export function buildStreamShapeFromSeries(
+  series: number[][],
+  bucketCount = STREAM_SHAPE_BUCKETS,
+): StreamShape | null {
   const buckets = Math.max(4, Math.floor(bucketCount));
   const relativeBuckets: number[][] = Array.from({ length: buckets }, () => []);
   const rateBuckets: number[][] = Array.from({ length: buckets }, () => []);
   let streams = 0;
 
-  for (const { pack } of rows) {
-    const minutes = pack.chat.density?.perMinute ?? [];
+  for (const minutes of series) {
     if (minutes.length < buckets) continue;
     const mean = average(minutes);
     if (!(mean > 0)) continue;
