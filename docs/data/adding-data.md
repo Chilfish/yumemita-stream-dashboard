@@ -131,12 +131,16 @@ bun run transcript:new W0bKqP-Eyj4 --dataset nonoka
 # 或者把已经写好的 Markdown 复制进来（videoId 可从文件名日期匹配 manifest）
 bun run transcript:import "D:/messages/archives/2026-10-13_ライブ振り返り.md" --dataset nonoka
 bun run transcript:import "<path>" --dataset nonoka --video-id W0bKqP-Eyj4
+
+# 整个目录批量导入：不合规的稿记跳过，不阻塞其余
+bun run transcript:import "D:/messages/archives/<member>/配信" --dataset nonoka
 ```
 
 导入会按 manifest 补 `date` / `title`，剔除 `<!-- archive-only:start -->` … `<!-- archive-only:end -->` 之间的归档段落；会员限定场次默认拒绝，确需例外加 `--allow-member-only`。
 
 落到 `content/transcripts/<datasetId>/<videoId>.md`；以 `_` / `.` 开头的文件是草稿，不参与发布。
-目标文件已存在时默认拒绝，`--force` 才覆盖。
+目标文件已存在时默认拒绝，`--force` 才覆盖。目录模式下一篇失败只跳过该篇（缺 videoId、对不上
+manifest、会员限定、目标已存在），单篇模式仍按原样报错退出。
 
 ### 2. 写正文
 

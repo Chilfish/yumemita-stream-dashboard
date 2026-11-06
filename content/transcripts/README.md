@@ -45,11 +45,17 @@ bun run transcript:new W0bKqP-Eyj4 --dataset nonoka
 # 导入已经写好的 Markdown（frontmatter 缺 videoId 时可用 --video-id 指定）
 bun run transcript:import "D:/messages/.../2026-10-13_ライブ振り返り.md" --dataset nonoka
 
+# 批量导入一个目录（不递归，跳过不合规的稿）
+bun run transcript:import "D:/messages/archives/.../配信" --dataset nonoka
+
 # 校验 + 发布到对象存储；加 --no-upload 只校验
 bun run publish:transcripts
 ```
 
 导入会按 manifest 补 `date` / `title`，去掉 `archive-only` 段落，并拒绝会员限定场次（逐字稿只留在归档侧；确需例外加 `--allow-member-only`）。
+
+目录模式下一篇出问题不影响其余：缺 `videoId`、文件名里也没有日期、对不上 manifest、会员限定、
+目标已存在（`--force` 才覆盖）都记为跳过并打印原因；只有读写失败才让退出码变 1。
 
 发布产物：
 
