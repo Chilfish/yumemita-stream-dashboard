@@ -8,19 +8,32 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, envField } from 'astro/config'
 import { loadEnv } from 'vite'
 import { DEFAULT_SITE_URL } from './src/lib/site-defaults.ts'
+import { isLocalMode, localPublicBase } from './scripts/lib/local-config.ts'
 import { loadPreviewData, loadEmojiIndex } from './scripts/lib/live-chat-preview-data.ts'
 
 // Bun / CI 未必把 .env 注入 process.env；显式读一次，避免 SITE_URL 静默回退。
 const mode = process.env.NODE_ENV === 'development' ? 'development' : 'production'
 const fileEnv = loadEnv(mode, process.cwd(), '')
 const siteUrl = (process.env.SITE_URL || fileEnv.SITE_URL || DEFAULT_SITE_URL).replace(/\/+$/, '')
-if (!process.env.PUBLIC_R2_BASE && !fileEnv.PUBLIC_R2_BASE) {
+
+// `LOCAL=1` 时媒体地址由配置直接指向本机 SILO，不把派生值写进 .env.local，
+// 避免关掉开关后仍把 localhost 地址带进生产构建。
+const configEnv = { ...fileEnv, ...process.env }
+const localMode = isLocalMode(configEnv)
+const publicR2Base = (localMode
+  ? localPublicBase(configEnv)
+  : (configEnv.PUBLIC_R2_BASE || '')).replace(/\/+$/, '')
+
+if (!publicR2Base) {
   console.warn('[astro.config] PUBLIC_R2_BASE 未设置：构建产物会回退到 /data/，线上封面 / 表情会 404')
+}
+if (localMode) {
+  console.warn(`[astro.config] LOCAL=1：媒体地址指向 ${publicR2Base}，这个构建只用于本地，不要部署`)
 }
 
 // 开发预览：workerd 里没有真实文件系统，改由 Vite 的 Node 中间件读 temp/youtube-live。
 const liveChatRoot = fileURLToPath(new URL('./temp/youtube-live', import.meta.url))
-const liveChatEmojiBase = (process.env.PUBLIC_R2_BASE || fileEnv.PUBLIC_R2_BASE || 'https://ymmt-s3.chilfish.top').replace(/\/+$/, '')
+const liveChatEmojiBase = publicR2Base || 'https://ymmt-s3.chilfish.top'
 
 function liveChatPreviewPlugin() {
   return {
@@ -162,6 +175,15 @@ export default defineConfig({
   integrations: [react()],
   vite: {
     plugins: [tailwindcss(), liveChatPreviewPlugin()],
+    server: {
+      watch: {
+        // data/ 是抓取产物、temp/ 是本地运行数据；写入时不需要触发 dev reload。
+        ignored: ['**/data/**', '**/temp/**'],
+      },
+    },
+    define: {
+      'import.meta.env.PUBLIC_R2_BASE': JSON.stringify(publicR2Base),
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

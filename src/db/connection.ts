@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { neon, neonConfig, Pool } from '@neondatabase/serverless'
 import { drizzle as drizzleHttp } from 'drizzle-orm/neon-http'
 import { drizzle as drizzleServerless } from 'drizzle-orm/neon-serverless'
+import { isLocalUrl } from '../lib/local-url'
 import * as schema from './schema'
 
 function getNodeRequire(): (id: string) => unknown {
@@ -18,13 +19,7 @@ function getNodeRequire(): (id: string) => unknown {
  * `endpoint` 指向本地 Neon HTTP 代理时（workerd 无法直连 TCP），强制走 HTTP 驱动。
  */
 export function isLocalDatabaseUrl(url: string): boolean {
-  try {
-    const host = new URL(url).hostname
-    return host === 'localhost' || host === '127.0.0.1' || host === '::1'
-  }
-  catch {
-    return false
-  }
+  return isLocalUrl(url)
 }
 
 function createHttpDb(url: string, endpoint?: string) {

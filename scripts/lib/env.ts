@@ -1,5 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import {
+  DEFAULT_LOCAL_DATABASE_URL,
+  DEFAULT_LOCAL_PROXY_ENDPOINT,
+  isLocalMode,
+  isLocalUrl,
+  localPublicBase,
+} from './local-config.ts'
 
 /**
  * 本地脚本读取 .env / .dev.vars / .env.local。
@@ -31,6 +38,18 @@ export function loadEnvFiles(cwd = process.cwd()): void {
       fromFile.add(key)
     }
   }
+
+  applyLocalOverrides()
+}
+
+/** `LOCAL=1` 是总开关：文件里写着线上地址也强制切回本机。 */
+function applyLocalOverrides(): void {
+  if (!isLocalMode()) return
+  if (!isLocalUrl(process.env.DATABASE_URL))
+    process.env.DATABASE_URL = DEFAULT_LOCAL_DATABASE_URL
+  if (!isLocalUrl(process.env.NEON_HTTP_ENDPOINT))
+    process.env.NEON_HTTP_ENDPOINT = DEFAULT_LOCAL_PROXY_ENDPOINT
+  process.env.PUBLIC_R2_BASE = localPublicBase()
 }
 
 export function requireEnv(name: string): string {
