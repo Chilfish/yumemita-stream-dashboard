@@ -94,7 +94,12 @@ describe('resolveCookies 优先级', () => {
   })
 
   it('没有 jar 时 yt-dlp 回退浏览器', () => {
-    expect(ytdlpCookieArgs({ jarPath: null }, { browser: 'firefox' }))
+    expect(ytdlpCookieArgs({ jarPath: null, source: 'header' }, { browser: 'firefox' }))
       .toEqual(['--cookies-from-browser', 'firefox'])
+  })
+
+  it('--no-cookies 不会把浏览器 cookie 又带回 yt-dlp', async () => {
+    const resolved = await resolveCookies({ disable: true })
+    expect(ytdlpCookieArgs(resolved, { browser: 'firefox' })).toEqual([])
   })
 })

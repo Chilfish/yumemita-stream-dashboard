@@ -392,22 +392,26 @@ bun run db:verify
 
 ## cookie 缓存（`~/yt-cookies.txt`）
 
-抓取脚本共用一份登录态 cookie：第一次从浏览器导出，之后直接复用。
+抓取脚本在每次运行开始时从浏览器导出登录态 cookie 到 `~/yt-cookies.txt`，整轮抓取复用；
+导出失败才退回旧缓存。
 
 ```bash
-# 手动导出 / 强制刷新（平时不需要，缺失时脚本会自动导出）
+# 手动导出 / 推到 CI（平时不需要，抓取脚本会自己导出）
 bun scripts/export-yt-cookies.ts
 bun scripts/export-yt-cookies.ts --browser edge --push
 ```
 
+- 为什么每次导出：浏览器会轮换 `__Secure-*PSIDTS`。旧 jar 会让 yt-dlp 带着过期会话请求，
+  直接命中 "Sign in to confirm you're not a bot"；同一时刻 `--cookies-from-browser` 却正常。
 - 默认 `--browser firefox`，输出 `~/yt-cookies.txt`；`fetch-streams` / `fetch-danmaku` / `fetch-live-chat` /
-  `daily-update` / `backfill-owner-chats` 都会自动读取。
-- 首次导出后直接复用；需要刷新时加 `--refresh-cookies`，换路径用 `--cookie-cache <文件>`，
-  完全不使用加 `--no-cookies`。
+  `daily-update` / `backfill-owner-chats` 都会自动读取。换路径用 `--cookie-cache <文件>`，
+  完全不使用加 `--no-cookies`（yt-dlp 也保持匿名，不会回退浏览器）。
 - 优先级：`--cookie` 请求头 > `--cookies <文件>` > `YT_COOKIE` > `~/yt-cookies.txt` > 匿名。
 - 文件是登录态凭据，等同账号密码：不要提交、不要贴到聊天里；浏览器退出登录即可失效。
 - 手工请求 watch 页只发送 youtube.com 的 cookie；混入 google.com 的 `NID` / `SIDCC` 会被降级成没有
   `ytInitialData` 的页面。`#HttpOnly_` 是前缀不是注释，`SID` / `__Secure-*` 都会保留。
+- yt-dlp 解 YouTube 的 JS challenge 需要 JS runtime：本机装 deno（与 CI 一致）。`--list-formats`
+  只列出 360p 是 YouTube 的 SABR-only 实验，本仓库只抓元信息 / 弹幕 / 评论，不受影响。
 
 ## 开播前 / 直播中采集（实时通道）
 

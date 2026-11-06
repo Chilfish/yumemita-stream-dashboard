@@ -1,16 +1,18 @@
 /**
- * YouTube 登录态 cookie 的通用来源：默认从本机浏览器导出一次，缓存到 `~/yt-cookies.txt`，
- * 之后的抓取直接复用；需要时用 `--refresh-cookies` 强制重新导出。
+ * YouTube 登录态 cookie 的通用来源：每次抓取开始时从本机浏览器导出到 `~/yt-cookies.txt`，
+ * 整轮抓取复用；导出失败时退回旧缓存。
  *
- * 为什么缓存：
- * - `--cookies-from-browser` 每次都要读浏览器 profile，Firefox 正在运行时还可能读不到；
- * - 同一台机器上的 fetch-streams / fetch-danmaku / fetch-live-chat 反复导出没有意义；
+ * 为什么每次都导出：
+ * - 浏览器会轮换 `__Secure-*PSIDTS`，放久的缓存会失效。失效的 jar 比没有更糟：
+ *   yt-dlp 带着它请求会命中 "Sign in to confirm you're not a bot"，而同一时刻
+ *   `--cookies-from-browser` 却能正常读取。
+ * - 导出只多一次 `--simulate` 请求，相对整轮抓取可以忽略。
  * - 文件落在 home 目录，脚本可以共用，也不在仓库里。
  *
  * 注意：缓存文件等同账号凭据。不要提交、不要贴到聊天里；泄露后在浏览器退出登录即可失效。
  *
  * 优先级：显式 `--cookie` 请求头 > 显式 `--cookies` 文件 > `YT_COOKIE` 环境变量 >
- * `~/yt-cookies.txt`（缺失时自动导出）> 匿名。
+ * `~/yt-cookies.txt`（每次运行重新导出）> 匿名。
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -207,9 +209,7 @@ export async function exportCookieJar(options: ExportCookieOptions): Promise<Exp
 export interface EnsureCookieJarOptions {
   browser?: string
   cachePath?: string
-  /** 强制重新导出。 */
-  refresh?: boolean
-  /** 缓存超过这个时长就重新导出；0 = 不按时间过期（默认）。 */
+  /** 缓存最多复用多久；默认 0 = 本次调用就重新导出。 */
   maxAgeMs?: number
   domains?: string[]
   url?: string
@@ -226,7 +226,7 @@ export interface CookieJar {
 }
 
 /**
- * 确保 `~/yt-cookies.txt` 可用：缺失 / 过期 / 强制刷新时从浏览器导出，
+ * 确保 `~/yt-cookies.txt` 可用：默认每次调用都从浏览器重新导出，
  * 导出失败但旧缓存还在时继续用旧缓存。返回 null 表示只能匿名抓取。
  */
 export async function ensureCookieJar(options: EnsureCookieJarOptions = {}): Promise<CookieJar | null> {
@@ -234,9 +234,12 @@ export async function ensureCookieJar(options: EnsureCookieJarOptions = {}): Pro
   const cachePath = resolve(options.cachePath ?? defaultCookieCachePath())
   const maxAgeMs = options.maxAgeMs ?? 0
   const exists = existsSync(cachePath)
-  const stale = exists && maxAgeMs > 0 && Date.now() - statSync(cachePath).mtimeMs > maxAgeMs
+  const ageMs = exists ? Date.now() - statSync(cachePath).mtimeMs : 0
+  // 默认 0 = 每次都重新导出。浏览器的 `__Secure-*PSIDTS` 会轮换，
+  // 旧 jar 拿在手里反而会被 YouTube 判成机器人。
+  const stale = exists && (maxAgeMs <= 0 || ageMs > maxAgeMs)
 
-  if (exists && !options.refresh && !stale) {
+  if (exists && !stale) {
     try {
       const info = inspectCookieJar(cachePath)
       if (info.youtube > 0)
@@ -247,11 +250,11 @@ export async function ensureCookieJar(options: EnsureCookieJarOptions = {}): Pro
       log(`cookie 缓存损坏，重新导出：${cachePath}`)
     }
   }
-  else if (stale) {
+  else if (exists && maxAgeMs > 0) {
     log(`cookie 缓存已超过 ${Math.round(maxAgeMs / 3_600_000)} 小时，重新导出`)
   }
 
-  const reason = options.refresh ? '强制刷新' : exists ? '缓存不可用' : '首次导出'
+  const reason = !exists ? '首次导出' : maxAgeMs > 0 ? '缓存过期' : '重新导出'
   log(`${reason}：从 ${options.browser ?? DEFAULT_COOKIE_BROWSER} 导出到 ${cachePath}`)
   const result = await exportCookieJar({
     out: cachePath,
@@ -324,13 +327,16 @@ export async function resolveCookies(options: ResolveCookiesOptions = {}): Promi
 
 /**
  * yt-dlp 的 cookie 参数：显式 jar > 缓存 jar > 浏览器直读。
- * 显式 `--cookie` 请求头无法转给 yt-dlp，这种情况下仍然回退浏览器。
+ * 显式 `--cookie` 请求头无法转给 yt-dlp，这种情况下仍然回退浏览器；
+ * `--no-cookies` 必须保持匿名，不能靠回退把浏览器 cookie 又带回来。
  */
 export function ytdlpCookieArgs(
-  resolved: Pick<ResolvedCookies, 'jarPath'>,
+  resolved: Pick<ResolvedCookies, 'jarPath' | 'source'>,
   options: { browser?: string } = {},
 ): string[] {
   if (resolved.jarPath)
     return ['--cookies', resolved.jarPath]
+  if (resolved.source === 'none')
+    return []
   return ['--cookies-from-browser', options.browser ?? DEFAULT_COOKIE_BROWSER]
 }

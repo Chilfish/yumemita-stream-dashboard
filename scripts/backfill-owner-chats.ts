@@ -42,7 +42,6 @@ const { values } = parseArgs({
     cookies: { type: 'string' },
     'cookies-from-browser': { type: 'string', default: 'firefox' },
     'cookie-cache': { type: 'string' },
-    'refresh-cookies': { type: 'boolean' },
     'no-cookies': { type: 'boolean' },
     force: { type: 'boolean' },
     'no-upload': { type: 'boolean' },
@@ -64,11 +63,10 @@ const USAGE = `用法：bun scripts/backfill-owner-chats.ts [选项]
   --concurrency <n>          yt-dlp 并发，默认 3
   --limit <n>                本次最多处理 n 场，0 = 全部
   --work-dir <目录>          临时下载目录，默认 ./temp/owner-chats
-  --cookies <文件>           Netscape cookie jar；不传则复用 ~/yt-cookies.txt（缺失时从浏览器导出）
-  --cookies-from-browser <b> 导出缓存时用哪个浏览器，默认 firefox
+  --cookies <文件>           Netscape cookie jar；不传则每次运行从浏览器导出到 ~/yt-cookies.txt
+  --cookies-from-browser <b> 导出 cookie 时用哪个浏览器，默认 firefox
   --cookie-cache <文件>      cookie 缓存路径，默认 ~/yt-cookies.txt
-  --refresh-cookies          强制重新从浏览器导出 cookie
-  --no-cookies               不使用 cookie 缓存
+  --no-cookies               不使用 cookie，以匿名状态抓取
   --force                    已有 ownerChats 的场次也重新抓取
   --no-upload                只更新本地 pack，不上传对象存储
   --keep-raw                 保留下载的 live_chat 与 jsonl
@@ -183,7 +181,6 @@ const resolvedCookies = await resolveCookies({
   envCookie: process.env.YT_COOKIE,
   browser: values['cookies-from-browser'],
   cachePath: values['cookie-cache'],
-  refresh: values['refresh-cookies'],
   disable: values['no-cookies'],
   appRoot: APP_ROOT,
   log: line => console.log(`[owner-chats] ${line}`),

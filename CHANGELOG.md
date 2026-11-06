@@ -4,6 +4,7 @@
 
 ### 工程
 
+- **cookie 缓存每次运行重新导出**：浏览器会轮换 `__Secure-*PSIDTS`，`~/yt-cookies.txt` 长期复用后会命中 YouTube bot 检查（同一时刻 `--cookies-from-browser` 却正常）。`resolveCookies` 现在每次运行先导出、导出失败才退回旧缓存，`--refresh-cookies` 移除；顺带修掉 `--no-cookies` 仍把浏览器 cookie 传给 yt-dlp。
 - **R2 迁到独立桶 `yumemita-data`**：封面、表情、逐字稿正文与 `archive/` 从共享 `static` 桶（前缀 `stream-dashboard`）复制到新桶的桶根，不再有公共前缀；`publish:data` / `publish:transcripts` 默认写入新桶，Worker 的 `r2_buckets` binding 读到的 `transcripts.r2_key` 可直接命中。
 - **`.md` 封面地址修正**：frontmatter 的 `image` 改用 `PUBLIC_R2_BASE` 拼绝对地址，不再拼成站内 `/thumbs/...`（会 404）。
 - **缓存失效补齐**：`daily-update` 与 `purge-cache --dataset` 在成员有新增场次时同时失效 `gallery`，全组相册不再等 TTL 自然过期。

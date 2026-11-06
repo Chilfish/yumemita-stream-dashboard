@@ -96,7 +96,6 @@ const OPTIONS = {
   'no-replay': { type: 'boolean' },
   'cookies-from-browser': { type: 'string', default: 'firefox' },
   'cookie-cache': { type: 'string' },
-  'refresh-cookies': { type: 'boolean' },
   'no-cookies': { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
@@ -114,10 +113,9 @@ const USAGE = `用法：bun scripts/fetch-live-chat.ts --video <id> [选项]
   --root <目录>         会话根目录（默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live）
   --cookie <字符串>     Cookie 请求头（会员限定需要）；也可用环境变量 YT_COOKIE
   --cookies <文件>      Netscape cookie jar（yt-dlp 导出的 cookies.txt）
-  --cookies-from-browser <b> 导出缓存时用哪个浏览器，默认 firefox
+  --cookies-from-browser <b> 导出 cookie 时用哪个浏览器，默认 firefox
   --cookie-cache <文件> cookie 缓存路径，默认 ~/yt-cookies.txt
-  --refresh-cookies     强制重新从浏览器导出 cookie
-  --no-cookies          不使用 cookie 缓存，以匿名状态抓取
+  --no-cookies          不使用 cookie，以匿名状态抓取
   --max-hours <n>       最长跟随小时数，0 = 不限（默认 0）
   --min-interval <ms>   轮询间隔下限，默认 1000
   --max-interval <ms>   轮询间隔上限，默认 15000
@@ -273,7 +271,7 @@ function log(line: string): void {
   console.log(`[live-chat] ${line}`)
 }
 
-/** 默认复用 `~/yt-cookies.txt`；缺失时从浏览器导出一次。 */
+/** 每次运行重新导出到 `~/yt-cookies.txt`，导出失败才用旧缓存。 */
 async function resolveChatCookie(
   videoId: string,
   cli: {
@@ -281,7 +279,6 @@ async function resolveChatCookie(
     cookies?: string
     browser?: string
     cachePath?: string
-    refresh?: boolean
     disable?: boolean
   },
 ): Promise<string | null> {
@@ -291,7 +288,6 @@ async function resolveChatCookie(
     envCookie: process.env.YT_COOKIE,
     browser: cli.browser,
     cachePath: cli.cachePath,
-    refresh: cli.refresh,
     disable: cli.disable,
     url: `https://www.youtube.com/watch?v=${videoId}`,
     appRoot: APP_ROOT,
@@ -759,7 +755,6 @@ async function main(): Promise<void> {
     cookies: values.cookies,
     browser: values['cookies-from-browser'],
     cachePath: values['cookie-cache'],
-    refresh: values['refresh-cookies'],
     disable: values['no-cookies'],
   })
 

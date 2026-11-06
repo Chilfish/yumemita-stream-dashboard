@@ -65,7 +65,6 @@ const { values } = parseArgs({
     'max-pages': { type: 'string', default: '0' },
     'no-resume': { type: 'boolean' },
     'cookie-cache': { type: 'string' },
-    'refresh-cookies': { type: 'boolean' },
     'no-cookies': { type: 'boolean' },
     'no-force-ipv4': { type: 'boolean' },
     'dry-run': { type: 'boolean' },
@@ -91,10 +90,9 @@ const USAGE = `用法：bun scripts/fetch-danmaku.ts [--root <会话根目录>] 
   --keep-raw                 保留原始 .live_chat.json（仅 yt-dlp 引擎）
   --cookie <字符串>          InnerTube 的 Cookie 请求头（会员限定需要）；也可用 YT_COOKIE
   --cookies <文件>           Netscape cookie jar；InnerTube 直接读，yt-dlp 传 --cookies
-  --cookies-from-browser <b> 导出 cookie 缓存 / yt-dlp 回退时用哪个浏览器，默认 firefox
+  --cookies-from-browser <b> 导出 cookie / yt-dlp 回退时用哪个浏览器，默认 firefox
   --cookie-cache <文件>      cookie 缓存路径，默认 ~/yt-cookies.txt
-  --refresh-cookies          强制重新从浏览器导出 cookie
-  --no-cookies               不使用 cookie 缓存，以匿名状态抓取
+  --no-cookies               不使用 cookie，以匿名状态抓取
   --page-delay <ms>          InnerTube 每页间隔，默认 150
   --max-pages <n>            InnerTube 最多翻多少页，0 = 不限（安全阀）
   --no-resume                不读 work/replay-state.json，从 watch 页重新翻
@@ -278,14 +276,13 @@ if (values['dry-run']) {
   process.exit(0)
 }
 
-// cookie 默认复用 ~/yt-cookies.txt；缺失时从浏览器导出一次，之后 InnerTube 与 yt-dlp 共用。
+// cookie 默认每次运行重新导出到 ~/yt-cookies.txt，随后 InnerTube 与 yt-dlp 共用。
 const resolvedCookies = await resolveCookies({
   cookie: values.cookie,
   cookies: values.cookies,
   envCookie: process.env.YT_COOKIE,
   browser: values['cookies-from-browser'],
   cachePath: values['cookie-cache'],
-  refresh: values['refresh-cookies'],
   disable: values['no-cookies'],
   url: tasks[0] ? `https://www.youtube.com/watch?v=${tasks[0].videoId}` : undefined,
   appRoot: APP_ROOT,

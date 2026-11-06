@@ -392,8 +392,9 @@ bun run fetch:live-chat --video <videoId> --once   # 只拉一页（等待室历
   （仍需 `fetch:streams` 抓到 `meta/info.json`）。
 - 词频只统计消息正文，不含系统提示；主播操作通过 `chat.ownerChats`（`kind: "event"`）进入 `?view=words`，
   全部事件保留在 `chat.events`。
-- 登录态默认复用 `~/yt-cookies.txt`：首次从浏览器导出，之后直接读取；`--refresh-cookies` 强制刷新，
-  `--no-cookies` 以匿名状态抓取。CI 用 `--cookies <文件>` 或 `YT_COOKIE`。
+- 登录态每次运行从浏览器重新导出到 `~/yt-cookies.txt`，整轮复用；导出失败才退回旧缓存。
+  浏览器会轮换 `__Secure-*PSIDTS`，旧 jar 会命中 YouTube bot 检查。`--no-cookies` 以匿名状态抓取
+  （yt-dlp 也不会回退浏览器）。CI 用 `--cookies <文件>` 或 `YT_COOKIE`。
 
 ### 已结束场次的回放
 
