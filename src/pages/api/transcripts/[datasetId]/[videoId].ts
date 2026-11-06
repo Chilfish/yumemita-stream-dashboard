@@ -1,20 +1,12 @@
 import type { APIRoute } from 'astro'
-import { env } from 'cloudflare:workers'
 import { db } from '@/db/client'
 import { getStream } from '@/db/queries/streams'
 import { getTranscriptMeta } from '@/db/queries/transcripts'
 import { memberOnlyAccess } from '@/lib/member-access'
+import { readObjectText } from '@/lib/object-read'
 import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
-
-interface R2Object {
-  text: () => Promise<string>
-}
-
-interface R2BucketLike {
-  get: (key: string) => Promise<R2Object | null>
-}
 
 function json(body: unknown, status: number, cacheControl = 'no-store'): Response {
   return Response.json(body, {
@@ -53,14 +45,9 @@ export const GET: APIRoute = async (context) => {
     return json({ error: '这场还没有逐字稿' }, 404)
   }
 
-  const bucket = (env as unknown as { R2?: R2BucketLike }).R2
-  if (!bucket) {
-    return json({ error: '逐字稿暂时不可用' }, 503)
-  }
-
   try {
-    const object = await bucket.get(meta.r2Key)
-    if (!object) {
+    const body = await readObjectText(meta.r2Key)
+    if (body === null) {
       return json({ error: '逐字稿暂时不可用' }, 503)
     }
 
@@ -72,7 +59,7 @@ export const GET: APIRoute = async (context) => {
       })
     }
 
-    return new Response(await object.text(), {
+    return new Response(body, {
       headers: {
         'content-type': 'application/json; charset=utf-8',
         ...(keyed ? { 'cache-control': 'private, no-store' } : {}),

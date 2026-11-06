@@ -1,5 +1,4 @@
 import type { APIRoute } from 'astro'
-import { env } from 'cloudflare:workers'
 import { runBatch } from '@/db/batch'
 import { db } from '@/db/client'
 import { mapDataset, selectDatasetsQuery, type DatasetQueryRow } from '@/db/queries/datasets'
@@ -13,28 +12,18 @@ import {
 import { memberOnlyAccess } from '@/lib/member-access'
 import { thumbnailUrl } from '@/lib/media'
 import { renderStreamMarkdown } from '@/lib/agent-markdown'
+import { readObjectText } from '@/lib/object-read'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
 import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
-interface R2Object {
-  text: () => Promise<string>
-}
-
-interface R2BucketLike {
-  get: (key: string) => Promise<R2Object | null>
-}
-
 async function readTranscriptBody(key: string | null | undefined): Promise<string | null> {
   if (!key) return null
-  const bucket = (env as unknown as { R2?: R2BucketLike }).R2
-  if (!bucket) return null
 
   try {
-    const object = await bucket.get(key)
-    if (!object) return null
-    const raw = await object.text()
+    const raw = await readObjectText(key)
+    if (raw === null) return null
     try {
       const parsed = JSON.parse(raw) as Record<string, unknown>
       const body = parsed.body ?? parsed.content ?? parsed.markdown
