@@ -13,6 +13,11 @@ export interface PublishStateEntry {
   sha256: string
   size: number
   uploadedAt: string
+  /**
+   * 内容里自带的时间戳（目前只有逐字稿用文件 mtime）。
+   * 内容没变时复用它，避免 checkout / 改 mtime 触发每天全量重传。
+   */
+  contentUpdatedAt?: string
 }
 
 export interface PublishState {
@@ -75,6 +80,9 @@ export function readPublishState(path: string, target: string): PublishState {
       sha256: entry.sha256,
       size: entry.size,
       uploadedAt: typeof entry.uploadedAt === 'string' ? entry.uploadedAt : '',
+      ...(typeof entry.contentUpdatedAt === 'string'
+        ? { contentUpdatedAt: entry.contentUpdatedAt }
+        : {}),
     }
   }
 

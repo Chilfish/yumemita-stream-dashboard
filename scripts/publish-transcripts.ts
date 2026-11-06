@@ -28,7 +28,6 @@ import {
 } from '../src/lib/transcripts.ts'
 import type { TranscriptIndexEntry } from '../src/lib/transcripts.ts'
 import type { BatchManifest } from '../src/types/dataset.ts'
-import { isoJst } from './lib/dataset-manifest.ts'
 import {
   createObjectStore,
   readCredentials,
@@ -139,6 +138,16 @@ function videoIdsOf(source: DatasetSource): Set<string> | null {
   }
 }
 
+const uploadEnabled = !values['no-upload']
+const credentials = uploadEnabled ? readCredentials() : null
+if (uploadEnabled && !credentials)
+  fail('缺少 R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET；只校验请加 --no-upload')
+
+const store = credentials ? createObjectStore(credentials) : null
+const state = credentials
+  ? readPublishState(STATE_PATH, `${credentials.bucket}/${credentials.prefix}`)
+  : null
+
 const failures: string[] = []
 const transcripts: PlannedTranscript[] = []
 const seen = new Map<string, string>()
@@ -182,34 +191,52 @@ for (const dirent of readdirSync(CONTENT_ROOT, { withFileTypes: true }).sort((a,
     if (ids && !ids.has(file.videoId))
       warn(`${rel}：manifest 里没有 ${file.videoId}，确认 id 没写错`)
 
-    const updatedAt = statSync(path).mtime.toISOString()
+    const mtime = statSync(path).mtime.toISOString()
     const normalized = { ...file, datasetId }
-    const body = JSON.stringify({
-      schema: TRANSCRIPT_SCHEMA,
-      datasetId,
-      videoId: file.videoId,
-      frontmatter: file.frontmatter,
-      markdown: file.markdown,
-      updatedAt,
-    })
+    const key = transcriptObjectKey(datasetId, file.videoId)
+    const previousEntry = state?.objects[key]
+    const build = (updatedAt: string) => {
+      const body = JSON.stringify({
+        schema: TRANSCRIPT_SCHEMA,
+        datasetId,
+        videoId: file.videoId,
+        frontmatter: file.frontmatter,
+        markdown: file.markdown,
+        updatedAt,
+      })
+      return { body, entry: toIndexEntry(normalized, updatedAt), digest: digestBody(body) }
+    }
+
+    // 内容没变时沿用上次记录的时间：CI 每天 checkout 会改 mtime，不能让它触发全量重传。
+    let built = build(previousEntry?.contentUpdatedAt ?? mtime)
+    const unchanged = previousEntry != null
+      && previousEntry.sha256 === built.digest.sha256
+      && previousEntry.size === built.digest.size
+    if (!unchanged && built.entry.updatedAt !== mtime)
+      built = build(mtime)
 
     transcripts.push({
       datasetId,
       videoId: file.videoId,
-      key: transcriptObjectKey(datasetId, file.videoId),
+      key,
       rel,
-      body,
-      entry: toIndexEntry(normalized, updatedAt),
-      digest: digestBody(body),
+      body: built.body,
+      entry: built.entry,
+      digest: built.digest,
       skip: false,
     })
   }
 }
 
 const entries = sortTranscriptEntries(transcripts.map(item => item.entry))
+// 用条目里的最新时间，而不是当前时刻：内容没变时索引也不该每天变一次。
+const generatedAt = entries.reduce(
+  (latest, entry) => (entry.updatedAt > latest ? entry.updatedAt : latest),
+  '',
+) || new Date(0).toISOString()
 const indexBody = JSON.stringify({
   schema: TRANSCRIPT_INDEX_SCHEMA,
-  generatedAt: isoJst(new Date()),
+  generatedAt,
   entries,
 })
 
@@ -227,12 +254,8 @@ if (values['no-upload']) {
   process.exit(exitCode)
 }
 
-const credentials = readCredentials()
-if (!credentials)
+if (!store || !credentials || !state)
   fail('缺少 R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET；只校验请加 --no-upload')
-
-const store = createObjectStore(credentials)
-const state = readPublishState(STATE_PATH, `${credentials.bucket}/${credentials.prefix}`)
 
 let remote: Map<string, number> | null = null
 if (!values.force) {
@@ -244,11 +267,10 @@ if (!values.force) {
   }
 }
 
-const planned = transcripts.map((item) => {
-  const digest = digestBody(item.body)
-  const skip = !values.force && isUnchanged(state.objects[item.key], digest, remote, item.key)
-  return { ...item, digest, skip }
-})
+const planned = transcripts.map(item => ({
+  ...item,
+  skip: !values.force && isUnchanged(state.objects[item.key], item.digest, remote, item.key),
+}))
 const pending = planned.filter(item => !item.skip)
 const skippedBodies = planned.length - pending.length
 
@@ -259,7 +281,11 @@ let uploaded = 0
 await runPool(pending, 4, async (item) => {
   try {
     await store.put(item.key, item.body)
-    state.objects[item.key] = { ...item.digest, uploadedAt: new Date().toISOString() }
+    state.objects[item.key] = {
+      ...item.digest,
+      uploadedAt: new Date().toISOString(),
+      contentUpdatedAt: item.entry.updatedAt,
+    }
     uploaded += 1
   }
   catch (error) {
