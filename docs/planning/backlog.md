@@ -27,6 +27,7 @@
 | B18 | 数据库读路径优化：合并查询、窄列、缓存 TTL 与本地压测 | P0 | 本地库 | 2026-11-05 成本控制 | ✅ 冷渲染 HTTP 往返压到 ≤2（多数 1 次）；`bun run db:bench` 可复测；见 [db-optimization.md](db-optimization.md) |
 | B19 | 全栈性能审计：岛屿拆分、props 收敛、对比页窄查询、交互热点与 ingest / publish 批量化 | P1 | 无 | 2026-11-05 巡检 | 🚧 P0 大部分落地：逐字稿 DEV 守卫（会员稿不再进 client chunk）、列表窄列、对比页密度 API、单场页取数收敛、搜索防抖、context memo、图表 hover 节流。客户端 JS 1.52 → 0.98 MB，单场页 HTML 696 → 281 KB，对比页 3 场 9 → 4 SQL。剩余：props 收敛、壳层重构；见 [performance-audit.md](performance-audit.md) 与 [performance.md](../engineering/performance.md) |
 | B20 | 脚本层重复读写：成员状态批量查询、逐字稿按 hash 跳过、公开汇总窄 SQL、日程批量 upsert、对账 batch、逐字稿发布稳定 mtime | P1 | 无 | 2026-11-06 实测日志 | ✅ `daily-update` 状态 2N → 2 SQL；`syncTranscripts` 未变跳过；`computeDatasetPublicTotals` 改窄 SQL（词/作者 `sum + group by`，不再还原 pack）；新增 `streams.paid_share_pct`；日程与对账各 1 次 batch；逐字稿不再每天全量重传。任一 pack 变化仍会全量重算该成员 insights，见 [db-optimization.md](db-optimization.md) §8 |
+| B21 | 全本地开发开关：`LOCAL=1` 同时切数据库、对象存储与媒体地址 | P1 | 安装 PostgreSQL、[SILO](https://silo.pgsty.com/zh/download/#server-windows) | 2026-11-06 成本控制 | ✅ 脚本与 dev 共用 `LOCAL=1`；数据库走本机 Postgres + `/sql` 代理，对象存储走 SILO，`PUBLIC_R2_BASE` 指向本地桶，发布进度按 `local/` 隔离，purge 跳过；见 [local-database.md](../engineering/local-database.md) |
 
 ## 审查承接区
 

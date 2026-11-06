@@ -144,7 +144,9 @@ bun run validate:data  # 旧数据链路
 ```
 
 本地开发默认连本机 Postgres，避免开发流量计入 Neon 出流量。`bun run dev` 会准备
-Postgres、建库 / 迁移与 Neon HTTP 代理，已有服务则复用；Astro 退出后两者继续后台运行：
+Postgres、建库 / 迁移与 Neon HTTP 代理，已有服务则复用；Astro 退出后两者继续后台运行。
+设 `LOCAL=1`（或 `bun run dev --local`）还会启动本地 SILO，把对象存储、`PUBLIC_R2_BASE`
+与脚本上传一起切到本机：
 
 ```bash
 bun run dev          # 一条命令：Postgres + 代理 + Astro
