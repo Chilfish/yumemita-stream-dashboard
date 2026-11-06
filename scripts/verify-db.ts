@@ -3,6 +3,7 @@ import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
+import { runBatch } from '../src/db/batch.ts'
 import { createDb } from '../src/db/connection.ts'
 import { computeDatasetPublicTotals } from '../src/db/queries/dataset-totals.ts'
 import {
@@ -85,7 +86,16 @@ async function main(): Promise<void> {
     const videoIds = local.map(item => item.pack.video.id)
     if (videoIds.length === 0) continue
 
-    const dbRows = await db.select().from(streams).where(eq(streams.datasetId, source.id))
+    const dbRows = await db
+      .select({
+        id: streams.id,
+        videoId: streams.videoId,
+        chatTotal: streams.chatTotal,
+        superchats: streams.superchats,
+        scTotalsByCurrency: streams.scTotalsByCurrency,
+      })
+      .from(streams)
+      .where(eq(streams.datasetId, source.id))
     const scopeIds = new Set(videoIds)
     const dbRowsInScope = dbRows.filter(row => scopeIds.has(row.videoId))
     if (dbRowsInScope.length !== local.length) {
@@ -97,15 +107,42 @@ async function main(): Promise<void> {
     const byVideo = new Map(dbRowsInScope.map(row => [row.videoId, row]))
     const dbIds = dbRowsInScope.map(row => row.id)
 
-    const paidCounts = await db
-      .select({
-        streamId: paidEvents.streamId,
-        kind: paidEvents.kind,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(paidEvents)
-      .where(inArray(paidEvents.streamId, dbIds))
-      .groupBy(paidEvents.streamId, paidEvents.kind)
+    const [paidCounts, commentCounts, wordCounts, authorTotals] = await runBatch<[
+      { streamId: number, kind: string, count: number }[],
+      { streamId: number, count: number }[],
+      { streamId: number, count: number }[],
+      { streamId: number, messages: number, authors: number }[],
+    ]>(db, [
+      db
+        .select({
+          streamId: paidEvents.streamId,
+          kind: paidEvents.kind,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(paidEvents)
+        .where(inArray(paidEvents.streamId, dbIds))
+        .groupBy(paidEvents.streamId, paidEvents.kind),
+      db
+        .select({ streamId: comments.streamId, count: sql<number>`count(*)::int` })
+        .from(comments)
+        .where(inArray(comments.streamId, dbIds))
+        .groupBy(comments.streamId),
+      db
+        .select({ streamId: streamWords.streamId, count: sql<number>`count(*)::int` })
+        .from(streamWords)
+        .where(inArray(streamWords.streamId, dbIds))
+        .groupBy(streamWords.streamId),
+      db
+        .select({
+          streamId: streamAuthors.streamId,
+          messages: sql<number>`coalesce(sum(${streamAuthors.messages}), 0)::int`,
+          authors: sql<number>`count(*)::int`,
+        })
+        .from(streamAuthors)
+        .where(inArray(streamAuthors.streamId, dbIds))
+        .groupBy(streamAuthors.streamId),
+    ])
+
     const paidByStream = new Map<string, Map<string, number>>()
     for (const row of paidCounts) {
       const key = String(row.streamId)
@@ -114,29 +151,8 @@ async function main(): Promise<void> {
       paidByStream.set(key, bucket)
     }
 
-    const commentCounts = await db
-      .select({ streamId: comments.streamId, count: sql<number>`count(*)::int` })
-      .from(comments)
-      .where(inArray(comments.streamId, dbIds))
-      .groupBy(comments.streamId)
     const commentsByStream = new Map(commentCounts.map(row => [String(row.streamId), row.count]))
-
-    const wordCounts = await db
-      .select({ streamId: streamWords.streamId, count: sql<number>`count(*)::int` })
-      .from(streamWords)
-      .where(inArray(streamWords.streamId, dbIds))
-      .groupBy(streamWords.streamId)
     const wordsByStream = new Map(wordCounts.map(row => [String(row.streamId), row.count]))
-
-    const authorTotals = await db
-      .select({
-        streamId: streamAuthors.streamId,
-        messages: sql<number>`coalesce(sum(${streamAuthors.messages}), 0)::int`,
-        authors: sql<number>`count(*)::int`,
-      })
-      .from(streamAuthors)
-      .where(inArray(streamAuthors.streamId, dbIds))
-      .groupBy(streamAuthors.streamId)
     const authorsByStream = new Map(authorTotals.map(row => [String(row.streamId), row]))
 
     for (const { pack } of local) {

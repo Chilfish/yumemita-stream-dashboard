@@ -22,7 +22,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { eq } from 'drizzle-orm'
+import { inArray } from 'drizzle-orm'
+import { runBatch } from '../src/db/batch.ts'
 import { createDb } from '../src/db/connection.ts'
 import { datasetInsights, streams } from '../src/db/schema.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
@@ -139,14 +140,38 @@ function runScript(script: string, args: string[]): Promise<number> {
   })
 }
 
+function isoOrNull(value: Date | string | null | undefined): string | null {
+  if (!value) return null
+  const time = value instanceof Date ? value.getTime() : Date.parse(value)
+  return Number.isNaN(time) ? null : new Date(time).toISOString()
+}
+
+interface DatabaseStreamRow {
+  datasetId: string
+  videoId: string
+  title: string | null
+  durationSec: number | null
+  startedAt: Date | string | null
+  endedAt: Date | string | null
+  availability: string | null
+  vstatsViews: number | null
+  avgConcurrent: string | number | null
+  chatTotal: number | null
+}
+
 /** 已入库的场次与 insights 时间：数据库是「哪些场次已经有了」的唯一来源。 */
-async function loadDatabaseState(
+async function loadDatabaseStates(
   db: ReturnType<typeof createDb>,
-  source: DatasetSource,
-): Promise<LoadedState> {
-  const [rows, insight] = await Promise.all([
+  sources: DatasetSource[],
+): Promise<Map<string, LoadedState>> {
+  const ids = sources.map(source => source.id)
+  const [rows, insights] = await runBatch<[
+    DatabaseStreamRow[],
+    { datasetId: string, generatedAt: Date | string | null }[],
+  ]>(db, [
     db
       .select({
+        datasetId: streams.datasetId,
         videoId: streams.videoId,
         title: streams.title,
         durationSec: streams.durationSec,
@@ -158,29 +183,37 @@ async function loadDatabaseState(
         chatTotal: streams.chatTotal,
       })
       .from(streams)
-      .where(eq(streams.datasetId, source.id)),
+      .where(inArray(streams.datasetId, ids)),
     db
-      .select({ generatedAt: datasetInsights.generatedAt })
+      .select({ datasetId: datasetInsights.datasetId, generatedAt: datasetInsights.generatedAt })
       .from(datasetInsights)
-      .where(eq(datasetInsights.datasetId, source.id))
-      .limit(1),
+      .where(inArray(datasetInsights.datasetId, ids)),
   ])
 
-  return {
-    streams: rows.map(row => ({
+  const byDataset = new Map<string, PlanStream[]>()
+  for (const row of rows) {
+    const list = byDataset.get(row.datasetId) ?? []
+    list.push({
       videoId: row.videoId,
       title: row.title ?? null,
       durationSec: row.durationSec ?? null,
-      startedAt: row.startedAt ? row.startedAt.toISOString() : null,
-      endedAt: row.endedAt ? row.endedAt.toISOString() : null,
+      startedAt: isoOrNull(row.startedAt),
+      endedAt: isoOrNull(row.endedAt),
       availability: row.availability ?? null,
       vstatsViews: row.vstatsViews ?? null,
       avgConcurrent: row.avgConcurrent == null ? null : Number(row.avgConcurrent),
       chatTotal: row.chatTotal ?? null,
-    })),
-    generatedAt: insight[0]?.generatedAt ? insight[0].generatedAt.toISOString() : null,
-    from: 'database',
+    })
+    byDataset.set(row.datasetId, list)
   }
+
+  const generatedAt = new Map(insights.map(row => [row.datasetId, isoOrNull(row.generatedAt)]))
+
+  return new Map(sources.map(source => [source.id, {
+    streams: byDataset.get(source.id) ?? [],
+    generatedAt: generatedAt.get(source.id) ?? null,
+    from: 'database' as const,
+  }]))
 }
 
 /** 本地暂存区的 pack 数量与最新修改时间，用来发现「抓到了但 ingest 没成功」的场次。 */
@@ -335,6 +368,7 @@ async function main(): Promise<void> {
   const noPublish = Boolean(values['no-publish'])
 
   const db = createDb(requireEnv('DATABASE_URL'))
+  const states = await loadDatabaseStates(db, selected)
 
   let failures = 0
   let newTotal = 0
@@ -345,7 +379,7 @@ async function main(): Promise<void> {
 
   for (const source of selected) {
     console.log(`\n[update] === ${source.label} (${source.id}) ===`)
-    const state = await loadDatabaseState(db, source)
+    const state = states.get(source.id) ?? { streams: [], generatedAt: null, from: 'database' as const }
     const knownIds = state.streams.map(stream => stream.videoId)
     console.log(`[update] 数据库：${knownIds.length} 场（${state.from}）`)
 
