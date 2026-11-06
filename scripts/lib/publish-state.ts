@@ -3,6 +3,7 @@
  *
  * 记录是**本地缓存**，不是真源：远端对象是否还在、大小是否对得上，由 publish 时
  * 列一次桶来核对。换桶 / 换 `R2_PREFIX` 时 `target` 不匹配，整份记录失效（全量传一次）。
+ * `LOCAL=1` 使用单独的 `.publish-state.local.json`，避免影响线上增量进度。
  */
 import { createHash } from 'node:crypto'
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -22,7 +23,7 @@ export interface PublishStateEntry {
 
 export interface PublishState {
   schema: string
-  /** `${bucket}/${prefix}`；目标的标识，变了就当记录作废。 */
+  /** `${bucket}/${prefix}`；本地模式带 `local/` 前缀。目标变了就当记录作废。 */
   target: string
   updatedAt: string
   objects: Record<string, PublishStateEntry>

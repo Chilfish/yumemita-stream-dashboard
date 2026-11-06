@@ -44,6 +44,7 @@ import {
   groupSummaryKey,
   insightsKey,
   manifestKey,
+  publishTarget,
   readCredentials,
   remoteBase,
   runPool,
@@ -51,6 +52,7 @@ import {
   thumbsKey,
 } from './lib/object-storage.ts'
 import { digestBody, digestBytes, isUnchanged, readPublishState, writePublishState } from './lib/publish-state.ts'
+import { publishStatePath } from './lib/local-config.ts'
 
 interface DatasetSource {
   id: string
@@ -91,7 +93,8 @@ const USAGE = `用法：bun scripts/publish-data.ts [选项]
   --allow-shrink   允许本地场次少于远端（确实要下架场次时才用）
   -h, --help       显示本帮助
 
-上传需要环境变量：R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET`
+上传需要环境变量：R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET；
+本地模式设 LOCAL=1（走本机 SILO，默认 http://127.0.0.1:9000）`
 
 if (values.help) {
   console.log(USAGE)
@@ -465,8 +468,8 @@ if (!assetsOnly) {
 }
 
 // 进度记录：内容摘要对齐就不重传；同时列一次远端，确认对象还在、大小对得上。
-const statePath = join(APP_ROOT, 'data', '.publish-state.json')
-const state = readPublishState(statePath, `${credentials.bucket}/${credentials.prefix}`)
+const statePath = publishStatePath(APP_ROOT)
+const state = readPublishState(statePath, publishTarget(credentials))
 
 let remote: Map<string, number> | null = null
 if (!values.force) {

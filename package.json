@@ -13,6 +13,7 @@
     "dev": "bun scripts/dev.ts",
     "dev:db": "bun scripts/dev-db.ts",
     "dev:db:proxy": "bun scripts/dev-db-proxy.ts",
+    "dev:storage": "bun scripts/dev-storage.ts",
     "dev:seed": "bun scripts/ingest-db.ts",
     "build": "astro build",
     "preview": "astro preview",

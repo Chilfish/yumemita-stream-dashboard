@@ -6,13 +6,35 @@
  */
 import { S3Client } from 'bun'
 import { thumbVariantName } from '../../src/lib/thumb-variants.ts'
+import {
+  DEFAULT_LOCAL_ACCESS_KEY,
+  DEFAULT_LOCAL_SECRET_KEY,
+  isLocalMode,
+  localBucket,
+  localEndpoint,
+  localPublicBase,
+} from './local-config.ts'
+
+export {
+  DEFAULT_LOCAL_ACCESS_KEY,
+  DEFAULT_LOCAL_BUCKET,
+  DEFAULT_LOCAL_ENDPOINT,
+  DEFAULT_LOCAL_SECRET_KEY,
+  isLocalMode,
+  localBucket,
+  localEndpoint,
+  localPublicBase,
+} from './local-config.ts'
 
 export const MANIFEST_SCHEMA = 'yumemita.stream-datapack.batch/v1'
 export const INSIGHTS_SCHEMA = 'yumemita.dashboard.insights/v1'
 
 /** 对象存储公开根地址；只用于 archive / 逐字稿 / 封面的可达性校验与恢复。 */
 export function remoteBase(): string {
-  return (process.env.DATAPACK_BASE ?? '').replace(/\/+$/, '')
+  const configured = (process.env.DATAPACK_BASE ?? '').replace(/\/+$/, '')
+  if (configured)
+    return configured
+  return isLocalMode() ? localPublicBase() : ''
 }
 
 export function datapackKey(datasetId: string, videoId: string): string {
@@ -75,17 +97,44 @@ interface Credentials {
   bucket: string
   /** 桶内前缀（目录），空串表示直接写桶根目录。 */
   prefix: string
+  /** S3 兼容端点；R2 由 accountId 拼出，本地模式指向 SILO。 */
+  endpoint: string
 }
 
 export function readCredentials(): Credentials | null {
+  const prefix = (process.env.R2_PREFIX ?? '').replace(/^\/+|\/+$/g, '')
+
+  if (isLocalMode()) {
+    return {
+      accountId: '',
+      accessKeyId: process.env.S3_ACCESS_KEY_ID ?? process.env.MINIO_ROOT_USER ?? DEFAULT_LOCAL_ACCESS_KEY,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? process.env.MINIO_ROOT_PASSWORD ?? DEFAULT_LOCAL_SECRET_KEY,
+      bucket: localBucket(),
+      prefix,
+      endpoint: localEndpoint(),
+    }
+  }
+
   const accountId = process.env.R2_ACCOUNT_ID
   const accessKeyId = process.env.R2_ACCESS_KEY_ID
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
   const bucket = process.env.R2_BUCKET
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket)
     return null
-  const prefix = (process.env.R2_PREFIX ?? '').replace(/^\/+|\/+$/g, '')
-  return { accountId, accessKeyId, secretAccessKey, bucket, prefix }
+  return {
+    accountId,
+    accessKeyId,
+    secretAccessKey,
+    bucket,
+    prefix,
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+  }
+}
+
+/** 发布进度的目标标识；本地与线上共用一个 `.publish-state.json` 时必须分开。 */
+export function publishTarget(credentials: Credentials): string {
+  const base = `${credentials.bucket}/${credentials.prefix}`
+  return isLocalMode() ? `local/${base}` : base
 }
 
 export interface ObjectStore {
@@ -145,7 +194,9 @@ export function createObjectStore(credentials: Credentials): ObjectStore {
     accessKeyId: credentials.accessKeyId,
     secretAccessKey: credentials.secretAccessKey,
     bucket: credentials.bucket,
-    endpoint: `https://${credentials.accountId}.r2.cloudflarestorage.com`,
+    endpoint: credentials.endpoint,
+    // MinIO / R2 都按 path-style 寻址；虚拟主机风格只适用于 AWS。
+    virtualHostedStyle: false,
   })
 
   const prefix = credentials.prefix ? `${credentials.prefix}/` : ''

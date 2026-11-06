@@ -6,7 +6,13 @@ import process from 'node:process'
 import { Client, Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
-import { isLocalDatabaseUrl } from '../../src/db/connection.ts'
+import { ensureSiloRunning } from './dev-silo.ts'
+import {
+  DEFAULT_LOCAL_DATABASE_URL,
+  DEFAULT_LOCAL_PROXY_ENDPOINT,
+  isLocalMode,
+  isLocalUrl,
+} from './local-config.ts'
 
 /**
  * `bun run dev` 的本地服务编排：Postgres、开发库 / 迁移、Neon HTTP 代理。
@@ -15,8 +21,8 @@ import { isLocalDatabaseUrl } from '../../src/db/connection.ts'
  * - 代理按需拉起一次，之后重复执行 dev 只复用健康检查通过的实例。
  */
 
-export const DEFAULT_DATABASE_URL = 'postgres://postgres@localhost:5432/ymmt_dev'
-export const DEFAULT_PROXY_ENDPOINT = 'http://127.0.0.1:4444/sql'
+export const DEFAULT_DATABASE_URL = DEFAULT_LOCAL_DATABASE_URL
+export const DEFAULT_PROXY_ENDPOINT = DEFAULT_LOCAL_PROXY_ENDPOINT
 
 export interface DevServicesResult {
   local: boolean
@@ -133,16 +139,6 @@ function resolvePostgresInstall(): PostgresInstall | undefined {
   return dataDir ? { pgCtl, dataDir } : undefined
 }
 
-export function isProxyEndpointLocal(endpoint: string): boolean {
-  try {
-    const host = new URL(endpoint).hostname
-    return host === 'localhost' || host === '127.0.0.1' || host === '::1'
-  }
-  catch {
-    return false
-  }
-}
-
 async function isPortOpen(host: string, port: number, timeoutMs = 1000): Promise<boolean> {
   return await new Promise((resolvePort) => {
     const socket = connect({ host, port })
@@ -232,11 +228,46 @@ export async function applyMigrations(databaseUrl: string): Promise<void> {
   }
 }
 
+/** 覆盖已有 key、保留其他行；用于 `LOCAL=1` 时把 `.env.local` / `.dev.vars` 切到本机。 */
+function upsertEnvValues(content: string, values: Record<string, string>): string {
+  const pending = new Map(Object.entries(values))
+  const lines = content.length > 0 ? content.split(/\r?\n/) : []
+  const result = lines.map((line) => {
+    const match = /^\s*([A-Za-z0-9_]+)\s*=/.exec(line)
+    if (!match) return line
+    const key = match[1] as string
+    if (!pending.has(key)) return line
+    const value = pending.get(key) as string
+    pending.delete(key)
+    return `${key}=${value}`
+  })
+  for (const [key, value] of pending) result.push(`${key}=${value}`)
+  return `${result.join('\n').replace(/\n+$/, '')}\n`
+}
+
 export function ensureEnvLocal(databaseUrl: string): void {
   const path = resolve('.env.local')
-  if (existsSync(path)) return
-  writeFileSync(path, `# 本地开发数据库；不要提交（.gitignore 已忽略）\nDATABASE_URL=${databaseUrl}\n`)
-  console.log('[dev] 已写入 .env.local')
+  const values: Record<string, string> = { DATABASE_URL: databaseUrl }
+  if (isLocalMode()) {
+    values.LOCAL = '1'
+  }
+
+  if (!existsSync(path)) {
+    writeFileSync(
+      path,
+      `# 本地开发变量；不要提交（.gitignore 已忽略）\n${Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n')}\n`,
+    )
+    console.log('[dev] 已写入 .env.local')
+    return
+  }
+
+  if (!isLocalMode()) return
+  const content = readFileSync(path, 'utf8')
+  const next = upsertEnvValues(content, values)
+  if (next !== content) {
+    writeFileSync(path, next)
+    console.log(`[dev] .env.local 已切到本地：${Object.keys(values).join(' / ')}`)
+  }
 }
 
 function readEnvValue(content: string, key: string): string | undefined {
@@ -250,6 +281,9 @@ export function ensureDevVars(databaseUrl: string, endpoint: string): void {
     DATABASE_URL: databaseUrl,
     NEON_HTTP_ENDPOINT: endpoint,
   }
+  if (isLocalMode()) {
+    values.LOCAL = '1'
+  }
 
   if (!existsSync(path)) {
     writeFileSync(
@@ -261,6 +295,15 @@ export function ensureDevVars(databaseUrl: string, endpoint: string): void {
   }
 
   const content = readFileSync(path, 'utf8')
+  if (isLocalMode()) {
+    const next = upsertEnvValues(content, values)
+    if (next !== content) {
+      writeFileSync(path, next)
+      console.log(`[dev] .dev.vars 已切到本地：${Object.keys(values).join(' / ')}`)
+    }
+    return
+  }
+
   const missing = Object.entries(values).filter(([key]) => readEnvValue(content, key) === undefined)
   if (missing.length) {
     const prefix = content.endsWith('\n') ? content : `${content}\n`
@@ -269,7 +312,7 @@ export function ensureDevVars(databaseUrl: string, endpoint: string): void {
   }
 
   const configured = readEnvValue(content, 'DATABASE_URL')
-  if (configured && !isLocalDatabaseUrl(configured)) {
+  if (configured && !isLocalUrl(configured)) {
     console.warn(`[dev] 注意：.dev.vars 的 DATABASE_URL 不是本机地址（${new URL(configured).host}），astro dev 仍会连远程库`)
   }
 }
@@ -292,7 +335,7 @@ function readLogTail(path: string, lines = 10): string {
 }
 
 export async function ensureDevProxy(endpoint: string, databaseUrl: string): Promise<void> {
-  if (!isProxyEndpointLocal(endpoint)) {
+  if (!isLocalUrl(endpoint)) {
     console.log(`[dev] NEON_HTTP_ENDPOINT 不是本机地址，跳过开发代理：${endpoint}`)
     return
   }
@@ -359,10 +402,15 @@ export async function ensureDevProxy(endpoint: string, databaseUrl: string): Pro
 export async function ensureDevServices(
   options: { url?: string, endpoint?: string } = {},
 ): Promise<DevServicesResult> {
-  const databaseUrl = options.url || process.env.DATABASE_URL || DEFAULT_DATABASE_URL
-  const endpoint = options.endpoint || process.env.NEON_HTTP_ENDPOINT || DEFAULT_PROXY_ENDPOINT
+  const local = isLocalMode()
+  const databaseUrl = options.url
+    || (local ? DEFAULT_DATABASE_URL : process.env.DATABASE_URL)
+    || DEFAULT_DATABASE_URL
+  const endpoint = options.endpoint
+    || (local ? DEFAULT_PROXY_ENDPOINT : process.env.NEON_HTTP_ENDPOINT)
+    || DEFAULT_PROXY_ENDPOINT
 
-  if (!isLocalDatabaseUrl(databaseUrl)) {
+  if (!isLocalUrl(databaseUrl)) {
     console.warn(
       `[dev] DATABASE_URL 不是本机地址（${new URL(databaseUrl).host}），跳过本地 Postgres；`
       + 'astro dev 将直接使用远程库。想走本地库请把 .dev.vars / .env.local 指回 localhost。',
@@ -383,5 +431,17 @@ export async function ensureDevServices(
   }
 
   await ensureDevProxy(endpoint, databaseUrl)
+
+  try {
+    const silo = await ensureSiloRunning()
+    if (!silo.started) {
+      console.warn(`[dev] LOCAL=1 但本地对象存储未启动：${silo.reason}`)
+      console.warn('[dev] 页面读库不受影响；publish / fetch 的上传会失败。装好 SILO 后重跑本命令。')
+    }
+  }
+  catch (error) {
+    console.warn(`[dev] 本地对象存储启动失败：${error instanceof Error ? error.message : String(error)}`)
+  }
+
   return { local: true, databaseUrl, endpoint }
 }

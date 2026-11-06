@@ -1,4 +1,6 @@
 /** 调用 Worker 内部 purge 端点；zone 级 purge 不影响 Workers Cache，只能走这里。 */
+import { isLocalMode } from './local-config.ts'
+
 export interface PurgeOptions {
   /** 站点根地址；默认读 SITE_URL。 */
   siteUrl?: string
@@ -17,6 +19,10 @@ export interface PurgeResult {
 }
 
 export async function purgeCache(options: PurgeOptions): Promise<PurgeResult> {
+  if (isLocalMode()) {
+    return { success: true, skipped: true, reason: 'LOCAL=1：本地开发不做线上缓存失效' }
+  }
+
   const siteUrl = (options.siteUrl ?? process.env.SITE_URL ?? '').replace(/\/+$/, '')
   const token = options.token ?? process.env.PURGE_TOKEN ?? ''
   const tags = [...new Set(options.tags.filter(Boolean))]

@@ -30,6 +30,7 @@ import type { TranscriptIndexEntry } from '../src/lib/transcripts.ts'
 import type { BatchManifest } from '../src/types/dataset.ts'
 import {
   createObjectStore,
+  publishTarget,
   readCredentials,
   remoteBase,
   runPool,
@@ -40,6 +41,7 @@ import {
   readPublishState,
   writePublishState,
 } from './lib/publish-state.ts'
+import { publishStatePath } from './lib/local-config.ts'
 
 interface DatasetSource {
   id: string
@@ -62,7 +64,7 @@ interface PlannedTranscript {
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONTENT_ROOT = join(APP_ROOT, 'content', 'transcripts')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
-const STATE_PATH = join(APP_ROOT, 'data', '.publish-state.json')
+const STATE_PATH = publishStatePath(APP_ROOT)
 
 const USAGE = `用法：bun scripts/publish-transcripts.ts [选项]
 
@@ -73,7 +75,8 @@ const USAGE = `用法：bun scripts/publish-transcripts.ts [选项]
   --force          忽略 data/.publish-state.json 的进度，全量重传
   -h, --help       显示本帮助
 
-上传需要环境变量：R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET`
+上传需要环境变量：R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET；
+本地模式设 LOCAL=1（走本机 SILO，默认 http://127.0.0.1:9000）`
 
 const { values } = parseArgs({
   options: {
@@ -145,7 +148,7 @@ if (uploadEnabled && !credentials)
 
 const store = credentials ? createObjectStore(credentials) : null
 const state = credentials
-  ? readPublishState(STATE_PATH, `${credentials.bucket}/${credentials.prefix}`)
+  ? readPublishState(STATE_PATH, publishTarget(credentials))
   : null
 
 const failures: string[] = []

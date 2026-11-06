@@ -10,7 +10,13 @@ import { loadEnvFiles } from './lib/env.ts'
  *
  * Postgres 与代理是独立后台进程：Astro 退出或被 kill 后继续运行，
  * 重复执行本命令只会复用它们。参数原样透传（如 `--port 4322`）。
+ * `--local` 等价于 `LOCAL=1`，同时把数据库、对象存储与媒体地址切到本机。
  */
+
+if (process.argv.includes('--local')) {
+  process.env.LOCAL = '1'
+  process.argv = process.argv.filter(arg => arg !== '--local')
+}
 
 loadEnvFiles()
 
