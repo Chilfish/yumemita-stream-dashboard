@@ -84,14 +84,11 @@ export function GroupFocusStream({ member, stream }: GroupFocusStreamProps) {
           color={color}
           label={member.dataset.label}
         />
-        <MemberDot color={color} />
         <span className="font-medium text-foreground">{member.dataset.label}</span>
-        <span className="text-muted-foreground">全组最新一场</span>
         <span className="tabular-nums text-ink-3">
           {formatDate(stream.startedAt)} {formatWeekday(stream.startedAt)}{" "}
           {formatTime(stream.startedAt)}
         </span>
-        {relative ? <span className="text-muted-foreground tabular-nums">· {relative}</span> : null}
       </p>
 
       <h2 className="mt-1.5 text-title text-foreground">
@@ -102,24 +99,6 @@ export function GroupFocusStream({ member, stream }: GroupFocusStreamProps) {
           {stream.title}
         </Link>
       </h2>
-
-      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted-foreground">
-        <span className="tabular-nums">
-          播放 {formatInteger(stream.vstatsViews ?? stream.snapshotViews)}
-        </span>
-        <span aria-hidden="true">·</span>
-        <span className="tabular-nums">SC {formatInteger(stream.superchats)} 笔</span>
-        <span aria-hidden="true">·</span>
-        <span className="tabular-nums">平均同接 {formatInteger(stream.avgConcurrent)}</span>
-        {memberOnly ? (
-          <>
-            <span aria-hidden="true">·</span>
-            <Badge size="sm" variant="outline">
-              会员限定
-            </Badge>
-          </>
-        ) : null}
-      </p>
 
       <div className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-3">
         <Readout
@@ -134,24 +113,6 @@ export function GroupFocusStream({ member, stream }: GroupFocusStreamProps) {
         />
         <Readout label="时长" value={formatDurationLong(stream.durationSec)} />
       </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <Link className={LINK_CLASS} to={streamPath(member.dataset.id, stream.videoId)}>
-          单场详情 →
-        </Link>
-        <Link className={LINK_CLASS} to={homePath(member.dataset.id)}>
-          进入 {member.dataset.label} 的首页 →
-        </Link>
-      </div>
-
-      <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hairline pt-2.5 text-caption text-ink-3 tabular-nums">
-        <span>全期 {formatInteger(member.streamCount)} 场</span>
-        <span aria-hidden="true">·</span>
-        <span>近 7 天 {formatInteger(member.weekStreams)} 场</span>
-        <span aria-hidden="true">·</span>
-        <span>弹幕 {formatInteger(member.chatTotal)} 条</span>
-      </p>
     </section>
   );
 }
-

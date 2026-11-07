@@ -567,7 +567,6 @@ export function TrendsView({ rows, totals }: TrendsViewProps) {
             stickyFirstColumn
           />
         </PanelBody>
-        <PanelNote>标题未匹配关键词时归入「杂谈」。</PanelNote>
       </Panel>
 
       {totals.streamShape ? (

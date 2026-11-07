@@ -36,7 +36,6 @@ export function GroupHero({ members }: GroupHeroProps) {
                 <h3 className="text-caption text-ink-3" id="group-rest-heading">
                   其他成员
                 </h3>
-                <p className="text-caption text-ink-3">按最近更新排序</p>
               </div>
               <ul className="mt-2 divide-y divide-hairline">
                 {rest.map(member => (

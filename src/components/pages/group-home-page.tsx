@@ -1,8 +1,6 @@
 import { GroupHero } from "@/components/dashboard/group-hero";
-import { GroupMemberEntries } from "@/components/dashboard/group-member-entries";
 import { GroupMemberPanel } from "@/components/dashboard/group-member-panel";
 import { GroupPulse } from "@/components/dashboard/group-pulse";
-import { GroupRecentUpdates } from "@/components/dashboard/group-recent-updates";
 import { DayTimeline, DayTimelineLink } from "@/components/dashboard/day-timeline";
 import { useGroupDataContext } from "@/components/dashboard/group-data-context";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -25,26 +23,18 @@ export function GroupHomePage({ dayPlan }: { dayPlan?: DayPlan | null }) {
           eyebrow={`${members.length} 位成员`}
           title="全组"
         >
-          {latest
-            ? `最近更新 ${formatDate(latest.startedAt)} ${formatTime(latest.startedAt)} · ${latest.memberLabel}`
-            : "还没有加载到任何场次"}
         </PageHeader>
-
-        <GroupPulse totals={totals} />
       </div>
 
       <DayTimeline action={<DayTimelineLink />} plan={dayPlan ?? null} />
 
       <GroupHero members={members} />
-      <GroupRecentUpdates rows={rows} />
       <GroupMemberPanel
         attendanceEnd={attendanceEnd}
         attendanceStart={attendanceStart}
         days={days}
         members={members}
       />
-      <GroupMemberEntries members={members} />
     </div>
   );
 }
-

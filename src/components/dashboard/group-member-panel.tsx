@@ -61,77 +61,8 @@ export function GroupMemberPanel({
 
   return (
     <Panel>
-      <PanelHead
-        actions={
-          <ToggleGroup
-            aria-label="成员对比指标"
-            onValueChange={changeMetric}
-            size="sm"
-            value={[metric]}
-          >
-            {MEMBER_METRICS.map(option => (
-              <ToggleGroupItem
-                className="rounded-full px-2.5 text-footnote text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background"
-                key={option.key}
-                value={option.key}
-              >
-                {option.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        }
-        meta="全期累计 · 按公开场次统计"
-        title="成员"
-      />
-
-      <PanelBody>
-        <ol className="flex flex-col gap-3">
-          {standings.map((row, index) => (
-            <li key={row.id} style={{ "--member-color": row.color } as CSSProperties}>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="w-4 shrink-0 text-caption tabular-nums text-ink-3">
-                    {index + 1}
-                  </span>
-                  <MemberDot color={row.color} />
-                  <span className="truncate text-body font-medium text-foreground">
-                    {row.label}
-                  </span>
-                </span>
-                <span className="shrink-0 text-footnote tabular-nums text-foreground">
-                  <span className="font-medium">{formatMetricValue(row.value, active)}</span>
-                  <span className="ml-1 text-caption text-ink-3">{active.unit}</span>
-                </span>
-              </div>
-
-              <div className="mt-1 flex items-center gap-2">
-                {row.value == null ? (
-                  <span aria-hidden="true" className="h-1.5 flex-1 rounded-full bg-hairline" />
-                ) : (
-                  <Meter
-                    aria-label={`${row.label} ${active.label}`}
-                    aria-valuetext={`${formatMetricValue(row.value, active)} ${active.unit}`}
-                    className="flex-1 gap-0"
-                    max={maxValue}
-                    min={0}
-                    value={row.value}
-                  >
-                    <MeterTrack className="h-1.5 rounded-full bg-hairline">
-                      <MeterIndicator className="rounded-full bg-member" />
-                    </MeterTrack>
-                  </Meter>
-                )}
-                <span className="w-10 shrink-0 text-right text-caption tabular-nums text-ink-3">
-                  {row.share == null ? "—" : formatPercent(row.share * 100, 0)}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </PanelBody>
-
       {attendance && attendance.weeks > 0 ? (
-        <div className="border-t border-hairline px-5 py-3">
+        <div className="border-hairline px-5 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
             <h3 className="text-caption text-ink-3">近 {attendance.days} 天出勤</h3>
             <p className="text-caption text-ink-3 tabular-nums">
@@ -241,16 +172,6 @@ export function GroupMemberPanel({
           ) : null}
         </div>
       ) : null}
-
-      <PanelNote>
-        <p>场次含会员限定；弹幕 / 时长 / SC / 同接只计公开场次。</p>
-        <p className="mt-0.5 text-caption text-ink-3">
-          右侧为占全组比例；平均同接按场次时长加权，不参与占比。
-        </p>
-        <p className="mt-0.5 text-caption text-ink-3">
-          出勤按周排列：每列一周、周一在上，标签为每 4 周的第一天；颜色越深表示当天场次越多。
-        </p>
-      </PanelNote>
     </Panel>
   );
 }

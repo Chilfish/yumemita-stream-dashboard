@@ -59,7 +59,6 @@ export function GroupMemberRow({ member }: GroupMemberRowProps) {
             color={color}
             label={member.dataset.label}
           />
-          <MemberDot color={color} />
           <span className="block min-w-0 font-medium text-foreground">
             {member.dataset.label}
           </span>
@@ -90,10 +89,6 @@ export function GroupMemberRow({ member }: GroupMemberRowProps) {
             <span className="block text-body text-foreground transition-colors duration-120 ease-out group-hover:text-member-ink">
               {stream.title}
             </span>
-            <span className="mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 text-caption">
-              <InlineValue label={primary.label} unit={primary.unit} value={primary.value} />
-              <InlineValue label={secondary.label} unit={secondary.unit} value={secondary.value} />
-            </span>
           </span>
         </Link>
       ) : (
@@ -102,4 +97,3 @@ export function GroupMemberRow({ member }: GroupMemberRowProps) {
     </li>
   );
 }
-

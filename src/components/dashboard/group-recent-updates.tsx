@@ -145,4 +145,3 @@ export function GroupRecentUpdates({ rows }: GroupRecentUpdatesProps) {
     </Panel>
   );
 }
-

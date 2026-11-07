@@ -46,7 +46,6 @@ export function GroupMemberEntries({ members }: GroupMemberEntriesProps) {
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-center gap-1.5 text-body font-medium text-foreground">
                     <span className="min-w-0">{member.dataset.label}</span>
-                    <MemberDot color={color} />
                   </span>
                   <span className="block text-caption text-ink-3 tabular-nums">
                     {member.latest
@@ -65,4 +64,3 @@ export function GroupMemberEntries({ members }: GroupMemberEntriesProps) {
     </section>
   );
 }
-
