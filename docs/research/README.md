@@ -1,0 +1,18 @@
+# 调研（Research）
+
+本目录存放与具体实现解耦的通用问题调研：外部资料、现象分析、机制解释与可迁移的做法。项目内的执行规范仍放在 `engineering/`、`ui-design/` 与 `planning/`。
+
+## 索引
+
+| 文档 | 说明 | 日期 |
+| --- | --- | --- |
+| [ai-generated-ui-density.md](./ai-generated-ui-density.md) | AI 生成界面为什么倾向堆信息、加脚注与重复入口；外部观察、机制与规避方法 | 2026-11-07 |
+| [agents-md-structure.md](./agents-md-structure.md) | AGENTS.md / CLAUDE.md 的合理长度与结构；渐进披露、维护规则与外部依据 | 2026-11-07 |
+
+## 约定
+
+- 区分「外部观察」与「本仓库结论」；引用给出来源与日期。
+- 调研不替代规范：可执行规则写进对应规范文档，并在报告里链接。
+- 结论带适用边界；不把从业者经验写成受控实验。
+- 外部链接失效时保留标题与出处，不直接删除段落。
+- 根指令文件的取舍与维护规则见 [agents-md-structure.md](./agents-md-structure.md)。

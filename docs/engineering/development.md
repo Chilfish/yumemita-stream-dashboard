@@ -104,7 +104,6 @@ src/
 │  └─ ui/           coss ui primitives（生成物）
 ├─ stores/          Zustand：主题等全局状态
 ├─ styles/app.css   Tailwind v4 + coss token + 动效
-├─ legacy/pages/    旧 React Router 页面，仅迁移参考
 ├─ middleware.ts    请求 id、安全头
 ├─ worker.ts        Cloudflare Worker 入口
 └─ env.d.ts         Astro App.Locals 类型
@@ -153,8 +152,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 - 当前用 Astro 文件路由：`src/pages/index.astro`（组首页）、`404.astro`、`500.astro`；稳定页面显式 `export const prerender = true`。
 - 页面从 `src/lib/seo.ts` 的 `buildSeo()` 生成 `SeoMeta`，交给 `<Layout meta={meta}>` 输出 title / description / canonical / OG / JSON-LD。
-- 旧 React Router 路由表已删除；URL 形态与旧页面逻辑保留在 `src/legacy/pages/`，迁移时逐页改写成 `.astro` + 岛屿。
-- 目标 URL 形态（阶段 3 实现）：`/:id` 成员首页、`/:id/streams?q=&type=&sort=&dir=&vstats=`、`/:id/trends`、`/:id/stream/:videoId?view=`、`/:id/compare?ids=a,b,c`、`/:id/about`；旧地址 `/:id/overview`、`/:id/table` 用 `Astro.redirect()`。
+- 旧 React Router 路由表与 `src/legacy/` 已删除；当前 URL 形态：`/:id` 成员首页、`/:id/streams?q=&type=&sort=&dir=&vstats=`、`/:id/trends`、`/:id/stream/:videoId?view=`、`/:id/compare?ids=a,b,c`、`/:id/about`；旧地址 `/:id/overview`、`/:id/table` 用 `Astro.redirect()`。
 - 表格参数继续用 `parseTableParams` / `writeTableParams`（`lib/table-params.ts`）；岛屿内更新用 `history.replaceState`。
 
 ## D3 图表写法
@@ -214,7 +212,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 3. 交互部分拆成岛屿（`client:visible` / `client:load`），props 只传可序列化数据；首屏正文由 `.astro` 输出。
 4. 在 `src/lib/routes.ts` 的 `VIEWS` 加 key，并在 `app-sidebar.tsx` 的 `NAV_ITEMS` 加导航项。
 5. 如果新视图需要新聚合，先在 `lib/aggregate.ts` 加函数和测试。
-6. 迁移旧页面时从 `src/legacy/pages/` 对照，不要继续修改旧文件。
+6. 新增页面按现有 Astro 结构实现，不要参考已删除的旧页面。
 
 ## 加一个聚合指标
 
@@ -243,7 +241,7 @@ bun run test:watch
 
 - `astro check` 是当前 typecheck 入口；它暂不支持 TypeScript 7，仓库锁定 TypeScript 6（与模板一致）。
 - 路径别名只写在 `tsconfig.json` 的 `paths`（`@/*` → `./src/*`）；`astro.config.mjs` 与 `vitest.config.ts` 使用同一别名。
-- `scripts/` 与 `src/legacy/` 暂不进入 `astro check`（旧链路沿用原有类型边界），接入 ingest 后会单独补类型检查。
+- `scripts/` 由 `oxlint` 覆盖，不进入 `astro check`；新增脚本仍要保证无 `any` 与未使用导入。
 - 构建产物：`dist/` 是 Cloudflare Worker + 静态资源；`astro build` 只预渲染 404 / 500，数据页请求期渲染。
 - 本地预览 `bun run preview` 走 workerd，与线上响应头（`cache-tag` / `cloudflare-cdn-cache-control`）一致。
 

@@ -1,14 +1,13 @@
 # 代码规范
 
-**项目**：yumemita-stream-dashboard | **最后更新**：2026-11-03
-**当前实现**：Astro 7 + Cloudflare Workers + TypeScript 6（迁移阶段 0）。PostgreSQL 查询与页面迁移尚未完成，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。旧 React Router 页面只保留在 `src/legacy/pages/`。
+**项目**：yumemita-stream-dashboard | **最后更新**：2026-11-07
+**当前实现**：Astro 7 + Cloudflare Workers + PostgreSQL，请求期 SSR。页面在 `src/pages/*.astro`，数据入口在 `src/db/queries/`；旧 React Router 页面已删除。
 
 ## 文件与命名
 
 | 类型 | 风格 | 示例 |
 | --- | --- | --- |
 | Astro 页面 | kebab-case | `src/pages/index.astro`、`[...].astro` |
-| 旧路由页面（迁移参考） | kebab-case | `src/legacy/pages/stream-page.tsx` |
 | React 组件 | PascalCase | `StreamDetailView.tsx`、`GroupHero.tsx` |
 | coss UI 组件 | kebab-case | `src/components/ui/button.tsx` |
 | hooks | kebab-case，`use-` 前缀 | `use-dataset.ts`、`use-stream-packs.ts` |
@@ -24,12 +23,12 @@
 
 ## 代码风格基线
 
-旧代码使用 **分号 + 双引号 + 2 空格缩进**；迁移阶段 0 新增的 Astro 文件沿用模板的 **无分号 + 单引号 + 2 空格缩进**。两种风格暂并存，阶段 3 页面迁移完成后用一次独立 commit 统一，不要在功能提交里混入全文件格式化。
+React 组件使用 **分号 + 双引号 + 2 空格缩进**；Astro 文件沿用模板的 **无分号 + 单引号 + 2 空格缩进**。两种风格并存，不要在功能提交里混入全文件格式化；统一格式单独提交。
 
 ```ts
-import { useEffect, useState } from "react";
-import { fetchManifest } from "@/lib/data";
-import type { BatchManifest } from "@/types/dataset";
+import type { StreamRow } from "@/types/db";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 ```
 
 - import 顺序：`type` 导入 → 外部依赖 → `@/` 别名 → 相对路径。
@@ -37,7 +36,7 @@ import type { BatchManifest } from "@/types/dataset";
 - 禁止 wildcard import（`import * as X`），类型导入除外。
 - 不用 `any`；外部数据先断言再校验。
 
-> 迁移到 Astro 模板时，如果整体采用模板的「无分号 + 单引号」格式，先用一次独立 commit 统一格式化，不要在功能提交里混入。
+> 如果决定统一成一种格式，先用一次独立 commit 完成，不要在功能提交里混入。
 
 ## TypeScript
 

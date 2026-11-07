@@ -246,7 +246,7 @@ bun run transcript:import "D:/messages/archives/…/2026-10-13_ライブ振り�
 
 - 单一真源：封面来自 pack 的 `video.thumbnail`，逐字稿来自 `content/`；派生索引一律由发布步骤生成，不手改。
 - 增量、可续跑、单条失败不阻塞（与 `fetch-streams` / `publish:assets` 一致）。
-- 不新增常驻服务、数据库、账号体系；对象存储 + 静态托管仍是唯一运行时依赖。
+- 不新增额外的常驻服务、数据库或账号体系；运行时依赖保持为 Cloudflare Workers + Neon PostgreSQL + R2。
 - 外部服务（YouTube、推文归档）一律可降级，不能成为首屏阻塞。
 - 新依赖需要维护性理由；封面转码用 Bun 自带的 `Bun.Image`、逐字稿不引编辑器，都是这个原则的体现。
 - 路由和 URL 参数保持可分享、可刷新、可后退。

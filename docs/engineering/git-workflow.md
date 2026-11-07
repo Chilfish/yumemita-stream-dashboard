@@ -94,23 +94,16 @@ bun run db:query       # 改查询层时必跑
 
 ## 部署
 
-当前部署目标是静态托管（Vercel / 任意静态托管），数据在 R2：
-
-```bash
-bun run build
-# 部署用 wrangler；数据更新单独跑 ingest + publish:assets + purge
-```
-
-迁移目标是 Cloudflare Workers，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)：
+当前部署目标是 Cloudflare Workers + Neon PostgreSQL，媒体在 R2；部署入口见 [deployment.md](./deployment.md)：
 
 ```bash
 bunx wrangler secret put DATABASE_URL
-bun run build
-bunx wrangler deploy --config dist/server/wrangler.json
+bun run cf:deploy
 ```
 
 - 部署前跑通验证门禁与 [release-checklist.md](./release-checklist.md)。
-- 当前没有自动部署流水线；`main` 的部署由维护者手动执行。
+- `cf:deploy` 会从零构建、扫描本机地址后部署；不要直接用根 `wrangler.jsonc` 部署。
+- 数据更新单独跑 `db:ingest` + `publish:assets` + `purge:cache`，不需要重新构建前端。
 - R2 凭据只在上传 / 抓取环境注入，不进入前端构建产物。
 
 ## AI 协作开发
@@ -118,5 +111,5 @@ bunx wrangler deploy --config dist/server/wrangler.json
 - 文档先行：先更新 [planning/backlog.md](../planning/backlog.md) 或方案文档，再写代码。
 - 验证先行：先写验收标准，再实现。
 - 新库 API 行为不确定时，先写最小 spike 实测，不凭记忆写集成代码。
-- 新 Bug 模式写 postmortem，预防项同步到 `AGENTS.md` 或本文件。
+- 新 Bug 模式写 postmortem，预防项同步到本文件或 postmortem 基线雷区；只有每次任务都成立的约束才进 `AGENTS.md`。
 - 文档与界面文案按 [writing-style.md](../writing-style.md) 执行。

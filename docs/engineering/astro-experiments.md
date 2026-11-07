@@ -1,7 +1,7 @@
 # Astro 迁移实验与可复用模式
 
 > 本文件记录模板 `starter-astro-react` 已验证过的 Astro 模式，以及本项目迁移时的落点。
-> 这些模式目前**不在本仓库运行**；当前实现仍是 React Router 8 + Vite。迁移方案见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。
+> 这些模式已在本仓库落地；当前实现是 Astro 7 SSR + Cloudflare Workers + PostgreSQL。迁移决策见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。
 > 模板的原始实验记录：`starter-astro-react` 仓库的 `docs/engineering/astro-experiments.md`（本地路径 `D:\git\starter-astro-react\docs\engineering\astro-experiments.md`）。
 
 ## 一、可复用模式

@@ -30,6 +30,7 @@ docs/
 ├── engineering/                 # 工程规范、开发、部署、性能、排查
 │   ├── README.md
 │   ├── code-style.md
+│   ├── code-map.md
 │   ├── git-workflow.md
 │   ├── release-checklist.md
 │   ├── development.md
@@ -76,10 +77,12 @@ docs/
 | 新增功能 / 判断功能边界 | [requirements-spec.md](./requirements/requirements-spec.md) + [user-stories.md](./requirements/user-stories.md) | FR 编号、验收标准、范围 |
 | 架构级变更 | [architecture.md](./planning/architecture.md) | 分层、数据流、路由与关键决策 |
 | 规划下一阶段 | [backlog.md](./planning/backlog.md) | 未决任务、优先级、前置条件 |
-| 迁移到 Astro / PostgreSQL | [astro-ssr-migration.md](./planning/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 目标架构、数据模型、`.md` 路由、缓存与发布 |
+| 改逐字稿索引 / 长列表 | [transcript-index.md](./planning/transcript-index.md) | 搜索、标签分面、月份导航、折叠与移动端 |
+| 追溯迁移决策 / 数据模型 | [astro-ssr-migration.md](./planning/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 已完成的迁移方案、数据模型、`.md` 路由、缓存与发布 |
 | 规划 / 实现直播日历 | [live-calendar.md](./planning/live-calendar.md) | 未来场次、手工日程、月历与议程视图、缓存与验收 |
 | 优化数据库读路径 | [db-optimization.md](./planning/db-optimization.md) | 查询条数、往返、传输量、缓存与压测 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
+| 不确定该改哪个文件 | [code-map.md](./engineering/code-map.md) | 任务意图 → 关键文件；只放入口 |
 | 本地开发 / 测试 | [development.md](./engineering/development.md) + [local-database.md](./engineering/local-database.md) | 环境、脚本、D3、测试；本地 Postgres 与开发代理 |
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |
 | 发布 | [release-checklist.md](./engineering/release-checklist.md) + [deployment.md](./engineering/deployment.md) | 验证、冒烟、部署、回滚 |
@@ -123,11 +126,10 @@ requirements/ planning/ → engineering/ → 代码 → research/ postmortem/ re
 1. **语言**：文档用简体中文；代码、命令、字段名、commit message 用英文。
 2. **单一入口**：新增、删除、移动文档时同步更新本页；索引只列存在的文件。
 3. **文档即事实**：路径、命令、路由、字段名必须与当前代码一致；改代码时同步清理旧引用。
-4. **不把计划当现状**：未完成的内容放 `planning/backlog.md` 或 `planning/todo-*.md`，正文只写已经成立的事实。
-5. **迁移期**：Astro / PostgreSQL 的内容写在 `planning/`，不要写成当前实现；当前命令仍以 `package.json` 为准。
-6. **写作**：按 [writing-style.md](./writing-style.md) 执行。不堆形容词和黑话，数字带单位，链接写清指向。
-7. **复盘 blameless**：postmortem 归因于系统条件，不归因于个人。
-8. **存档不主动读取**：`archive/` 只作历史参考。
+4. **不把计划当现状**：未完成的内容放 `planning/backlog.md` 或阶段方案，正文只写已经成立的事实；当前命令以 `package.json` 为准。
+5. **写作**：按 [writing-style.md](./writing-style.md) 执行。不堆形容词和黑话，数字带单位，链接写清指向。
+6. **复盘 blameless**：postmortem 归因于系统条件，不归因于个人。
+7. **存档不主动读取**：`archive/` 只作历史参考。
 
 ## 五、验证
 
@@ -138,20 +140,21 @@ bun run check          # astro check + vitest + oxlint
 bun run build          # astro build（Worker + 预渲染 404/500）
 bun run preview        # Cloudflare workerd 预览
 bun run db:bench       # 冷渲染 SQL / HTTP 往返与 p50/p95（本地库）
-bun run validate:data  # 校验旧数据链路的 index / manifest / insights / group-*
+bun run db:verify      # 数据库一致性
+bun run db:query       # 查询层冒烟
+bun run validate:data  # 校验数据链路的 index / manifest / insights / group-*
 ```
 
 - 涉及页面的改动必须在 `bun run dev` 或 `bun run preview` 下手工走查相关路径。
-- 数据改动要跑 `validate:data`；发布后加 `--remote` 确认对象存储可达。
+- 数据改动要跑 `db:verify` 与 `validate:data`；发布后加 `--remote` 确认对象存储可达。
 - 不把「构建通过」当作功能已验证；未执行的检查标注「未验证」。
-- 阶段 1 接入 PostgreSQL 后，验证会补上 `scripts/verify-db.ts` 与 `.md` 端点检查。
 
 ## 六、根目录文档
 
 | 文档 | 说明 |
 | --- | --- |
 | [README.md](../README.md) | 项目介绍、技术栈、路由、环境变量、部署 |
-| [AGENTS.md](../AGENTS.md) | AI Agent 协作指南（意图 → 文件映射、强制规范） |
+| [AGENTS.md](../AGENTS.md) | AI Agent 协作入口（强制规范、技术约束、工作流） |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | 人类贡献者指南 |
 | [CHANGELOG.md](../CHANGELOG.md) | 变更日志 |
 | [NOTICE.md](../NOTICE.md) | 数据与内容版权说明 |

@@ -20,9 +20,10 @@ planning/（规划与执行：怎么做、做到哪了）
 
 | 文档 | 说明 | 何时阅读 |
 | --- | --- | --- |
-| [architecture.md](./architecture.md) | 当前 React Router + Vite 的分层、数据流、路由、状态与图表策略 | 任何架构级变更前 |
+| [architecture.md](./architecture.md) | 当前 Astro 7 + Workers + PostgreSQL 的分层、数据流、路由、状态与图表策略 | 任何架构级变更前 |
 | [backlog.md](./backlog.md) | 任务清单：未完成项、已完成历史、审查承接区 | 规划下一阶段任务 |
-| [astro-ssr-migration.md](./astro-ssr-migration.md) | Astro 7 + Cloudflare Workers + PostgreSQL + R2 迁移方案；SSR、数据模型、`.md` 路由、缓存与发布 | 规划或执行迁移 |
+| [astro-ssr-migration.md](./astro-ssr-migration.md) | Astro 7 + Cloudflare Workers + PostgreSQL + R2 迁移决策与实现记录；SSR、数据模型、`.md` 路由、缓存与发布 | 追溯迁移决策时 |
+| [transcript-index.md](./transcript-index.md) | 逐字稿索引的搜索、标签分面、月份导航、折叠、密度与移动端筛选 | 改逐字稿列表或做长列表交互 |
 | [live-calendar.md](./live-calendar.md) | 直播日历：`scheduled_streams`、手工日程、每日同步、月历与议程视图、缓存与验收 | 规划或实现日历页 |
 | [share-card.md](./share-card.md) | 分享卡片的信息层级、间距、配色、导出与验证 | 改分享卡片或截图样式 |
 | [product-direction.md](./product-direction.md) | 封面、相册、逐字稿、组首页、推文联动的产品方向与阶段验收 | 规划产品迭代 |
@@ -36,5 +37,5 @@ planning/（规划与执行：怎么做、做到哪了）
 3. **计划不是现状**：正文只写已经成立的事实；未开工或进行中的任务放 `backlog.md` 或阶段方案。
 4. 新任务先登记再实现，写清来源（需求 / 审查 / postmortem / 用户反馈）。
 5. backlog 状态统一：📋 未开始 / 🚧 进行中 / ✅ 已完成 / ⏸️ 暂缓 / ❌ 已移除。
-6. 迁移类方案必须区分「当前实现」与「目标形态」，不要把 Astro / PostgreSQL 写成已上线。
+6. 方案类文档区分「当前实现」与「目标形态」；已完成的迁移以 `architecture.md` 为准。
 7. 文档与界面文案按 [writing-style.md](../writing-style.md)。

@@ -103,7 +103,7 @@ bun run dev -- --port 4322
 ## 分享的链接打开后不是原来的页面
 
 - 路由是真实路径：完整链接为 `https://example.com/nonoka/stream/<videoId>`。旧版本的 `#/...` 链接会在应用启动前自动改写成真实路径。
-- 静态托管必须配置 SPA 回退（`vercel.json` 已带），否则直接刷新深链会 404。
+- 深链是真实路径，由 Astro 文件路由与 Worker 处理，不需要 SPA 回退。刷新 404 时检查 `src/pages/` 的页面文件与 `dist/server/wrangler.json` 的路由配置。
 - 链接里的 `videoId` 或 `datasetId` 不存在时会重定向/提示：dataset 不合法回到首个数据集；场次不存在显示「找不到这场直播」并标 `noindex`。
 - 旧版本没有路由，之前的页面链接（只有根路径）会回到组首页，这是预期行为。
 - 切换数据集时只会保留当前 section（单场会回到该数据集最新一场），不会保留原来的 `videoId`。

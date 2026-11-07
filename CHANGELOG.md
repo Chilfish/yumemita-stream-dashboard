@@ -11,6 +11,9 @@
 
 ### 文档
 
+- **AGENTS.md 精简为入口文件**：236 → 57 行，只保留项目一句话、先读入口、强制规范、技术约束与工作流；任务意图 → 文件移到 [docs/engineering/code-map.md](docs/engineering/code-map.md)，取舍依据见 [docs/research/agents-md-structure.md](docs/research/agents-md-structure.md)。
+- 新增 [docs/research/ai-generated-ui-density.md](docs/research/ai-generated-ui-density.md)：AI 生成界面信息密度问题的外部观察、机制分析、组首页案例与规避方法。
+- 新增 [docs/ui-design/information-density.md](docs/ui-design/information-density.md)：一屏一个焦点、四个冗余信号与生成后的删除清单；同步 `AGENTS.md`、UI 规范、文案规范、postmortem 基线雷区、PR 模板与审查清单。
 - 文档不再写死总场次与 sitemap 条数（本地 pack、数据库与 CDN 会短时不一致），统一改为「以数据库为准」并给出计算公式。
 
 - 按模板 `starter-astro-react` 的文档规范重组 `docs/`：拆成 `requirements/`、`planning/`、`engineering/`、`data/`、`ui-design/`、`postmortem/`、`reviews/`、`development-log/`、`archive/`；根目录只保留 `README.md` 与 `writing-style.md`，`docs/README.md` 作为唯一入口。

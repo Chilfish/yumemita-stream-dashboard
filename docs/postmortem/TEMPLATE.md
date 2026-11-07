@@ -51,7 +51,7 @@
 
 ### 预防（针对整类问题）
 
-- [ ] 面向整类问题；流程级预防同步到 `AGENTS.md` / `docs/engineering/git-workflow.md`
+- [ ] 面向整类问题；流程级预防同步到对应规范；只有每次任务都成立的约束才进 `AGENTS.md`
 - [ ] 能落成门禁的，补检查或测试，并确认故意改坏时会变红
 
 ## 教训
@@ -85,4 +85,4 @@ path/to/changed-file
 3. 填写各章节；根因归因到系统条件，不 blame 个人。
 4. 在 [README.md](./README.md) 索引表加一行。
 5. 将「教训」浓缩为「基线雷区」的一条自查规则。
-6. 若预防属流程级，同步到 `AGENTS.md` 或 `docs/engineering/git-workflow.md`。
+6. 若预防属流程级，同步到对应规范（如 `docs/engineering/git-workflow.md`）；只有每次任务都成立的约束才进 `AGENTS.md`。
