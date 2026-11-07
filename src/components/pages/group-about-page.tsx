@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
 import type { ReactNode } from "react";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { useGroupDataContext } from "@/components/dashboard/group-data-context";
+import { PageHeader } from "@/components/dashboard/primitives/page-header";
+import { useGroupDataContext } from "@/components/dashboard/contexts/group-data-context";
 import { formatInteger } from "@/lib/format";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 

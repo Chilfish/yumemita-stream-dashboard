@@ -2,19 +2,19 @@ import type { CSSProperties } from 'react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { PackStatus } from '@/types/datapack'
 import { TriangleAlert } from 'lucide-react'
-import { AppHeader } from '@/components/dashboard/app-header'
-import { AppSidebar } from '@/components/dashboard/app-sidebar'
-import { DatasetViewContext } from '@/components/dashboard/dataset-view-context'
-import { MobileTabBar } from '@/components/dashboard/mobile-tab-bar'
+import { AppHeader } from '@/components/dashboard/shell/app-header'
+import { AppSidebar } from '@/components/dashboard/shell/app-sidebar'
+import { DatasetViewContext } from '@/components/dashboard/contexts/dataset-view-context'
+import { MobileTabBar } from '@/components/dashboard/shell/mobile-tab-bar'
 import { CalendarPage } from '@/components/pages/calendar-page'
 import { GalleryPage } from '@/components/pages/gallery-page'
 import { HomePage } from '@/components/pages/home-page'
 import { StreamsPage } from '@/components/pages/streams-page'
 import { TranscriptsPage } from '@/components/pages/transcripts-page'
 import { TrendsPage } from '@/components/pages/trends-page'
-import { CompareView } from '@/components/dashboard/compare-view'
-import { LockedStreamView } from '@/components/dashboard/locked-stream-view'
-import { StreamDetailView } from '@/components/dashboard/stream-detail-view'
+import { CompareView } from '@/components/dashboard/compare/compare-view'
+import { LockedStreamView } from '@/components/dashboard/stream/locked-stream-view'
+import { StreamDetailView } from '@/components/dashboard/stream/stream-detail-view'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
@@ -39,7 +39,7 @@ import { useShellTheme } from './shell-theme'
 
 // 命令面板只在 ⌘K 打开时渲染，先按需加载，避免把 autocomplete / dialog 塞进首屏包。
 const CommandPalette = lazy(() =>
-  import('@/components/dashboard/command-palette').then(module => ({
+  import('@/components/dashboard/shell/command-palette').then(module => ({
     default: module.CommandPalette,
   })))
 

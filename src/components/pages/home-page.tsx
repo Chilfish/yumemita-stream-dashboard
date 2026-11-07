@@ -1,5 +1,5 @@
-import { useDatasetView } from "@/components/dashboard/dataset-view-context";
-import { MemberHomeView } from "@/components/dashboard/member-home-view";
+import { useDatasetView } from "@/components/dashboard/contexts/dataset-view-context";
+import { MemberHomeView } from "@/components/dashboard/home/member-home-view";
 
 export function HomePage() {
   const { dataset, manifest, rows, totals } = useDatasetView();

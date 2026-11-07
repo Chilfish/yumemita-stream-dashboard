@@ -8,6 +8,7 @@
 - **R2 迁到独立桶 `yumemita-data`**：封面、表情、逐字稿正文与 `archive/` 从共享 `static` 桶（前缀 `stream-dashboard`）复制到新桶的桶根，不再有公共前缀；`publish:data` / `publish:transcripts` 默认写入新桶，Worker 的 `r2_buckets` binding 读到的 `transcripts.r2_key` 可直接命中。
 - **`.md` 封面地址修正**：frontmatter 的 `image` 改用 `PUBLIC_R2_BASE` 拼绝对地址，不再拼成站内 `/thumbs/...`（会 404）。
 - **缓存失效补齐**：`daily-update` 与 `purge-cache --dataset` 在成员有新增场次时同时失效 `gallery`，全组相册不再等 TTL 自然过期。
+- **dashboard 组件按领域重组**：59 个平铺文件拆到 `contexts/`、`primitives/`、`shell/` 与 10 个领域目录，页面外壳只做组合；新增 [component-organization.md](docs/engineering/component-organization.md) 约定分层、依赖方向与拆分门槛。
 
 ### 文档
 

@@ -1,9 +1,9 @@
 import { ChartCard, EmptyChart } from "@/components/charts/chart-card";
 import { MultiLineChart, type ChartSeries } from "@/components/charts/multi-line-chart";
-import { CopyLinkButton } from "@/components/dashboard/copy-link-button";
-import { DataTable, type DataColumn } from "@/components/dashboard/data-table";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { Panel, PanelBody, PanelHead } from "@/components/dashboard/panel";
+import { CopyLinkButton } from "@/components/dashboard/primitives/copy-link-button";
+import { DataTable, type DataColumn } from "@/components/dashboard/primitives/data-table";
+import { PageHeader } from "@/components/dashboard/primitives/page-header";
+import { Panel, PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";

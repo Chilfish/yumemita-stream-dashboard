@@ -144,7 +144,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 - `Select` 用 **items-first**：`<Select items={items}>` + `<SelectItem value={item}>`；不要沿用 Radix 的纯 children 写法。
 - `Button` 默认 `type="button"`；表单里要显式写 `type`。
-- `Table` 自身不带排序/分页；场次表的筛选/排序状态存在 URL 里，由 `streams-page.tsx` + `lib/table-params.ts` 管理，`streams-view.tsx` + `dashboard/data-table.tsx` 是受控视图。
+- `Table` 自身不带排序/分页；场次表的筛选/排序状态存在 URL 里，由 `streams-page.tsx` + `lib/table-params.ts` 管理，`dashboard/streams/streams-view.tsx` + `dashboard/primitives/data-table.tsx` 是受控视图。
 - 导航用 `SidebarMenuButton render={<NavLink to={...} />}`；active 状态自己算好传给 `isActive`，不要给 `NavLink` 传函数式 `className`。
 - 侧边栏折叠样式靠祖先的 `group-data-[collapsible=icon]`；只在折叠时隐藏的内容加这个 class。
 
@@ -207,10 +207,10 @@ bunx --bun shadcn@latest add @coss/ui -y
 
 ## 加一个页面（Astro）
 
-1. 在 `src/components/dashboard/` 新建视图组件，props 只接收 `StreamRow[]` / `DatasetTotals` / 单场 `StreamRow`。
+1. 在 `src/components/dashboard/<domain>/` 新建视图组件，props 只接收 `StreamRow[]` / `DatasetTotals` / 单场 `StreamRow`；落位规则见 [component-organization.md](./component-organization.md)。
 2. 在 `src/pages/` 新建 `.astro`，用 `buildSeo()` 生成 meta，`<Layout meta={meta}>` 包住内容；数据页写 `export const prerender = false`。
 3. 交互部分拆成岛屿（`client:visible` / `client:load`），props 只传可序列化数据；首屏正文由 `.astro` 输出。
-4. 在 `src/lib/routes.ts` 的 `VIEWS` 加 key，并在 `app-sidebar.tsx` 的 `NAV_ITEMS` 加导航项。
+4. 在 `src/lib/routes.ts` 的 `VIEWS` 加 key，并在 `dashboard/shell/app-sidebar.tsx` 的 `NAV_ITEMS` 加导航项。
 5. 如果新视图需要新聚合，先在 `lib/aggregate.ts` 加函数和测试。
 6. 新增页面按现有 Astro 结构实现，不要参考已删除的旧页面。
 

@@ -1,6 +1,6 @@
 import { useSearchParams } from "@/lib/router-compat";
-import { useDatasetView } from "@/components/dashboard/dataset-view-context";
-import { StreamsView } from "@/components/dashboard/streams-view";
+import { useDatasetView } from "@/components/dashboard/contexts/dataset-view-context";
+import { StreamsView } from "@/components/dashboard/streams/streams-view";
 import { type TableParams, parseTableParams, writeTableParams } from "@/lib/table-params";
 
 export function StreamsPage() {

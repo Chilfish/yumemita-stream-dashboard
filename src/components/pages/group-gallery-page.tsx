@@ -1,9 +1,9 @@
 import { RotateCcw } from "lucide-react";
 import { useMemo } from "react";
 import { useSearchParams } from "@/lib/router-compat";
-import { GalleryView } from "@/components/dashboard/gallery-view";
-import { useGroupDataContext } from "@/components/dashboard/group-data-context";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { GalleryView } from "@/components/dashboard/gallery/gallery-view";
+import { useGroupDataContext } from "@/components/dashboard/contexts/group-data-context";
+import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {

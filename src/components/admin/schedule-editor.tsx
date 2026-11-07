@@ -8,7 +8,7 @@ import {
 } from "@/components/admin/schedule-form-state";
 import { ScheduleForm } from "@/components/admin/schedule-form";
 import { ScheduleList } from "@/components/admin/schedule-list";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import {
   AlertDialog,
   AlertDialogClose,

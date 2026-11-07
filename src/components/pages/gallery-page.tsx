@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { Link } from "@/lib/router-compat";
-import { useDatasetView } from "@/components/dashboard/dataset-view-context";
-import { GalleryView, type GalleryRow } from "@/components/dashboard/gallery-view";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { useDatasetView } from "@/components/dashboard/contexts/dataset-view-context";
+import { GalleryView, type GalleryRow } from "@/components/dashboard/gallery/gallery-view";
+import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 import { streamsPath } from "@/lib/routes";

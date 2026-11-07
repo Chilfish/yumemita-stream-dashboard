@@ -1,5 +1,5 @@
 import { TriangleAlert } from "lucide-react";
-import { CalendarView } from "@/components/dashboard/calendar-view";
+import { CalendarView } from "@/components/dashboard/calendar/calendar-view";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { CalendarPageData } from "@/types/calendar";
 

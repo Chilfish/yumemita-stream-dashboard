@@ -1,9 +1,9 @@
-import { GroupHero } from "@/components/dashboard/group-hero";
-import { GroupMemberPanel } from "@/components/dashboard/group-member-panel";
-import { GroupPulse } from "@/components/dashboard/group-pulse";
-import { DayTimeline, DayTimelineLink } from "@/components/dashboard/day-timeline";
-import { useGroupDataContext } from "@/components/dashboard/group-data-context";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { GroupHero } from "@/components/dashboard/group/group-hero";
+import { GroupMemberPanel } from "@/components/dashboard/group/group-member-panel";
+import { GroupPulse } from "@/components/dashboard/group/group-pulse";
+import { DayTimeline, DayTimelineLink } from "@/components/dashboard/calendar/day-timeline";
+import { useGroupDataContext } from "@/components/dashboard/contexts/group-data-context";
+import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { formatDate, formatTime } from "@/lib/format";
 import type { DayPlan } from "@/types/calendar";
 

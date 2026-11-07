@@ -1,4 +1,4 @@
-import { CalendarView } from "@/components/dashboard/calendar-view";
+import { CalendarView } from "@/components/dashboard/calendar/calendar-view";
 import type { CalendarPageData } from "@/types/calendar";
 
 interface GroupCalendarPageProps {

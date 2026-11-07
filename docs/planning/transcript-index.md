@@ -1,15 +1,15 @@
 # 逐字稿索引：检索、分面与长列表
 
 > 状态：✅ 已实现（2026-11-07）。
-> 相关代码：`src/components/dashboard/transcripts-view.tsx`、`src/components/dashboard/transcripts-toolbar.tsx`、
+> 相关代码：`src/components/dashboard/transcript/transcripts-view.tsx`、`src/components/dashboard/transcript/transcripts-toolbar.tsx`、
 > `src/components/pages/transcripts-page.tsx`、`src/lib/transcripts.ts`、`src/lib/transcript-params.ts`。
 
 ## 当前实现
 
 - `src/lib/transcript-params.ts`：`q` / `tags` / `sort` / `dense` 的解析、写入与筛选计数，URL 只保存非默认值。
 - `src/lib/transcripts.ts`：搜索分词、标签分面、排序、摘要截取与高亮切分；配 `src/lib/*.test.ts`。
-- `src/components/dashboard/transcripts-toolbar.tsx`：搜索框与单一「筛选」入口；桌面 Popover、移动端底部 Sheet。
-- `src/components/dashboard/transcripts-view.tsx`：月份分组、逐组 disclosure、扁平搜索结果、命中高亮。
+- `src/components/dashboard/transcript/transcripts-toolbar.tsx`：搜索框与单一「筛选」入口；桌面 Popover、移动端底部 Sheet。
+- `src/components/dashboard/transcript/transcripts-view.tsx`：月份分组、逐组 disclosure、扁平搜索结果、命中高亮。
 - `src/pages/[datasetId]/transcripts.astro` 与数据库查询不变，仍是请求期 SSR 传完整索引。
 
 ## 背景

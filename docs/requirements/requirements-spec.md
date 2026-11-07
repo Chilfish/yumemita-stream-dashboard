@@ -103,15 +103,15 @@
 
 | 需求 | 实现位置 | 说明 |
 | --- | --- | --- |
-| `FR-HOME-001` / `FR-MEMBER-001` | `src/pages/`、`src/components/dashboard/group-*`、`member-home-view.tsx` | 组级与成员级页面 |
-| `FR-CAL-001`–`FR-CAL-012` | `src/pages/calendar.astro`、`src/pages/[datasetId]/calendar.astro`、`src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/db/queries/calendar.ts`、`src/lib/calendar.ts`、`src/components/dashboard/calendar-view.tsx`、`src/components/dashboard/day-timeline.tsx`、`scripts/lib/schedule-sync.ts` | 读取、月历 / 议程、自动同步、管理端写入、读取时关联与今天+明天时间线已落地；ICS 暂缓。方案见 [live-calendar.md](../planning/live-calendar.md)，接口见 [schedule-admin.md](../engineering/schedule-admin.md) |
-| `FR-STREAM-001` | `src/components/dashboard/streams-view.tsx`、`src/lib/table-params.ts` | 表格与 URL 状态 |
-| `FR-STREAM-002` | `src/components/dashboard/stream-detail-view.tsx` 等 | 单场分段 |
-| `FR-TREND-001` | `src/components/dashboard/trends-view.tsx`、`src/lib/aggregate.ts` | 聚合与图表 |
-| `FR-GALLERY-*` | `src/components/dashboard/gallery-view.tsx`、`group-gallery-page.tsx` | 相册 |
-| `FR-COMPARE-001` | `src/components/dashboard/compare-view.tsx`、`multi-line-chart.tsx` | 同成员场次对比 |
+| `FR-HOME-001` / `FR-MEMBER-001` | `src/pages/`、`src/components/dashboard/group/`、`src/components/dashboard/home/member-home-view.tsx` | 组级与成员级页面 |
+| `FR-CAL-001`–`FR-CAL-012` | `src/pages/calendar.astro`、`src/pages/[datasetId]/calendar.astro`、`src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/db/queries/calendar.ts`、`src/lib/calendar.ts`、`src/components/dashboard/calendar/calendar-view.tsx`、`src/components/dashboard/calendar/day-timeline.tsx`、`scripts/lib/schedule-sync.ts` | 读取、月历 / 议程、自动同步、管理端写入、读取时关联与今天+明天时间线已落地；ICS 暂缓。方案见 [live-calendar.md](../planning/live-calendar.md)，接口见 [schedule-admin.md](../engineering/schedule-admin.md) |
+| `FR-STREAM-001` | `src/components/dashboard/streams/streams-view.tsx`、`src/lib/table-params.ts` | 表格与 URL 状态 |
+| `FR-STREAM-002` | `src/components/dashboard/stream/stream-detail-view.tsx` 等 | 单场分段 |
+| `FR-TREND-001` | `src/components/dashboard/trends/trends-view.tsx`、`src/lib/aggregate.ts` | 聚合与图表 |
+| `FR-GALLERY-*` | `src/components/dashboard/gallery/gallery-view.tsx`、`group-gallery-page.tsx` | 相册 |
+| `FR-COMPARE-001` | `src/components/dashboard/compare/compare-view.tsx`、`multi-line-chart.tsx` | 同成员场次对比 |
 | `FR-COMPARE-002` | `src/pages/compare.astro`、`src/components/pages/group-compare-page.tsx`、`src/lib/compare.ts`、`src/db/queries/group-compare.ts` | 组级全员对比 |
-| `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript-view.tsx`、`transcripts-view.tsx`、`src/db/queries/transcripts.ts`、`src/pages/[datasetId]/transcripts.astro`、`scripts/publish-transcripts.ts` | 逐字稿 |
+| `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript/transcript-view.tsx`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/db/queries/transcripts.ts`、`src/pages/[datasetId]/transcripts.astro`、`scripts/publish-transcripts.ts` | 逐字稿 |
 | `FR-DATA-*` | `scripts/publish-data.ts`、`scripts/daily-update.ts`、`scripts/lib/` | 数据链路 |
 | `FR-SEO-*` | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | SEO |
 | `FR-AGENT-001` / `FR-ARCH-001` | `src/pages/[datasetId]/stream/[videoId].md.ts`、`src/lib/agent-markdown.ts`、`src/db/queries/` | Agent 视图与数据库查询 |

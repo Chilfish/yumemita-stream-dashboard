@@ -1,5 +1,5 @@
-import { useDatasetView } from "@/components/dashboard/dataset-view-context";
-import { TranscriptsView } from "@/components/dashboard/transcripts-view";
+import { useDatasetView } from "@/components/dashboard/contexts/dataset-view-context";
+import { TranscriptsView } from "@/components/dashboard/transcript/transcripts-view";
 import { useSearchParams } from "@/lib/router-compat";
 import {
   parseTranscriptParams,

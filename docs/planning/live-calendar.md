@@ -37,13 +37,13 @@
 | 纯逻辑 | `src/lib/calendar.ts`、`src/lib/calendar-labels.ts` | 状态派生、月网格、URL 参数；16 + 5 条单测 |
 | 查询 | `src/db/queries/calendar.ts` | 一次查 `streams` 与 `scheduled_streams`，不读 pack |
 | 页面 | `src/pages/calendar.astro`、`src/pages/[datasetId]/calendar.astro` | 全组 / 成员两个入口 |
-| 视图 | `src/components/dashboard/calendar-view.tsx`、`month-grid.tsx`、`agenda-list.tsx`、`calendar-event-row.tsx` | 月历 / 议程、当天 `Popover`、成员筛选 |
+| 视图 | `src/components/dashboard/calendar/calendar-view.tsx`、`month-grid.tsx`、`agenda-list.tsx`、`calendar-event-row.tsx` | 月历 / 议程、当天 `Popover`、成员筛选 |
 | 自动同步 | `scripts/lib/schedule-sync.ts`、`scripts/daily-update.ts` | `is_upcoming` 写日程，`is_live` 更新标记；planner 有单测 |
 | 缓存 | `astro.config.mjs`、`scripts/purge-cache.ts` | `schedule` tag 与 routeRules |
 | 管理端 | `src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/lib/admin-auth.ts`、`src/middleware.ts` | 内部编辑页 + Basic / Cookie 鉴权 |
 | 手工关联 | `src/lib/calendar.ts` 的 `matchSchedulesToStreams` | 按成员 + JST 日期 + 时段匹配真实场次 |
-| 今日计划 | `getDayPlan` / `buildDayPlanFromRows`、`day-timeline.tsx` | 今天 + 明天，组首页与日历页 |
-| 分享卡片 | `src/components/dashboard/share-card.tsx`、`share-button.tsx`、`public/share/bg_member_list.webp` | React + Tailwind 渲染，modern-screenshot 导出 PNG；设计见 [share-card.md](share-card.md) |
+| 今日计划 | `getDayPlan` / `buildDayPlanFromRows`、`calendar/day-timeline.tsx` | 今天 + 明天，组首页与日历页 |
+| 分享卡片 | `src/components/dashboard/calendar/share-card.tsx`、`share-button.tsx`、`public/share/bg_member_list.webp` | React + Tailwind 渲染，modern-screenshot 导出 PNG；设计见 [share-card.md](share-card.md) |
 | 暂缓 | `FR-CAL-009` ICS | 订阅未做 |
 
 与初版设计的偏差：
