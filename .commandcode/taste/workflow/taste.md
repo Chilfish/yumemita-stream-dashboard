@@ -1,0 +1,4 @@
+# Workflow
+
+- Reusable agent skills he asks for should be built against his standard skill-creator spec (`D:\messages\.agents\skills\skill-creator\SKILL.md`) and installed as a proper `<name>/SKILL.md`, not improvised markdown scattered around the repo. Placement is *repo-local*: the skill belongs in the project's own `.agents/` directory (`<repo>/.agents/skills/<name>/SKILL.md`), not in a global/user-level skills dir — correcting the vertical into `~/.agents/skills` drew "I:\dev\yumemita-stream-dashboard\.agents 写在这里了啦". Confidence: 0.6
+- Data-entry fields whose value is genuinely unknown must stay optional rather than being required or filled with an invented placeholder: a schedule entry's title can be omitted entirely ("标题不是必须的，…也确实不知道标题是啥") and the UI shows 「待定」 — forcing a value or fabricating one is the wrong answer. Confidence: 0.5
