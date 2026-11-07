@@ -94,6 +94,7 @@
 - **性能**：首屏只加载当前页面必需的数据；成员页不下载全部 datapack；单场按需拉取。
 - **可访问性**：焦点可见；非文本图表提供 `role` / `aria-label`；200% 缩放不溢出。
 - **样式**：颜色来自设计 Token；浅色 / 深色同时成立；不硬编码颜色。
+- **信息密度**：一屏回答一个问题；同一数字 / 名称 / 状态只出现一次；界面不写统计口径；不加自证式导航（见 [information-density.md](../ui-design/information-density.md)）。
 - **隐私**：不公开 cookie、邮箱、付款信息；会员限定内容上线前确认范围。
 - **SEO**：canonical 为绝对地址且不带 query；表格筛选、相册筛选归一到基路径；对比页与未知路径 `noindex`。
 - **兼容**：旧地址 `/:id/overview`、`/:id/table`、`/:id/stream` 保持 302；`.md` 路由不进 sitemap，用 `X-Robots-Tag: noindex`。
@@ -124,3 +125,4 @@
 | 2026-11-04 | 登记直播日历需求 `FR-CAL-001`–`FR-CAL-009`，方案见 [live-calendar.md](../planning/live-calendar.md)；明确「不做实时看板」仅指直播中指标 | v1.2 |
 | 2026-11-04 | 直播日历读取路径、月历 / 议程、自动同步与缓存落地；`FR-CAL-003` 手工维护按用户要求暂缓，`FR-CAL-009` ICS 未做 | v1.3 |
 | 2026-11-07 | 新增管理端 `FR-CAL-010`、今日计划 `FR-CAL-011`、读取时关联 `FR-CAL-012`；`FR-CAL-003` 改为 `/admin/schedule` 与 `/api/admin/schedule` | v1.4 |
+| 2026-11-07 | 新增「信息密度」非功能约束；组首页删除重复指标、口径脚注与自证式导航 | v1.5 |

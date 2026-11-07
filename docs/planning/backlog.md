@@ -32,6 +32,8 @@
 | B23 | 本地最新数据一键同步线上 | P1 | `.dev.vars` 线上目标 | 2026-11-06 同步需求 | ✅ `bun run sync:remote` 只读 `.dev.vars` 的 `DATABASE_URL_ONLINE` / `R2_*`、强制 `LOCAL=0`；默认只新增（查线上 videoId，窗口最近 7 天开播），`--update-existing` 才刷新旧场次；`daily-update` 把 new/force ID 直接传给 ingest / publish；见 [adding-data.md](../data/adding-data.md) |
 | B24 | 脚本启动时先打印目标环境（本地 / 线上、数据库、存储桶） | P3 | 无 | 2026-11-06 使用反馈 | ✅ `describeEnvironment()` 统一输出，`loadEnvFiles()` 与 publish / fetch / verify 入口共用；不用等跑完才看到地址。见 [scripts/README.md](../../scripts/README.md)「运行环境提示」 |
 | B25 | 日程管理端：宽容时间输入、编辑页组件拆分、移动端列表、直播链接只保留单输入 | P3 | 无 | 2026-11-07 反馈 | ✅ `TimeInput` + `src/lib/time.ts`；`schedule-editor` 拆成容器 / 表单 / 列表 / 表单状态；`md` 以下改堆叠列表；直播链接去掉 `videoId` 输入，`url` 只作外链。见 [time-input.md](../ui-design/time-input.md) 与 [GENERAL.md](../ui-design/GENERAL.md) §7 |
+| B26 | 逐字稿索引：搜索、标签分面、月份分组折叠、密度与移动端筛选（`FR-TRANSCRIPT-002`） | P2 | 无 | 2026-11-07 逐字稿体验讨论 | ✅ `transcripts-toolbar.tsx` 收成搜索 + 单一筛选入口；`q` / `tags` / `sort` / `dense` 写 URL；默认全展开、逐组收起；标签改为元信息文本；移动端底部筛选面板；`bun run test` 416 通过、构建与路由冒烟通过。见 [transcript-index.md](transcript-index.md) |
+| B27 | 界面冗余清理：首页已删重复指标、口径脚注与自证式导航；其余页面按同一清单逐页扫描 | P1 | 无 | 2026-11-07 首页讨论 | 🚧 首页完成；其余页面待扫，规范见 [information-density.md](../ui-design/information-density.md) |
 
 ## 审查承接区
 

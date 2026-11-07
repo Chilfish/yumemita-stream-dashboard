@@ -117,6 +117,9 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 | --- | --- |
 | `any`（含隐式） | 明确类型 / `unknown` + 收窄 |
 | 在视图里重复聚合 | 放 `src/lib/aggregate.ts`，补测试 |
+| 同一概念在页面多处重复 | 只保留一处；见 [information-density.md](../ui-design/information-density.md) |
+| 在界面写统计口径 / 方法学脚注 | 口径写进 `docs/data/data-model.md` |
+| 自证式导航（「详情 →」「进入 X →」） | 标题本身可点，一个区块最多一个动作 |
 | 硬编码颜色 | CSS 变量 / Token |
 | 首屏渲染依赖 `window` | 放到事件或 effect |
 | 手写弹层 / 下拉 | 复用 `src/components/ui/` |

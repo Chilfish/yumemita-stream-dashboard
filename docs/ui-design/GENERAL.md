@@ -20,7 +20,7 @@ import { Card, CardHeader, CardPanel, CardTitle } from "@/components/ui/card";
 import { Button } from "../../components/ui/button";
 ```
 
-迁移到 Astro 模板后，别名改为 `~/*`，届时统一替换，不在功能提交里混改。
+当前别名是 `@/*`；不要改成 `~/*`，也不要混用两种写法。
 
 ### 0.2 类名工具
 
@@ -259,5 +259,9 @@ useMediaQuery({ pointer: "coarse" });
 | `<hr />` 分割区域 | `<Separator />` |
 | 手写弹层 / 下拉 | `Dialog` / `Menu` / `Select` / `Popover` |
 | 窄屏把表格压到标题列一字一行 | `md` 以下改堆叠列表（见 [§7](#7-响应式数据表格)） |
+| 同一数字在 caption、读数与脚注里各写一遍 | 只保留层级最高的一处（见 [information-density.md](./information-density.md)） |
+| 在区块底部解释统计口径 | 口径写进 `docs/data/data-model.md`，界面只展示结果 |
+| 「单场详情 →」「进入 X 的首页 →」 | 标题本身可点，一个区块最多一个动作 |
+| 新面板与已有面板回答同一个问题 | 先写这一屏回答的问题，重复区块删掉 |
 | 在未挂载 Provider 的组件里调用 toast | 先挂载 `ToastProvider` |
 | 导入 `@/components/ui/button` 以外的手写按钮 | 统一用 coss `Button` |

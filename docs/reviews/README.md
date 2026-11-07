@@ -19,6 +19,7 @@
 - [ ] 数据口径：`null` 不被画成 0；币种不换算；时间按 JST
 - [ ] 组件：复用 `src/components/ui/`；未改生成文件里的业务逻辑
 - [ ] 设计 Token：无硬编码颜色，浅色 / 深色同时成立
+- [ ] 信息密度：一个概念只出现一次；无口径脚注与自证式导航（见 [information-density.md](../ui-design/information-density.md)）
 - [ ] 无障碍：焦点可见，图标按钮有可访问名称，图表有 `aria-label`
 - [ ] 性能：没有为单个数字拉完整 manifest；大文件不进首屏
 - [ ] 安全：R2 / 数据库凭据不进客户端 bundle；不渲染不可信 Markdown
@@ -28,7 +29,7 @@
 - [ ] 路径、命令、路由与代码一致；无死链
 - [ ] 新 Bug 模式已写 postmortem
 
-## 审查清单（迁移到 Astro 后追加）
+## 审查清单（Astro / SSR）
 
 - [ ] 每页显式声明 `prerender`，数据页为 `false`
 - [ ] `client:*` 指令与交互需求匹配；`client:only` 未承载首屏正文

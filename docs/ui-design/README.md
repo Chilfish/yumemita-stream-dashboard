@@ -14,6 +14,7 @@
 - [ ] 图标按钮有可访问名称，焦点环可见
 - [ ] 空态、加载态、错误态与默认态一起交付
 - [ ] 390 / 320px 无横向溢出（表格允许自身滚动）
+- [ ] 没有重复表述、口径脚注与自证式导航（见 [information-density.md](./information-density.md)）
 
 ## 1. 核心原则
 
@@ -23,6 +24,7 @@
 4. **分隔线优先于容器**：能用 1px 分隔线和留白分组的，不加边框、不加阴影。
 5. **数字按排版处理**：数值右对齐、等宽，单位小一号、降一级颜色。
 6. **成员色即强调色**：每位成员一个固定色相，图表主色继承成员色；强调面积 < 10%。
+7. **一个概念只出现一次**：同一数字、名称、状态不在标题、正文与脚注里重复；删除清单见 [information-density.md](./information-density.md)。
 
 ## 2. 颜色
 
@@ -137,9 +139,11 @@
 
 ## 9. 文案
 
-界面文案按 [writing-style.md](../writing-style.md)：按钮用动词或名词短语；空态说三件事；错误提示给可执行动作；数字带单位。
+界面文案按 [writing-style.md](../writing-style.md)：按钮用动词或名词短语；空态说三件事；错误提示给可执行动作；数字带单位。不写统计口径脚注，不加「详情 →」这类重复入口。
 
 ## 10. 专题
 
+- [information-density.md](./information-density.md)：一屏一个焦点、四个冗余信号、生成后的删除清单与组首页反例。
+- [AI 生成界面的信息密度问题](../research/ai-generated-ui-density.md)：外部观察、机制分析与通用规避方法。
 - [chat-visualization.md](./chat-visualization.md)：弹幕与事件可视化组件的目标形态、数据契约、虚拟化、导入与正式化路径。当前 `/dev/live-chat` 只是 POC。
 - [time-input.md](./time-input.md)：`TimeInput` 的宽容解析、滚轮选择、键盘与可访问性约定；纯逻辑在 `src/lib/time.ts`。

@@ -48,8 +48,12 @@ docs/
 ├── ui-design/                   # 设计系统与 coss 组件规范
 │   ├── README.md
 │   ├── GENERAL.md
+│   ├── information-density.md
 │   ├── chat-visualization.md
 │   └── time-input.md
+├── research/                    # 通用问题调研
+│   ├── README.md
+│   └── ai-generated-ui-density.md
 ├── postmortem/                  # 事故复盘与基线雷区
 │   ├── README.md
 │   └── TEMPLATE.md
@@ -89,6 +93,8 @@ docs/
 | 做弹幕可视化 / 时间线 | [chat-visualization.md](./ui-design/chat-visualization.md) + [ui-design/README.md](./ui-design/README.md) | 数据契约、行类型、虚拟化、导入与正式化路径 |
 | 查看抓取进度 | [data-progress.md](./data/data-progress.md) | 已入库场次、跳过判定、下一批候选 |
 | 改 UI / 组件 | [ui-design/README.md](./ui-design/README.md) + [GENERAL.md](./ui-design/GENERAL.md) | Token、排版、coss 原子组件；时间输入见 [time-input.md](./ui-design/time-input.md) |
+| 判断信息该不该上屏 | [information-density.md](./ui-design/information-density.md) | 一屏一个焦点、四个冗余信号、删除清单与组首页反例 |
+| 理解 AI 生成页面的通病 | [ai-generated-ui-density.md](./research/ai-generated-ui-density.md) | 外部观察、机制分析、组首页案例与规避方法 |
 | 写文档 / 界面文案 | [writing-style.md](./writing-style.md) | 语气、用词、术语、反例 |
 | 代码审查 | [reviews/README.md](./reviews/README.md) + [TEMPLATE.md](./reviews/TEMPLATE.md) | 审查视角、问题分级、承接流程 |
 | 写代码前防复现 | [postmortem/README.md](./postmortem/README.md) | 基线雷区、高危文件 |
@@ -98,7 +104,7 @@ docs/
 
 ```text
 需求与规划 → 工程规范 → 功能实现 → 反馈沉淀 → 存档
-requirements/ planning/ → engineering/ → 代码 → postmortem/ reviews/ development-log/ → archive/
+requirements/ planning/ → engineering/ → 代码 → research/ postmortem/ reviews/ development-log/ → archive/
 ```
 
 | 事件 | 动作 |
@@ -106,6 +112,7 @@ requirements/ planning/ → engineering/ → 代码 → postmortem/ reviews/ dev
 | 新功能 / 需求变更 | 先更新 `requirements/` 与 `planning/backlog.md`，再实现 |
 | 架构级决策 | 追加到 `planning/architecture.md` 的 ADR |
 | 新 Bug 模式 / 返工 | 写 `postmortem/0NN-*.md`，教训进入「基线雷区」 |
+| 外部调研 / 通用问题 | 写 `research/<主题>.md`，可执行结论同步到对应规范文档 |
 | 每次代码审查 | 记录 `reviews/review-YYYY-MM-DD-<主题>.md`，问题登记 backlog |
 | 每天收尾 | 记录 `development-log/YYYY-MM-DD.md` |
 | 阶段计划完成 | `git mv` 到 `archive/`，更新本页索引 |

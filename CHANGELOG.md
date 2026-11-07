@@ -40,6 +40,7 @@
 
 ### 界面
 
+- **组首页信息克制**：删除与 Hero / 成员面板重复的脉冲、最近更新与成员入口区块，以及重复指标、口径脚注与自证式导航；规则见 [information-density.md](docs/ui-design/information-density.md)。
 - 单场「弹幕与词」的表情榜改用图片渲染（频道表情按 id 取对象存储，Unicode 表情仍显示字符）；付费页的 SC 留言也会显示留言里的表情。
 - **封面层**：`fetch:thumbs` 把 YouTube 封面镜像到本地并随 `publish:data` 上传；首页最近一场、最近场次、单场页与相册统一 16:9 渲染，缺图走成员色兜底。
 - **相册页**：`/:datasetId/gallery`，按 JST 自然月分组的封面墙，懒加载、`?order=` 可分享；侧栏与移动端标签栏新增入口。
