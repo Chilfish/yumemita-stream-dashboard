@@ -1,17 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
+  collectTranscriptTags,
   extractToc,
+  filterTranscripts,
   groupTranscriptsByMonth,
+  matchesTranscriptQuery,
   parseFrontmatter,
   parseTranscriptFile,
   rewriteTimecodes,
   slugifyHeading,
   sortTranscriptEntries,
+  splitTranscriptHighlight,
   stripArchiveBlock,
   timecodeSeconds,
   toIndexEntry,
+  transcriptExcerpt,
+  transcriptMonthShortLabel,
   transcriptObjectKey,
   youtubeTimeUrl,
+  type TranscriptIndexEntry,
 } from "./transcripts";
 
 const SAMPLE = `---
@@ -254,5 +261,128 @@ describe("stripArchiveBlock", () => {
   it("leaves a clean document untouched", () => {
     const source = ["## 1. 开场", "", "正文。", "", "## 附录：中日对照字幕（整理版）"].join("\n");
     expect(stripArchiveBlock(source)).toBe(source);
+  });
+});
+
+describe("index search helpers", () => {
+  const entries: TranscriptIndexEntry[] = [
+    {
+      datasetId: "nonoka",
+      videoId: "a1",
+      date: "2026-10-13",
+      title: "13th live 回顾",
+      tags: ["杂谈", "Live回顾"],
+      summary: "聊了 13th live 的幕后。",
+      updatedAt: "2026-11-07T00:00:00.000Z",
+    },
+    {
+      datasetId: "nonoka",
+      videoId: "a2",
+      date: "2026-09-01",
+      title: "朝活杂谈",
+      tags: ["杂谈", "朝活"],
+      summary: null,
+      updatedAt: "2026-10-01T00:00:00.000Z",
+    },
+    {
+      datasetId: "nonoka",
+      videoId: "a3",
+      date: null,
+      title: "未标日期",
+      tags: ["杂谈"],
+      summary: "没有日期的旧稿。",
+      updatedAt: "",
+    },
+    {
+      datasetId: "nonoka",
+      videoId: "a4",
+      date: "2026-10-20",
+      title: "弹唱练习",
+      tags: ["弹唱"],
+      summary: "吉他练习与闲聊。",
+      updatedAt: "2026-11-01T00:00:00.000Z",
+    },
+  ];
+
+  it("matches all whitespace-separated tokens across title, summary, tags, date and id", () => {
+    expect(matchesTranscriptQuery(entries[0]!, "13th 幕后")).toBe(true);
+    expect(matchesTranscriptQuery(entries[0]!, "2026-10")).toBe(true);
+    expect(matchesTranscriptQuery(entries[0]!, "a1")).toBe(true);
+    expect(matchesTranscriptQuery(entries[0]!, "13th 不存在")).toBe(false);
+    expect(matchesTranscriptQuery(entries[0]!, "  ")).toBe(true);
+  });
+
+  it("requires every selected tag", () => {
+    expect(filterTranscripts(entries, { tags: ["杂谈"] }).map(entry => entry.videoId)).toEqual([
+      "a1",
+      "a2",
+      "a3",
+    ]);
+    expect(filterTranscripts(entries, { tags: ["杂谈", "朝活"] }).map(entry => entry.videoId)).toEqual([
+      "a2",
+    ]);
+    expect(filterTranscripts(entries, { query: "弹唱", tags: ["杂谈"] })).toEqual([]);
+  });
+
+  it("sorts oldest first while keeping undated entries last", () => {
+    expect(sortTranscriptEntries(entries, "oldest").map(entry => entry.videoId)).toEqual([
+      "a2",
+      "a1",
+      "a4",
+      "a3",
+    ]);
+    expect(sortTranscriptEntries(entries, "newest").map(entry => entry.videoId)).toEqual([
+      "a4",
+      "a1",
+      "a2",
+      "a3",
+    ]);
+  });
+
+  it("sorts by title", () => {
+    const items: TranscriptIndexEntry[] = [
+      { ...entries[0]!, videoId: "b", title: "beta" },
+      { ...entries[0]!, videoId: "a", title: "alpha" },
+      { ...entries[0]!, videoId: "c", title: "alpha" },
+    ];
+    expect(sortTranscriptEntries(items, "title").map(entry => entry.videoId)).toEqual(["a", "c", "b"]);
+  });
+
+  it("collects tag facets by count then name", () => {
+    const facets = collectTranscriptTags(entries);
+    expect(facets[0]).toEqual({ tag: "杂谈", count: 3 });
+    expect(facets).toHaveLength(4);
+    expect(facets.find(facet => facet.tag === "朝活")?.count).toBe(1);
+  });
+
+  it("cuts excerpts around the first match", () => {
+    const text = `${"前".repeat(60)}关键词在这里${"后".repeat(60)}`;
+    const excerpt = transcriptExcerpt(text, "关键词", 40);
+    expect(excerpt).toContain("关键词");
+    expect(excerpt.startsWith("…")).toBe(true);
+    expect(excerpt.endsWith("…")).toBe(true);
+    expect(transcriptExcerpt("短摘要", "短")).toBe("短摘要");
+    expect(transcriptExcerpt(null, "x")).toBe("");
+  });
+
+  it("splits text into plain and matched parts", () => {
+    expect(splitTranscriptHighlight("13th live 回顾", "13th live")).toEqual([
+      { text: "13th", match: true },
+      { text: " ", match: false },
+      { text: "live", match: true },
+      { text: " 回顾", match: false },
+    ]);
+    expect(splitTranscriptHighlight("a+b 与 c", "a+b")).toEqual([
+      { text: "a+b", match: true },
+      { text: " 与 c", match: false },
+    ]);
+    expect(splitTranscriptHighlight("没有命中", "zzz")).toEqual([
+      { text: "没有命中", match: false },
+    ]);
+  });
+
+  it("uses compact month labels for navigation", () => {
+    expect(transcriptMonthShortLabel("2026-10")).toBe("2026.10");
+    expect(transcriptMonthShortLabel("")).toBe("未标注");
   });
 });

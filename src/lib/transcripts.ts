@@ -427,16 +427,162 @@ export function toIndexEntry(file: TranscriptFile, updatedAt: string): Transcrip
   };
 }
 
-/** 新的在前；没有日期的排最后，再按标题稳定排序。 */
+export const TRANSCRIPT_SORT_ORDERS = ["newest", "oldest", "title"] as const;
+
+export type TranscriptSortOrder = (typeof TRANSCRIPT_SORT_ORDERS)[number];
+
+export function isTranscriptSortOrder(value: unknown): value is TranscriptSortOrder {
+  return typeof value === "string" && (TRANSCRIPT_SORT_ORDERS as readonly string[]).includes(value);
+}
+
+/** 新的在前；没有日期的排最后。`title` 按标题，同日再按日期倒序。 */
 export function sortTranscriptEntries(
   entries: TranscriptIndexEntry[],
+  order: TranscriptSortOrder = "newest",
 ): TranscriptIndexEntry[] {
+  const byTitle = (a: TranscriptIndexEntry, b: TranscriptIndexEntry): number =>
+    a.title.localeCompare(b.title) ||
+    (b.date ?? "").localeCompare(a.date ?? "") ||
+    a.videoId.localeCompare(b.videoId);
+
   return [...entries].sort((a, b) => {
+    if (order === "title") return byTitle(a, b);
+
     const left = a.date ?? "";
     const right = b.date ?? "";
-    if (left !== right) return right.localeCompare(left);
-    return a.title.localeCompare(b.title);
+    // 缺日期始终排最后，不随升序 / 降序翻转。
+    if (!left || !right) {
+      if (!left && !right) return byTitle(a, b);
+      return left ? -1 : 1;
+    }
+    if (left !== right) {
+      return order === "oldest" ? left.localeCompare(right) : right.localeCompare(left);
+    }
+    return byTitle(a, b);
   });
+}
+
+export interface TranscriptTagCount {
+  tag: string;
+  count: number;
+}
+
+/** 索引页的标签分面：按篇数倒序，同篇数按名称排序。 */
+export function collectTranscriptTags(
+  entries: TranscriptIndexEntry[],
+): TranscriptTagCount[] {
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    for (const tag of entry.tags) {
+      const text = tag.trim();
+      if (!text) continue;
+      counts.set(text, (counts.get(text) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+export function transcriptSearchTokens(query: string): string[] {
+  return [...new Set(
+    query
+      .toLocaleLowerCase()
+      .split(/\s+/)
+      .map(token => token.trim())
+      .filter(Boolean),
+  )];
+}
+
+function transcriptSearchHaystack(entry: TranscriptIndexEntry): string {
+  return [
+    entry.title,
+    entry.summary ?? "",
+    entry.tags.join(" "),
+    entry.date ?? "",
+    entry.videoId,
+  ]
+    .join("\n")
+    .toLocaleLowerCase();
+}
+
+/** 空格分词后要求全部命中；空查询视为通过。 */
+export function matchesTranscriptQuery(
+  entry: TranscriptIndexEntry,
+  query: string,
+): boolean {
+  const tokens = transcriptSearchTokens(query);
+  if (tokens.length === 0) return true;
+  const haystack = transcriptSearchHaystack(entry);
+  return tokens.every(token => haystack.includes(token));
+}
+
+/** 标签之间是「同时包含」，不是「任意一个」。 */
+export function filterTranscripts(
+  entries: TranscriptIndexEntry[],
+  options: { query?: string; tags?: string[] } = {},
+): TranscriptIndexEntry[] {
+  const query = options.query ?? "";
+  const tags = (options.tags ?? []).filter(Boolean);
+  return entries.filter(
+    entry =>
+      tags.every(tag => entry.tags.includes(tag)) &&
+      matchesTranscriptQuery(entry, query),
+  );
+}
+
+/** 摘要截取：优先从命中词附近开始，保留前后文；没有命中时取开头。 */
+export function transcriptExcerpt(
+  text: string | null,
+  query: string,
+  maxLength = 90,
+): string {
+  const source = stripInlineMarkdown(text ?? "").replace(/\s+/g, " ").trim();
+  if (!source || source.length <= maxLength) return source;
+
+  const haystack = source.toLocaleLowerCase();
+  let hit = -1;
+  for (const token of transcriptSearchTokens(query)) {
+    const index = haystack.indexOf(token);
+    if (index >= 0 && (hit < 0 || index < hit)) hit = index;
+  }
+
+  const start = hit < 0 ? 0 : Math.max(0, hit - Math.floor(maxLength / 3));
+  const end = Math.min(source.length, start + maxLength);
+  return `${start > 0 ? "…" : ""}${source.slice(start, end).trim()}${end < source.length ? "…" : ""}`;
+}
+
+export interface TranscriptTextPart {
+  text: string;
+  match: boolean;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** 把文本按查询词切成普通段与命中段，供渲染层包 `<mark>`。 */
+export function splitTranscriptHighlight(
+  text: string,
+  query: string,
+): TranscriptTextPart[] {
+  if (!text) return [];
+  const tokens = transcriptSearchTokens(query).sort((a, b) => b.length - a.length);
+  if (tokens.length === 0) return [{ text, match: false }];
+
+  const pattern = new RegExp(`(${tokens.map(escapeRegExp).join("|")})`, "gi");
+  const parts: TranscriptTextPart[] = [];
+  let last = 0;
+
+  for (const match of text.matchAll(pattern)) {
+    const index = match.index ?? 0;
+    if (index > last) parts.push({ text: text.slice(last, index), match: false });
+    parts.push({ text: match[0], match: true });
+    last = index + match[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), match: false });
+
+  return parts.length > 0 ? parts : [{ text, match: false }];
 }
 
 export interface TranscriptMonthGroup {
@@ -454,6 +600,16 @@ function monthLabel(key: string): string {
   return `${year} 年 ${monthNumber} 月`;
 }
 
+export function transcriptMonthKey(entry: TranscriptIndexEntry): string {
+  return entry.date && entry.date.length >= 7 ? entry.date.slice(0, 7) : "";
+}
+
+/** 月份导航用的紧凑标签：`2026.11`；没有日期时是 `未标注`。 */
+export function transcriptMonthShortLabel(key: string): string {
+  if (!key) return "未标注";
+  return key.replace("-", ".");
+}
+
 /** 索引页按月分组，保持传入顺序（先 sortTranscriptEntries 再分组）。 */
 export function groupTranscriptsByMonth(
   entries: TranscriptIndexEntry[],
@@ -462,7 +618,7 @@ export function groupTranscriptsByMonth(
   const index = new Map<string, TranscriptMonthGroup>();
 
   for (const entry of entries) {
-    const key = entry.date && entry.date.length >= 7 ? entry.date.slice(0, 7) : "";
+    const key = transcriptMonthKey(entry);
     let group = index.get(key);
     if (!group) {
       group = { key, label: monthLabel(key), entries: [] };
