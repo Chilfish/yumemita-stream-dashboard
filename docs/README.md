@@ -22,6 +22,7 @@ docs/
 │   ├── db-optimization.md
 │   ├── performance-audit.md
 │   ├── live-calendar.md
+│   ├── share-card.md
 │   ├── product-direction.md
 │   ├── ui-refactor.md
 │   └── ui-refactor-progress.md
@@ -33,6 +34,7 @@ docs/
 │   ├── development.md
 │   ├── local-database.md
 │   ├── deployment.md
+│   ├── schedule-admin.md
 │   ├── performance.md
 │   ├── troubleshooting.md
 │   └── astro-experiments.md
@@ -45,7 +47,8 @@ docs/
 ├── ui-design/                   # 设计系统与 coss 组件规范
 │   ├── README.md
 │   ├── GENERAL.md
-│   └── chat-visualization.md
+│   ├── chat-visualization.md
+│   └── time-input.md
 ├── postmortem/                  # 事故复盘与基线雷区
 │   ├── README.md
 │   └── TEMPLATE.md
@@ -75,6 +78,8 @@ docs/
 | 本地开发 / 测试 | [development.md](./engineering/development.md) + [local-database.md](./engineering/local-database.md) | 环境、脚本、D3、测试；本地 Postgres 与开发代理 |
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |
 | 发布 | [release-checklist.md](./engineering/release-checklist.md) + [deployment.md](./engineering/deployment.md) | 验证、冒烟、部署、回滚 |
+| 维护未来日程 / Agent 录日程 | [schedule-admin.md](./engineering/schedule-admin.md) + [live-calendar.md](./planning/live-calendar.md) | 管理端、幂等、时段与关联规则 |
+| 改分享卡片 / 分享截图 | [share-card.md](./planning/share-card.md) | React + Tailwind 布局、官方背景、modern-screenshot 导出 |
 | 性能回归 | [performance.md](./engineering/performance.md) | 首屏数据流、缓存分层、实测数字 |
 | 做全栈性能优化 | [performance-audit.md](./planning/performance-audit.md) | 岛屿拆分、props 收敛、交互热点、ingest / publish 与优先级 |
 | 排查页面 / 数据问题 | [troubleshooting.md](./engineering/troubleshooting.md) | 常见报错与口径 |
@@ -82,7 +87,7 @@ docs/
 | 弹幕 / 事件字段与事件类型 | [chat-events.md](./data/chat-events.md) | 消息记录、事件记录、去重、表情索引、已知限制 |
 | 做弹幕可视化 / 时间线 | [chat-visualization.md](./ui-design/chat-visualization.md) + [ui-design/README.md](./ui-design/README.md) | 数据契约、行类型、虚拟化、导入与正式化路径 |
 | 查看抓取进度 | [data-progress.md](./data/data-progress.md) | 已入库场次、跳过判定、下一批候选 |
-| 改 UI / 组件 | [ui-design/README.md](./ui-design/README.md) + [GENERAL.md](./ui-design/GENERAL.md) | Token、排版、coss 原子组件 |
+| 改 UI / 组件 | [ui-design/README.md](./ui-design/README.md) + [GENERAL.md](./ui-design/GENERAL.md) | Token、排版、coss 原子组件；时间输入见 [time-input.md](./ui-design/time-input.md) |
 | 写文档 / 界面文案 | [writing-style.md](./writing-style.md) | 语气、用词、术语、反例 |
 | 代码审查 | [reviews/README.md](./reviews/README.md) + [TEMPLATE.md](./reviews/TEMPLATE.md) | 审查视角、问题分级、承接流程 |
 | 写代码前防复现 | [postmortem/README.md](./postmortem/README.md) | 基线雷区、高危文件 |

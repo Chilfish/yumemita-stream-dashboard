@@ -1,9 +1,9 @@
 # 直播日历需求与方案
 
-> 状态：🚧 实现中（2026-11-04）：读取路径、月历 / 议程、自动同步与缓存已落地；手工日程维护与 ICS 暂缓。月格按用户要求改为列出当天全部场次，不折叠。
+> 状态：✅ 读取、月历 / 议程、自动同步、缓存、管理端写入与读取时关联已落地（2026-11-07）。ICS 暂缓。
+> 手工日程改由 `/admin/schedule` 与 `/api/admin/schedule` 维护，接口说明见 [schedule-admin.md](../engineering/schedule-admin.md)。
 > 目标：在现有只读归档站上增加一层「未来日程」，让访客知道接下来谁什么时候播；开播后由每日任务照常入库，日历自动从「预定」变成「已结束」。
-> 关联需求：`FR-CAL-001` – `FR-CAL-009`，backlog `B14`。
-> 本文只描述设计与计划。实现前不把 `scheduled_streams` 写进 [data-model.md](../data/data-model.md) 的当前表结构；实现完成后再补。
+> 关联需求：`FR-CAL-001` – `FR-CAL-012`，backlog `B14`。表结构与字段口径见 [data-model.md](../data/data-model.md) §9。
 
 ## 目录
 
@@ -40,8 +40,11 @@
 | 视图 | `src/components/dashboard/calendar-view.tsx`、`month-grid.tsx`、`agenda-list.tsx`、`calendar-event-row.tsx` | 月历 / 议程、当天 `Popover`、成员筛选 |
 | 自动同步 | `scripts/lib/schedule-sync.ts`、`scripts/daily-update.ts` | `is_upcoming` 写日程，`is_live` 更新标记；planner 有单测 |
 | 缓存 | `astro.config.mjs`、`scripts/purge-cache.ts` | `schedule` tag 与 routeRules |
-| 冒烟 | `scripts/db-query-smoke.ts`、`scripts/smoke-routes.mjs` | 日历查询与路由 |
-| 暂缓 | `content/schedule/`、`schedule:sync`、ICS | 手工维护与订阅未做 |
+| 管理端 | `src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/lib/admin-auth.ts`、`src/middleware.ts` | 内部编辑页 + Basic / Cookie 鉴权 |
+| 手工关联 | `src/lib/calendar.ts` 的 `matchSchedulesToStreams` | 按成员 + JST 日期 + 时段匹配真实场次 |
+| 今日计划 | `getDayPlan` / `buildDayPlanFromRows`、`day-timeline.tsx` | 今天 + 明天，组首页与日历页 |
+| 分享卡片 | `src/components/dashboard/share-card.tsx`、`share-button.tsx`、`public/share/bg_member_list.webp` | React + Tailwind 渲染，modern-screenshot 导出 PNG；设计见 [share-card.md](share-card.md) |
+| 暂缓 | `FR-CAL-009` ICS | 订阅未做 |
 
 与初版设计的偏差：
 
@@ -74,13 +77,14 @@
 
 | 场景 | 用户问题 | 页面回答 |
 | --- | --- | --- |
-| 打开站点 | 最近谁播了？ | 组首页已有；日历补充「接下来」 |
-| 今晚 | 今晚有人播吗？几点？ | 「接下来」横条 + 当天高亮 |
+| 打开站点 | 最近谁播了？ | 组首页已有；日历补充今天 / 明天 |
+| 今晚 | 今晚有人播吗？几点？ | 今天与明天时间线 + 当天高亮 |
+| 明早 | 明天早上有朝活吗？ | 时间线的「明天」组 |
 | 这周 | 这周还有几场？ | 月网格与议程视图 |
 | 下个月 | 下个月有活动吗？ | 月份切换；手工填写的远期安排 |
 | 某天没播 | 那天为什么空着？ | 空格即没有安排，不额外解释 |
 | 开播后 | 昨天那场去哪看？ | 日历事件链到单场页 |
-| 维护者 | 新安排怎么加？ | 改 `content/schedule/<id>.json` 后同步入库 |
+| 维护者 | 新安排怎么加？ | 打开 `/admin/schedule`，或调用 `/api/admin/schedule` |
 
 ## 4. 功能需求与验收标准
 
@@ -88,7 +92,11 @@
 | --- | --- | --- | --- | --- |
 | `FR-CAL-001` | P1 | 提供全组与成员日历页 | `AC-CAL-001`：`/calendar` 与 `/{datasetId}/calendar` 返回 200；侧栏、面包屑、移动端导航与现有页面一致；`?month=` / `?day=` / `?members=` / `?view=` 可分享、刷新与前进后退保持状态 | ✅ |
 | `FR-CAL-002` | P1 | 展示未来场次与状态 | `AC-CAL-002`：未来场次来自 `scheduled_streams`；状态按 `now` 派生为预定 / 直播中 / 已结束 / 已取消 / 待补录；同 `video_id` 命中 `streams` 时显示已结束并链到单场页；不往 `streams` 写占位行 | ✅ |
-| `FR-CAL-003` | P1 | 手工维护日程 | `AC-CAL-003`：`content/schedule/<datasetId>.json` 经 `bun run schedule:sync` 入库；同一文件重复同步不产生重复行；删除文件中的条目会删除对应手工行；格式错误时脚本以非 0 退出并指出文件与字段 | ⏸️ 用户要求先暂缓 |
+| `FR-CAL-003` | P1 | 手工维护日程 | `AC-CAL-003`：`/admin/schedule` 与 `/api/admin/schedule` 可新增 / 编辑 / 取消 / 删除手工日程；重复提交同一自然键幂等；非法输入返回 400 与字段名 | ✅ |
+| `FR-CAL-010` | P1 | 管理端鉴权 | `AC-CAL-010`：页面与接口未认证返回 401；页面用 Basic 登录后由 HttpOnly Cookie 维持；Agent 可直接带 Basic 头；写操作带 `Origin` 时校验同源 | ✅ |
+| `FR-CAL-011` | P1 | 今日直播计划 | `AC-CAL-011`：组首页与日历页显示今天（JST）全部日程 / 场次；状态每 60 秒重算；空态说明「今天还没有排播」 | ✅ |
+| `FR-CAL-013` | P2 | 日程分享卡片 | `AC-CAL-013`：时间线右上角有低调的分享按钮；用 React + Tailwind 渲染独立卡片并由 modern-screenshot 导出 PNG，使用官方背景、成员头像与类型图标；可下载、复制（手工 + 导出） | ✅ |
+| `FR-CAL-012` | P1 | 手工日程与真实场次关联 | `AC-CAL-012`：读取时按成员 + JST 日期 + 时段匹配；跨午夜晚场归一；同日同时段取时间最近；命中后隐藏手工行并链到单场页；无匹配保持「待补录」 | ✅ |
 | `FR-CAL-004` | P1 | 每日任务自动同步未来场 | `AC-CAL-004`：`daily-update` 读取频道列表后，把 `is_upcoming` 且能确定时间的场次 upsert 为 `source='youtube'`；同一轮重跑幂等；同步后 purge `schedule` tag | 🚧 已接入；未在真实频道跑过 |
 | `FR-CAL-005` | P1 | 月历视图与议程视图 | `AC-CAL-005`：桌面默认月网格，列出当天全部场次，格子随内容长高；移动端默认议程列表；`view` 显式写入时固定；今天、选中日、非本月日期有明确区分 | ✅ |
 | `FR-CAL-006` | P1 | 会员限定日程展示 | `AC-CAL-006`：会限场次显示标题、时间、成员与锁标记；不显示任何派生指标；锁标记有可访问名称；日历页不因 `?key=` 改变缓存策略 | ✅ |
@@ -138,7 +146,7 @@ export const scheduledStreams = pgTable(
 | `dataset_id` | 成员，等于一个 dataset |
 | `event_key` | `yt:<videoId>` 或 `manual:<id>`。有 `videoId` 时一律用前者，避免手工行与自动行重复 |
 | `video_id` | 可空；未定或纯手工时为空 |
-| `title` | 标题；自动来源取频道列表 |
+| `title` | 标题；管理端可省略，空字符串表示「待定」；自动来源取频道列表 |
 | `url` | YouTube 链接，可空 |
 | `scheduled_at` | 预定开播时刻，可空；为空时进「日期待定」 |
 | `expected_minutes` | 预计时长，用于计算「直播中」窗口 |
@@ -236,91 +244,49 @@ export async function getCalendarEvents(
 ### 5.5 与 `streams` 的关系
 
 ```text
-content/schedule/<id>.json ──┐
-                             ├─→ scheduled_streams（未来、预定、取消）
-daily-update 频道列表 ───────┘         │
-                                       │ 读取时按 (dataset_id, video_id) 关联
-                                       ▼
-                              日历状态：upcoming / live / pending
-                                       │
+/admin/schedule 或 API ──┐
+                         ├─→ scheduled_streams（未来、预定、取消）
+daily-update 频道列表 ───┘         │
+                                   │ 读取时按 dataset + JST 日期 + 时段匹配
+                                   ▼
+                          日历状态：upcoming / live / pending
+                                   │
 开播结束 → daily-update → ingest ─→ streams（已结束）
-                                       │
-                                       ▼
-                              日历状态：done，链到单场页
+                                   │
+                                   ▼
+                          日历状态：done，链到单场页
 ```
 
 两条链路互不写入。`scheduled_streams` 只服务日历，不参与列表、聚合、相册、sitemap。
+关联只发生在读取时，不写回 `video_id`。
 
 ## 6. 数据维护
 
-### 6.1 手工文件
+### 6.1 管理端
 
-位置：`content/schedule/<datasetId>.json`。`content/` 已入库，和逐字稿同级；`data/` 被 gitignore，不能放手工数据。
+维护者通过 `/admin/schedule` 或 `/api/admin/schedule` 写手工日程，不经过仓库文件。
 
-```json
-{
-  "datasetId": "nonoka",
-  "events": [
-    {
-      "id": "2026-11-08-talk",
-      "title": "雑談",
-      "at": "2026-11-08T20:00:00+09:00",
-      "expectedMinutes": 120,
-      "availability": "public",
-      "note": ""
-    },
-    {
-      "id": "2026-11-10-sing",
-      "title": "歌枠",
-      "at": "2026-11-10T21:00:00+09:00",
-      "expectedMinutes": 90,
-      "videoId": "abc123",
-      "availability": "subscriber_only"
-    }
-  ]
-}
-```
+- 页面只从 `/about` 链接，带 `noindex`，不进 sitemap。
+- 页面用 HTTP Basic 登录，成功后由 HttpOnly Cookie 维持；Agent 直接带 Basic 头调接口。
+- 字段、幂等规则、错误码与示例见 [schedule-admin.md](../engineering/schedule-admin.md)。
 
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `id` | 是 | 文件内唯一、稳定的 slug。`videoId` 存在时 `id` 只用于本地识别 |
-| `title` | 是 | 标题 |
-| `at` | 否 | ISO 8601，必须带时区；缺失时进「日期待定」 |
-| `expectedMinutes` | 否 | 预计时长；缺省按 180 分钟计算直播窗口 |
-| `videoId` | 否 | YouTube video id；填了就和自动同步合并为同一行 |
-| `availability` | 否 | `public`（默认）/ `subscriber_only` |
-| `cancelled` | 否 | `true` 时显示已取消；用于「排了又取消」 |
-| `note` | 否 | 备注 |
+只填日期 + 时段时写 `date` 与 `slot`；知道精确时间时写 `scheduledAt`，服务端派生 `date` 与 `slot`。
+保存成功后自动失效 `schedule` / `group` / `dataset-<id>` 缓存。
 
-校验用仓库已有的 `valibot`：`at` 必须能解析、`id` 不得重复、`videoId` 形如 `[A-Za-z0-9_-]{11}`、`datasetId` 必须存在于 `data-sources.json`。
+### 6.2 手工行与真实场次的关联
 
-### 6.2 `scripts/sync-schedule.ts`
+手工行默认 `video_id = null`。开播结束、`daily-update` 把回放 ingest 进 `streams` 后，
+日历读取时由 `matchSchedulesToStreams` 按下列规则匹配：
 
-```bash
-bun run schedule:check          # 只校验文件，不连数据库
-bun run schedule:sync           # 同步全部成员
-bun run schedule:sync --dataset nonoka
-bun run schedule:sync --dry-run
-bun run schedule:sync --prune   # 额外清理过期自动行
-```
+1. 同一成员、同一 JST 日期、同一时段；
+2. 同日同时段有多场时取开播时间最近的一场；
+3. `late` 跨午夜，23:30 与次日 00:30 视为同一晚；
+4. `stream` 优先于 `youtube`，`youtube` 优先于 `manual`；
+5. 已取消的日程不参与匹配；
+6. 匹配不到时保留手工行，状态为「待补录」。
 
-行为：
-
-1. 读 `content/schedule/*.json`，用 valibot 校验；失败时列出文件与字段并以非 0 退出。
-2. 手工行 `event_key = videoId ? yt:<videoId> : manual:<id>`；插入时 `source='manual'`，命中已有 `source='youtube'` 的行时保持 `youtube`。
-3. `onConflictDoUpdate` 覆盖标题、时间、预计时长、可见性、取消标记、备注；`updated_at = now()`。
-4. 对比文件与库里的手工行，删除文件中已移除的 `manual:*` 行。`yt:*` 行交给自动同步与清理规则。
-5. `--prune`：删除 `source='youtube'`、`scheduled_at < now - 7 days`、且没有对应 `streams` 行的记录。
-6. 成功后打印新增、更新、删除条数；`schedule:sync` 不负责 purge，由调用方（workflow 或本地脚本）决定。
-
-冲突规则：
-
-| 字段 | 手工优先 | 自动优先 |
-| --- | --- | --- |
-| `title` / `url` / `scheduled_at` / `expected_minutes` | — | ✅ 频道数据更新更及时 |
-| `availability` / `note` / `cancelled_at` | ✅ 人工判断优先 | — |
-
-同一行两边都写时按上表逐字段合并；`source` 保持 `youtube`，`event_key` 保持 `yt:*`。
+命中后手工行不再显示，日历直接展示真实场次的标题、时长与单场链接。
+关联只发生在读取时，不写回数据库，因此没有主键冲突，也不需要迁移后的回填任务。
 
 ### 6.3 每日任务自动同步
 
@@ -371,7 +337,7 @@ T+1d   日历读取时命中 streams → done，链到单场页
 
 按 Apple 公开的三条原则推演：清晰（Clarity）、让内容优先（Deference）、层次（Depth）。落到这个页面：
 
-1. **先回答，再浏览。** 页面顶部先给「接下来」的具体场次，月网格负责探索。不让用户先读一整个月才知道今晚有没有播。
+1. **先回答，再浏览。** 页面顶部先给今天 + 明天的具体场次（跨天朝活也在内），月网格负责探索。不让用户先读一整个月才知道今晚有没有播。
 2. **内容优先，减少容器。** 事件用「色条 + 时间 + 标题」，不套卡片、不加阴影。网格线用 hairline，靠留白和字重分层。
 3. **渐进披露。** 月 → 日 → 事件详情。月格直接列出当天全部场次；点日期展开带完整标题与链接的列表。
 4. **窄屏换排布。** 1024px 以下直接换成议程列表，不压缩月网格。桌面月网格与移动议程是同一份数据的两种排布。
@@ -400,8 +366,8 @@ T+1d   日历读取时命中 streams → done，链到单场页
 
 ```text
 ┌ 日历 ─────────────────────────────── [月 | 列表]  [今天] [‹] [›] ┐
-│ 接下来 · 7 天                                                     │
-│ [11/08 周六 20:00  雑談 · ののか] [11/09 周日 21:00 歌枠 · りつ] …│
+│ 今天与明天                                                       │
+│ [今天 20:00 雑談 · ののか] [明天 06:00 朝活 · りつ]               │
 ├──────────────────────────────────────────────────────────────────┤
 │ 日      月      火      水      木      金      土                │
 ├──────────────────────────────────────────────────────────────────┤
@@ -431,8 +397,8 @@ T+1d   日历读取时命中 streams → done，链到单场页
 
 页面结构：
 
-1. `PageHeader`：标题「日历」，`facts` 两项为「本月 N 场」「未来 M 场」。
-2. 「接下来」横条：未来 7 天，最多 5 条，横向滚动。
+1. `PageHeader`：标题「日历」，`facts` 两项为「本月 N 场」「今天与明天 N 场」。
+2. 「今天与明天」时间线：按 JST 自然日分组，跨天朝活放在「明天」；不再使用「接下来 · 7 天」横条。
 3. 视图切换：`SegmentedControl` 月 / 列表。
 4. 月网格或议程列表。
 5. 页脚 `PanelNote`：图例与口径说明。

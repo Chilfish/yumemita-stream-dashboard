@@ -20,7 +20,7 @@
 | B11 | 开播前 / 直播中弹幕采集（InnerTube live chat，补齐 yt-dlp 只能拿回放的空档） | P2 | 无 | 2026-11-04 需求 | 🚧 实时采集、已结束场次自动回放（`fetch:live-chat` / `fetch:danmaku --video`）与合并已实现；每日任务尚未自动接入实时采集 |
 | B12 | 弹幕与事件可视化组件（POC `/dev/live-chat`） | P2 | B6 或 R2 `danmaku_*.jsonl` 读取方案 | 2026-11-04 需求 | 🚧 POC 完成；数据源、组件化与正式入口待做 |
 | B13 | 组首页成员活跃：近 100 天出勤、成员榜指标切换、近 20 场趋势 | P2 | 无（复用 group summary） | 2026-11-04 讨论 | ✅ 已实现（`FR-HOME-002`）；复用 group summary，无新增查询 |
-| B14 | 直播日历：未来场次、手工日程与月历视图（`FR-CAL-001`–`FR-CAL-009`） | P2 | 无（新表 `scheduled_streams`） | 2026-11-04 需求 | 🚧 读取、月历 / 议程、自动同步与缓存已实现；手工日程与 ICS 暂缓；方案见 [live-calendar.md](live-calendar.md) |
+| B14 | 直播日历：未来场次、手工日程与月历视图（`FR-CAL-001`–`FR-CAL-012`） | P2 | 无（新表 `scheduled_streams`） | 2026-11-04 需求 | ✅ 读取、月历 / 议程、自动同步、缓存、管理端写入、读取时关联与今天+明天时间线已实现；ICS 暂缓。方案见 [live-calendar.md](live-calendar.md)，接口见 [schedule-admin.md](../engineering/schedule-admin.md) |
 | B15 | yt-dlp 字幕的直播段 + 回放段重复：`normalizeLiveChat` 按 `rendererId` 去重 | P1 | 无 | 2026-11-05 反馈 | ✅ `normalizeLiveChat` 去重 + `duplicates` 计数 + 单测；`fmjJNbzcr3g` 已重新生成（32,343 → 22,058）；见 [postmortem 001](../postmortem/001-yt-dlp-chat-duplicate.md) |
 | B16 | 页面汇总改为读 `dataset_insights.public_totals`，不再每次渲染拉整库明细 | P0 | `db:ingest` 重算 insights | 2026-11-05 Neon 账单 | ✅ 单页数据库出流量 3.5–10.5 MB → 约 0.2–0.4 MB；见 [postmortem 002](../postmortem/002-dataset-packs-per-render.md) |
 | B17 | 本地开发数据库：Scoop Postgres + Neon HTTP 代理 + 初始化脚本 | P1 | 无 | 2026-11-05 成本控制 | ✅ `bun run dev` 一条命令拉起 Postgres / 库 / 代理；Astro 退出后服务继续后台运行。`dev:db` / `dev:db:proxy` / `dev:seed` 保留；见 [local-database.md](../engineering/local-database.md) |
@@ -29,8 +29,9 @@
 | B20 | 脚本层重复读写：成员状态批量查询、逐字稿按 hash 跳过、公开汇总窄 SQL、日程批量 upsert、对账 batch、逐字稿发布稳定 mtime | P1 | 无 | 2026-11-06 实测日志 | ✅ `daily-update` 状态 2N → 2 SQL；`syncTranscripts` 未变跳过；`computeDatasetPublicTotals` 改窄 SQL（词/作者 `sum + group by`，不再还原 pack）；新增 `streams.paid_share_pct`；日程与对账各 1 次 batch；逐字稿不再每天全量重传。任一 pack 变化仍会全量重算该成员 insights，见 [db-optimization.md](db-optimization.md) §8 |
 | B21 | 全本地开发开关：`LOCAL=1` 同时切数据库、对象存储与媒体地址 | P1 | 安装 PostgreSQL、[SILO](https://silo.pgsty.com/zh/download/#server-windows) | 2026-11-06 成本控制 | ✅ 脚本与 dev 共用 `LOCAL=1`；数据库走本机 Postgres + `/sql` 代理，对象存储走 SILO，`PUBLIC_R2_BASE` 指向本地桶，发布进度按 `local/` 隔离，purge 跳过；见 [local-database.md](../engineering/local-database.md) |
 | B22 | `~/yt-cookies.txt` 长期复用后失效：yt-dlp 撞 bot 检查，`--cookies-from-browser` 却正常 | P1 | 无 | 2026-11-07 yt-dlp 反馈 | ✅ 每次运行从浏览器重新导出，导出失败才退回旧缓存；移除 `--refresh-cookies`；`--no-cookies` 不再回退浏览器 cookie。见 [开发日志](../development-log/2026-11-07.md) 与 [postmortem 003](../postmortem/003-stale-yt-cookies-cache.md) |
-| B23 | 本地最新数据一键同步线上 | P1 | `.env` 线上凭据 | 2026-11-06 同步需求 | ✅ `bun run sync:remote` 只读 `.env`、强制 `LOCAL=0`；默认只新增（查线上 videoId，窗口最近 7 天开播），`--update-existing` 才刷新旧场次；`daily-update` 把 new/force ID 直接传给 ingest / publish；见 [adding-data.md](../data/adding-data.md) |
+| B23 | 本地最新数据一键同步线上 | P1 | `.dev.vars` 线上目标 | 2026-11-06 同步需求 | ✅ `bun run sync:remote` 只读 `.dev.vars` 的 `DATABASE_URL_ONLINE` / `R2_*`、强制 `LOCAL=0`；默认只新增（查线上 videoId，窗口最近 7 天开播），`--update-existing` 才刷新旧场次；`daily-update` 把 new/force ID 直接传给 ingest / publish；见 [adding-data.md](../data/adding-data.md) |
 | B24 | 脚本启动时先打印目标环境（本地 / 线上、数据库、存储桶） | P3 | 无 | 2026-11-06 使用反馈 | ✅ `describeEnvironment()` 统一输出，`loadEnvFiles()` 与 publish / fetch / verify 入口共用；不用等跑完才看到地址。见 [scripts/README.md](../../scripts/README.md)「运行环境提示」 |
+| B25 | 日程管理端：宽容时间输入、编辑页组件拆分、移动端列表、直播链接只保留单输入 | P3 | 无 | 2026-11-07 反馈 | ✅ `TimeInput` + `src/lib/time.ts`；`schedule-editor` 拆成容器 / 表单 / 列表 / 表单状态；`md` 以下改堆叠列表；直播链接去掉 `videoId` 输入，`url` 只作外链。见 [time-input.md](../ui-design/time-input.md) 与 [GENERAL.md](../ui-design/GENERAL.md) §7 |
 
 ## 审查承接区
 
@@ -65,7 +66,7 @@
 ## 分析
 
 - [x] 趋势页：场次频率、弹幕/分、SC 的月度趋势与明细表；典型节奏曲线、全期高频词/发言者已从首页移入趋势页。
-- [x] 内容类型 × 指标：趋势页对比弹唱 / 活动 / 杂谈 / 游戏的场次、时长、弹幕/分、SC/小时。
+- [x] 内容类型 × 指标：趋势页对比歌枠 / 活动 / 杂谈 / 游戏的场次、时长、弹幕/分、SC/小时。
 - [ ] SC 留言主题：简单关键词/共现，不引入重型 NLP。
 - [ ] 观众重叠：`authors.json`（作者 → 场次索引）已由发布生成，尚缺重叠计算与页面。
 - [ ] 峰值解释：把峰值分钟与人工标注的事件（抽卡、公布、读 SC）对齐。

@@ -12,6 +12,8 @@
 | [development.md](./development.md) | 本地环境、脚本、coss ui、D3 图表写法、测试 | 日常开发 |
 | [local-database.md](./local-database.md) | 本地 Postgres、Neon HTTP 代理、灌数据与排查 | 本地开发不连线上库 |
 | [deployment.md](./deployment.md) | 当前静态托管、R2 发布、子路径、缓存、CI | 上线与数据发布 |
+| [schedule-admin.md](./schedule-admin.md) | 日程管理 API：认证、日期与时段、幂等、关联规则、端点和示例 | 维护未来日程 / 写 Agent 调用 |
+| [share-card.md](../planning/share-card.md) | 分享卡片：React + Tailwind 布局、官方背景、modern-screenshot 导出 | 改分享卡片或截图样式 |
 | [performance.md](./performance.md) | 首屏数据流、缓存分层、图片 / 字体 / 拆包与实测数字 | 改加载逻辑或排查性能 |
 | [troubleshooting.md](./troubleshooting.md) | 常见报错、数据异常与口径问题 | 页面空白 / 图表为空 |
 | [astro-experiments.md](./astro-experiments.md) | 模板已验证的 Astro 模式与本项目迁移时的落点 | 执行 Astro 迁移 |

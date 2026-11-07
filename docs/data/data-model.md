@@ -415,6 +415,39 @@ bun run fetch:live-chat --video <videoId>                       # 已结束时�
 - 回放只覆盖 YouTube 当前可见的消息；被删除 / 封禁账号的历史消息只在 yt-dlp 字幕档里。
   需要历史完整档时对已有场次跑 `--force --engine yt-dlp`。
 
+## 9. 直播日程（`scheduled_streams`）
+
+未来场次单独存在 `scheduled_streams`，不写 `streams`。日历读取时再与已结束场次合并。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `dataset_id` | text | 成员 id，外键到 `datasets` |
+| `event_key` | text | `yt:<videoId>` 或 `manual:<slug>`，与 `dataset_id` 组成主键 |
+| `video_id` | text \| null | 已知的 YouTube video id；有值时主键用 `yt:` |
+| `title` | text | 日程标题；空字符串表示「待定」 |
+| `url` | text \| null | YouTube 链接 |
+| `date` | date \| null | JST 自然日；只知道日期和时段时由管理端写入 |
+| `slot` | text \| null | `early` / `mid` / `late`；有精确时间时派生 |
+| `kind` | text \| null | `sing` / `event` / `talk` / `game`；空值时按标题推断 |
+| `thumbnail_key` | text \| null | 预留列，当前不写入、不展示；正式封面仍从 `streams.thumbnail_key` 读取 |
+| `scheduled_at` | timestamptz \| null | 精确开播时间；只有时段时为空 |
+| `expected_minutes` | integer \| null | 预计时长 |
+| `cancelled_at` | timestamptz \| null | 非空表示已取消 |
+| `availability` | text \| null | `public` / `subscriber_only` |
+| `source` | text | `youtube`（频道自动同步）/ `manual`（管理端） |
+| `note` | text \| null | 备注 |
+| `last_seen_at` / `last_live_at` | timestamptz \| null | 频道检查时间，用于派生直播中 |
+| `created_at` / `updated_at` | timestamptz | 审计时间 |
+
+索引：
+
+- 主键 `(dataset_id, event_key)`，同步脚本按它 upsert。
+- `(dataset_id, video_id)` 部分唯一索引，避免同一视频出现两条。
+- `(dataset_id, date)` 与 `(scheduled_at)` 服务日期范围查询。
+
+读取时按「成员 + JST 日期 + 时段」把没有 `video_id` 的手工行匹配到 `streams`；
+命中后不再显示手工行，直接显示真实场次。匹配规则见 [schedule-admin.md](../engineering/schedule-admin.md) 第 3 节。
+
 ## 口径与限制
 
 - **时间一律 JST（UTC+9）**。`video.startedAt` 取 `release_timestamp`（开播），不是 `timestamp`（公开）。

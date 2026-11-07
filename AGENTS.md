@@ -39,6 +39,9 @@
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts` | 手写 Markdown，发布到 R2 |
 | 数据字段 / 口径 | `docs/data/data-model.md`、`src/types/` | 改字段同步文档与类型 |
 | 会员限定公开范围 | `src/lib/visibility.ts`、`src/lib/member-access.ts`、`src/db/queries/shared.ts` | 元数据（封面 / 标题 / 时间）公开；派生指标清零，单场复用详情模板 |
+| 未来日程 / 管理端 | `src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/lib/schedule.ts`、`src/lib/admin-auth.ts`、`.agents/skills/schedule-maintenance/SKILL.md` | 手工日程、类型与鉴权；接口见 [schedule-admin.md](./docs/engineering/schedule-admin.md) |
+| 日程分享卡片 | `src/components/dashboard/share-card.tsx`、`share-button.tsx`、`public/share/bg_member_list.webp` | React + Tailwind 渲染，modern-screenshot 导出 PNG；官方背景 + 成员头像 + 类型图标 |
+| 日程与真实场次关联 / 今日计划 | `src/lib/calendar.ts`、`src/db/queries/calendar.ts`、`src/components/dashboard/day-timeline.tsx` | 读取时按日期+时段匹配，不写回 `video_id`；今天 + 明天时间线 |
 | 部署 / 缓存 | `docs/engineering/deployment.md`、`wrangler.jsonc`、`scripts/r2-cors.json`、`astro.config.mjs` | Cloudflare Workers + R2 |
 | 发布检查 | `docs/engineering/release-checklist.md` | 按清单勾选 |
 | 迁移执行 | `docs/planning/astro-ssr-migration.md` | 分阶段，先 PoC 再切换 |
@@ -153,7 +156,7 @@ bun run dev          # 一条命令：Postgres + 代理 + Astro
 bun run dev:seed     # 从本地 pack 灌数据
 ```
 
-`.dev.vars` / `.env.local` 缺失时脚本会自动补写；步骤与排查见
+环境变量只有一个文件 `.dev.vars`（本地值 + `*_ONLINE` 线上目标），缺失时脚本会自动补写；步骤与排查见
 [docs/engineering/local-database.md](./docs/engineering/local-database.md)。
 
 - 纯逻辑放 `src/lib/` 并配 `.test.ts`。

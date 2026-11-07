@@ -51,7 +51,11 @@
 | `FR-MEMBER-001` | P0 | 成员首页提供近况与规模 | `AC-MEMBER-001`：`/:datasetId` 展示规模指标、最近一场、本月变化、更新日历；数据缺失时显示「—」或空状态（手工） | ✅ | README |
 | `FR-CAL-001` | P2 | 提供全组与成员日历页 | `AC-CAL-001`：`/calendar` 与 `/{datasetId}/calendar` 可访问；`?month=` / `?day=` / `?members=` / `?view=` 可分享并保持状态（手工） | ✅ | 2026-11-04 需求 |
 | `FR-CAL-002` | P2 | 展示未来场次与派生状态 | `AC-CAL-002`：未来场次来自 `scheduled_streams`；状态按 `now` 派生为预定 / 直播中 / 已结束 / 已取消 / 待补录；同 `video_id` 命中 `streams` 时显示已结束；不往 `streams` 写占位行（单测 + 手工） | ✅ | 2026-11-04 需求 |
-| `FR-CAL-003` | P2 | 手工维护日程 | `AC-CAL-003`：`content/schedule/<datasetId>.json` 经 `schedule:sync` 入库；重复同步幂等；删除文件条目会删除对应手工行；非法格式非 0 退出（脚本 + 手工） | ⏸️ 暂缓 | 2026-11-04 需求 |
+| `FR-CAL-003` | P2 | 手工维护日程 | `AC-CAL-003`：`/admin/schedule` 与 `/api/admin/schedule` 可新增 / 编辑 / 取消 / 删除手工日程；标题可省略；重复提交同一自然键幂等；非法输入返回 400 与字段名（接口 + 手工） | ✅ | 2026-11-04 需求；2026-11-07 改为管理端 |
+| `FR-CAL-010` | P2 | 管理端鉴权 | `AC-CAL-010`：未认证时页面 401 + Basic 挑战、接口 401 JSON；页面登录后 Cookie 维持；Agent 可直接带 Basic 头；写操作带 `Origin` 时校验同源（接口） | ✅ | 2026-11-07 需求 |
+| `FR-CAL-011` | P2 | 今日直播计划 | `AC-CAL-011`：组首页与日历页显示今天 + 明天（JST）的日程 / 场次，跨天朝活归到「明天」；状态每 60 秒重算；空态说明没有排播；标题可空时显示「待定」（手工） | ✅ | 2026-11-07 需求 |
+| `FR-CAL-013` | P2 | 日程分享卡片 | `AC-CAL-013`：时间线右上角分享按钮用 React + Tailwind 渲染独立卡片，并由 modern-screenshot 导出 PNG；使用官方背景、成员头像与内容类型图标；可下载、复制（手工） | ✅ | 2026-11-07 需求 |
+| `FR-CAL-012` | P2 | 手工日程与真实场次关联 | `AC-CAL-012`：读取时按成员 + JST 日期 + 时段匹配 `streams`；跨午夜晚场归一；同日同时段取最近；命中后隐藏手工行并链到单场页；无匹配保持待补录（单测） | ✅ | 2026-11-07 需求 |
 | `FR-CAL-004` | P2 | 每日任务自动同步未来场 | `AC-CAL-004`：`daily-update` 把 `is_upcoming` 场次 upsert 为 `source='youtube'`；重跑幂等；同步后 purge `schedule` tag（脚本 + 手工） | 🚧 已接入，未在真实频道验证 | 2026-11-04 需求 |
 | `FR-CAL-005` | P2 | 月历与议程视图 | `AC-CAL-005`：桌面月网格列出当天全部场次，格子随内容长高；移动默认议程；今天、选中日、非本月日期区分明确；390 / 320px 无横向溢出（手工） | ✅ | 2026-11-04 需求 |
 | `FR-CAL-006` | P2 | 会员限定日程展示 | `AC-CAL-006`：会限场次显示标题、时间、成员与锁标记；不显示派生指标；锁标记有可访问名称（手工） | ✅ | 2026-11-04 需求 |
@@ -98,7 +102,7 @@
 | 需求 | 实现位置 | 说明 |
 | --- | --- | --- |
 | `FR-HOME-001` / `FR-MEMBER-001` | `src/pages/`、`src/components/dashboard/group-*`、`member-home-view.tsx` | 组级与成员级页面 |
-| `FR-CAL-001`–`FR-CAL-009` | `src/pages/calendar.astro`、`src/pages/[datasetId]/calendar.astro`、`src/db/queries/calendar.ts`、`src/lib/calendar.ts`、`src/components/dashboard/calendar-view.tsx`、`scripts/lib/schedule-sync.ts` | 读取、月历 / 议程、自动同步已落地；手工维护与 ICS 暂缓，方案见 [live-calendar.md](../planning/live-calendar.md) |
+| `FR-CAL-001`–`FR-CAL-012` | `src/pages/calendar.astro`、`src/pages/[datasetId]/calendar.astro`、`src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/db/queries/calendar.ts`、`src/lib/calendar.ts`、`src/components/dashboard/calendar-view.tsx`、`src/components/dashboard/day-timeline.tsx`、`scripts/lib/schedule-sync.ts` | 读取、月历 / 议程、自动同步、管理端写入、读取时关联与今天+明天时间线已落地；ICS 暂缓。方案见 [live-calendar.md](../planning/live-calendar.md)，接口见 [schedule-admin.md](../engineering/schedule-admin.md) |
 | `FR-STREAM-001` | `src/components/dashboard/streams-view.tsx`、`src/lib/table-params.ts` | 表格与 URL 状态 |
 | `FR-STREAM-002` | `src/components/dashboard/stream-detail-view.tsx` 等 | 单场分段 |
 | `FR-TREND-001` | `src/components/dashboard/trends-view.tsx`、`src/lib/aggregate.ts` | 聚合与图表 |
@@ -118,3 +122,4 @@
 | 2026-11-04 | `FR-COMPARE-002` 组级全员对比上线；`FR-DATA-004` 线上实测通过；同步当前运行形态与数据链路表述 | v1.1 |
 | 2026-11-04 | 登记直播日历需求 `FR-CAL-001`–`FR-CAL-009`，方案见 [live-calendar.md](../planning/live-calendar.md)；明确「不做实时看板」仅指直播中指标 | v1.2 |
 | 2026-11-04 | 直播日历读取路径、月历 / 议程、自动同步与缓存落地；`FR-CAL-003` 手工维护按用户要求暂缓，`FR-CAL-009` ICS 未做 | v1.3 |
+| 2026-11-07 | 新增管理端 `FR-CAL-010`、今日计划 `FR-CAL-011`、读取时关联 `FR-CAL-012`；`FR-CAL-003` 改为 `/admin/schedule` 与 `/api/admin/schedule` | v1.4 |
