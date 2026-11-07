@@ -70,6 +70,7 @@
 | `FR-COMPARE-001` | P1 | 同一成员内最多 4 场对比 | `AC-COMPARE-001`：`?ids=a,b,c` 可分享；逐分钟曲线叠加；指标横表；超过 4 场有明确限制（手工） | ✅ | README |
 | `FR-COMPARE-002` | P2 | 跨成员对比 | `AC-COMPARE-002`：组级 `/compare` 按同一月份区间与内容类型横向对比；`?members=` / `?type=` / `?months=` 可分享；样本不足时标注（手工） | ✅ | roadmap |
 | `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签（手工） | ✅ | product-direction |
+| `FR-TRANSCRIPT-002` | P2 | 逐字稿索引的检索、分面与长列表 | `AC-TRANSCRIPT-002`：搜索匹配标题 / 摘要 / 标签 / 日期 / `videoId`；标签多选同时命中；`q` / `tags` / `sort` / `dense` 写入 URL；标签、排序与密度收进单一筛选入口；月份分组可折叠；移动端筛选面板可用；320px 无横向溢出（手工 + 单测） | ✅ | transcript-index |
 | `FR-DATA-001` | P0 | 由 pack 派生 streams / insights | `AC-DATA-001`：`bun run db:ingest` 重建 `streams` + `dataset_insights`；`db:verify` 0 problems；不手改数据库（手工 / 脚本） | ✅ | data-model |
 | `FR-DATA-002` | P0 | 资产发布到 R2 | `AC-DATA-002`：`publish:assets` 上传顺序为 thumbs → emoji → archive；逐字稿单独发布；对象可达（手工） | ✅ | deployment |
 | `FR-DATA-003` | P0 | 每日增量抓取与入库 | `AC-DATA-003`：`daily-update.ts` 与 `streams` 做差集；安静日不抓取、不 ingest；失败开 issue（手工 / Actions 日志） | ✅ | deployment |

@@ -19,6 +19,7 @@ docs/
 │   ├── architecture.md
 │   ├── backlog.md
 │   ├── astro-ssr-migration.md
+│   ├── transcript-index.md
 │   ├── db-optimization.md
 │   ├── performance-audit.md
 │   ├── live-calendar.md

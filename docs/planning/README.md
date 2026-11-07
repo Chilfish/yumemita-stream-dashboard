@@ -8,6 +8,7 @@ planning/（规划与执行：怎么做、做到哪了）
   ├── architecture.md            ← 分层、数据流、路由、关键决策
   ├── backlog.md                 ← 任务清单与优先级
   ├── astro-ssr-migration.md     ← 当前阶段方案：Astro + Workers + PostgreSQL
+  ├── transcript-index.md        ← 逐字稿索引：检索、分面、月份导航与移动端
   ├── live-calendar.md           ← 直播日历：未来场次、手工日程与月历视图
   ├── share-card.md              ← 直播日程分享卡片：层级、间距、配色与导出
   ├── product-direction.md       ← 产品方向与阶段计划
