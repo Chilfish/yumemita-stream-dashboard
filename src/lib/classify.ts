@@ -3,7 +3,7 @@ export const CONTENT_TYPES = ["sing", "event", "talk", "game"] as const;
 export type ContentTypeKey = (typeof CONTENT_TYPES)[number];
 
 export const CONTENT_TYPE_LABELS: Record<ContentTypeKey, string> = {
-  sing: "弹唱",
+  sing: "歌枠",
   event: "活动",
   talk: "杂谈",
   game: "游戏",

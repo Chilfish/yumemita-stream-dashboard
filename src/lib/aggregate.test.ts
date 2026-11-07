@@ -769,7 +769,7 @@ describe("buildContentTypeStats", () => {
     });
     expect(game).toMatchObject({ streams: 1, chatPerMinute: 2, scPerHour: 1.5 });
     expect(talk).toMatchObject({ streams: 2, chatTotal: 40, commentsPerStream: 1 });
-    expect(stats.map(stat => stat.label)).toEqual(["弹唱", "活动", "杂谈", "游戏"]);
+    expect(stats.map(stat => stat.label)).toEqual(["歌枠", "活动", "杂谈", "游戏"]);
   });
 
   it("keeps member-only streams in the share without adding their metrics", () => {
