@@ -19,7 +19,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "cf:preview": "astro build && astro preview",
-    "cf:deploy": "astro build && wrangler deploy --config dist/server/wrangler.json",
+    "cf:deploy": "bun scripts/deploy.ts",
     "astro": "astro",
     "typecheck": "astro check",
     "test": "vitest run",
@@ -71,6 +71,7 @@
     "d3": "^7.9.2",
     "drizzle-orm": "^0.45.4",
     "lucide-react": "^1.70.0",
+    "modern-screenshot": "^4.7.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0",
@@ -93,7 +94,7 @@
     "drizzle-kit": "^0.31.11",
     "oxlint": "^1.92.0",
     "pg": "^8.23.1",
-    "typescript": "^7.0.2",
+    "typescript": "6.0.3",
     "vitest": "^5.1.0",
     "wrangler": "^4.158.0"
   }
