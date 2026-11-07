@@ -111,6 +111,7 @@
 | <640 | 隐藏侧栏；底部标签栏 + 成员 Sheet；左右 14px |
 
 - 不因屏幕小隐藏功能；只改变呈现方式。
+- 记录型表格在 `md` 以下改为堆叠列表，禁止把标题列压成一字一列；规则见 [GENERAL.md §7](./GENERAL.md#7-响应式数据表格)。
 - 触控目标 ≥44px；底部标签栏处理安全区。
 - 场次表窄屏可改两行式列表；图表按数据点密度横向滚动。
 
@@ -141,3 +142,4 @@
 ## 10. 专题
 
 - [chat-visualization.md](./chat-visualization.md)：弹幕与事件可视化组件的目标形态、数据契约、虚拟化、导入与正式化路径。当前 `/dev/live-chat` 只是 POC。
+- [time-input.md](./time-input.md)：`TimeInput` 的宽容解析、滚轮选择、键盘与可访问性约定；纯逻辑在 `src/lib/time.ts`。

@@ -188,7 +188,17 @@ export function GroupAboutPage() {
               </dd>
             </div>
           </dl>
-          <p className="text-caption text-ink-3">© 2026 Chilfish · 非官方粉丝项目</p>
+          <p className="text-caption text-ink-3">
+            © 2026 Chilfish · 非官方粉丝项目
+            <span className="mx-1.5">·</span>
+            <a
+              className="underline-offset-2 transition-colors duration-120 ease-out hover:text-foreground hover:underline"
+              data-astro-reload
+              href="/admin/schedule"
+            >
+              日程维护
+            </a>
+          </p>
         </Section>
       </div>
     </div>

@@ -1,0 +1,63 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import { ScheduleEditor } from '@/components/admin/schedule-editor'
+import { db } from '@/db/client'
+import { getAdminScheduleList } from '@/db/queries/calendar'
+import { getDatasets } from '@/db/queries/datasets'
+import { addDays, currentJstDay } from '@/lib/calendar'
+import type { SeoMeta } from '@/lib/seo'
+import type { AdminScheduleItem } from '@/types/calendar'
+
+export const prerender = false
+
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+
+const today = currentJstDay(new Date())
+let datasets: Awaited<ReturnType<typeof getDatasets>> = []
+let items: AdminScheduleItem[] = []
+
+try {
+  datasets = await getDatasets(db)
+  items = await getAdminScheduleList(db, {
+    from: addDays(today, -7),
+    to: addDays(today, 60),
+  })
+}
+catch (error) {
+  console.error('[page] admin schedule failed', error)
+  Astro.response.status = 500
+}
+
+const canonical = Astro.site
+  ? new URL(Astro.url.pathname, Astro.site).toString()
+  : Astro.url.toString()
+
+const meta: SeoMeta = {
+  title: '日程维护',
+  description: '内部日程维护页',
+  canonical,
+  image: null,
+  imageAlt: null,
+  robots: 'noindex,follow',
+  ogType: 'website',
+  publishedTime: null,
+  jsonLd: [],
+}
+---
+
+<Layout meta={meta}>
+  {Astro.response.status === 500
+    ? <p class="p-6 text-footnote text-muted-foreground">日程读取失败，请查看日志后刷新重试。</p>
+    : (
+        <ScheduleEditor
+          client:load
+          datasets={datasets.map(dataset => ({
+            id: dataset.id,
+            label: dataset.label,
+            color: dataset.color,
+          }))}
+          initialItems={items}
+          today={today}
+        />
+      )}
+</Layout>

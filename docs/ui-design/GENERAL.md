@@ -199,7 +199,55 @@ useMediaQuery({ min: "md", max: "xl" });
 useMediaQuery({ pointer: "coarse" });
 ```
 
-## 7. 常见错误速查
+## 7. 响应式数据表格
+
+记录型列表（日程、场次、成员）在窄屏不要压缩表格：固定列宽会把标题列挤成一字一列。
+统一形态是「桌面表格 + 移动端堆叠列表」，分界点 `md`（768px）。
+
+### 7.1 结构
+
+```tsx
+<div className="hidden md:block">
+  <Table>…</Table>
+</div>
+
+<ul className="md:hidden">
+  {rows.map(row => (
+    <li className="flex flex-col gap-1.5 border-t border-hairline px-4 py-3 first:border-t-0">
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-caption tabular-nums text-ink-3">{time}</span>
+        <span className="text-footnote font-medium">{member}</span>
+        <Badge size="sm">{state}</Badge>
+      </div>
+      <p className="text-footnote leading-snug">{title}</p>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-caption text-ink-3">{relation}</span>
+        <RowActions />
+      </div>
+    </li>
+  ))}
+</ul>
+```
+
+- 同一行内容拆成共享小组件（状态 Badge、关联状态、操作按钮），桌面与移动端复用，不写两份判断。
+- 移动端行内顺序：元信息（时间 / 成员 / 状态）→ 标题（换行，不截断）→ 备注 → 关联 / 操作。
+- 日期分组标题放在两种形态之外，共用一份。
+- 参考实现：`src/components/admin/schedule-list.tsx`。
+
+### 7.2 规则
+
+| 规则 | 原因 |
+| --- | --- |
+| 标题列不设固定宽度、不用 `truncate` | 窄屏会把标题压成一字一列 |
+| `<md` 不渲染表格，改堆叠列表 | 表格横向滚动或压缩都难读 |
+| 列表行用分隔线分组，不加卡片 | 保持密度，避免卡片堆 |
+| 触控目标 ≥44px（`Button` 已带 `pointer-coarse`） | 移动端可点 |
+| 页面级无横向滚动 | 宽内容在自身容器内滚动 |
+| 用 iPhone 设备档（DPR + touch）验证 320 / 390 宽 | 只缩桌面视口看不出问题 |
+
+真正的宽数据表（图表、热力图、多指标矩阵）才用 `overflow-x-auto` 容器内滚动；记录列表一律切换形态。
+
+## 8. 常见错误速查
 
 | 错误 | 正确做法 |
 | --- | --- |
@@ -210,5 +258,6 @@ useMediaQuery({ pointer: "coarse" });
 | `bg-white dark:bg-gray-900` | `bg-background` / `bg-card` |
 | `<hr />` 分割区域 | `<Separator />` |
 | 手写弹层 / 下拉 | `Dialog` / `Menu` / `Select` / `Popover` |
+| 窄屏把表格压到标题列一字一行 | `md` 以下改堆叠列表（见 [§7](#7-响应式数据表格)） |
 | 在未挂载 Provider 的组件里调用 toast | 先挂载 `ToastProvider` |
 | 导入 `@/components/ui/button` 以外的手写按钮 | 统一用 coss `Button` |

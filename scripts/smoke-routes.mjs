@@ -57,6 +57,28 @@ for (const route of routes) {
   }
 }
 
+// 管理端只接受已认证请求；未配置时返回 503，两种都算「已保护」。
+for (const path of ['/admin/schedule', '/api/admin/schedule']) {
+  const response = await fetch(`${baseUrl}${path}`, { redirect: 'manual' })
+  if (response.status === 401 || response.status === 503) {
+    console.log(`✓ ${path}: ${response.status} (protected)`)
+  }
+  else {
+    failures += 1
+    console.error(`✗ ${path}: ${response.status} (expected 401 or 503)`)
+  }
+}
+
+const robots = await fetch(`${baseUrl}/robots.txt`)
+const robotsText = await robots.text()
+if (!robotsText.includes('Disallow: /admin/')) {
+  failures += 1
+  console.error('✗ /robots.txt: 缺少 /admin/ 的 Disallow')
+}
+else {
+  console.log('✓ /robots.txt: /admin/ disallowed')
+}
+
 // 全员对比是分析页：确认 noindex，且筛选参数不会让页面变成 404。
 const compare = await fetch(`${baseUrl}/compare?members=nonoka&type=sing&months=all`)
 const compareHtml = await compare.text()
