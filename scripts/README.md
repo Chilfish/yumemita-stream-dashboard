@@ -25,8 +25,9 @@
 `describeEnvironment()`（`scripts/lib/local-config.ts`）是唯一实现，`loadEnvFiles()` 与各脚本入口共用；
 只输出模式、数据库主机 / 库名与桶名，不带账号密码。
 
-写入目标由 `LOCAL` 决定：`LOCAL=1` 才采用 `.env.local` / `.dev.vars` 里的本机数据库与代理地址，
-未开时只认 `.env`（线上 Neon + R2）。`bun run dev` 是例外，它始终准备本机库。
+环境变量只有一个文件 `.dev.vars`（模板 `.dev.vars.example`）。普通键是本地值，
+`*_ONLINE` 是线上目标：`LOCAL=1` 用普通键，`LOCAL=0` 用 `*_ONLINE` 覆盖。
+`bun run dev` 是例外，它始终准备本机库。
 
 ## 数据库 ingest
 

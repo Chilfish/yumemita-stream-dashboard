@@ -1,7 +1,27 @@
-# 本地 Cloudflare workerd 开发环境使用 .dev.vars
-# 复制为 .dev.vars 后填入真实值
-DATABASE_URL=postgresql://user:password@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+# 唯一的环境文件。复制为 .dev.vars（已在 .gitignore）后填真实值。
+#
+# 一份文件放下两套目标：
+#   - 普通键是本地开发用的值，wrangler / astro dev 与所有脚本都读它们；
+#   - 线上目标写在 `*_ONLINE` 里（DATABASE_URL_ONLINE 等），LOCAL=0 时替换同名键。
+# 开关：LOCAL=1 全部走本机（数据库 / 对象存储 / 媒体地址），LOCAL=0 走线上。
+# 不设时按文件里的 LOCAL 行；命令行设的 LOCAL 优先于文件。
 
+# 本地开发：工作区默认走本机 Postgres（bun run dev 会准备它）。
+LOCAL=1
+DATABASE_URL=postgres://postgres@localhost:5432/ymmt_dev
+# 线上 Neon；LOCAL=0 时生效，sync:remote / 发布 / 部署走它。
+DATABASE_URL_ONLINE=postgresql://user:password@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+
+# workerd 不能直连 TCP：本地页面读路径经 /sql 代理（bun run dev 自动拉起）。
+NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql
+
+# 本地对象存储（SILO，MinIO 的维护分支）只在 LOCAL=1 时生效；默认值即下面这组。
+# S3_ENDPOINT=http://127.0.0.1:9000
+# S3_ACCESS_KEY_ID=silo-admin
+# S3_SECRET_ACCESS_KEY=silo-admin
+# SILO_DATA=temp/silo-data
+
+# Cloudflare R2（脚本发布资产；Worker 通过 wrangler 的 r2_buckets 绑定读取）
 R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
@@ -9,7 +29,17 @@ R2_BUCKET=yumemita-data
 # 桶内已无公共前缀；对象直接放在桶根（archive/、<datasetId>/thumbs/、emojis/ …）。
 R2_PREFIX=
 
-PUBLIC_R2_BASE=
+# 封面 / 表情的公开域名，构建时内联到客户端（LOCAL=1 时自动改成本机桶地址）
+PUBLIC_R2_BASE=https://ymmt-s3.chilfish.top
+
+# 站点根地址：canonical / sitemap / purge 端点
 SITE_URL=https://ymmt.chilfish.top
 
+# 内部缓存失效端点令牌（Worker secret 同名）
 PURGE_TOKEN=
+
+# 日程管理端登录；留空时 /admin 与 /api/admin 返回 503。
+# ADMIN_SESSION_SECRET 缺省时用 ADMIN_PASSWORD 签名登录 Cookie。
+ADMIN_USER=
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=

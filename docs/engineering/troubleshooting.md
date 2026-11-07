@@ -108,7 +108,7 @@ bun run dev -- --port 4322
 - 旧版本没有路由，之前的页面链接（只有根路径）会回到组首页，这是预期行为。
 - 切换数据集时只会保留当前 section（单场会回到该数据集最新一场），不会保留原来的 `videoId`。
 
-## 分享卡片没有标题或封面
+## 分享卡片没有标题
 
 - 单场 head 由 SSR 在请求期输出；新场次 ingest 后立即可用，不需要额外构建。
 - 检查 `SITE_URL` / `astro.config.mjs` 的 `site`：canonical / `og:url` / `og:image` 需要绝对地址。

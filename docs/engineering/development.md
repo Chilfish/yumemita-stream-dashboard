@@ -8,7 +8,7 @@
 
 - **Bun ≥ 1.4**（推荐，仓库带 `bun.lock`）
 - Node.js ≥ 22.22（Astro / Cloudflare 工具链需要）
-- 阶段 0 不需要数据库；`.env.example` 已预留 `DATABASE_URL` 与 R2 变量
+- 阶段 0 不需要数据库；`.dev.vars.example` 已预留 `DATABASE_URL` 与 R2 变量
 
 ```bash
 bun install
@@ -36,11 +36,11 @@ Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整�
 | `bun run preview` | 本地预览构建产物（workerd；复用后台的本地服务） |
 | `bun run cf:preview` | 构建后预览，部署前检查 |
 | `bun run cf:deploy` | `astro build` + `wrangler deploy --config dist/server/wrangler.json` |
-| `bun run dev:db` | 只做本地库初始化：建库、应用迁移、写 `.env.local`（见 [local-database.md](./local-database.md)） |
+| `bun run dev:db` | 只做本地库初始化：建库、应用迁移、补 `.dev.vars`（见 [local-database.md](./local-database.md)） |
 | `bun run dev:db:proxy` | 单独前台启动本地 Neon HTTP 兼容代理（`dev` 会自动处理） |
 | `bun run dev:seed` | 本地灌数据；参数同 `db:ingest` |
 | `bun run db:generate` / `db:push` / `db:studio` | Drizzle 迁移工具 |
-| `bun run db:migrate` | 应用 `drizzle/` 迁移（读 `.env` / `.dev.vars` / `.env.local`） |
+| `bun run db:migrate` | 应用 `drizzle/` 迁移（按 `.dev.vars` 与 `LOCAL` 选库） |
 | `bun run db:ingest` | 本地 pack → PostgreSQL；支持 `--dataset` / `--ids` / `--limit` / `--all` / `--dry-run` |
 | `bun run db:verify` | 数据库与本地 pack 字段级对账 |
 | `bun run db:query` | 查询层冒烟：列表 / insights / 组首页 / 相册 + 本地延迟 |
@@ -69,7 +69,7 @@ Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整�
   - 全量回填可按 `--dataset <id>` 一个 dataset 一个进程并行；每个进程独立算该成员的 insights，互不覆盖。
   - `dataset_insights.public_totals` 由 ingest 用窄 SQL 聚合写入，页面汇总只读它；请求期不再加载明细。
 - 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表；`dataset_insights` 用 `scripts/lib/json-equal.ts` 深比较（`jsonb` 不保留键顺序）。
-- `DATABASE_URL` 从 `.env` / `.dev.vars` / `.env.local` 读取，优先级为真实环境 > `.env.local` > `.dev.vars` > `.env`；缺失时直接报错，不静默回退。
+- `DATABASE_URL` 从 `.dev.vars` 读取（`loadEnvFiles()`），运行环境里的同名变量优先；`LOCAL=0` 时取 `DATABASE_URL_ONLINE`；缺失时直接报错，不静默回退。
 - 查询层：`src/db/queries/`，函数接收 `Db` 作为第一个参数（页面 / 脚本共用）；DTO 在 `src/types/db.ts`。
   - `batch.ts`：`runBatch()`，Neon HTTP 下用 `db.batch` 把多条只读 SQL 放进一次请求；本地 `pg` 回退并行。
   - `datasets.ts`：`selectDatasetsQuery` / `getDatasets` / `getDataset`

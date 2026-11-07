@@ -6,23 +6,22 @@ import { cacheCloudflare } from '@astrojs/cloudflare/cache'
 import react from '@astrojs/react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, envField } from 'astro/config'
-import { loadEnv } from 'vite'
 import { DEFAULT_SITE_URL } from './src/lib/site-defaults.ts'
 import { isLocalMode, localPublicBase } from './scripts/lib/local-config.ts'
+import { loadEnvFiles } from './scripts/lib/env.ts'
 import { loadPreviewData, loadEmojiIndex } from './scripts/lib/live-chat-preview-data.ts'
 
-// Bun / CI 未必把 .env 注入 process.env；显式读一次，避免 SITE_URL 静默回退。
-const mode = process.env.NODE_ENV === 'development' ? 'development' : 'production'
-const fileEnv = loadEnv(mode, process.cwd(), '')
-const siteUrl = (process.env.SITE_URL || fileEnv.SITE_URL || DEFAULT_SITE_URL).replace(/\/+$/, '')
+// 环境变量只有一个来源：.dev.vars（脚本、wrangler、astro dev 都读它）。
+// 在这里加载一次，SITE_URL / PUBLIC_R2_BASE / LOCAL 才不会静默回退。
+loadEnvFiles()
+const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).replace(/\/+$/, '')
 
-// `LOCAL=1` 时媒体地址由配置直接指向本机 SILO，不把派生值写进 .env.local，
+// `LOCAL=1` 时媒体地址由配置直接指向本机 SILO，不把派生值写进文件，
 // 避免关掉开关后仍把 localhost 地址带进生产构建。
-const configEnv = { ...fileEnv, ...process.env }
-const localMode = isLocalMode(configEnv)
+const localMode = isLocalMode()
 const publicR2Base = (localMode
-  ? localPublicBase(configEnv)
-  : (configEnv.PUBLIC_R2_BASE || '')).replace(/\/+$/, '')
+  ? localPublicBase()
+  : (process.env.PUBLIC_R2_BASE || '')).replace(/\/+$/, '')
 
 if (!publicR2Base) {
   console.warn('[astro.config] PUBLIC_R2_BASE 未设置：构建产物会回退到 /data/，线上封面 / 表情会 404')
@@ -156,6 +155,21 @@ export default defineConfig({
         optional: true,
       }),
       PURGE_TOKEN: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+      ADMIN_USER: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+      ADMIN_PASSWORD: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+      ADMIN_SESSION_SECRET: envField.string({
         context: 'server',
         access: 'secret',
         optional: true,

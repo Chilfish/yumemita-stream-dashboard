@@ -28,7 +28,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat } from './lib/live-chat.ts'
-import { logEnvironment } from './lib/env.ts'
+import { loadEnvFiles } from './lib/env.ts'
 import { mergeDanmakuFiles } from './lib/danmaku-merge.ts'
 import { readCredentials } from './lib/object-storage.ts'
 import { restoreDataset } from './lib/restore-datapacks.ts'
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  logEnvironment('fetch:streams')
+  loadEnvFiles({ prefix: 'fetch:streams' })
 
   const sources = readJson<{ datasets?: DatasetSource[] }>(DATASOURCES_PATH).datasets ?? []
   const dataset = values.dataset

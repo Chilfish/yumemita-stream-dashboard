@@ -4,7 +4,6 @@ import {
   DEFAULT_DATABASE_URL,
   ensureDevDatabase,
   ensureDevVars,
-  ensureEnvLocal,
   ensurePostgresRunning,
 } from './lib/dev-services.ts'
 
@@ -23,7 +22,6 @@ function parseArgs(argv: string[]): DevDbOptions {
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2))
   ensurePostgresRunning(options.url)
-  ensureEnvLocal(options.url)
   await ensureDevDatabase(options.url)
   await applyMigrations(options.url)
   ensureDevVars(options.url, process.env.NEON_HTTP_ENDPOINT ?? 'http://127.0.0.1:4444/sql')

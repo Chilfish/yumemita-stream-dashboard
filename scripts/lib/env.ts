@@ -10,7 +10,7 @@ import {
 } from './local-config.ts'
 
 /**
- * 解析 `.env` 格式的文本；不做变量展开，只处理注释、空行与成对引号。
+ * 解析 `.dev.vars` 格式的文本；不做变量展开，只处理注释、空行与成对引号。
  * `KEY=a=b` 只按第一个 `=` 切分，值里可以再出现 `=`。
  */
 export function parseEnvContent(content: string): Record<string, string> {
@@ -39,72 +39,62 @@ export function readEnvFile(path: string): Record<string, string> {
   return parseEnvContent(readFileSync(path, 'utf8'))
 }
 
-const ENV_FILES = ['.env', '.dev.vars', '.env.local'] as const
+/** 唯一的环境文件：wrangler / astro dev 原生读它，脚本也读它。 */
+export const ENV_FILE = '.dev.vars'
 
-/**
- * 决定「数据写到哪」的键：非本地模式下只认 `.env`。
- * `.env.local` / `.dev.vars` 里的这两个值是本机开发用的，不该影响线上运行。
- */
-const LOCAL_ONLY_KEYS = new Set(['DATABASE_URL', 'NEON_HTTP_ENDPOINT'])
+/** `KEY_ONLINE` 是「线上模式用这套值」的写法：同一份文件里放本地与线上两套目标。 */
+const ONLINE_SUFFIX = '_ONLINE'
 
 export interface LoadEnvOptions {
-  /**
-   * 开发服务器专用：`bun run dev` 始终准备并连本机库，不受 `LOCAL` 开关影响，
-   * 因此无条件采用 `.env.local` / `.dev.vars` 的地址。普通脚本不要传。
-   */
-  devServer?: boolean
+  /** 仓库根目录；默认当前工作目录。 */
+  cwd?: string
+  /** 目标环境那行的前缀，默认 `env`；传脚本名可以沿用 `[publish-data] …` 的日志。 */
+  prefix?: string
 }
 
 /**
- * 本地脚本读取 .env / .dev.vars / .env.local。
- * Bun 只会自动加载 .env，`.dev.vars` 是 Cloudflare 的本地约定，需要手动读。
- * 后面的文件覆盖前面的（`.env.local` 优先级最高）。
+ * 读 `.dev.vars`，按 `LOCAL` 决定用哪一套值。
  *
- * 不能沿用「已经在 `process.env` 里就跳过」的写法：Bun 启动时会把 `.env*` 先灌一遍，
- * 且同名键先读到的赢（`.env` 会盖住 `.env.local`），和这里声明的优先级正好相反。
- * 所以以本函数读到的文件为准，只有 `LOCAL` 开关允许运行环境直接覆盖。
+ * - 文件里的普通键是**本地开发**者的值（`DATABASE_URL` 指本机库，wrangler / astro dev 也直接读它们）；
+ * - 线上目标写在 `DATABASE_URL_ONLINE` 这类 `*_ONLINE` 键里：`LOCAL=0` 时替换同名键，`LOCAL=1` 时忽略；
+ * - 文件只补运行环境里没有的键：命令行显式传的变量（`LOCAL=0 SITE_URL=… bun run …`）始终优先；
+ * - `LOCAL=1` 时再兜底一次，数据库、代理、媒体地址都强制指本机。
  *
- * `LOCAL=1` 才会采用 `.env.local` / `.dev.vars` 的本地数据库与代理地址；
- * `LOCAL=0`（或不设）这两项只认 `.env`，避免「对象传到 R2、元数据写进本地库」。
- * 其余键（R2 凭据、SITE_URL 等）仍按文件顺序覆盖。
+ * 线上模式而 `DATABASE_URL` 仍指向本机时把它清掉并提示，
+ * 避免「对象传到 R2、元数据却写进本地库」这种混合状态。
  */
-export function loadEnvFiles(options: LoadEnvOptions = {}, cwd = process.cwd()): void {
-  const files = ENV_FILES.map(name => ({
-    path: resolve(cwd, name),
-    values: {} as Record<string, string>,
-  }))
-  for (const file of files) {
-    if (existsSync(file.path)) file.values = readEnvFile(file.path)
+export function loadEnvFiles(options: LoadEnvOptions = {}): void {
+  const path = resolve(options.cwd ?? process.cwd(), ENV_FILE)
+  const values = existsSync(path) ? readEnvFile(path) : {}
+  const ambient = new Set(Object.keys(process.env))
+  const local = process.env.LOCAL !== undefined ? isLocalMode(process.env) : isLocalMode(values)
+
+  for (const [key, value] of Object.entries(values)) {
+    if (key.endsWith(ONLINE_SUFFIX) || ambient.has(key)) continue
+    process.env[key] = value
   }
 
-  const local = resolveLocalMode(files)
-  const fromFile = new Set<string>()
+  if (local) {
+    applyLocalOverrides()
+  }
+  else {
+    for (const [key, value] of Object.entries(values)) {
+      if (!key.endsWith(ONLINE_SUFFIX) || value === '') continue
+      const base = key.slice(0, -ONLINE_SUFFIX.length)
+      if (ambient.has(base)) continue
+      process.env[base] = value
+    }
 
-  for (const [index, file] of files.entries()) {
-    const devFile = index > 0
-
-    for (const [key, value] of Object.entries(file.values)) {
-      // 开关只认运行环境：命令行 / `bun run dev --local` 设的 LOCAL 不被文件改回去。
-      if (key === 'LOCAL' && process.env.LOCAL !== undefined && !fromFile.has(key)) continue
-      if (devFile && !local && !options.devServer && LOCAL_ONLY_KEYS.has(key)) continue
-      process.env[key] = value
-      fromFile.add(key)
+    if (isLocalUrl(process.env.DATABASE_URL)) {
+      delete process.env.DATABASE_URL
+      console.warn(
+        '[env] 线上模式但 DATABASE_URL 指向本机：'
+        + `要用线上库请写 DATABASE_URL${ONLINE_SUFFIX}，本地调试请设 LOCAL=1`,
+      )
     }
   }
 
-  applyLocalOverrides()
-  logEnvironment('env')
-}
-
-/** 开关的优先级：运行环境 > `.env.local` > `.dev.vars` > `.env`。 */
-function resolveLocalMode(
-  files: ReadonlyArray<{ values: Record<string, string> }>,
-): boolean {
-  if (process.env.LOCAL !== undefined)
-    return isLocalMode(process.env)
-  const merged: Record<string, string | undefined> = {}
-  for (const file of files) Object.assign(merged, file.values)
-  return isLocalMode(merged)
+  logEnvironment(options.prefix ?? 'env')
 }
 
 /**
@@ -128,7 +118,7 @@ function applyLocalOverrides(): void {
 export function requireEnv(name: string): string {
   const value = process.env[name]
   if (!value) {
-    throw new Error(`缺少环境变量 ${name}；请在 .env 或 .dev.vars 中配置`)
+    throw new Error(`缺少环境变量 ${name}；请在 ${ENV_FILE} 中配置`)
   }
   return value
 }

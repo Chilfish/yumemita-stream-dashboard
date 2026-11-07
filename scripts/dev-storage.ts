@@ -15,7 +15,7 @@ import { isLocalMode, localPublicBase } from './lib/local-config.ts'
 loadEnvFiles()
 
 if (!isLocalMode()) {
-  console.error('[storage] 需要 LOCAL=1（可写在 .env.local）')
+  console.error('[storage] 需要 LOCAL=1（可写在 .dev.vars）')
   process.exit(1)
 }
 

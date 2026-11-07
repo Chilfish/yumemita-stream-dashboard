@@ -98,11 +98,13 @@ Astro 退出或被 kill 后，Postgres 与代理继续在后台运行。`.dev.va
 
 ### 配置
 
-复制 `.env.example` 为 `.env`，至少填写数据库与公开资源地址：
+复制 `.dev.vars.example` 为 `.dev.vars`（唯一的环境文件，已在 `.gitignore`），填数据库与公开资源地址：
 
 ```env
-# Neon PostgreSQL（页面查询 + ingest 写入）
-DATABASE_URL=postgresql://user:password@ep-xxx.neon.tech/neondb?sslmode=require
+# 本地开发用本机库；线上目标写在 *_ONLINE 里，LOCAL=0 时生效
+LOCAL=1
+DATABASE_URL=postgres://postgres@localhost:5432/ymmt_dev
+DATABASE_URL_ONLINE=postgresql://user:password@ep-xxx.neon.tech/neondb?sslmode=require
 
 # 封面 / 表情的 R2 公开域名，构建时内联
 PUBLIC_R2_BASE=https://ymmt-s3.chilfish.top

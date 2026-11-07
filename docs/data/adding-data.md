@@ -63,7 +63,7 @@ bun run sync:remote -- --update-existing     # 允许按 hash 刷新已有场次
 bun run sync:remote -- --recent-days 30 --update-existing
 ```
 
-它只读 `.env` 的线上 `DATABASE_URL` / `R2_*`，刻意忽略 `.env.local` 与 `.dev.vars`，并在子进程里设置 `LOCAL=0`；`.env` 指向本机时直接拒绝执行。
+它只读 `.dev.vars` 的线上目标（`DATABASE_URL_ONLINE` / `R2_*`），并在子进程里设置 `LOCAL=0`；`DATABASE_URL_ONLINE` 指向本机时直接拒绝执行。
 
 默认策略：
 

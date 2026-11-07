@@ -24,7 +24,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { archiveKey, createObjectStore, readCredentials, remoteBase } from './lib/object-storage.ts'
-import { logEnvironment } from './lib/env.ts'
+import { loadEnvFiles } from './lib/env.ts'
 import { isStopword } from '../src/lib/stopwords.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -63,7 +63,7 @@ const datasets = values.dataset && values.dataset.length > 0
 
 let store: ReturnType<typeof createObjectStore> | null = null
 if (values.remote) {
-  logEnvironment('verify')
+  loadEnvFiles({ prefix: 'verify' })
   const credentials = readCredentials()
   store = credentials ? createObjectStore(credentials) : null
   if (!store && !remoteBase()) {

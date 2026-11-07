@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat, type ChatRecord } from './lib/live-chat.ts'
 import { archiveKey, createObjectStore, datapackKey, readCredentials } from './lib/object-storage.ts'
-import { logEnvironment } from './lib/env.ts'
+import { loadEnvFiles } from './lib/env.ts'
 import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
 import type { OwnerChat, StreamDatapack } from '../src/types/datapack.ts'
 
@@ -169,7 +169,7 @@ if (selected.length === 0)
 if (values.ids && selected.length !== 1)
   fail('用 --ids 时请同时指定且只指定一个 --dataset')
 
-logEnvironment('backfill')
+loadEnvFiles({ prefix: 'backfill' })
 
 const credentials = readCredentials()
 if (!values['dry-run'] && !credentials && !values['no-upload'])

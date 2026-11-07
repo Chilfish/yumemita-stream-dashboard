@@ -1,8 +1,9 @@
 # 本地开发环境（PostgreSQL + SILO）
 
-> **最后更新**：2026-11-06
-> 本地开发不再连 Neon / R2，避免把开发 / 预览 / 爬虫流量算进线上出流量。生产与脚本的凭据仍留在 `.env`。
-> 一个 `LOCAL=1` 同时切换数据库、对象存储与媒体地址；见下方「本地对象存储」。`bun run dev --local` 会开启并写回 `.env.local`，之后持续生效。
+> **最后更新**：2026-11-07
+> 本地开发默认连本机 Postgres + SILO，避免把开发 / 预览 / 爬虫流量算进线上出流量。
+> 环境变量只有一个文件：`.dev.vars`。本地值写普通键，线上目标写 `*_ONLINE`。
+> `LOCAL=1` 同时切换数据库、对象存储与媒体地址；见下方「本地对象存储」。
 
 ## 为什么需要代理
 
@@ -19,9 +20,9 @@
 
 - `src/db/connection.ts`：URL 是本机（`localhost` / `127.0.0.1` / `::1`）时，`createDb` / `createWriteDb` 走 `pg`；传入 `NEON_HTTP_ENDPOINT` 时强制走 HTTP 驱动。
 - `scripts/dev.ts`：`bun run dev` 的入口，先准备本地服务，再用 Node 启动 Astro。
-- `scripts/lib/dev-services.ts`：启动 / 复用 Postgres 与代理、建库、跑迁移、补齐 `.env.local` / `.dev.vars`。
+- `scripts/lib/dev-services.ts`：启动 / 复用 Postgres 与代理、建库、跑迁移、补齐 `.dev.vars`。
 - `scripts/dev-db-proxy.ts`：本地 `/sql` 代理，只接受本机数据库地址。
-- `scripts/dev-db.ts`：只做建库 + 迁移 + 写 `.env.local` 的独立命令。
+- `scripts/dev-db.ts`：只做建库 + 迁移 + 补 `.dev.vars` 的独立命令。
 - `scripts/lib/local-config.ts`：`LOCAL=1` 的总开关与默认端点 / 凭据。
 - `scripts/lib/dev-silo.ts`：本地 SILO 的启动、建桶与匿名读策略。
 - `scripts/dev-storage.ts`：只准备本地对象存储（`bun run dev:storage`）。
@@ -74,9 +75,7 @@ Scoop 的 `apps/silo/current/silo.exe`，再回退到已安装的 `minio`（CLI 
 - `DATABASE_URL` / `NEON_HTTP_ENDPOINT` 不是本机地址时，强制切到本地默认值。
 - 对象存储改为指向 SILO；发布进度的 `target` 带 `local/` 前缀，与线上 R2 的记录分开，
   不会互相误判「已上传」而跳过。
-- `.env.local` 与 `.dev.vars` 自动写入 `LOCAL=1` 与本地 `DATABASE_URL`（以及代理端点），
-  但这些本机地址只在 `LOCAL=1` 时被脚本采用；`LOCAL=0` 会回到 `.env` 的线上库。
-  `astro.config.mjs` 在 `LOCAL=1` 时把 `import.meta.env.PUBLIC_R2_BASE` 定义为本地桶地址，
+- `astro.config.mjs` 在 `LOCAL=1` 时把 `import.meta.env.PUBLIC_R2_BASE` 定义为本地桶地址，
   不把派生的媒体地址落进文件，关掉开关就自动回到线上值。
 - 浏览器封面 / 表情、逐字稿 API 的 DEV 回退都改读 SILO；生产仍走 R2 binding。
 - `purge:cache` 直接跳过，不会去动线上 Workers Cache。
@@ -87,24 +86,23 @@ Scoop 的 `apps/silo/current/silo.exe`，再回退到已安装的 `minio`（CLI 
 ## 启动开发：一条命令
 
 ```bash
-bun run dev            # 沿用当前 .env.local 的配置
-bun run dev --local    # 开启 LOCAL=1：Postgres + 代理 + SILO + 本地媒体地址
+bun run dev            # 按 .dev.vars：Postgres + 代理 +（LOCAL=1 时）SILO
+bun run dev --local    # 强制 LOCAL=1，并把开关写回 .dev.vars
 ```
 
-`--local` 会把 `LOCAL=1` 写进 `.env.local` / `.dev.vars`，之后普通 `bun run dev` 与
-`db:ingest` / `publish:*` / `fetch:*` 等脚本都会读到。要切回线上，把 `LOCAL` 改成 `0`
-（或删掉这两行）：对象存储、媒体地址与数据库都会回到 `.env` 的值。
+`.dev.vars` 里的 `LOCAL=1` 决定普通脚本（`db:ingest` / `publish:*` / `fetch:*`）走本地还是线上；
+命令行设的 `LOCAL` 优先于文件。要切到线上，把 `LOCAL` 改成 `0` 或直接 `LOCAL=0 bun run …`。
 
 开发服务器与开关无关：`bun run dev` 始终准备并连本机库，`LOCAL` 只决定对象存储、
-媒体地址是否也切到本机。所以 `.env.local` 里留本地 `DATABASE_URL` 不会让脚本误连本机库。
+媒体地址是否也切到本机。所以 `.dev.vars` 里留本地 `DATABASE_URL` 不会让脚本误连本机库。
 
 它会依次：
 
-1. 按 `.env` → `.dev.vars` → `.env.local`（后者覆盖前者）解析 `DATABASE_URL`；开发服务器
-   无条件采用其中的本机地址，普通脚本只在 `LOCAL=1` 时采用，见下方「与线上环境的关系」；
+1. 读 `.dev.vars` 的 `DATABASE_URL`（`LOCAL=1` 时强制本机地址）；开发服务器无条件用本机库，
+   普通脚本按 `LOCAL` 取普通键或 `DATABASE_URL_ONLINE`，见下方「与线上环境的关系」；
 2. `DATABASE_URL` 是本机地址时，启动 Postgres（已在运行则跳过）、创建 `ymmt_dev`、应用 `drizzle/` 迁移；
-3. 缺少 `.env.local` / `.dev.vars` 时补写本地地址与 `NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql`；
-   `LOCAL=1` 时把 `LOCAL=1` 写回这两个文件（`.env.local` 里已有 `DATABASE_URL` 也会被覆盖成本机）；
+3. 缺少 `.dev.vars` 时按模板补写；`LOCAL=1` 时把本地地址与
+   `NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql` 覆盖回文件（`*_ONLINE` 的线上目标保持不动）；
 4. 启动或复用 `dev:db:proxy`；
 5. `LOCAL=1` 时启动或复用 SILO，建桶并设置匿名读；
 6. 用 **Node** 启动 Astro（Bun 运行时的 fetch 会让 miniflare 报 `ECONNREFUSED`，不要改回去）。
@@ -143,7 +141,7 @@ bun run dev:db:proxy                                  # 只起代理（前台）
 LOCAL=1 bun run dev:storage                           # 只准备 SILO 与本地桶
 ```
 
-`dev:db` 会拉起 Postgres（未运行时）、写 `.env.local`、建库并应用迁移，但不起代理；`dev:db:proxy` 需要自己另开终端，`bun run dev` 一般不需要它。只跑 `publish:*` / `fetch:*` 时，先用 `dev:storage` 确认 SILO 就绪。
+`dev:db` 会拉起 Postgres（未运行时）、补齐 `.dev.vars`、建库并应用迁移，但不起代理；`dev:db:proxy` 需要自己另开终端，`bun run dev` 一般不需要它。只跑 `publish:*` / `fetch:*` 时，先用 `dev:storage` 确认 SILO 就绪。
 
 ## 灌入数据
 
@@ -155,30 +153,31 @@ bun run dev:seed
 bun run dev:seed --dataset nonoka
 ```
 
-灌数据默认写哪张库由 `LOCAL` 决定：`LOCAL=1` 时 `db:ingest` / `db:verify` / `db:query` 指向本地库，
-未开时（`LOCAL=0` 或不设）读 `.env` 的 Neon。本地调试请先设 `LOCAL=1`（见下方说明）。
+灌数据写哪张库由 `LOCAL` 决定：`LOCAL=1` 时 `db:ingest` / `db:verify` / `db:query` 指向本地库，
+`LOCAL=0` 时用 `DATABASE_URL_ONLINE` 的 Neon。执行前看脚本首行的目标环境就能确认。
 
 `db:ingest` 会同时写 `dataset_insights.totals` 与 `public_totals`，页面汇总只读后者。
 
-## 与线上环境的关系
+## 环境文件：只有 `.dev.vars`
 
 | 文件 | 用途 | 是否提交 |
 | --- | --- | --- |
-| `.env` | Neon 连接、R2 凭据；发布 / 部署 / CI | 否 |
-| `.env.local` | 本地开发覆盖（优先于 `.env`） | 否 |
-| `.dev.vars` | workerd（dev / preview）运行时变量 | 否 |
+| `.dev.vars` | 唯一的本地环境文件：本地值 + `*_ONLINE` 线上目标 | 否 |
+| `.dev.vars.example` | 模板，列出所有键与说明 | 是 |
 
-- `loadEnvFiles()` 的优先级：`.env.local` > `.dev.vars` > `.env`，以它读到的文件为准。
-  `LOCAL` 是例外：运行环境（命令行 / `bun run dev --local`）设了就覆盖文件。
-- Bun 启动时会先把 `.env*` 灌进 `process.env` 且「先读到的赢」（`.env` 会盖住 `.env.local`），
-  所以脚本不能靠「变量已存在就跳过」，否则文件优先级形同虚设。
-- `DATABASE_URL` / `NEON_HTTP_ENDPOINT` 这两项决定「数据写到哪」：`LOCAL=1` 才采用
-  `.env.local` / `.dev.vars` 的本机地址，`LOCAL=0` 只认 `.env`。其余键仍按文件顺序覆盖。
-- 开发服务器（`bun run dev`）不走上面的判定：它始终采用本机地址准备 Postgres / 代理。
-- `LOCAL=1` 打开后，即使文件里写着线上地址，`DATABASE_URL` / `NEON_HTTP_ENDPOINT` / `PUBLIC_R2_BASE` 也会在加载后强制切到本机。
+- wrangler / astro dev 原生读 `.dev.vars`；脚本、`astro.config.mjs`、`drizzle.config.ts`
+  统一走 `loadEnvFiles()`（`scripts/lib/env.ts`），不再有 `.env` / `.env.local`。
+- 普通键是本地值；`DATABASE_URL_ONLINE` 这类 `*_ONLINE` 是线上目标。
+  `LOCAL=1` 用普通键（并忽略 `*_ONLINE`），`LOCAL=0` 用 `*_ONLINE` 覆盖同名键。
+- `LOCAL` 本身以运行环境为准：`LOCAL=0 bun run …` / `bun run dev --local` 都压过文件。
+- 文件只补运行环境里没有的键，所以 `DATABASE_URL=… bun run db:verify` 这种显式覆盖照样生效。
+- 线上模式但 `DATABASE_URL` 仍指向本机时，加载器会清掉它并提示——正是为了拦住
+  「对象传到 R2、元数据写进本地库」这种混合状态。
+- 开发服务器（`bun run dev`）不走上面的判定：它始终准备本机 Postgres / 代理。
 - `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` 只在 `LOCAL=1` 时生效；线上仍用 `R2_*`。
-- 发布资产、每日任务、部署必须用 `.env` 里的线上库；执行前看脚本首行的目标环境，确认是 Neon 而不是 `localhost`。
-- `.dev.vars` 改成线上库即可让 dev / preview 直接连 Neon；脚本会提示，但不建议日常这么做。
+- `LOCAL=1` 打开后，`DATABASE_URL` / `NEON_HTTP_ENDPOINT` / `PUBLIC_R2_BASE` 会在加载后强制切到本机。
+- 发布资产、每日任务、部署前看脚本首行的目标环境，确认是 Neon 而不是 `localhost`。
+- CI 不用文件：GitHub Actions 直接把变量注入进程环境，`loadEnvFiles()` 发现没有 `.dev.vars` 就跳过。
 
 ## 停止
 
@@ -220,3 +219,6 @@ kill $(lsof -ti :9000)
 | 上传报 403 / SignatureDoesNotMatch | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` 与 SILO 启动时的 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` 不一致；默认都是 `silo-admin` |
 | 本地发布仍显示「跳过未变化」但桶是空的 | 本地进度在 `data/.publish-state.local.json`，`target` 应带 `local/`；确认 `LOCAL=1` 对当前进程可见，且没有被线上 `.publish-state.json` 干扰 |
 | SILO 启动失败 | 看 `temp/silo.log`；端口冲突时改 `S3_ENDPOINT` 与 `SILO_CONSOLE_PORT` |
+| 线上模式却提示「DATABASE_URL 指向本机」 | `.dev.vars` 只有本地 `DATABASE_URL`、没写 `DATABASE_URL_ONLINE`；补上线上地址，或确认这次本来就要跑本地（`LOCAL=1`） |
+| 改了 `.env` 却不生效 | 已经没有 `.env` 了：变量只有 `.dev.vars` 一个来源，`*_ONLINE` 是线上目标 |
+| 想临时只改一次数据库 | 直接传进程环境：`DATABASE_URL=… LOCAL=0 bun run db:verify` |

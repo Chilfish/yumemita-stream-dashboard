@@ -228,7 +228,7 @@ export async function applyMigrations(databaseUrl: string): Promise<void> {
   }
 }
 
-/** 覆盖已有 key、保留其他行；用于 `LOCAL=1` 时把 `.env.local` / `.dev.vars` 切到本机。 */
+/** 覆盖已有 key、保留其他行（包括 `*_ONLINE` 的线上目标）；用于把 `.dev.vars` 切到本机。 */
 function upsertEnvValues(content: string, values: Record<string, string>): string {
   const pending = new Map(Object.entries(values))
   const lines = content.length > 0 ? content.split(/\r?\n/) : []
@@ -243,36 +243,6 @@ function upsertEnvValues(content: string, values: Record<string, string>): strin
   })
   for (const [key, value] of pending) result.push(`${key}=${value}`)
   return `${result.join('\n').replace(/\n+$/, '')}\n`
-}
-
-export function ensureEnvLocal(databaseUrl: string): void {
-  const path = resolve('.env.local')
-  const values: Record<string, string> = { DATABASE_URL: databaseUrl }
-  if (isLocalMode()) {
-    values.LOCAL = '1'
-  }
-
-  if (!existsSync(path)) {
-    writeFileSync(
-      path,
-      `# 本地开发变量；不要提交（.gitignore 已忽略）\n${Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n')}\n`,
-    )
-    console.log('[dev] 已写入 .env.local')
-    return
-  }
-
-  if (!isLocalMode()) return
-  const content = readFileSync(path, 'utf8')
-  const next = upsertEnvValues(content, values)
-  if (next !== content) {
-    writeFileSync(path, next)
-    console.log(`[dev] .env.local 已切到本地：${Object.keys(values).join(' / ')}`)
-  }
-}
-
-function readEnvValue(content: string, key: string): string | undefined {
-  const match = new RegExp(`^\\s*${key}\\s*=\\s*(.*)$`, 'm').exec(content)
-  return match?.[1].trim().replace(/^['"]|['"]$/g, '')
 }
 
 export function ensureDevVars(databaseUrl: string, endpoint: string): void {
@@ -413,7 +383,7 @@ export async function ensureDevServices(
   if (!isLocalUrl(databaseUrl)) {
     console.warn(
       `[dev] DATABASE_URL 不是本机地址（${new URL(databaseUrl).host}），跳过本地 Postgres；`
-      + 'astro dev 将直接使用远程库。想走本地库请把 .dev.vars / .env.local 指回 localhost。',
+      + 'astro dev 将直接使用远程库。想走本地库请把 .dev.vars 的 DATABASE_URL 指回 localhost。',
     )
     return { local: false, databaseUrl, endpoint }
   }
@@ -421,7 +391,6 @@ export async function ensureDevServices(
   ensurePostgresRunning(databaseUrl)
   await ensureDevDatabase(databaseUrl)
   await applyMigrations(databaseUrl)
-  ensureEnvLocal(databaseUrl)
   ensureDevVars(databaseUrl, endpoint)
 
   const parsed = new URL(databaseUrl)

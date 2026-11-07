@@ -8,8 +8,8 @@
  *   bun run sync:remote -- --update-existing   # 允许按内容 hash 改写已有场次
  *   bun run sync:remote -- --force             # 连同已有场次一起全量重写
  *
- * 只读 `.env` 的线上凭据，刻意忽略 `.env.local` / `.dev.vars` 的本地值，并在子进程里
- * 设置 `LOCAL=0`，避免本地开关把数据写回本机 Postgres / SILO。
+ * 只认 `.dev.vars` 里的线上目标（`DATABASE_URL_ONLINE` / `R2_*`），并在子进程里设置 `LOCAL=0`，
+ * 避免本地开关把数据写回本机 Postgres / SILO。
  *
  * 默认策略是**只新增**：先对比本地 pack 文件名与线上 `streams.video_id`，只把缺失的
  * videoId 交给 ingest / verify / publish。已有场次不读不写，避免一次本地重抓就把整库
@@ -67,8 +67,8 @@ const PACK_SUFFIX = '.datapack.json'
 
 const USAGE = `用法：bun scripts/sync-remote.ts [选项]
 
-把本地 pack / 封面 / 逐字稿同步到 .env 指定的线上数据库与对象存储。
-只读 .env；忽略 .env.local 与 .dev.vars 的本地值。默认只新增缺失场次。
+把本地 pack / 封面 / 逐字稿同步到 .dev.vars 指定的线上数据库与对象存储。
+只读 .dev.vars 的线上目标（DATABASE_URL_ONLINE / R2_*）。默认只新增缺失场次。
 
 选项：
   --dataset <id>     只同步指定 dataset，可重复
@@ -118,16 +118,16 @@ function fail(message: string): never {
   process.exit(1)
 }
 
-const envPath = join(APP_ROOT, '.env')
+const envPath = join(APP_ROOT, '.dev.vars')
 if (!existsSync(envPath))
-  fail('找不到 .env（线上凭据）；本脚本只认 .env，不读 .env.local')
+  fail('找不到 .dev.vars（线上凭据）；本脚本只认它，不读环境变量里的本机值')
 
 const remote = readEnvFile(envPath)
-const databaseUrl = remote.DATABASE_URL
+const databaseUrl = remote.DATABASE_URL_ONLINE
 if (!databaseUrl)
-  fail('.env 缺少 DATABASE_URL')
+  fail('.dev.vars 缺少 DATABASE_URL_ONLINE（线上 Neon）')
 if (isLocalUrl(databaseUrl))
-  fail(`.env 的 DATABASE_URL 指向本机（${new URL(databaseUrl).host}），拒绝同步`)
+  fail(`DATABASE_URL_ONLINE 指向本机（${new URL(databaseUrl).host}），拒绝同步`)
 
 for (const key of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET']) {
   if (!remote[key])
@@ -368,9 +368,20 @@ if (values['dry-run']) {
   process.exit(0)
 }
 
-// 子进程只继承线上凭据；清掉本地端点，避免任何脚本回落到本机服务。
-const childEnv: Record<string, string | undefined> = { ...process.env, ...remote, LOCAL: '0' }
+// 子进程只继承线上凭据；把 `*_ONLINE` 展开成同名键，并清掉本地端点，
+// 避免任何脚本回落到本机服务。
+const childEnv: Record<string, string | undefined> = { ...process.env, LOCAL: '0' }
+for (const [key, value] of Object.entries(remote)) {
+  if (key === 'LOCAL')
+    continue
+  if (key.endsWith('_ONLINE'))
+    childEnv[key.slice(0, -'_ONLINE'.length)] = value
+  else if (key !== 'DATABASE_URL')
+    childEnv[key] = value
+}
+childEnv.LOCAL = '0'
 for (const key of [
+  'DATABASE_URL_ONLINE',
   'NEON_HTTP_ENDPOINT',
   'S3_ENDPOINT',
   'MINIO_ENDPOINT',
