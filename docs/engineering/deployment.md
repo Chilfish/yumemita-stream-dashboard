@@ -22,21 +22,24 @@ bun run cf:preview   # build + preview
 ```
 
 - 开发环境 `Astro.cache.enabled === false`，缓存调用是 no-op；要验证缓存必须用生产构建或线上。
-- `.dev.vars` 提供 `DATABASE_URL`、R2、`PUBLIC_R2_BASE`、`SITE_URL`、`PURGE_TOKEN`。
+- `.dev.vars` 是唯一的环境文件：`DATABASE_URL` / `DATABASE_URL_ONLINE`、R2、`PUBLIC_R2_BASE`、`SITE_URL`、`PURGE_TOKEN`、管理端凭据。
 - `astro preview` 下 R2 binding 不可用时，逐字稿 API 返回 503，客户端回退到本地 `content/transcripts/` 快照。
-- `astro.config.mjs` 里 `process.env.SITE_URL` 优先于 `.env`；本机 shell 残留同名变量时会覆盖 `.env`，部署前用 `SITE_URL=https://ymmt.chilfish.top bun run cf:deploy` 显式传一次最稳。
+- `astro.config.mjs` 通过 `loadEnvFiles()` 读同一个文件；进程环境里的同名变量优先，临时切换用 `SITE_URL=… bun run cf:deploy`。
 
 ## 部署
 
 ```bash
-bun run cf:deploy                         # build + wrangler deploy --config dist/server/wrangler.json
+bun run cf:deploy                         # 强制 LOCAL=0 → 构建 → 校验产物 → wrangler deploy
+bun run cf:deploy -- --no-deploy          # 只构建并校验，不部署
 bunx wrangler rollback                    # 回滚到上一版
 ```
 
+- `cf:deploy` 固定按线上处理：强制 `LOCAL=0`、先清 `dist/` 再从零构建，构建后扫描产物，
+  一旦出现本机媒体 / 代理地址就中止（`PROXY` 这类系统环境变量不算）。
 - 必须用 `dist/server/wrangler.json` 部署：它由 adapter 生成，`main` 指向 `entry.mjs`、`assets` 指向 `../client`。根目录 `wrangler.jsonc` 只是源配置；直接 `wrangler deploy` 会把 `dist/server` 与 `.dev.vars` 当成静态资源上传。
 - `.github/workflows/deploy.yml` 手动触发（`workflow_dispatch`）：`bun run ci` → `wrangler deploy --config dist/server/wrangler.json` → 线上路由冒烟。
 - 需要仓库 Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`；Variables：`PUBLIC_R2_BASE`、`SITE_URL`。
-- Worker secrets（`wrangler secret put`）：`DATABASE_URL`、`PURGE_TOKEN`。
+- Worker secrets（`wrangler secret put`）：`DATABASE_URL`、`PURGE_TOKEN`，以及日程管理端的账号 / 密码 / 会话密钥（见 `.dev.vars.example`）。
 - `wrangler.jsonc` 声明 `nodejs_compat`、`ASSETS`、`R2` binding 与 Workers Cache（`cross_version_cache: false`）。
 - `astro build` 与 `wrangler deploy` 不需要数据库；migration 在部署前单独执行。
 - `SITE_URL` 决定 canonical / OG / sitemap / `.md` 链接的域名；切域名时改这个变量（或本地环境）后重新构建部署一次。
@@ -48,6 +51,7 @@ bunx wrangler rollback                    # 回滚到上一版
 | Secret | `DATABASE_URL` | Worker 读 + ingest 写 |
 | Secret | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | ingest / 资产发布（桶 `yumemita-data`） |
 | Secret | `PURGE_TOKEN` | ingest 调 purge 端点 |
+| Secret | 日程管理端三项 | `/admin/schedule` 与 `/api/admin/schedule` 的 Basic 登录与 Cookie 签名；名称见 `.dev.vars.example` |
 | Secret | `YT_COOKIES` / `MIHOMO_SUB_URL` | 抓取（GitHub Actions） |
 | Var | `PUBLIC_R2_BASE` | 封面 / 表情公开域名，`https://ymmt-s3.chilfish.top`（构建时内联） |
 | Var | `SITE_URL` | canonical / sitemap / purge 地址，`https://ymmt.chilfish.top` |
@@ -87,7 +91,7 @@ bunx wrangler r2 bucket cors list yumemita-data
 ## 缓存
 
 - 数据页用 `Astro.cache.set({ maxAge, swr, tags })`；endpoint 用 `context.cache.set()`。
-- `Cache-Tag`：`group`、`gallery`、`dataset-<id>`、`stream-<videoId>`、`transcripts`、`sitemap`、`llms`。
+- `Cache-Tag`：`group`、`gallery`、`dataset-<id>`、`stream-<videoId>`、`transcripts`、`schedule`、`sitemap`、`llms`。
 - 404 与 purge 端点 `no-store`；其余数据页 TTL 60–300 秒，`stale-while-revalidate` 300–600 秒。
 - 缓存是 Workers Cache；zone 级 purge 不影响它，只能调 Worker 内部端点。
 - 观察 `Cf-Cache-Status` 与 middleware 的 `x-response-time`。
