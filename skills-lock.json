@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "anon-tweet": {
+      "source": "Chilfish/anonTweet",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/anon-tweet/SKILL.md",
+      "computedHash": "f62bbdde6b79b159fe8e96924344003e364114ffc17fab03f9327c377739ecd5"
+    }
+  }
+}
