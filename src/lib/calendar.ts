@@ -1,3 +1,4 @@
+import { jstHour, slotForJstTime } from "@/lib/schedule";
 import type {
   CalendarEvent,
   CalendarEventInput,
@@ -6,6 +7,8 @@ import type {
   CalendarParams,
   CalendarViewMode,
   CalendarWindow,
+  DayPlan,
+  ScheduleSlot,
 } from "@/types/calendar";
 
 /**
@@ -169,11 +172,34 @@ export function buildMonthGrid(month: string, now: Date): CalendarWeek[] {
   return weeks;
 }
 
+/** 按 JST 自然日切出今天 / 明天（或更多天）的时间线数据。 */
+export function buildDayPlan(
+  events: CalendarEvent[],
+  now: Date,
+  days = 2,
+  members: CalendarMember[] = [],
+): DayPlan {
+  const today = currentJstDay(now);
+  const dates = Array.from({ length: days }, (_, index) => addDays(today, index));
+
+  return {
+    now: now.toISOString(),
+    members,
+    days: dates.map((date, offset) => ({
+      date,
+      offset,
+      events: events
+        .filter(event => (event.date ?? jstDateKey(event.at)) === date)
+        .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? "")),
+    })),
+  };
+}
+
 export function groupEventsByDate(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
   const grouped = new Map<string, CalendarEvent[]>();
 
   for (const event of events) {
-    const date = jstDateKey(event.at);
+    const date = event.date ?? jstDateKey(event.at);
     if (!date) continue;
     const bucket = grouped.get(date) ?? [];
     bucket.push(event);
@@ -242,6 +268,106 @@ export function deriveCalendarEventState(
   return "pending";
 }
 
+const MATCH_CROSS_ANCHOR_MINUTES = 120;
+const MATCH_TENTATIVE_SCORE = 500;
+
+function eventAnchor(event: CalendarEventInput): string | null {
+  const slot: ScheduleSlot | null = event.slot ?? slotForJstTime(event.at);
+  const date = event.date ?? jstDateKey(event.at);
+  if (!date || !slot) return null;
+
+  // 晚场跨午夜：00:00–04:59 归到前一天，23:30 与次日 00:30 视为同一晚。
+  let anchor = date;
+  if (slot === "late" && event.at) {
+    const hour = jstHour(event.at);
+    if (hour != null && hour < 5) anchor = addDays(date, -1);
+  }
+  return `${event.datasetId}:${anchor}:${slot}`;
+}
+
+function minutesApart(a: CalendarEventInput, b: CalendarEventInput): number | null {
+  if (!a.at || !b.at) return null;
+  const left = Date.parse(a.at);
+  const right = Date.parse(b.at);
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return null;
+  return Math.abs(left - right) / 60_000;
+}
+
+/**
+ * 把没有 videoId 的手工日程按「成员 + JST 日期 + 时段」匹配到真实事件。
+ * 返回 `schedule.key -> 命中的事件`；命中的日程在日历里被隐藏，改显真实场次。
+ */
+export function matchSchedulesToStreams(
+  streams: CalendarEventInput[],
+  schedules: CalendarEventInput[],
+): Map<string, CalendarEventInput> {
+  const matches = new Map<string, CalendarEventInput>();
+  const streamByVideo = new Map<string, CalendarEventInput>();
+  const used = new Set<string>();
+
+  for (const stream of streams) {
+    if (!stream.videoId) continue;
+    streamByVideo.set(`${stream.datasetId}:${stream.videoId}`, stream);
+  }
+
+  for (const schedule of schedules) {
+    if (schedule.cancelled || !schedule.videoId) continue;
+    const stream = streamByVideo.get(`${schedule.datasetId}:${schedule.videoId}`);
+    if (!stream) continue;
+    matches.set(schedule.key, stream);
+    used.add(stream.key);
+  }
+
+  const realEvents = [
+    ...streams,
+    ...schedules.filter(event => event.source === "youtube" && !event.cancelled),
+  ];
+
+  for (const schedule of schedules) {
+    if (schedule.cancelled || schedule.source !== "manual" || schedule.videoId) continue;
+    if (matches.has(schedule.key)) continue;
+
+    const anchor = eventAnchor(schedule);
+    if (!anchor) continue;
+
+    let best: { event: CalendarEventInput; score: number } | null = null;
+
+    for (const candidate of realEvents) {
+      if (candidate.key === schedule.key || candidate.datasetId !== schedule.datasetId) continue;
+      if (used.has(candidate.key)) continue;
+
+      const candidateAnchor = eventAnchor(candidate);
+      if (!candidateAnchor) continue;
+
+      let score: number | null = null;
+      if (candidateAnchor === anchor) {
+        score = minutesApart(schedule, candidate) ?? MATCH_TENTATIVE_SCORE;
+      }
+      else if (!schedule.timeTentative && !candidate.timeTentative) {
+        const diff = minutesApart(schedule, candidate);
+        if (diff != null && diff <= MATCH_CROSS_ANCHOR_MINUTES) score = 1000 + diff;
+      }
+
+      if (score == null) continue;
+      if (
+        !best
+        || score < best.score
+        || (score === best.score
+          && (candidate.at ?? "").localeCompare(best.event.at ?? "") < 0)
+      ) {
+        best = { event: candidate, score };
+      }
+    }
+
+    if (best) {
+      matches.set(schedule.key, best.event);
+      used.add(best.event.key);
+    }
+  }
+
+  return matches;
+}
+
 const SOURCE_PRIORITY: Record<CalendarEventInput["source"], number> = {
   stream: 0,
   youtube: 1,
@@ -258,8 +384,11 @@ export interface BuildCalendarInput {
 /**
  * 合并已结束场次与未来日程。同一个 video_id 只保留一条：
  * `streams` 优先于自动同步，自动同步优先于手工行。
+ * 手工行还会按日期 + 时段匹配真实事件，命中后不再单独显示。
  */
 export function buildCalendarEvents(input: BuildCalendarInput): CalendarEvent[] {
+  const matches = matchSchedulesToStreams(input.streams, input.schedules);
+
   const streamKeys = new Set<string>();
   for (const event of input.streams) {
     if (event.videoId) streamKeys.add(`${event.datasetId}:${event.videoId}`);
@@ -269,6 +398,7 @@ export function buildCalendarEvents(input: BuildCalendarInput): CalendarEvent[] 
   const schedules = [...input.schedules]
     .sort((a, b) => SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source])
     .filter(event => {
+      if (matches.has(event.key)) return false;
       if (!event.videoId) return true;
       const key = `${event.datasetId}:${event.videoId}`;
       if (streamKeys.has(key) || seenSchedules.has(key)) return false;
@@ -286,6 +416,7 @@ export function buildCalendarEvents(input: BuildCalendarInput): CalendarEvent[] 
         state: deriveCalendarEventState(event, input.now),
         memberLabel: member?.label ?? event.datasetId,
         color: member?.color ?? "var(--member-color)",
+        memberAvatar: member?.avatar ?? null,
       } satisfies CalendarEvent;
     })
     .sort((a, b) => {

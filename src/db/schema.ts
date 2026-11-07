@@ -98,6 +98,14 @@ export const scheduledStreams = pgTable(
     videoId: text('video_id'),
     title: text('title').notNull(),
     url: text('url'),
+    /** JST 自然日；只知道日期和时段时由管理端写入。 */
+    date: date('date'),
+    /** `early` / `mid` / `late`；精确时间已知时可直接派生。 */
+    slot: text('slot'),
+    /** `sing` / `event` / `talk` / `game`，与内容分类口径一致。 */
+    kind: text('kind'),
+    /** 提前放出的封面，存 `images/temp-thumbs/...`；与正式存档封面分开。 */
+    thumbnailKey: text('thumbnail_key'),
     scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     expectedMinutes: integer('expected_minutes'),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
@@ -118,6 +126,7 @@ export const scheduledStreams = pgTable(
       .where(sql`${table.videoId} is not null`),
     index('scheduled_streams_at_idx').on(table.scheduledAt),
     index('scheduled_streams_dataset_at_idx').on(table.datasetId, table.scheduledAt),
+    index('scheduled_streams_dataset_date_idx').on(table.datasetId, table.date),
   ],
 )
 

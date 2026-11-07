@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   agendaDayLabel,
   buildCalendarEvents,
+  buildDayPlan,
   buildMonthGrid,
   calendarWindow,
   deriveCalendarEventState,
   groupEventsByDate,
   jstDateKey,
+  matchSchedulesToStreams,
   monthRange,
   parseCalendarParams,
   shiftMonth,
   writeCalendarParams,
 } from "./calendar";
+import { nominalStart, slotForJstTime } from "./schedule";
 import type { CalendarEventInput, CalendarMember } from "@/types/calendar";
 
 const member: CalendarMember = {
@@ -23,12 +26,17 @@ const member: CalendarMember = {
 };
 
 function input(overrides: Partial<CalendarEventInput> = {}): CalendarEventInput {
+  const at = overrides.at === undefined ? "2026-11-08T20:00:00+09:00" : overrides.at;
   return {
     key: "schedule:test",
     datasetId: "nonoka",
     videoId: "abc12345678",
     title: "雑談",
-    at: "2026-11-08T20:00:00+09:00",
+    at,
+    date: at ? jstDateKey(at) : null,
+    slot: at ? slotForJstTime(at) : null,
+    kind: null,
+    timeTentative: false,
     endAt: null,
     expectedMinutes: 120,
     cancelled: false,
@@ -40,6 +48,32 @@ function input(overrides: Partial<CalendarEventInput> = {}): CalendarEventInput 
     url: null,
     ...overrides,
   };
+}
+
+function manual(overrides: Partial<CalendarEventInput> = {}): CalendarEventInput {
+  return input({
+    key: "schedule:manual:test",
+    videoId: null,
+    source: "manual",
+    hasStream: false,
+    href: null,
+    ...overrides,
+  });
+}
+
+function stream(overrides: Partial<CalendarEventInput> = {}): CalendarEventInput {
+  const at = overrides.at === undefined ? "2026-11-08T20:10:00+09:00" : overrides.at;
+  return input({
+    key: `stream:${overrides.videoId ?? "stream12345"}`,
+    videoId: overrides.videoId ?? "stream12345",
+    source: "stream",
+    hasStream: true,
+    href: `/nonoka/stream/${overrides.videoId ?? "stream12345"}`,
+    at,
+    date: at ? jstDateKey(at) : null,
+    slot: at ? slotForJstTime(at) : null,
+    ...overrides,
+  });
 }
 
 describe("deriveCalendarEventState", () => {
@@ -144,6 +178,152 @@ describe("buildCalendarEvents", () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]?.title).toBe("自动");
+  });
+});
+
+describe("手工日程匹配真实场次", () => {
+  const now = new Date("2026-11-09T12:00:00+09:00");
+
+  it("同成员、同日期、同时段只保留真实场次", () => {
+    const events = buildCalendarEvents({
+      streams: [stream()],
+      schedules: [manual({ title: "手工" })],
+      members: [member],
+      now,
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.source).toBe("stream");
+    expect(events[0]?.state).toBe("done");
+  });
+
+  it("只有日期+时段时按时段匹配，显示真实场次", () => {
+    const target = manual({
+      at: nominalStart("2026-11-08", "late"),
+      date: "2026-11-08",
+      slot: "late",
+      timeTentative: true,
+    });
+    const events = buildCalendarEvents({
+      streams: [stream({ at: "2026-11-08T21:30:00+09:00" })],
+      schedules: [target],
+      members: [member],
+      now,
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.timeTentative).toBe(false);
+  });
+
+  it("23:30 与次日 00:30 视为同一晚", () => {
+    const events = buildCalendarEvents({
+      streams: [stream({ at: "2026-11-09T00:30:00+09:00" })],
+      schedules: [manual({ at: "2026-11-08T23:30:00+09:00" })],
+      members: [member],
+      now,
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.source).toBe("stream");
+  });
+
+  it("同一天两场不同时段各匹配各的", () => {
+    const morning = stream({
+      videoId: "morning1234",
+      at: "2026-11-08T09:10:00+09:00",
+    });
+    const night = stream({
+      videoId: "night123456",
+      at: "2026-11-08T21:00:00+09:00",
+    });
+    const events = buildCalendarEvents({
+      streams: [morning, night],
+      schedules: [
+        manual({ key: "schedule:m", at: "2026-11-08T09:00:00+09:00" }),
+        manual({ key: "schedule:n", at: "2026-11-08T20:30:00+09:00" }),
+      ],
+      members: [member],
+      now,
+    });
+
+    expect(events).toHaveLength(2);
+    expect(events.every(event => event.source === "stream")).toBe(true);
+  });
+
+  it("同一天同时段两场时取时间最近的一场", () => {
+    const early = stream({
+      videoId: "early123456",
+      at: "2026-11-08T19:00:00+09:00",
+    });
+    const late = stream({
+      videoId: "late1234567",
+      at: "2026-11-08T21:00:00+09:00",
+    });
+    const events = buildCalendarEvents({
+      streams: [early, late],
+      schedules: [manual({ at: "2026-11-08T20:50:00+09:00" })],
+      members: [member],
+      now,
+    });
+
+    const ids = events.map(event => event.videoId);
+    expect(ids).toContain("late1234567");
+    expect(events.filter(event => event.source === "manual")).toHaveLength(0);
+  });
+
+  it("已取消的日程不认领场次", () => {
+    const matches = matchSchedulesToStreams(
+      [stream()],
+      [manual({ cancelled: true })],
+    );
+
+    expect(matches.size).toBe(0);
+  });
+
+  it("匹配不到时保留待补录的手工行", () => {
+    const events = buildCalendarEvents({
+      streams: [stream({ at: "2026-11-08T09:00:00+09:00" })],
+      schedules: [manual({ at: "2026-11-08T21:00:00+09:00" })],
+      members: [member],
+      now: new Date("2026-11-08T18:00:00+09:00"),
+    });
+
+    expect(events.some(event => event.source === "manual")).toBe(true);
+  });
+
+  it("手工行与自动同步行同日同时段时只保留自动行", () => {
+    const events = buildCalendarEvents({
+      streams: [],
+      schedules: [
+        manual({ key: "schedule:manual", title: "手工" }),
+        input({ key: "schedule:yt", source: "youtube", title: "自动" }),
+      ],
+      members: [member],
+      now,
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.title).toBe("自动");
+  });
+});
+
+describe("今天与明天", () => {
+  it("跨天朝活归到明天", () => {
+    const now = new Date("2026-11-08T12:00:00+09:00");
+    const events = buildCalendarEvents({
+      streams: [],
+      schedules: [
+        input({ key: "today", at: "2026-11-08T20:00:00+09:00" }),
+        input({ key: "tomorrow", at: "2026-11-09T06:00:00+09:00", videoId: "tomorrow123" }),
+      ],
+      members: [member],
+      now,
+    });
+    const plan = buildDayPlan(events, now, 2);
+
+    expect(plan.days.map(day => day.date)).toEqual(["2026-11-08", "2026-11-09"]);
+    expect(plan.days[0]?.events.map(event => event.key)).toEqual(["today"]);
+    expect(plan.days[1]?.events.map(event => event.key)).toEqual(["tomorrow"]);
   });
 });
 

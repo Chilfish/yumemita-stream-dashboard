@@ -2,8 +2,17 @@ import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
 import type { DatasetTotals } from '@/lib/aggregate'
 import { buildGroupDataFromStreams, buildGroupDataFromSummary, type GroupData } from '@/lib/group'
+import { addDays, currentJstDay } from '@/lib/calendar'
+import type { CalendarMember, DayPlan } from '@/types/calendar'
 import type { DatasetIndexEntry, StreamNavItem, StreamSummary } from '@/types/dataset'
 import type { StreamDatapack } from '@/types/datapack'
+import {
+  buildScheduleQueries,
+  buildStreamQueries,
+  buildDayPlanFromRows,
+  type ScheduleQueryRow as CalendarScheduleRow,
+  type StreamQueryRow as CalendarStreamRow,
+} from './calendar'
 import {
   getDatasets,
   mapDataset,
@@ -54,6 +63,8 @@ export interface DatasetPageData {
 export interface GroupPageData {
   datasets: DatasetIndexEntry[]
   data: GroupData
+  /** 组首页的今天 / 明天计划；其他页面为 null。 */
+  dayPlan: DayPlan | null
 }
 
 export function toIndex(rows: Awaited<ReturnType<typeof getDatasets>>): DatasetIndexEntry[] {
@@ -161,6 +172,7 @@ export async function getStreamPageData(
 export async function getGroupPageData(
   db: Db,
   view: 'home' | 'gallery',
+  options: { withToday?: boolean } = {},
 ): Promise<GroupPageData> {
   if (view === 'gallery') {
     const [datasetRows, streamRows] = await runBatch<[
@@ -174,18 +186,52 @@ export async function getGroupPageData(
     return {
       datasets,
       data: buildGroupDataFromStreams(datasets, mapGroupStreams(streamRows)),
+      dayPlan: null,
     }
   }
 
-  const [datasetRows, members, days, latest, recent] = await runBatch<
-    [DatasetQueryRow[], ...GroupSummaryParts]
+  const now = new Date()
+  const today = currentJstDay(now)
+  const tomorrow = addDays(today, 1)
+
+  if (!options.withToday) {
+    const [datasetRows, members, days, latest, recent] = await runBatch<
+      [DatasetQueryRow[], ...GroupSummaryParts]
+    >(db, [
+      selectDatasetsQuery(db, undefined),
+      ...buildGroupSummaryQueries(db),
+    ])
+    const datasets = toIndex(datasetRows.map(mapDataset))
+    return {
+      datasets,
+      data: buildGroupDataFromSummary(datasets, assembleGroupSummary(members, days, latest, recent)),
+      dayPlan: null,
+    }
+  }
+
+  const [datasetRows, members, days, latest, recent, todayStreams, todaySchedules] = await runBatch<
+    [DatasetQueryRow[], ...GroupSummaryParts, CalendarStreamRow[], CalendarScheduleRow[]]
   >(db, [
     selectDatasetsQuery(db, undefined),
     ...buildGroupSummaryQueries(db),
+    buildStreamQueries(db, { from: today, to: tomorrow }),
+    buildScheduleQueries(db, { from: today, to: tomorrow }),
   ])
   const datasets = toIndex(datasetRows.map(mapDataset))
   const summary = assembleGroupSummary(members, days, latest, recent)
-  return { datasets, data: buildGroupDataFromSummary(datasets, summary) }
+  const calendarMembers: CalendarMember[] = datasets.map(dataset => ({
+    id: dataset.id,
+    label: dataset.label,
+    color: dataset.color ?? null,
+    avatar: dataset.avatar ?? null,
+    streamCount: dataset.count,
+  }))
+
+  return {
+    datasets,
+    data: buildGroupDataFromSummary(datasets, summary),
+    dayPlan: buildDayPlanFromRows(todayStreams, todaySchedules, calendarMembers, now, 2),
+  }
 }
 
 export async function getComparePacks(

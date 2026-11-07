@@ -9,6 +9,7 @@
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { Db } from '../../src/db/connection.ts'
 import { scheduledStreams } from '../../src/db/schema.ts'
+import { jstDateKeyFrom, slotForJstTime } from '../../src/lib/schedule.ts'
 import type { ChannelEntry } from './update-plan.ts'
 
 export interface PlannedScheduleEntry {
@@ -16,6 +17,8 @@ export interface PlannedScheduleEntry {
   eventKey: string
   title: string
   url: string
+  date: string | null
+  slot: string | null
   scheduledAt: Date | null
   expectedMinutes: number | null
 }
@@ -54,12 +57,15 @@ export function planScheduleEntries(
       continue
     }
 
+    const scheduledAt = parseScheduledAt(entry.scheduledAt)
     upcoming.push({
       videoId: entry.id,
       eventKey: `yt:${entry.id}`,
       title: entry.title?.trim() || '未命名直播',
       url: `https://www.youtube.com/watch?v=${entry.id}`,
-      scheduledAt: parseScheduledAt(entry.scheduledAt),
+      date: jstDateKeyFrom(scheduledAt),
+      slot: slotForJstTime(scheduledAt),
+      scheduledAt,
       expectedMinutes: entry.durationSec
         ? Math.max(1, Math.round(entry.durationSec / 60))
         : null,
@@ -93,6 +99,8 @@ export async function syncScheduleFromChannel(
         videoId: entry.videoId,
         title: entry.title,
         url: entry.url,
+        date: entry.date,
+        slot: entry.slot,
         scheduledAt: entry.scheduledAt,
         expectedMinutes: entry.expectedMinutes,
         source: 'youtube',
@@ -110,6 +118,9 @@ export async function syncScheduleFromChannel(
           updatedAt: sql`excluded.updated_at`,
           // 频道暂时没给时刻时保留旧值，不把已有排期擦掉。
           scheduledAt: sql`coalesce(excluded.scheduled_at, ${scheduledStreams.scheduledAt})`,
+          // 同样不覆盖已有的日期与时段：手工补过的信息优先保留。
+          date: sql`coalesce(excluded.date, ${scheduledStreams.date})`,
+          slot: sql`coalesce(excluded.slot, ${scheduledStreams.slot})`,
           expectedMinutes: sql`coalesce(excluded.expected_minutes, ${scheduledStreams.expectedMinutes})`,
         },
       })

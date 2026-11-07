@@ -1,6 +1,10 @@
 import process from 'node:process'
 import { createDb } from '../src/db/connection.ts'
-import { getCalendarData } from '../src/db/queries/calendar.ts'
+import {
+  getAdminScheduleList,
+  getCalendarData,
+  getDayPlan,
+} from '../src/db/queries/calendar.ts'
 import { getDatasets, getDataset } from '../src/db/queries/datasets.ts'
 import { getGroupCompareData } from '../src/db/queries/group-compare.ts'
 import { getGroupGallery, getGroupSummary } from '../src/db/queries/group.ts'
@@ -11,7 +15,13 @@ import {
 } from '../src/db/queries/streams.ts'
 import { getTranscriptIndex, getTranscriptMeta } from '../src/db/queries/transcripts.ts'
 import { getCompareDensityMap } from '../src/db/queries/view-data.ts'
-import { calendarWindow, currentJstMonth, monthRange } from '../src/lib/calendar.ts'
+import {
+  addDays,
+  calendarWindow,
+  currentJstDay,
+  currentJstMonth,
+  monthRange,
+} from '../src/lib/calendar.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 
 const failures: string[] = []
@@ -72,6 +82,25 @@ async function main(): Promise<void> {
     counts[event.state] = (counts[event.state] ?? 0) + 1
     return counts
   }, {})
+
+  const today = currentJstDay(now)
+  const dayPlan = await getDayPlan(db, now)
+  check(dayPlan.days.length === 2, 'getDayPlan 没有返回今天与明天')
+  check(dayPlan.days[0]?.date === today, 'getDayPlan 第一天不是今天')
+  check(
+    dayPlan.days.every(day => day.events.every(event => event.date === day.date)),
+    'getDayPlan 事件混入了其他日期',
+  )
+
+  const adminSchedule = await getAdminScheduleList(db, {
+    from: addDays(today, -7),
+    to: addDays(today, 60),
+  })
+  check(Array.isArray(adminSchedule), 'getAdminScheduleList 没有返回数组')
+  check(
+    adminSchedule.every(item => item.date === null || /^\d{4}-\d{2}-\d{2}$/.test(item.date)),
+    '管理日程日期格式异常',
+  )
 
   const insights = await getDatasetInsights(db, 'nonoka')
   check(insights === null || insights.totals.streamCount > 0, 'dataset_insights 数据异常')
@@ -139,6 +168,8 @@ async function main(): Promise<void> {
       insights: insights ? insights.totals.streamCount : null,
       transcripts: transcriptEntries.length,
       calendar: { events: calendar.events.length, states: calendarStates },
+      dayPlan: dayPlan.days.map(day => day.events.length),
+      adminSchedule: adminSchedule.length,
     },
     group: {
       members: summary.members.length,
