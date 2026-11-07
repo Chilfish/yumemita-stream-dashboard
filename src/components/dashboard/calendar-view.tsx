@@ -1,7 +1,8 @@
-import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AgendaList } from "@/components/dashboard/agenda-list";
 import { CalendarEventRow } from "@/components/dashboard/calendar-event-row";
+import { DayTimeline } from "@/components/dashboard/day-timeline";
 import { MemberDot } from "@/components/dashboard/member-avatar";
 import { MonthGrid } from "@/components/dashboard/month-grid";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -9,22 +10,19 @@ import { Button } from "@/components/ui/button";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  buildDayPlan,
   currentJstDay,
   currentJstMonth,
   deriveCalendarEventState,
   isMonthInWindow,
-  jstDateKey,
   jstMonthKey,
   monthLabel,
   parseCalendarParams,
-  relativeDayLabel,
   shiftMonth,
   undatedEvents,
-  upcomingEvents,
   writeCalendarParams,
 } from "@/lib/calendar";
-import { CALENDAR_STATE_LABELS, eventAriaLabel } from "@/lib/calendar-labels";
-import { formatInteger, formatTime } from "@/lib/format";
+import { formatInteger } from "@/lib/format";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useNavigate, useSearchParams } from "@/lib/router-compat";
 import { cn } from "@/lib/utils";
@@ -86,7 +84,14 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
     () => visibleEvents.filter(event => event.at && jstMonthKey(event.at) === params.month),
     [visibleEvents, params.month],
   );
-  const upcoming = useMemo(() => upcomingEvents(visibleEvents, now, 7), [visibleEvents, now]);
+  const dayPlan = useMemo(
+    () => buildDayPlan(visibleEvents, now, 2, data.members),
+    [visibleEvents, now, data.members],
+  );
+  const nearTermCount = dayPlan.days.reduce(
+    (total, day) => total + day.events.filter(event => event.state !== "cancelled").length,
+    0,
+  );
   const undated = useMemo(() => undatedEvents(visibleEvents), [visibleEvents]);
   const mode: CalendarViewMode = params.view ?? (isNarrow ? "agenda" : "month");
 
@@ -120,12 +125,6 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
     navigateToMonth(today.slice(0, 7), today);
   }
 
-  function focusEvent(event: CalendarEvent): void {
-    const date = jstDateKey(event.at);
-    if (!date) return;
-    navigateToMonth(date.slice(0, 7), date);
-  }
-
   function selectDay(day: string | null): void {
     if (!day) {
       updateParams({ day: null });
@@ -155,7 +154,7 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
         )}
         facts={[
           { label: "本月场次", value: formatInteger(monthEvents.length) },
-          { label: "未来 7 天", value: formatInteger(upcoming.length) },
+          { label: "今天与明天", value: formatInteger(nearTermCount) },
         ]}
         title="日历"
       >
@@ -199,10 +198,11 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
           : null}
       </div>
 
+      <DayTimeline plan={dayPlan} />
+
       {mode === "month"
         ? (
             <>
-              <UpcomingStrip now={now} onSelect={focusEvent} upcoming={upcoming} />
               <MonthGrid
                 events={monthEvents}
                 month={params.month}
@@ -225,9 +225,6 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
             />
           )}
 
-      <p className="text-caption text-ink-3">
-        实心：已结束 · 空心：预定 · 圆点：直播中 · 锁：会员限定。会员限定场次只显示标题与时间，指标在解锁后可见。
-      </p>
     </div>
   );
 }
@@ -272,74 +269,6 @@ function MemberFilter({
           )
         : null}
     </div>
-  );
-}
-
-function UpcomingStrip({
-  upcoming,
-  now,
-  onSelect,
-}: {
-  upcoming: CalendarEvent[];
-  now: Date;
-  onSelect: (event: CalendarEvent) => void;
-}) {
-  return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-headline text-foreground">接下来 · 7 天</h2>
-        <span className="text-caption tabular-nums text-ink-3">
-          {formatInteger(upcoming.length)} 场
-        </span>
-      </div>
-
-      {upcoming.length === 0
-        ? (
-            <p className="text-footnote text-muted-foreground">
-              未来 7 天还没有安排。
-            </p>
-          )
-        : (
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {upcoming.slice(0, 5).map(event => {
-                const date = jstDateKey(event.at);
-                if (!date) return null;
-
-                return (
-                  <button
-                    aria-label={eventAriaLabel(event)}
-                    className="flex w-56 shrink-0 flex-col gap-1 rounded-lg border border-hairline bg-card px-3 py-2 text-left transition-colors duration-120 ease-out hover:bg-accent/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-member-ink"
-                    key={event.key}
-                    onClick={() => onSelect(event)}
-                    type="button"
-                  >
-                    <span className="flex items-center gap-1.5 text-caption text-ink-3">
-                      <MemberDot color={event.color} />
-                      <span className="truncate">{event.memberLabel}</span>
-                      <span className="ms-auto shrink-0 tabular-nums">
-                        {relativeDayLabel(date, now)} {formatTime(event.at)}
-                      </span>
-                    </span>
-                    <span className="truncate text-footnote text-foreground">
-                      {event.title}
-                    </span>
-                    <span className="flex items-center gap-1 text-caption text-muted-foreground">
-                      {CALENDAR_STATE_LABELS[event.state]}
-                      {event.memberOnly
-                        ? (
-                            <>
-                              <Lock aria-hidden="true" className="size-3" />
-                              <span className="sr-only">会员限定</span>
-                            </>
-                          )
-                        : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-    </section>
   );
 }
 

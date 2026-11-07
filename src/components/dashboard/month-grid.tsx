@@ -1,7 +1,7 @@
 import { Lock } from "lucide-react";
 import { useMemo } from "react";
 import { CalendarEventRow } from "@/components/dashboard/calendar-event-row";
-import { eventAriaLabel } from "@/lib/calendar-labels";
+import { eventAriaLabel, eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
 import {
   Popover,
   PopoverPopup,
@@ -14,7 +14,6 @@ import {
   relativeDayLabel,
   weekdayLabel,
 } from "@/lib/calendar";
-import { formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "@/types/calendar";
 
@@ -37,14 +36,14 @@ function EventLine({ event }: { event: CalendarEvent }) {
       : { backgroundColor: event.color };
 
   return (
-    <span className="flex min-w-0 items-center gap-1 px-0.5" title={event.title}>
+    <span className="flex min-w-0 items-center gap-1 px-0.5" title={eventTitle(event)}>
       <span
         aria-hidden="true"
         className="h-3.5 w-0.5 shrink-0 rounded-full"
         style={barStyle}
       />
       <span className="shrink-0 text-[10px] leading-[0.875rem] font-normal tracking-normal tabular-nums text-ink-3">
-        {formatTime(event.at)}
+        {eventTimeLabel(event)}
       </span>
       <span
         className={cn("min-w-0 truncate", muted && "line-through")}
@@ -54,7 +53,7 @@ function EventLine({ event }: { event: CalendarEvent }) {
           lineHeight: "var(--text-footnote--line-height)",
         }}
       >
-        {event.title}
+        {eventTitle(event)}
       </span>
       {event.memberOnly ? (
         <Lock aria-hidden="true" className="size-2.5 shrink-0 text-ink-3" />

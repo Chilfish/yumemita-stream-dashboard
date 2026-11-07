@@ -1,8 +1,8 @@
 import { ExternalLink, Lock } from "lucide-react";
 import { MemberDot } from "@/components/dashboard/member-avatar";
 import { Badge } from "@/components/ui/badge";
-import { eventAriaLabel } from "@/lib/calendar-labels";
-import { formatDuration, formatTime } from "@/lib/format";
+import { eventAriaLabel, eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
+import { formatDuration } from "@/lib/format";
 import { Link } from "@/lib/router-compat";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarEventState } from "@/types/calendar";
@@ -49,7 +49,7 @@ export function CalendarEventRow({ event, className }: CalendarEventRowProps) {
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
           <span className="shrink-0 text-caption tabular-nums text-ink-3">
-            {formatTime(event.at)}
+            {eventTimeLabel(event)}
           </span>
           <span className="truncate text-caption text-muted-foreground">{event.memberLabel}</span>
           {event.memberOnly ? (
@@ -76,7 +76,7 @@ export function CalendarEventRow({ event, className }: CalendarEventRowProps) {
             lineHeight: "var(--text-footnote--line-height)",
           }}
         >
-          {event.title}
+          {eventTitle(event)}
         </span>
         {duration != null ? (
           <span className="mt-0.5 block text-caption tabular-nums text-ink-3">

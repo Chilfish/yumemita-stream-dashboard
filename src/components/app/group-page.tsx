@@ -11,7 +11,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { homePath, type GroupViewKey } from '@/lib/routes'
 import { RouterProvider, useNavigate } from '@/lib/router-compat'
 import type { GroupData } from '@/lib/group'
-import type { CalendarPageData } from '@/types/calendar'
+import type { CalendarPageData, DayPlan } from '@/types/calendar'
 import type { GroupCompareData } from '@/types/compare'
 import type { DatasetIndexEntry } from '@/types/dataset'
 import { useShellTheme } from './shell-theme'
@@ -23,6 +23,7 @@ export interface GroupPageProps {
   data: GroupData | null
   compare: GroupCompareData | null
   calendar?: CalendarPageData | null
+  dayPlan?: DayPlan | null
   view: GroupView
   section: GroupViewKey
   pathname: string
@@ -38,7 +39,7 @@ export function GroupPage(props: GroupPageProps) {
   )
 }
 
-function GroupShell({ datasets, data, compare, calendar, section, pathname }: GroupPageProps) {
+function GroupShell({ datasets, data, compare, calendar, dayPlan, section, pathname }: GroupPageProps) {
   const { theme, onToggleTheme } = useShellTheme()
   const navigate = useNavigate()
   const allBuckets = compare?.buckets.filter(bucket => bucket.type === 'all') ?? []
@@ -91,7 +92,7 @@ function GroupShell({ datasets, data, compare, calendar, section, pathname }: Gr
                         ? <GroupAboutPage />
                         : section === 'gallery'
                           ? <GroupGalleryPage />
-                          : <GroupHomePage />}
+                          : <GroupHomePage dayPlan={dayPlan} />}
                     </GroupDataContext.Provider>
                   )
                 : null}

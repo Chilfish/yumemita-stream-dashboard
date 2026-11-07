@@ -3,15 +3,17 @@ import { GroupMemberEntries } from "@/components/dashboard/group-member-entries"
 import { GroupMemberPanel } from "@/components/dashboard/group-member-panel";
 import { GroupPulse } from "@/components/dashboard/group-pulse";
 import { GroupRecentUpdates } from "@/components/dashboard/group-recent-updates";
+import { DayTimeline, DayTimelineLink } from "@/components/dashboard/day-timeline";
 import { useGroupDataContext } from "@/components/dashboard/group-data-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { formatDate, formatTime } from "@/lib/format";
+import type { DayPlan } from "@/types/calendar";
 
 /**
  * 组首页：先回答「最近谁播了」，再给全组状态，最后才是浏览入口。
  * 顺序即优先级——脉冲只有三行数字，hero 拿走整块封面，最近更新与入口留在下面。
  */
-export function GroupHomePage() {
+export function GroupHomePage({ dayPlan }: { dayPlan?: DayPlan | null }) {
   const { attendanceEnd, attendanceStart, days, members, rows, totals } = useGroupDataContext();
   const latest = rows[0] ?? null;
 
@@ -30,6 +32,8 @@ export function GroupHomePage() {
 
         <GroupPulse totals={totals} />
       </div>
+
+      <DayTimeline action={<DayTimelineLink />} plan={dayPlan ?? null} />
 
       <GroupHero members={members} />
       <GroupRecentUpdates rows={rows} />
