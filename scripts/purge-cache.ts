@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { ALL_CACHE_TAGS, CACHE_TAGS, datasetTag, streamTag } from '../src/lib/cache-tags.ts'
 import { loadEnvFiles } from './lib/env.ts'
 import { purgeCache } from './lib/purge.ts'
 
@@ -58,30 +59,30 @@ for (const value of values.tags ?? []) {
     if (tag.trim()) tags.add(tag.trim())
 }
 for (const datasetId of values.dataset ?? []) {
-  tags.add(`dataset-${datasetId}`)
-  tags.add('group')
-  tags.add('gallery')
-  tags.add('schedule')
-  tags.add('sitemap')
-  tags.add('llms')
+  tags.add(datasetTag(datasetId))
+  tags.add(CACHE_TAGS.group)
+  tags.add(CACHE_TAGS.gallery)
+  tags.add(CACHE_TAGS.schedule)
+  tags.add(CACHE_TAGS.sitemap)
+  tags.add(CACHE_TAGS.llms)
 }
 for (const videoId of values.video ?? [])
-  tags.add(`stream-${videoId}`)
+  tags.add(streamTag(videoId))
 if (values.group) {
-  tags.add('group')
-  tags.add('gallery')
-  tags.add('schedule')
-  tags.add('sitemap')
-  tags.add('llms')
+  tags.add(CACHE_TAGS.group)
+  tags.add(CACHE_TAGS.gallery)
+  tags.add(CACHE_TAGS.schedule)
+  tags.add(CACHE_TAGS.sitemap)
+  tags.add(CACHE_TAGS.llms)
 }
 if (values.all) {
-  for (const tag of ['group', 'gallery', 'datasets', 'streams', 'transcripts', 'schedule', 'sitemap', 'llms', 'compare'])
+  for (const tag of ALL_CACHE_TAGS)
     tags.add(tag)
   const config = JSON.parse(readFileSync(join(APP_ROOT, 'data-sources.json'), 'utf8')) as {
     datasets?: { id: string }[]
   }
   for (const source of config.datasets ?? [])
-    tags.add(`dataset-${source.id}`)
+    tags.add(datasetTag(source.id))
 }
 
 if (tags.size === 0) {

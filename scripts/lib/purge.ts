@@ -44,7 +44,14 @@ export async function purgeCache(options: PurgeOptions): Promise<PurgeResult> {
       body: JSON.stringify({ tags }),
       signal: AbortSignal.timeout(20_000),
     })
-    const body = await response.json().catch(() => null) as { success?: boolean } | null
+    const body = await response.json().catch(() => null) as {
+      success?: boolean
+      skipped?: boolean
+      reason?: string
+    } | null
+    if (body?.skipped) {
+      return { success: true, skipped: true, reason: body.reason, status: response.status, body }
+    }
     return {
       success: response.ok && body?.success !== false,
       status: response.status,

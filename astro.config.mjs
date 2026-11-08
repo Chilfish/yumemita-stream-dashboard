@@ -6,6 +6,7 @@ import { cacheCloudflare } from '@astrojs/cloudflare/cache'
 import react from '@astrojs/react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, envField } from 'astro/config'
+import { CACHE_TAGS } from './src/lib/cache-tags.ts'
 import { DEFAULT_SITE_URL } from './src/lib/site-defaults.ts'
 import { isLocalMode, localPublicBase } from './scripts/lib/local-config.ts'
 import { loadEnvFiles } from './scripts/lib/env.ts'
@@ -92,20 +93,20 @@ export default defineConfig({
   routeRules: {
     // 数据只在 ingest 时变，ingest 成功后会按 tag purge；TTL 只做兜底。
     // 日历依赖请求时刻的直播状态，保持短 TTL。
-    '/': { maxAge: 3600, swr: 86400, tags: ['group'] },
-    '/gallery': { maxAge: 3600, swr: 86400, tags: ['group', 'gallery'] },
-    '/calendar': { maxAge: 60, swr: 300, tags: ['group', 'schedule'] },
-    '/[datasetId]': { maxAge: 3600, swr: 86400, tags: ['datasets'] },
-    '/[datasetId]/calendar': { maxAge: 60, swr: 300, tags: ['datasets', 'schedule'] },
-    '/[datasetId]/streams': { maxAge: 3600, swr: 86400, tags: ['datasets'] },
-    '/[datasetId]/trends': { maxAge: 3600, swr: 86400, tags: ['datasets'] },
-    '/[datasetId]/gallery': { maxAge: 3600, swr: 86400, tags: ['datasets'] },
-    '/about': { maxAge: 3600, swr: 86400, tags: ['group'] },
-    '/[datasetId]/transcripts': { maxAge: 3600, swr: 86400, tags: ['transcripts'] },
-    '/[datasetId]/stream/[videoId]': { maxAge: 3600, swr: 86400, tags: ['streams'] },
-    '/[datasetId]/stream/[videoId].md': { maxAge: 3600, swr: 86400, tags: ['streams'] },
-    '/sitemap.xml': { maxAge: 3600, swr: 86400, tags: ['sitemap'] },
-    '/llms.txt': { maxAge: 3600, swr: 86400, tags: ['llms'] },
+    '/': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.group] },
+    '/gallery': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.group, CACHE_TAGS.gallery] },
+    '/calendar': { maxAge: 60, swr: 300, tags: [CACHE_TAGS.group, CACHE_TAGS.schedule] },
+    '/[datasetId]': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.datasets] },
+    '/[datasetId]/calendar': { maxAge: 60, swr: 300, tags: [CACHE_TAGS.datasets, CACHE_TAGS.schedule] },
+    '/[datasetId]/streams': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.datasets] },
+    '/[datasetId]/trends': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.datasets] },
+    '/[datasetId]/gallery': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.datasets] },
+    '/about': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.group] },
+    '/[datasetId]/transcripts': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.transcripts] },
+    '/[datasetId]/stream/[videoId]': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.streams] },
+    '/[datasetId]/stream/[videoId].md': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.streams] },
+    '/sitemap.xml': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.sitemap] },
+    '/llms.txt': { maxAge: 3600, swr: 86400, tags: [CACHE_TAGS.llms] },
   },
   build: {
     // 字体与 Tailwind 的 CSS 体积较大；外链后由浏览器跨路由复用并长期缓存。

@@ -8,8 +8,6 @@ import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 
 export const prerender = false
 
-Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group', 'compare'] })
-
 let pageData: GroupComparePageData | null = null
 try {
   pageData = await getGroupCompareData(db)
@@ -18,6 +16,8 @@ catch (error) {
   console.error('[page] group compare failed', error)
   Astro.response.status = 500
 }
+
+if (pageData) Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group', 'compare'] })
 
 const streamCount = pageData
   ? pageData.data.buckets

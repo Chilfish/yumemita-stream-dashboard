@@ -57,7 +57,8 @@ export const POST: APIRoute = async (context) => {
   }
 
   if (context.cache?.enabled !== true) {
-    return respond({ success: true, invalidated: false, reason: 'cache disabled', tags }, 200)
+    // 未执行不能报成功：调用方需要区分「已失效」与「缓存未开启」。
+    return respond({ success: false, skipped: true, invalidated: false, reason: 'cache disabled', tags }, 200)
   }
 
   try {

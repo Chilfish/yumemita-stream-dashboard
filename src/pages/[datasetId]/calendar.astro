@@ -18,6 +18,7 @@ const datasetId = Astro.params.datasetId!
 let datasets: DatasetIndexEntry[] = []
 let dataset: DatasetIndexEntry | null = null
 let calendar: CalendarPageData | null = null
+let failed = false
 
 try {
   const now = new Date()
@@ -49,10 +50,13 @@ try {
 }
 catch (error) {
   console.error('[page] member calendar failed', error)
+  failed = true
   Astro.response.status = 500
 }
 
-if (!dataset) Astro.response.status = 404
+// 500 不能被后面的 404 覆盖，也不能进入缓存。
+if (failed) Astro.response.status = 500
+else if (!dataset) Astro.response.status = 404
 else Astro.cache.set({ maxAge: 60, swr: 300, tags: [`dataset-${datasetId}`, 'schedule'] })
 
 const meta = dataset
@@ -84,5 +88,5 @@ const meta = dataset
           view="calendar"
         />
       )
-    : <ErrorState code={dataset ? '500' : '404'} title={dataset ? '日历读取失败' : '找不到这位成员'} detail={dataset ? '可以刷新重试；场次列表和相册不受影响。' : '成员 id 可能写错了，或者还没有导入数据。'} />}
+    : <ErrorState code={failed || dataset ? '500' : '404'} title={failed || dataset ? '日历读取失败' : '找不到这位成员'} detail={failed || dataset ? '可以刷新重试；场次列表和相册不受影响。' : '成员 id 可能写错了，或者还没有导入数据。'} />}
 </Layout>

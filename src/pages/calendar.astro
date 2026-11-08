@@ -13,8 +13,6 @@ import type { DatasetIndexEntry } from '@/types/dataset'
 
 export const prerender = false
 
-Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group', 'schedule'] })
-
 let datasets: DatasetIndexEntry[] = []
 let calendar: CalendarPageData | null = null
 
@@ -45,6 +43,8 @@ catch (error) {
   console.error('[page] calendar failed', error)
   Astro.response.status = 500
 }
+
+if (calendar) Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group', 'schedule'] })
 
 const meta = pageSeo(Astro, {
   section: 'calendar',

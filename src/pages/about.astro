@@ -8,8 +8,6 @@ import { pageSeo, requestParams, requestSearch } from '@/lib/page'
 
 export const prerender = false
 
-Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group'] })
-
 let data: GroupPageData | null = null
 try {
   data = await getGroupPageData(db, 'home')
@@ -18,6 +16,8 @@ catch (error) {
   console.error('[page] about failed', error)
   Astro.response.status = 500
 }
+
+if (data) Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group'] })
 
 const meta = pageSeo(Astro, {
   section: 'about',
