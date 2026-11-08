@@ -10,18 +10,9 @@ import {
   signSession,
   verifySession,
 } from '@/lib/admin-auth'
+import { isAdminPath, isApiPath } from '@/lib/admin-path'
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
-
-function isAdminPath(pathname: string): boolean {
-  return pathname === '/admin'
-    || pathname.startsWith('/admin/')
-    || pathname.startsWith('/api/admin/')
-}
-
-function isApiPath(pathname: string): boolean {
-  return pathname.startsWith('/api/')
-}
 
 function unauthorized(context: APIContext): Response {
   if (isApiPath(context.url.pathname)) {
@@ -48,9 +39,16 @@ async function guardAdmin(context: APIContext): Promise<Response | null> {
       { status: 503, headers: { 'cache-control': 'no-store' } },
     )
   }
+  // 会话密钥与登录密码分离：缺少密钥时拒绝管理端，避免用密码作为 HMAC 密钥。
+  if (!ADMIN_SESSION_SECRET) {
+    return Response.json(
+      { ok: false, error: '管理端会话密钥未配置' },
+      { status: 503, headers: { 'cache-control': 'no-store' } },
+    )
+  }
 
   const pathname = context.url.pathname
-  const secret = ADMIN_SESSION_SECRET || ADMIN_PASSWORD
+  const secret = ADMIN_SESSION_SECRET
   const cookie = context.cookies.get(SESSION_COOKIE)?.value
   const cookieValid = await verifySession(cookie, secret)
 
@@ -72,14 +70,27 @@ async function guardAdmin(context: APIContext): Promise<Response | null> {
     )
   }
 
-  // Cookie 认请求时做一次同源校验；Agent / curl 不带 Origin，按凭据放行。
+  // Cookie 认请求时做一次同源校验。Agent / curl 通常不带 Origin，此时要求显式 Authorization，
+  // 避免只靠 Cookie 的无 Origin 请求绕过 CSRF 约束。
   if (MUTATING_METHODS.has(context.request.method)) {
-    const origin = context.request.headers.get('origin')
+    const headers = context.request.headers
+    const origin = headers.get('origin')
+    const fetchSite = headers.get('sec-fetch-site')
     if (origin && origin !== context.url.origin) {
       return Response.json(
         { ok: false, error: '来源不匹配' },
         { status: 403, headers: { 'cache-control': 'no-store' } },
       )
+    }
+    if (!origin) {
+      const authorized = Boolean(headers.get('authorization'))
+      const crossSite = fetchSite != null && fetchSite !== 'same-origin' && fetchSite !== 'none'
+      if (crossSite || (!fetchSite && !authorized)) {
+        return Response.json(
+          { ok: false, error: '来源不匹配' },
+          { status: 403, headers: { 'cache-control': 'no-store' } },
+        )
+      }
     }
   }
 

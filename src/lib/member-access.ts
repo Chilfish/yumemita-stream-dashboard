@@ -5,14 +5,18 @@ import { MEMBER_ONLY_PARAM, memberOnlyUnlocked } from "./visibility";
 export interface MemberOnlyAccess {
   /** 数据是否放行。 */
   unlocked: boolean;
-  /** 本次请求是否带了访问参数（带参数时响应一律不进入共享缓存）。 */
+  /** 访问参数是否被接受。只有接受时才需要关闭共享缓存，错误参数不再形成缓存绕过。 */
   keyed: boolean;
+  /** 会员限定访问参数是否已配置；未配置时应显式报错，而不是静默锁定。 */
+  configured: boolean;
 }
 
 function readAccess(url: URL): MemberOnlyAccess {
+  const unlocked = memberOnlyUnlocked(url.searchParams.get(MEMBER_ONLY_PARAM), MEMBER_ONLY_KEY);
   return {
-    unlocked: memberOnlyUnlocked(url.searchParams.get(MEMBER_ONLY_PARAM), MEMBER_ONLY_KEY),
-    keyed: url.searchParams.has(MEMBER_ONLY_PARAM),
+    unlocked,
+    keyed: unlocked,
+    configured: Boolean(MEMBER_ONLY_KEY),
   };
 }
 

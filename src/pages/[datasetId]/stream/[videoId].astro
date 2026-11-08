@@ -13,7 +13,7 @@ export const prerender = false
 
 const datasetId = Astro.params.datasetId!
 const videoId = Astro.params.videoId!
-const { unlocked, keyed } = memberOnlyCachePolicy(Astro)
+const { unlocked, keyed, configured } = memberOnlyCachePolicy(Astro)
 
 let failed = false
 const data = await getStreamPageData(db, datasetId, videoId).catch(error => {
@@ -24,10 +24,13 @@ const data = await getStreamPageData(db, datasetId, videoId).catch(error => {
 
 const summary = data?.summary ?? null
 // 会员限定场的封面、标题与时间公开，弹幕 / 评论 / SC 等明细要带访问参数才放行。
-const locked = summary !== null && isMemberOnly(summary.availability) && !unlocked
+const memberOnly = summary !== null && isMemberOnly(summary.availability)
+const misconfigured = memberOnly && !configured
+const locked = memberOnly && configured && !unlocked
+const blocked = locked || misconfigured
 
 // 第二轮：逐字稿元数据 + pack 在同一个 batch（1 次 HTTP 请求）。
-const extras = summary && !locked
+const extras = summary && !blocked
   ? await getStreamPageExtras(db, datasetId, videoId, data?.neighborIds ?? [])
   : null
 const transcript = extras?.transcript ?? null
@@ -41,7 +44,10 @@ if (data && summary) {
   for (const item of [newer, summary, older]) if (item) rows.push(item)
 }
 
-if (locked) {
+if (misconfigured) {
+  Astro.response.status = 503
+}
+else if (locked) {
   if (!keyed) Astro.cache.set({ maxAge: 3600, swr: 86400, tags: [`stream-${videoId}`, `dataset-${datasetId}`] })
 }
 else if (!data || !summary) {
@@ -55,7 +61,7 @@ else if (!keyed) {
 }
 
 const datasetLabel = data?.dataset.label ?? datasetId
-const baseMeta = locked && summary
+const baseMeta = blocked && summary
   ? pageSeo(Astro, {
       section: 'stream',
       dataset: { id: datasetId, label: datasetLabel, count: data?.dataset.count },
@@ -102,7 +108,7 @@ const baseMeta = locked && summary
         notFound: true,
       })
 
-const meta = locked
+const meta = blocked
   ? {
       ...baseMeta,
       description: '这是一场会员限定直播。本站只展示封面与标题，不公开弹幕、SC、评论与统计数据。',
@@ -111,9 +117,9 @@ const meta = locked
     }
   : baseMeta
 
-// 解锁后的 Markdown 视图保留 key，否则同源链接会立刻掉回锁定版。
-const markdownHref = summary && !locked
-  ? `/${datasetId}/stream/${videoId}.md${keyed ? `?key=${encodeURIComponent(Astro.url.searchParams.get('key') ?? '')}` : ''}`
+// 不把访问参数写进 HTML：它会进入历史记录与 Referer。需要 Markdown 正文时由请求方自行带上参数。
+const markdownHref = summary && !blocked
+  ? `/${datasetId}/stream/${videoId}.md`
   : undefined
 ---
 
@@ -121,7 +127,15 @@ const markdownHref = summary && !locked
   alternateMarkdown={markdownHref}
   meta={meta}
 >
-  {data && summary
+  {misconfigured
+    ? (
+        <ErrorState
+          code="503"
+          title="会员限定访问未配置"
+          detail="这项内容需要访问参数。请让站点管理员检查配置后重试。"
+        />
+      )
+    : data && summary
     ? (
         <DatasetPage
           client:idle

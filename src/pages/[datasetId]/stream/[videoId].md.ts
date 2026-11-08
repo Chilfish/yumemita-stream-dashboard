@@ -90,14 +90,23 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
   if (!summary) return notFound()
 
   const origin = context.site?.origin ?? DEFAULT_SITE_URL
-  const { unlocked, keyed } = memberOnlyAccess(context.url)
-  if (keyed) context.cache.set(false)
+  const access = memberOnlyAccess(context.url)
+  if (access.keyed) context.cache.set(false)
 
   const transcriptMeta = mapTranscriptMeta(transcriptRows[0])
   const dataset = datasetRows[0] ? mapDataset(datasetRows[0]) : null
 
   // 会员限定：只给标题与封面，和 HTML 页面的公开范围保持一致。
-  if (isMemberOnly(summary.availability) && !unlocked) {
+  if (isMemberOnly(summary.availability) && !access.unlocked) {
+    if (!access.configured) {
+      return new Response('# 503\n\n会员限定访问未配置。\n', {
+        status: 503,
+        headers: {
+          'content-type': 'text/markdown; charset=utf-8',
+          'cache-control': 'no-store',
+        },
+      })
+    }
     const image = thumbnailUrl(datasetId, videoId)
     const markdown = [
       `# ${summary.title}`,
@@ -114,7 +123,7 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
       status: 200,
       headers: {
         'content-type': 'text/markdown; charset=utf-8',
-        'cache-control': keyed
+        'cache-control': access.keyed
           ? 'private, no-store'
           : 'public, max-age=3600, stale-while-revalidate=86400',
         'x-robots-tag': 'noindex',
@@ -145,13 +154,15 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
 
   const tags = [`stream-${videoId}`, `dataset-${datasetId}`]
   if (transcriptMeta) tags.push('transcripts')
-  if (!keyed) context.cache.set({ maxAge: 3600, swr: 86400, tags })
+  if (!access.keyed) context.cache.set({ maxAge: 3600, swr: 86400, tags })
 
   return new Response(markdown, {
     status: 200,
     headers: {
       'content-type': 'text/markdown; charset=utf-8',
-      'cache-control': keyed ? 'private, no-store' : 'public, max-age=3600',
+      'cache-control': access.keyed
+        ? 'private, no-store'
+        : 'public, max-age=3600, stale-while-revalidate=86400',
       'x-robots-tag': 'noindex',
       'content-signal': 'ai-train=no, search=yes, ai-input=yes',
       'link': `<${origin}/${datasetId}/stream/${videoId}>; rel="alternate"; type="text/html"`,
@@ -171,20 +182,33 @@ export const HEAD: APIRoute = async (context) => {
     return new Response(null, { status: 404, headers: { ...headers, 'cache-control': 'no-store' } })
   }
 
-  const summary = await getStream(db, datasetId, videoId).catch((error) => {
+  let summary
+  try {
+    summary = await getStream(db, datasetId, videoId)
+  }
+  catch (error) {
     console.error('[md] head lookup failed', error)
-    return null
-  })
+    return new Response(null, { status: 503, headers: { ...headers, 'cache-control': 'no-store' } })
+  }
   if (!summary) {
     return new Response(null, { status: 404, headers: { ...headers, 'cache-control': 'no-store' } })
   }
 
-  const { keyed } = memberOnlyAccess(context.url)
+  const access = memberOnlyAccess(context.url)
+  const memberOnly = isMemberOnly(summary.availability)
+  if (memberOnly && !access.configured) {
+    return new Response(null, { status: 503, headers: { ...headers, 'cache-control': 'no-store' } })
+  }
+
   return new Response(null, {
     status: 200,
     headers: {
       ...headers,
-      'cache-control': keyed ? 'private, no-store' : 'public, max-age=3600',
+      'cache-control': access.keyed
+        ? 'private, no-store'
+        : memberOnly
+          ? 'public, max-age=3600, stale-while-revalidate=86400'
+          : 'public, max-age=3600',
     },
   })
 }

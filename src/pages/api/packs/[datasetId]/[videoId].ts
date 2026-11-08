@@ -15,8 +15,8 @@ export const GET: APIRoute = async (context) => {
     return Response.json({ error: '缺少参数' }, { status: 400 })
   }
 
-  const { unlocked, keyed } = memberOnlyAccess(context.url)
-  if (keyed) context.cache.set(false)
+  const access = memberOnlyAccess(context.url)
+  if (access.keyed) context.cache.set(false)
 
   try {
     // 场次与 pack 的 6 条查询放进同一个 batch。
@@ -24,14 +24,6 @@ export const GET: APIRoute = async (context) => {
       selectStreamQuery(db, datasetId, videoId),
       ...buildStreamPackQueries(db, datasetId, videoId, { words: 40, authors: 20 }),
     ])
-
-    const summary = streamRows[0] ? mapStreamRow(streamRows[0]) : null
-    if (summary && isMemberOnly(summary.availability) && !unlocked) {
-      return Response.json(
-        { error: '这场直播是会员限定，不公开数据' },
-        { status: 404, headers: { 'cache-control': 'no-store' } },
-      )
-    }
 
     const pack = assembleStreamPack(parts)
     if (!pack) {
@@ -41,7 +33,25 @@ export const GET: APIRoute = async (context) => {
       )
     }
 
-    if (!keyed) {
+    // 用 payload 自带的 availability 判定，不再依赖另一条查询的结果。
+    const summary = streamRows[0] ? mapStreamRow(streamRows[0]) : null
+    const availability = pack.video?.availability ?? summary?.availability
+    if (isMemberOnly(availability)) {
+      if (!access.configured) {
+        return Response.json(
+          { error: '会员限定访问未配置' },
+          { status: 503, headers: { 'cache-control': 'no-store' } },
+        )
+      }
+      if (!access.unlocked) {
+        return Response.json(
+          { error: '这场直播是会员限定，不公开数据' },
+          { status: 403, headers: { 'cache-control': 'no-store' } },
+        )
+      }
+    }
+
+    if (!access.keyed) {
       context.cache.set({
         maxAge: 3600,
         swr: 86400,
@@ -51,7 +61,7 @@ export const GET: APIRoute = async (context) => {
 
     return Response.json(pack, {
       headers: {
-        'cache-control': keyed
+        'cache-control': access.keyed
           ? 'private, no-store'
           : 'public, max-age=3600, stale-while-revalidate=86400',
       },

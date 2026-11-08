@@ -1,5 +1,9 @@
 /** 管理端凭证：HTTP Basic 用于首次登录与 Agent 直连，签名 Cookie 用于浏览器后续请求。 */
 
+import { safeEqual } from "./secure-compare";
+
+export { safeEqual };
+
 export const SESSION_COOKIE = "ymmt_admin";
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -25,16 +29,6 @@ export function parseBasicAuth(header: string | null): BasicCredentials | null {
   catch {
     return null;
   }
-}
-
-/** 常数时间比较，避免按字符逐位提前返回。 */
-export function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    mismatch |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return mismatch === 0;
 }
 
 function base64url(bytes: Uint8Array): string {
