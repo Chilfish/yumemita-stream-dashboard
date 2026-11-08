@@ -1,4 +1,4 @@
-import { Activity, CalendarDays, GitCompare, Images, LayoutDashboard, Table2, Users } from "lucide-react";
+import { Activity, CalendarDays, FileText, GitCompare, Images, LayoutDashboard, Table2, Users } from "lucide-react";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "@/lib/router-compat";
@@ -12,6 +12,7 @@ import {
   homePath,
   streamPath,
   streamsPath,
+  transcriptsPath,
   type GroupViewKey,
   type ViewKey,
 } from "@/lib/routes";
@@ -19,7 +20,7 @@ import type { DatasetIndexEntry } from "@/types/dataset";
 import { cn } from "@/lib/utils";
 
 interface MobileTabBarProps {
-  /** `null` = 组级页面：只有组首页 / 全组相册 / 成员。 */
+  /** `null` = 组级页面：没有逐字稿索引，第五项保留成员 Sheet。 */
   datasetId: string | null;
   datasets: DatasetIndexEntry[];
   activeSection: ViewKey | GroupViewKey;
@@ -48,6 +49,9 @@ export function MobileTabBar({
   onMemberSelect,
 }: MobileTabBarProps) {
   const [memberOpen, setMemberOpen] = useState(false);
+  // 与侧栏一致：单场详情归到「场次」，快捷入口本身不额外高亮。
+  const normalizedSection: ViewKey | GroupViewKey =
+    activeSection === "stream" ? "streams" : activeSection;
 
   const items: TabItem[] = datasetId
     ? [
@@ -60,6 +64,7 @@ export function MobileTabBar({
           icon: Activity,
           to: latestVideoId ? streamPath(datasetId, latestVideoId) : streamsPath(datasetId),
         },
+        { key: "transcripts", label: "逐字稿", icon: FileText, to: transcriptsPath(datasetId) },
       ]
     : [
         { key: "home", label: "组首页", icon: LayoutDashboard, to: groupHomePath() },
@@ -80,7 +85,7 @@ export function MobileTabBar({
         >
           {items.map(item => {
             const Icon = item.icon;
-            const active = activeSection === item.key;
+            const active = item.key !== "stream" && item.key === normalizedSection;
 
             return (
               <li key={item.key}>
@@ -96,17 +101,21 @@ export function MobileTabBar({
               </li>
             );
           })}
-          <li>
-            <button
-              aria-haspopup="dialog"
-              className={cn(ITEM_CLASS, "w-full text-muted-foreground")}
-              onClick={() => setMemberOpen(true)}
-              type="button"
-            >
-              <Users aria-hidden="true" className="size-[22px]" />
-              <span>成员</span>
-            </button>
-          </li>
+          {datasetId
+            ? null
+            : (
+                <li>
+                  <button
+                    aria-haspopup="dialog"
+                    className={cn(ITEM_CLASS, "w-full text-muted-foreground")}
+                    onClick={() => setMemberOpen(true)}
+                    type="button"
+                  >
+                    <Users aria-hidden="true" className="size-[22px]" />
+                    <span>成员</span>
+                  </button>
+                </li>
+              )}
         </ul>
       </nav>
 

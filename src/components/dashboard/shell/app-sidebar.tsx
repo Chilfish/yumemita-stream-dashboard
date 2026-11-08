@@ -114,7 +114,13 @@ export function AppSidebar({
     if (!dataset) return false;
     if (key === "home") return pathname === homePath(dataset.id);
     const target = viewPath(dataset.id, key);
-    return pathname === target || pathname.startsWith(`${target}/`);
+    if (pathname === target || pathname.startsWith(`${target}/`)) return true;
+    // 单场详情属于「场次」：路径是 /<id>/stream/<videoId>，不是 /<id>/streams。
+    if (key === "streams") {
+      const streamRoot = viewPath(dataset.id, "stream");
+      return pathname === streamRoot || pathname.startsWith(`${streamRoot}/`);
+    }
+    return false;
   }
 
   function isGroupActive(key: GroupViewKey): boolean {
