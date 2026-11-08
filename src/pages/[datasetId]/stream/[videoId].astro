@@ -29,6 +29,13 @@ const misconfigured = memberOnly && !configured
 const locked = memberOnly && configured && !unlocked
 const blocked = locked || misconfigured
 
+// 锁定页不渲染子视图；清掉 URL 里的 view，避免地址与页面状态不一致。
+if (locked && Astro.url.searchParams.has("view")) {
+  const url = new URL(Astro.url)
+  url.searchParams.delete("view")
+  return Astro.redirect(`${url.pathname}${url.search}`, 302)
+}
+
 // 第二轮：逐字稿元数据 + pack 在同一个 batch（1 次 HTTP 请求）。
 const extras = summary && !blocked
   ? await getStreamPageExtras(db, datasetId, videoId, data?.neighborIds ?? [])

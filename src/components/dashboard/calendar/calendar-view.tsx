@@ -226,8 +226,10 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
         : (
             <AgendaList
               events={monthEvents}
+              filtered={selectedMembers.length > 0}
               month={params.month}
               now={now}
+              onClearFilter={() => updateParams({ members: [] })}
               onNextMonth={() => goToMonth(shiftMonth(params.month, 1))}
               onShowMonth={() => updateParams({ view: "month" })}
             />

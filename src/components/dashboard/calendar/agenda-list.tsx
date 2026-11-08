@@ -19,6 +19,9 @@ interface AgendaListProps {
   events: CalendarEvent[];
   onNextMonth: () => void;
   onShowMonth: () => void;
+  /** 当前是否有成员筛选；用于区分「没有排播」与「筛选后为空」。 */
+  filtered?: boolean;
+  onClearFilter?: () => void;
 }
 
 /**
@@ -31,6 +34,8 @@ export function AgendaList({
   events,
   onNextMonth,
   onShowMonth,
+  filtered = false,
+  onClearFilter,
 }: AgendaListProps) {
   const byDate = useMemo(() => groupEventsByDate(events), [events]);
   const dates = useMemo(
@@ -45,13 +50,20 @@ export function AgendaList({
           <EmptyMedia variant="icon">
             <CalendarDays aria-hidden="true" />
           </EmptyMedia>
-          <EmptyTitle>这个月还没有安排</EmptyTitle>
+          <EmptyTitle>{filtered ? "没有符合条件的安排" : "这个月还没有安排"}</EmptyTitle>
           <EmptyDescription>
-            换个月份，或者回到当前月查看接下来的场次。
+            {filtered
+              ? "当前成员筛选下这个月没有排播。"
+              : "换个月份，或者回到当前月查看接下来的场次。"}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <div className="flex flex-wrap justify-center gap-2">
+            {filtered && onClearFilter ? (
+              <Button onClick={onClearFilter} size="sm" variant="outline">
+                清除成员筛选
+              </Button>
+            ) : null}
             <Button onClick={onShowMonth} size="sm" variant="outline">
               看月视图
             </Button>
