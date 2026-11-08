@@ -244,11 +244,14 @@
 
 | 状态 | 条目 |
 | --- | --- |
-| ✅ 已修 | Z1–Z7、R1、R2、R4、R5、R6（精确匹配落库）、R7、R8、R9、E1–E6、E7–E10、U2、U4、U5、U6 |
-| 🚧 部分修复 | R3（读数区分会限，未引入完整指标来源类型）、R6（模糊匹配仍读取期）、U1（仅场次页）、U3（回退可用视图，锁定页未清参数） |
-| 未做 | R3 的完整指标来源类型、R6 的模糊匹配落库 |
+| ✅ 已修 | Z1–Z7、R1–R9、E1–E10、U2、U4、U5、U6 |
+| 🚧 拆出后续 | U1（逐字稿与议程空状态）、U3（锁定页清理子视图参数） |
 
-第二轮补充：`densities` 返回 `{ densities, locked }`；日程精确匹配写入 `superseded_by`（迁移 `0008`）；抓取哨兵 30 天过期；自动日程 30 天未再出现即清理；逐字稿命中已解析缓存时不再闪骨架。
+第三轮补充：
+
+- R3：`StreamSummary` / `GroupStreamSummary` 增加 `masked` 标记，屏蔽行不再靠 `availability` 反推；列表、相册、首页与 CSV 统一使用。
+- R6：ingest 在每个成员结束后调用 `backfillSupersededSchedules`，复用 `matchSchedulesToStreams` 回填无 `videoId` 的模糊匹配。
+- U1 / U3 的具体页面文案与参数清理拆为 backlog B29 / B30。
 
 验证：
 
