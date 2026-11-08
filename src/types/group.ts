@@ -39,6 +39,8 @@ export interface GroupStreamSummary {
   startedAt: string | null;
   durationSec: number | null;
   availability: string | null;
+  /** true = 派生指标已按会员限定屏蔽；此时 0 不代表真实值。 */
+  masked?: boolean;
   avgConcurrent: number | null;
   maxConcurrent: number | null;
   chatTotal: number;

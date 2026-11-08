@@ -21,7 +21,7 @@ export function sortValue(
   key: TableSortKey,
   dateMs: number | null,
 ): number | null {
-  if (isMemberOnly(row.availability) && key !== "date" && key !== "duration") return null;
+  if ((row.masked ?? isMemberOnly(row.availability)) && key !== "date" && key !== "duration") return null;
 
   switch (key) {
     case "date":
@@ -132,7 +132,7 @@ const CSV_HEADERS = [
 /** 会限只导出元数据，指标留空，避免 CSV 绕过详情页的公开范围。 */
 export function buildStreamsCsv(rows: StreamSummary[]): string {
   const body = rows.map(row => {
-    const memberOnly = isMemberOnly(row.availability);
+    const memberOnly = row.masked ?? isMemberOnly(row.availability);
     return [
       row.date,
       row.title,

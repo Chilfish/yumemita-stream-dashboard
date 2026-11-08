@@ -44,7 +44,7 @@ export function StreamList({ datasetId, rows, empty, className }: StreamListProp
     <ul className={cn("divide-y divide-hairline", className)}>
       {rows.map(row => {
         const { key, matched } = classifyTitle(row.title);
-        const memberOnly = isMemberOnly(row.availability);
+        const memberOnly = row.masked ?? isMemberOnly(row.availability);
 
         return (
           <li key={row.videoId}>

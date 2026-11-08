@@ -33,17 +33,21 @@ function likeRateCell(value: number | null | undefined): ReactNode {
   return <span className="text-muted-foreground">{formatPercent(value / 10, 2)}</span>;
 }
 
+function isMasked(row: StreamSummary): boolean {
+  return row.masked ?? isMemberOnly(row.availability);
+}
+
 function streamMetricCell(
   row: StreamSummary,
   value: number | null | undefined,
   strong = false,
 ): ReactNode {
-  if (isMemberOnly(row.availability)) return <Missing />;
+  if (isMasked(row)) return <Missing />;
   return numberCell(value, strong);
 }
 
 function streamRateCell(row: StreamSummary, value: number | null | undefined): ReactNode {
-  if (isMemberOnly(row.availability)) return <Missing />;
+  if (isMasked(row)) return <Missing />;
   return likeRateCell(value);
 }
 
@@ -70,7 +74,7 @@ export function buildStreamColumns(extraCols: Set<OptionalTableColumn>): DataCol
       render: row => (
         <>
           <span className="break-words font-medium text-foreground">{row.title}</span>
-          {row.availability === "subscriber_only" ? (
+          {isMasked(row) ? (
             <Badge className="ms-1.5 align-middle" size="sm" variant="outline">
               会员
             </Badge>

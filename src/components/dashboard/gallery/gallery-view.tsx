@@ -102,7 +102,7 @@ function sortKey(row: GroupStreamSummary): string {
 
 /** 一个读数：优先峰值同接，没有 VSTATS 时退回弹幕；会限不展示读数。 */
 function cardMetric(row: GroupStreamSummary): { label: string; value: string } | null {
-  if (isMemberOnly(row.availability)) return null;
+  if (row.masked ?? isMemberOnly(row.availability)) return null;
   if (row.maxConcurrent != null) {
     return { label: "峰值同接", value: formatInteger(row.maxConcurrent) };
   }

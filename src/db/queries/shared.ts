@@ -71,6 +71,7 @@ export function maskMemberOnlyMetrics(summary: StreamSummary): StreamSummary {
 
   return {
     ...summary,
+    masked: true,
     avgConcurrent: null,
     maxConcurrent: null,
     maxConcurrentAt: null,

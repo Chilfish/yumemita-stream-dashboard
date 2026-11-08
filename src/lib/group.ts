@@ -362,6 +362,7 @@ export function toGroupStream(datasetId: string, row: StreamSummary): GroupStrea
     startedAt: row.startedAt,
     durationSec: row.durationSec,
     availability: row.availability,
+    masked: memberOnly,
     avgConcurrent: memberOnly ? null : row.avgConcurrent,
     maxConcurrent: memberOnly ? null : row.maxConcurrent,
     chatTotal: memberOnly ? 0 : row.chatTotal,

@@ -311,7 +311,8 @@ export function primaryReadout(row: GroupStreamSummary): Readout {
     return { label: "峰值同接", unit: "人", value: row.maxConcurrent };
   }
   // 会员限定与未抓取都用「—」；不能把屏蔽后的 0 当成真实弹幕数。
-  const chat = isMemberOnly(row.availability) || row.chatTotal <= 0 ? null : row.chatTotal;
+  const masked = row.masked ?? isMemberOnly(row.availability);
+  const chat = masked || row.chatTotal <= 0 ? null : row.chatTotal;
   return { label: "弹幕", unit: "条", value: chat };
 }
 
@@ -320,7 +321,7 @@ export function primaryReadout(row: GroupStreamSummary): Readout {
  * 弹幕为 0 的场次多半是 datapack 还没抓，不拿 0 当结论。
  */
 export function secondaryReadout(row: GroupStreamSummary): Readout {
-  const masked = isMemberOnly(row.availability);
+  const masked = row.masked ?? isMemberOnly(row.availability);
   if (row.maxConcurrent != null) {
     return { label: "弹幕", unit: "条", value: masked || row.chatTotal <= 0 ? null : row.chatTotal };
   }

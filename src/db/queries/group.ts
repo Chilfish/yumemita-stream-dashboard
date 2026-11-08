@@ -133,6 +133,7 @@ function toGroupStream(row: GroupStreamRow): GroupStreamSummary {
     startedAt: toIso(row.startedAt),
     durationSec: row.durationSec,
     availability: row.availability,
+    masked: memberOnly,
     avgConcurrent: memberOnly ? null : toNumber(row.avgConcurrent),
     maxConcurrent: memberOnly ? null : row.maxConcurrent,
     chatTotal: memberOnly ? 0 : row.chatTotal,

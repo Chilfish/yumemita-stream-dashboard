@@ -17,7 +17,7 @@ function Missing() {
 }
 
 function metricCell(row: StreamSummary, value: number | null | undefined) {
-  return isMemberOnly(row.availability) ? <Missing /> : formatInteger(value);
+  return (row.masked ?? isMemberOnly(row.availability)) ? <Missing /> : formatInteger(value);
 }
 
 interface HomeRecentStreamsProps {
@@ -51,7 +51,7 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
             videoId={row.videoId}
           />
           <span className="min-w-0 truncate text-foreground">{row.title}</span>
-          {isMemberOnly(row.availability) ? (
+          {(row.masked ?? isMemberOnly(row.availability)) ? (
             <Badge className="shrink-0" size="sm" variant="outline">
               会员限定
             </Badge>
