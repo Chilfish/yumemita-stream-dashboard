@@ -83,6 +83,8 @@ export function StreamDetailView({
 
   // 逐字稿是可选内容：没有稿的场次不显示这个分段，避免出现永远为空的标签。
   const subviews = STREAM_SUBVIEWS.filter(subview => subview !== "transcript" || hasTranscriptProp);
+  // URL 里的 view 可能指向当前不可用的分段（例如无稿时的 transcript）；回退到概览。
+  const activeView = subviews.includes(view) ? view : "overview";
 
   const currentIndex = rows.findIndex(item => item.videoId === summary.videoId);
   const newer = currentIndex > 0 ? rows[currentIndex - 1] : undefined;
@@ -172,7 +174,7 @@ export function StreamDetailView({
           <SegmentedControl aria-label="单场子视图" onKeyDown={handleSegmentedKeyDown}>
             {subviews.map(subview => (
               <SegmentedControlItem
-                aria-current={subview === view ? "page" : undefined}
+                aria-current={subview === activeView ? "page" : undefined}
                 key={subview}
                 onClick={() => onViewChange(subview)}
               >
@@ -214,8 +216,8 @@ export function StreamDetailView({
 
       <Panel className="p-4 md:p-5">
         {/* 子视图互换：只做 170ms 的淡入位移，高度跳变由淡入盖住。 */}
-        <div className="motion-swap" key={view}>
-          {renderSubview(view, row, datasetId)}
+        <div className="motion-swap" key={activeView}>
+          {renderSubview(activeView, row, datasetId)}
         </div>
       </Panel>
     </div>

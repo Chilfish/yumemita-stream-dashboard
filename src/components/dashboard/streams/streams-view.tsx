@@ -37,6 +37,7 @@ export interface StreamsViewProps {
 
 export function StreamsView({ rows, datasetId, params, onParamsChange }: StreamsViewProps) {
   const { q, type: typeFilter, sort, dir, vstats: onlyVstats, member: onlyMember } = params;
+  const hasFilters = Boolean(q.trim() || typeFilter || onlyVstats || onlyMember);
 
   const facts = useMemo<Fact[]>(() => {
     const chatTotal = rows.reduce((sum, row) => sum + row.chatTotal, 0);
@@ -105,16 +106,20 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
 
         {visible.length === 0 ? (
           <div className="flex flex-col items-start gap-3 rounded-panel bg-card px-4 py-8 shadow-surface">
-            <p className="text-body text-muted-foreground">没有匹配的场次</p>
-            <Button onClick={resetFilters} size="sm" type="button" variant="outline">
-              <RotateCcw aria-hidden="true" />
-              清除筛选
-            </Button>
+            <p className="text-body text-muted-foreground">
+              {hasFilters ? "没有匹配的场次" : "还没有场次"}
+            </p>
+            {hasFilters ? (
+              <Button onClick={resetFilters} size="sm" type="button" variant="outline">
+                <RotateCcw aria-hidden="true" />
+                清除筛选
+              </Button>
+            ) : null}
           </div>
         ) : (
           <>
             <div className="overflow-hidden rounded-panel bg-card shadow-surface md:hidden">
-              <StreamList datasetId={datasetId} empty="没有匹配的场次" rows={rendered} />
+              <StreamList datasetId={datasetId} empty={hasFilters ? "没有匹配的场次" : "还没有场次"} rows={rendered} />
             </div>
 
             <div

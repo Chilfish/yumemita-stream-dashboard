@@ -5,12 +5,14 @@ import { createContext, useCallback, useContext, useMemo } from 'react'
  * 组件部分在 `src/components/shared/router-compat.tsx`，barrel 见 `src/lib/router-compat.ts`。
  */
 
+type SearchUpdater = string | ((previous: string) => string)
+
 export interface RouterState {
   pathname: string
   search: string
   params: Record<string, string>
   navigate: (to: string) => void
-  setSearch: (search: string) => void
+  setSearch: (search: SearchUpdater) => void
 }
 
 export const RouterContext = createContext<RouterState | null>(null)
@@ -47,8 +49,10 @@ export function useParams<T extends Record<string, string> = Record<string, stri
   return useRouterStateValue().params as T
 }
 
+type SearchParamsUpdater = (previous: URLSearchParams) => URLSearchParams
+
 type SetSearchParams = (
-  next: URLSearchParams | Record<string, string>,
+  next: URLSearchParams | Record<string, string> | SearchParamsUpdater,
   options?: { replace?: boolean },
 ) => void
 
@@ -57,9 +61,16 @@ export function useSearchParams(): [URLSearchParams, SetSearchParams] {
   const params = useMemo(() => new URLSearchParams(search), [search])
 
   const setSearchParams = useCallback<SetSearchParams>((next) => {
-    const value = next instanceof URLSearchParams ? next : new URLSearchParams(next)
-    const query = value.toString()
-    setSearch(query ? `?${query}` : '')
+    setSearch(previous => {
+      const current = new URLSearchParams(previous)
+      const value = typeof next === 'function'
+        ? next(current)
+        : next instanceof URLSearchParams
+          ? next
+          : new URLSearchParams(next)
+      const query = value.toString()
+      return query ? `?${query}` : ''
+    })
   }, [setSearch])
 
   return [params, setSearchParams]

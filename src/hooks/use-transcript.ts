@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type TranscriptFile,
   type TranscriptPayload,
@@ -163,14 +163,18 @@ export function useTranscript(datasetId: string | null, videoId: string | null):
   const key = datasetId && videoId ? `${datasetId}/${videoId}` : EMPTY_KEY;
   const [state, setState] = useState<FileState>({ key: EMPTY_KEY, file: null, status: "idle", error: null });
   const [attempt, setAttempt] = useState(0);
+  // force 只作用于紧随其后的一次请求；重试成功后共享缓存重新生效。
+  const forceNextRef = useRef(false);
 
   useEffect(() => {
     if (!datasetId || !videoId) return;
     const controller = new AbortController();
+    const force = forceNextRef.current;
+    forceNextRef.current = false;
     // oxlint-disable-next-line react/set-state-in-effect -- 切换场次时必须重置加载状态
     setState({ key, file: null, status: "loading", error: null });
 
-    guard(loadTranscript(datasetId, videoId, attempt > 0), controller.signal)
+    guard(loadTranscript(datasetId, videoId, force), controller.signal)
       .then(file => {
         if (controller.signal.aborted) return;
         setState({ key, file, status: "ready", error: null });
@@ -188,15 +192,20 @@ export function useTranscript(datasetId: string | null, videoId: string | null):
     return () => controller.abort();
   }, [datasetId, videoId, key, attempt]);
 
+  const retry = (): void => {
+    forceNextRef.current = true;
+    setAttempt(value => value + 1);
+  };
+
   if (!key) return { file: null, status: "idle", error: null, retry: () => undefined };
   if (state.key !== key) {
-    return { file: null, status: "loading", error: null, retry: () => setAttempt(value => value + 1) };
+    return { file: null, status: "loading", error: null, retry };
   }
 
   return {
     file: state.file,
     status: state.status,
     error: state.error,
-    retry: () => setAttempt(value => value + 1),
+    retry,
   };
 }
