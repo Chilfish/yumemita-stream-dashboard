@@ -448,6 +448,18 @@ async function main(): Promise<void> {
 
     if (failures > 0) process.exitCode = 1
   }
+  catch (error) {
+    // 异常中断也要关闭报告，避免永远停留在 running。
+    if (db && batchId != null) {
+      await db.update(ingestReports).set({
+        finishedAt: new Date(),
+        status: 'failed',
+        failures: 1,
+        notes: error instanceof Error ? error.message.slice(0, 500) : 'aborted',
+      }).where(eq(ingestReports.id, batchId)).catch(() => undefined)
+    }
+    throw error
+  }
   finally {
     await pool?.end()
   }

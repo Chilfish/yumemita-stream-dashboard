@@ -516,6 +516,14 @@ const plannedThumbs = [...thumbUploads, ...emojiUploads].map((item) => {
 const pendingThumbs = plannedThumbs.filter(item => !item.skip)
 const skippedThumbs = plannedThumbs.length - pendingThumbs.length
 const adoptedThumbs = plannedThumbs.filter(item => item.skip && !state.objects[item.key]).length
+if (adoptedThumbs > 0) {
+  // 按远端大小对齐后写入摘要，下一次才能检测同尺寸的内容变化。
+  for (const item of plannedThumbs) {
+    if (item.skip && !state.objects[item.key])
+      state.objects[item.key] = { ...item.digest, uploadedAt: new Date().toISOString() }
+  }
+  writePublishState(statePath, state)
+}
 
 if (plannedThumbs.length === 0) {
   console.log('[publish-data] 本地没有封面或表情，跳过（先运行 bun run fetch:thumbs / fetch:emoji）')
@@ -554,6 +562,13 @@ const planned = packUploads.map((item) => {
 const pending = planned.filter(item => !item.skip)
 const skipped = planned.length - pending.length
 const adoptedPacks = planned.filter(item => item.skip && !state.objects[item.key]).length
+if (adoptedPacks > 0) {
+  for (const item of planned) {
+    if (item.skip && !state.objects[item.key])
+      state.objects[item.key] = { ...item.digest, uploadedAt: new Date().toISOString() }
+  }
+  writePublishState(statePath, state)
+}
 
 if (values.force)
   console.log(`[publish-data] --force：忽略本地进度，全量上传 ${pending.length} 个 datapack...`)

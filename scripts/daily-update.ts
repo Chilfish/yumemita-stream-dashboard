@@ -26,6 +26,7 @@ import { inArray } from 'drizzle-orm'
 import { runBatch } from '../src/db/batch.ts'
 import { createDb } from '../src/db/connection.ts'
 import { datasetInsights, streams } from '../src/db/schema.ts'
+import { CACHE_TAGS, datasetTag, streamTag } from '../src/lib/cache-tags.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 import { purgeCache } from './lib/purge.ts'
 import { syncScheduleFromChannel } from './lib/schedule-sync.ts'
@@ -420,7 +421,7 @@ async function main(): Promise<void> {
           knownIds: new Set(knownIds),
         })
         if (schedule.changed) {
-          purgeTags.add('schedule')
+          purgeTags.add(CACHE_TAGS.schedule)
           console.log(`[update] ${source.id} 日程：预定 ${schedule.upserted}，直播中 ${schedule.live}`)
         }
       }
@@ -443,6 +444,10 @@ async function main(): Promise<void> {
     if (plan.forceIds.length > 0) {
       const detail = plan.forceIds.slice(0, 10).map(id => `${id}(${plan.reasons.get(id) ?? '重抓'})`).join(', ')
       console.log(`[update]   重抓：${detail}${plan.forceIds.length > 10 ? ` 等 ${plan.forceIds.length} 场` : ''}`)
+    }
+    if (plan.expiredIds.length > 0) {
+      const detail = plan.expiredIds.slice(0, 10).map(id => `${id}(${plan.reasons.get(id) ?? '已过期'})`).join(', ')
+      console.log(`[update]   已放弃：${detail}${plan.expiredIds.length > 10 ? ` 等 ${plan.expiredIds.length} 场` : ''}`)
     }
 
     // 上次抓取成功但 ingest 失败（或本地用了 --no-publish）时，本地 pack 会比数据库新；
@@ -555,7 +560,7 @@ async function main(): Promise<void> {
       }
       else {
         transcriptsPublished = true
-        purgeTags.add('transcripts')
+        purgeTags.add(CACHE_TAGS.transcripts)
       }
     }
 
@@ -583,13 +588,15 @@ async function main(): Promise<void> {
 
     // 数据库已提交即可失效页面缓存；资产失败只影响封面，不该挡住数据更新。
     if (ingestOk) {
-      purgeTags.add(`dataset-${source.id}`)
-      purgeTags.add('group')
-      purgeTags.add('gallery')
-      purgeTags.add('sitemap')
-      purgeTags.add('llms')
+      purgeTags.add(datasetTag(source.id))
+      // 宽 tag 只由 routeRules 写入；不一起清会留下只能等 TTL 的条目。
+      purgeTags.add(CACHE_TAGS.datasets)
+      purgeTags.add(CACHE_TAGS.group)
+      purgeTags.add(CACHE_TAGS.gallery)
+      purgeTags.add(CACHE_TAGS.sitemap)
+      purgeTags.add(CACHE_TAGS.llms)
       for (const id of changedIds)
-        purgeTags.add(`stream-${id}`)
+        purgeTags.add(streamTag(id))
       published += 1
     }
 

@@ -176,7 +176,9 @@ function withinGrace(info: InfoJson | undefined, hours: number): boolean {
   if (end == null)
     return false
   const age = Date.now() - end
-  return age >= 0 && age < hours * 3600_000
+  // 结束时间在未来（时钟偏差、采集到直播中）也应按宽限期处理：
+  // 这时写 `*-unavailable.txt` 会让这场永久跳过。
+  return age < hours * 3600_000
 }
 
 /**

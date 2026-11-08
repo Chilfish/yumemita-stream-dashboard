@@ -351,7 +351,14 @@ async function processTarget(target: Target): Promise<void> {
     const chats = ownerChatsFrom(readRecords(jsonlPath))
     if (chats.length === 0) {
       noOwner += 1
-      console.log(`[backfill] - ${label} 没有 Owner 发言（原记录 ${pack.chat.ownerMessages}）`)
+      // 写入空数组表示「已确认没有主播发言」，下一次运行会按已处理跳过。
+      pack.chat.ownerChats = []
+      if (store && !values['no-upload'])
+        await store.put(archiveKey(target.source.id, target.videoId), JSON.stringify(pack))
+      const localDir = resolve(APP_ROOT, target.source.datapackDir)
+      mkdirSync(localDir, { recursive: true })
+      writeFileSync(join(localDir, `${target.videoId}.datapack.json`), `${JSON.stringify(pack, null, 2)}\n`, 'utf8')
+      console.log(`[backfill] - ${label} 没有 Owner 发言（原记录 ${pack.chat.ownerMessages}），已标记`)
       return
     }
 

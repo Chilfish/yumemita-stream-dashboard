@@ -56,6 +56,8 @@ export interface DatasetPlan {
   deferredIds: string[]
   /** 需要 `--force` 的场次，按清单顺序（最新在前）。 */
   forceIds: string[]
+  /** 超过重试窗口、本次不再尝试补数据的场次；用于在运行摘要里留下终态。 */
+  expiredIds: string[]
   /** videoId → 原因，打日志用。 */
   reasons: Map<string, string>
 }
@@ -112,6 +114,7 @@ export function planDataset(options: PlanOptions): DatasetPlan {
   const recentCutoff = nowMs - forceRecentHours * HOUR_MS
 
   const forceIds: string[] = []
+  const expiredIds: string[] = []
   for (const stream of options.streams) {
     if (!known.has(stream.videoId)) continue
     const end = endMs(stream)
@@ -135,8 +138,18 @@ export function planDataset(options: PlanOptions): DatasetPlan {
     if ((stream.chatTotal ?? 0) === 0 && age <= chatGapDays * DAY_MS) {
       forceIds.push(stream.videoId)
       reasons.set(stream.videoId, '缺弹幕')
+      continue
+    }
+    // 超过重试窗口仍缺数据：记录为终态，不再静默消失。
+    if (stream.availability === 'public' && missingVstats) {
+      expiredIds.push(stream.videoId)
+      reasons.set(stream.videoId, `缺 VSTATS 已超过 ${vstatsGapDays} 天`)
+    }
+    else if ((stream.chatTotal ?? 0) === 0) {
+      expiredIds.push(stream.videoId)
+      reasons.set(stream.videoId, `缺弹幕已超过 ${chatGapDays} 天`)
     }
   }
 
-  return { newIds, deferredIds, forceIds, reasons }
+  return { newIds, deferredIds, forceIds, expiredIds, reasons }
 }
