@@ -1,6 +1,6 @@
 # 数据文档（Data）
 
-本目录记录数据模型、加数据流程与抓取进度。当前数据链路是「本地 pack → PostgreSQL 查询 + R2 对象」，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。
+本目录记录数据模型、加数据流程与抓取进度。当前数据链路是「本地 pack → PostgreSQL 查询 + R2 对象」，见 [astro-ssr-migration.md](../archive/astro-ssr-migration.md)。
 
 ## 文档索引
 
@@ -43,7 +43,7 @@ data/<id>/*.datapack.json          本地暂存（gitignore）
 2. **git 不存数据**：只有 `data-sources.json`、`data/README.md` 和手写逐字稿进 git；`data/` 其余、`dist/` 都不提交。
 3. **时间一律 JST**：`startedAt` 取开播时刻，不是公开时刻。
 4. **不换算汇率**：SC / 贴纸按币种分列。
-5. **表结构**：以 `src/db/schema.ts` 与 `planning/astro-ssr-migration.md` 为准。
+5. **表结构**：以 `src/db/schema.ts` 与 `archive/astro-ssr-migration.md` 为准。
 6. **加数据后必跑**：`db:ingest` → `db:verify`；发布资产后按 tag purge。
 
 ## 常用命令

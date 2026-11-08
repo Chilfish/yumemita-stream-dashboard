@@ -46,7 +46,7 @@
 
 | FR ID | 优先级 | 描述 | 验收标准 | 状态 | 来源 |
 | --- | --- | --- | --- | --- | --- |
-| `FR-HOME-001` | P0 | 组首页回答「最近谁播了」 | `AC-HOME-001`：`/` 展示近 7 天 / 本月脉冲、最新一场、最近更新与成员入口；单个成员加载失败不阻塞其余成员（手工） | ✅ | README / product-direction |
+| `FR-HOME-001` | P0 | 组首页回答「最近谁播了」 | `AC-HOME-001`：`/` 展示近 7 天 / 本月脉冲、最新一场、最近更新与成员入口；单个成员加载失败不阻塞其余成员（手工） | ✅ | README / archive/product-direction |
 | `FR-HOME-002` | P2 | 组首页展示成员出勤、成员对比与近 20 场趋势 | `AC-HOME-002`：`/` 展示近 100 天出勤日历（JST，按周分列、周一在上、每 4 周日期标签，颜色深浅 = 当天场次；窄屏按成员换行）、可切换场次 / 时长 / 弹幕 / SC / 平均同接的成员榜；最近更新可展开到 20 条并显示每分钟弹幕趋势；空值显示「—」；复用已加载的 group summary，不新增请求（单测 + 手工） | ✅ | 2026-11-04 讨论 |
 | `FR-MEMBER-001` | P0 | 成员首页提供近况与规模 | `AC-MEMBER-001`：`/:datasetId` 展示规模指标、最近一场、本月变化、更新日历；数据缺失时显示「—」或空状态（手工） | ✅ | README |
 | `FR-CAL-001` | P2 | 提供全组与成员日历页 | `AC-CAL-001`：`/calendar` 与 `/{datasetId}/calendar` 可访问；`?month=` / `?day=` / `?members=` / `?view=` 可分享并保持状态（手工） | ✅ | 2026-11-04 需求 |
@@ -65,11 +65,11 @@
 | `FR-STREAM-001` | P0 | 场次列表可搜索、筛选、排序、导出 | `AC-STREAM-001`：`q` / `type` / `sort` / `dir` / `vstats` 写入 URL；刷新与前进后退保持状态；可导出 CSV（手工） | ✅ | README / architecture |
 | `FR-STREAM-002` | P0 | 单场页提供分段详情 | `AC-STREAM-002`：概览、时间轴、弹幕与词、付费、评论可切换；`?view=` 可分享；有稿时出现逐字稿分段（手工） | ✅ | README / ui-refactor |
 | `FR-TREND-001` | P1 | 趋势页提供月度与类型分析 | `AC-TREND-001`：`/:datasetId/trends` 展示月度趋势、月度明细、内容类型对比、典型节奏曲线、全期榜单（手工） | ✅ | README / roadmap |
-| `FR-GALLERY-001` | P1 | 成员相册按 JST 自然月分组 | `AC-GALLERY-001`：`/:datasetId/gallery` 按月份分组，图片懒加载，`?order=` 可分享；390 / 320px 无横向滚动（手工） | ✅ | product-direction |
-| `FR-GALLERY-002` | P1 | 全组相册支持跨成员筛选 | `AC-GALLERY-002`：`/gallery` 展示全部成员封面，`?member=` / `?type=` 写进 URL（手工） | ✅ | product-direction |
+| `FR-GALLERY-001` | P1 | 成员相册按 JST 自然月分组 | `AC-GALLERY-001`：`/:datasetId/gallery` 按月份分组，图片懒加载，`?order=` 可分享；390 / 320px 无横向滚动（手工） | ✅ | archive/product-direction |
+| `FR-GALLERY-002` | P1 | 全组相册支持跨成员筛选 | `AC-GALLERY-002`：`/gallery` 展示全部成员封面，`?member=` / `?type=` 写进 URL（手工） | ✅ | archive/product-direction |
 | `FR-COMPARE-001` | P1 | 同一成员内最多 4 场对比 | `AC-COMPARE-001`：`?ids=a,b,c` 可分享；逐分钟曲线叠加；指标横表；超过 4 场有明确限制（手工） | ✅ | README |
 | `FR-COMPARE-002` | P2 | 跨成员对比 | `AC-COMPARE-002`：组级 `/compare` 按同一月份区间与内容类型横向对比；`?members=` / `?type=` / `?months=` 可分享；样本不足时标注（手工） | ✅ | roadmap |
-| `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签（手工） | ✅ | product-direction |
+| `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签（手工） | ✅ | archive/product-direction |
 | `FR-TRANSCRIPT-002` | P2 | 逐字稿索引的检索、分面与长列表 | `AC-TRANSCRIPT-002`：搜索匹配标题 / 摘要 / 标签 / 日期 / `videoId`；标签多选同时命中；`q` / `tags` / `sort` / `dense` 写入 URL；标签、排序与密度收进单一筛选入口；月份分组可折叠；移动端筛选面板可用；320px 无横向溢出（手工 + 单测） | ✅ | transcript-index |
 | `FR-DATA-001` | P0 | 由 pack 派生 streams / insights | `AC-DATA-001`：`bun run db:ingest` 重建 `streams` + `dataset_insights`；`db:verify` 0 problems；不手改数据库（手工 / 脚本） | ✅ | data-model |
 | `FR-DATA-002` | P0 | 资产发布到 R2 | `AC-DATA-002`：`publish:assets` 上传顺序为 thumbs → emoji → archive；逐字稿单独发布；对象可达（手工） | ✅ | deployment |

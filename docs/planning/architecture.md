@@ -1,6 +1,6 @@
 # 架构
 
-> **当前形态（2026-11-04）**：Astro 7 SSR + Cloudflare Workers + Neon PostgreSQL。页面路由在 `src/pages/`，数据入口在 `src/db/queries/`，对象存储只放封面、表情、原始 pack 归档与逐字稿正文。方案与剩余项见 [astro-ssr-migration.md](./astro-ssr-migration.md)。
+> **当前形态（2026-11-04）**：Astro 7 SSR + Cloudflare Workers + Neon PostgreSQL。页面路由在 `src/pages/`，数据入口在 `src/db/queries/`，对象存储只放封面、表情、原始 pack 归档与逐字稿正文。迁移记录见 [archive/astro-ssr-migration.md](../archive/astro-ssr-migration.md)。
 
 ## 目标与非目标
 
@@ -288,7 +288,7 @@ src/types/                datapack / dataset / db DTO
 
 - **决策**：需要转移的行为状态用判别联合或单一判定函数表达；能落库的状态在写入时记录，依赖 `now` 的状态只允许一个函数计算。副作用返回可区分的结果类型（命中 / 缺失 / 未配置 / 跳过 / 错误），不用布尔或 `null` 折叠。
 - **理由**：当前生命周期多由可空字段与时间组合推导，同一事实在不同入口出现分歧；授权与缓存把「未执行」报成「成功」，无法在调用方区分。显式状态能审计、能测试，也能避免同一规则多份实现。
-- **后果**：新增状态需要同时更新类型、判定函数与测试；数据库迁移只为可审计的生命周期服务，读时派生仍保留给直播状态等短周期值。方案与阶段见 [state-machine-remediation.md](./state-machine-remediation.md)。
+- **后果**：新增状态需要同时更新类型、判定函数与测试；数据库迁移只为可审计的生命周期服务，读时派生仍保留给直播状态等短周期值。方案与阶段见 [archive/state-machine-remediation.md](../archive/state-machine-remediation.md)。
 
 ## 性能与限制
 

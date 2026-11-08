@@ -7,7 +7,7 @@
 
 # 项目审查记录（2026-11-08）：隐式状态机
 
-> 本档盘点代码里没有显式建模、由字段组合、布尔值或时间推导出来的状态机。问题清单按 Z / R / E / U 分级，承接项登记在 [planning/backlog.md](../planning/backlog.md) 的「审查承接区」，实施计划见 [state-machine-remediation.md](../planning/state-machine-remediation.md)。
+> 本档盘点代码里没有显式建模、由字段组合、布尔值或时间推导出来的状态机。问题清单按 Z / R / E / U 分级，问题已全部关闭，实施计划见 [state-machine-remediation.md](../archive/state-machine-remediation.md)。
 
 ## 〇、总评
 
@@ -166,7 +166,7 @@
 
 ## 四、问题清单
 
-> 编号与 backlog「审查承接区」一致。位置写到文件与函数；行号会随重构漂移，以符号为准。
+> 编号沿用审查阶段的 Z / R / E / U；问题已全部关闭。位置写到文件与函数；行号会随重构漂移，以符号为准。
 
 ### 🔴 Z — 安全与授权
 
@@ -236,7 +236,7 @@
 | P2 | E6–E10、U1–U6、D07–D12 的显式化 | 一致性债务与体验问题，可与功能迭代合并 |
 | P3 | C15、C22、C23、C25 等未引用或开发态组件 | 当前影响范围小，随触达文件时清理 |
 
-实施顺序、验收标准与文件范围见 [state-machine-remediation.md](../planning/state-machine-remediation.md)。
+实施顺序、验收标准与文件范围见 [state-machine-remediation.md](../archive/state-machine-remediation.md)。
 
 ## 七、实施状态（2026-11-08）
 
@@ -274,5 +274,5 @@
 - [data-model.md](../data/data-model.md)：字段口径与可空值语义。
 - [postmortem/README.md](../postmortem/README.md)：基线雷区与既有事故。
 - [information-density.md](../ui-design/information-density.md)：空状态与信息的取舍。
-- [backlog.md](../planning/backlog.md)：审查承接区与排期。
+- [backlog.md](../planning/backlog.md)：当前未完成任务与排期。
 

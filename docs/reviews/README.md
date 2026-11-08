@@ -1,6 +1,6 @@
 # 代码审查记录（Reviews）
 
-按次记录代码审查。审查问题按严重度分级（Z/R/E/U，见模板），并登记进 [planning/backlog.md](../planning/backlog.md) 的「审查承接区」排期。
+按次记录代码审查。审查问题按严重度分级（Z/R/E/U，见模板），并登记进 [planning/backlog.md](../planning/backlog.md) 排期；关闭后从 backlog 删除。
 
 ## 约定
 

@@ -1,7 +1,7 @@
 # Astro 迁移实验与可复用模式
 
 > 本文件记录模板 `starter-astro-react` 已验证过的 Astro 模式，以及本项目迁移时的落点。
-> 这些模式已在本仓库落地；当前实现是 Astro 7 SSR + Cloudflare Workers + PostgreSQL。迁移决策见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。
+> 这些模式已在本仓库落地；当前实现是 Astro 7 SSR + Cloudflare Workers + PostgreSQL。迁移决策见 [astro-ssr-migration.md](../archive/astro-ssr-migration.md)。
 > 模板的原始实验记录：`starter-astro-react` 仓库的 `docs/engineering/astro-experiments.md`（本地路径 `D:\git\starter-astro-react\docs\engineering\astro-experiments.md`）。
 
 ## 一、可复用模式
@@ -50,4 +50,4 @@
 - [Astro: Endpoints](https://docs.astro.build/en/guides/endpoints/)
 - [Astro: Middleware](https://docs.astro.build/en/guides/middleware/)
 - [@astrojs/cloudflare](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)
-- [astro-ssr-migration.md](../planning/astro-ssr-migration.md)
+- [astro-ssr-migration.md](../archive/astro-ssr-migration.md)

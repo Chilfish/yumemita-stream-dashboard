@@ -74,7 +74,7 @@ bun run db:query       # 改查询层时必跑
 
 1. 创建 PR，按 [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md) 填写。
 2. 单人项目由作者自查；有协作者时至少 1 人 Approve。
-3. 审查问题登记进 [planning/backlog.md](../planning/backlog.md) 的「审查承接区」。
+3. 审查问题登记进 [planning/backlog.md](../planning/backlog.md)，沿用 Z / R / E / U 编号；关闭后删除条目。
 4. 检查通过后 Merge，保留原子 commit。
 5. Merge 后删除 feature 分支。
 

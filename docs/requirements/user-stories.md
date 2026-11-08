@@ -133,24 +133,24 @@
 
 > 作为**使用 Agent 的分析者**，我想要**通过一个 `.md` 地址拿到单场结构化摘要和逐字稿**，以便**不解析 HTML 就能分析**。
 
-- **状态**：📋 规划中（`FR-AGENT-001`，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)）
+- **状态**：✅ 已完成（`FR-AGENT-001`，实现见 [astro-ssr-migration.md](../archive/astro-ssr-migration.md)）
 - **验收标准**：
-  - [ ] `/{datasetId}/stream/{videoId}.md` 返回 `text/markdown`
-  - [ ] frontmatter 含标题、日期、成员、canonical
-  - [ ] 包含概览、部分指标与原始逐字稿
-  - [ ] 未知 id 返回 404，不进 sitemap
+  - [x] `/{datasetId}/stream/{videoId}.md` 返回 `text/markdown`
+  - [x] frontmatter 含标题、日期、成员、canonical
+  - [x] 包含概览、部分指标与原始逐字稿
+  - [x] 未知 id 返回 404，不进 sitemap
 
 ### US-13：迁移到 Astro + 数据库
 
 > 作为**维护者**，我想要**把数据页改成请求期 SSR、把 datapack 投影到 PostgreSQL**，以便**新场次不触发前端构建，并支持检索与聚合**。
 
-- **状态**：📋 规划中（`FR-ARCH-001`，见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)）
+- **状态**：✅ 已完成（`FR-ARCH-001`，实现见 [astro-ssr-migration.md](../archive/astro-ssr-migration.md)）
 - **验收标准**：
-  - [ ] 数据库行数与 manifest 对账通过
-  - [ ] 单场页、成员页、组首页由数据库查询渲染
-  - [ ] `.md` 路由、sitemap、缓存失效可用
-  - [ ] 旧 URL、canonical、OG 保持
-  - [ ] 新场次入库后不触发前端构建即可访问
+  - [x] 数据库行数与 manifest 对账通过
+  - [x] 单场页、成员页、组首页由数据库查询渲染
+  - [x] `.md` 路由、sitemap、缓存失效可用
+  - [x] 旧 URL、canonical、OG 保持
+  - [x] 新场次入库后不触发前端构建即可访问
 
 ## 变更记录
 

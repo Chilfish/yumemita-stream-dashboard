@@ -246,7 +246,7 @@ data-sources.json      # 成员注册表
 - [docs/README.md](docs/README.md)：文档唯一入口
 - [docs/requirements/](docs/requirements/)：需求规格与用户故事
 - [docs/planning/architecture.md](docs/planning/architecture.md)：分层、数据流与路由
-- [docs/planning/astro-ssr-migration.md](docs/planning/astro-ssr-migration.md)：Astro + Workers + PostgreSQL 迁移方案
+- [docs/archive/astro-ssr-migration.md](docs/archive/astro-ssr-migration.md)：Astro + Workers + PostgreSQL 迁移记录
 - [docs/planning/backlog.md](docs/planning/backlog.md)：任务清单
 - [docs/data/data-model.md](docs/data/data-model.md)：manifest / datapack 字段与口径
 - [docs/data/adding-data.md](docs/data/adding-data.md)：新增场次、成员与数据集

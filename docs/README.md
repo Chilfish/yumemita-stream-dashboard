@@ -2,7 +2,7 @@
 
 > **本文档是项目文档的唯一入口。** 处理任务前先读本页，再按「按任务导航」读取对应文档，不要一次性全读。
 >
-> 当前是 **Astro 7 + Cloudflare Workers + Neon PostgreSQL** 形态：全部页面请求期查库，`.md`、sitemap、llms、purge 端点已实现。已合并到 `main` 并部署在 `ymmt.chilfish.top`。方案与实现说明见 [planning/astro-ssr-migration.md](./planning/astro-ssr-migration.md)。
+> 当前是 **Astro 7 + Cloudflare Workers + Neon PostgreSQL** 形态：全部页面请求期查库，`.md`、sitemap、llms、purge 端点已实现。已合并到 `main` 并部署在 `ymmt.chilfish.top`。当前架构见 [planning/architecture.md](./planning/architecture.md)，迁移记录见 [archive/astro-ssr-migration.md](./archive/astro-ssr-migration.md)。
 
 ## 一、文档目录
 
@@ -14,24 +14,17 @@ docs/
 │   ├── README.md
 │   ├── requirements-spec.md
 │   └── user-stories.md
-├── planning/                    # 架构、任务清单、阶段方案
+├── planning/                    # 架构、任务清单、进行中的方案
 │   ├── README.md
 │   ├── architecture.md
 │   ├── backlog.md
-│   ├── astro-ssr-migration.md
-│   ├── transcript-index.md
-│   ├── db-optimization.md
-│   ├── performance-audit.md
 │   ├── live-calendar.md
-│   ├── state-machine-remediation.md
-│   ├── share-card.md
-│   ├── product-direction.md
-│   ├── ui-refactor.md
-│   └── ui-refactor-progress.md
+│   └── performance-audit.md
 ├── engineering/                 # 工程规范、开发、部署、性能、排查
 │   ├── README.md
 │   ├── code-style.md
 │   ├── code-map.md
+│   ├── component-organization.md
 │   ├── git-workflow.md
 │   ├── release-checklist.md
 │   ├── development.md
@@ -55,9 +48,13 @@ docs/
 │   └── time-input.md
 ├── research/                    # 通用问题调研
 │   ├── README.md
+│   ├── agents-md-structure.md
 │   └── ai-generated-ui-density.md
 ├── postmortem/                  # 事故复盘与基线雷区
 │   ├── README.md
+│   ├── 001-yt-dlp-chat-duplicate.md
+│   ├── 002-dataset-packs-per-render.md
+│   ├── 003-stale-yt-cookies-cache.md
 │   └── TEMPLATE.md
 ├── reviews/                     # 代码审查记录
 │   ├── README.md
@@ -66,10 +63,22 @@ docs/
 ├── development-log/             # 按天开发日志
 │   ├── README.md
 │   ├── 2026-11-03.md
-│   └── 2026-11-04.md
+│   ├── 2026-11-04.md
+│   ├── 2026-11-05.md
+│   ├── 2026-11-06.md
+│   ├── 2026-11-07.md
+│   └── 2026-11-08.md
 └── archive/                     # 历史调研与已完成阶段方案
     ├── README.md
-    └── ssg-research.md
+    ├── ssg-research.md
+    ├── astro-ssr-migration.md
+    ├── db-optimization.md
+    ├── transcript-index.md
+    ├── ui-refactor.md
+    ├── ui-refactor-progress.md
+    ├── state-machine-remediation.md
+    ├── share-card.md
+    └── product-direction.md
 ```
 
 ## 二、按任务导航
@@ -77,21 +86,22 @@ docs/
 | 任务场景 | 先读 | 说明 |
 | --- | --- | --- |
 | 新增功能 / 判断功能边界 | [requirements-spec.md](./requirements/requirements-spec.md) + [user-stories.md](./requirements/user-stories.md) | FR 编号、验收标准、范围 |
+| 判断需求是否属于本站 | [product-direction.md](./archive/product-direction.md) | 已定稿的产品边界；逐字稿编辑器 / CMS 明确不做 |
 | 架构级变更 | [architecture.md](./planning/architecture.md) | 分层、数据流、路由与关键决策 |
 | 规划下一阶段 | [backlog.md](./planning/backlog.md) | 未决任务、优先级、前置条件 |
-| 改逐字稿索引 / 长列表 | [transcript-index.md](./planning/transcript-index.md) | 搜索、标签分面、月份导航、折叠与移动端 |
-| 追溯迁移决策 / 数据模型 | [astro-ssr-migration.md](./planning/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 已完成的迁移方案、数据模型、`.md` 路由、缓存与发布 |
-| 规划 / 实现直播日历 | [live-calendar.md](./planning/live-calendar.md) | 未来场次、手工日程、月历与议程视图、缓存与验收 |
-| 优化数据库读路径 | [db-optimization.md](./planning/db-optimization.md) | 查询条数、往返、传输量、缓存与压测 |
+| 改逐字稿索引 / 长列表 | [code-map.md](./engineering/code-map.md) + [transcript-index.md](./archive/transcript-index.md) | 先看代码入口，设计背景见 archive |
+| 追溯迁移决策 / 数据模型 | [astro-ssr-migration.md](./archive/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 已完成的迁移方案、数据模型、`.md` 路由、缓存与发布 |
+| 继续做直播日历 | [live-calendar.md](./planning/live-calendar.md) + [backlog.md](./planning/backlog.md) | 剩余首页 / 场次页入口与 ICS |
+| 优化数据库读路径 | [performance.md](./engineering/performance.md) + [db-optimization.md](./archive/db-optimization.md) | 当前结论与历史压测 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
 | 不确定该改哪个文件 | [code-map.md](./engineering/code-map.md) | 任务意图 → 关键文件；只放入口 |
 | 本地开发 / 测试 | [development.md](./engineering/development.md) + [local-database.md](./engineering/local-database.md) | 环境、脚本、D3、测试；本地 Postgres 与开发代理 |
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |
 | 发布 | [release-checklist.md](./engineering/release-checklist.md) + [deployment.md](./engineering/deployment.md) | 验证、冒烟、部署、回滚 |
 | 维护未来日程 / Agent 录日程 | [schedule-admin.md](./engineering/schedule-admin.md) + [live-calendar.md](./planning/live-calendar.md) | 管理端、幂等、时段与关联规则 |
-| 改分享卡片 / 分享截图 | [share-card.md](./planning/share-card.md) | React + Tailwind 布局、官方背景、modern-screenshot 导出 |
+| 改分享卡片 / 分享截图 | [share-card.md](./archive/share-card.md) | React + Tailwind 布局、官方背景、modern-screenshot 导出 |
 | 性能回归 | [performance.md](./engineering/performance.md) | 首屏数据流、缓存分层、实测数字 |
-| 做全栈性能优化 | [performance-audit.md](./planning/performance-audit.md) | 岛屿拆分、props 收敛、交互热点、ingest / publish 与优先级 |
+| 继续做全栈性能优化 | [performance-audit.md](./planning/performance-audit.md) + [backlog.md](./planning/backlog.md) | props 收敛、壳层重构、ingest / publish 批量化 |
 | 排查页面 / 数据问题 | [troubleshooting.md](./engineering/troubleshooting.md) | 常见报错与口径 |
 | 读写数据 / 加场次 | [data-model.md](./data/data-model.md) + [adding-data.md](./data/adding-data.md) | 字段、口径、发布步骤 |
 | 弹幕 / 事件字段与事件类型 | [chat-events.md](./data/chat-events.md) | 消息记录、事件记录、去重、表情索引、已知限制 |
@@ -102,7 +112,7 @@ docs/
 | 理解 AI 生成页面的通病 | [ai-generated-ui-density.md](./research/ai-generated-ui-density.md) | 外部观察、机制分析、组首页案例与规避方法 |
 | 写文档 / 界面文案 | [writing-style.md](./writing-style.md) | 语气、用词、术语、反例 |
 | 代码审查 | [reviews/README.md](./reviews/README.md) + [TEMPLATE.md](./reviews/TEMPLATE.md) | 审查视角、问题分级、承接流程 |
-| 状态判定 / 隐式状态机 | [review-2026-11-08-implicit-state-machines.md](./reviews/review-2026-11-08-implicit-state-machines.md) + [state-machine-remediation.md](./planning/state-machine-remediation.md) | 状态清单、问题分级、阶段与验收 |
+| 状态判定 / 隐式状态机 | [review-2026-11-08-implicit-state-machines.md](./reviews/review-2026-11-08-implicit-state-machines.md) + [state-machine-remediation.md](./archive/state-machine-remediation.md) | 状态清单、问题分级、阶段与验收（已关闭） |
 | 写代码前防复现 | [postmortem/README.md](./postmortem/README.md) | 基线雷区、高危文件 |
 | 了解历史决策 | [development-log/](./development-log/) + [archive/](./archive/) | 按日期查阅；存档不主动读 |
 
@@ -115,7 +125,7 @@ requirements/ planning/ → engineering/ → 代码 → research/ postmortem/ re
 
 | 事件 | 动作 |
 | --- | --- |
-| 新功能 / 需求变更 | 先更新 `requirements/` 与 `planning/backlog.md`，再实现 |
+| 新功能 / 需求变更 | 先更新 `requirements/` 与 `planning/backlog.md`，再实现；完成后从 backlog 删除条目 |
 | 架构级决策 | 追加到 `planning/architecture.md` 的 ADR |
 | 新 Bug 模式 / 返工 | 写 `postmortem/0NN-*.md`，教训进入「基线雷区」 |
 | 外部调研 / 通用问题 | 写 `research/<主题>.md`，可执行结论同步到对应规范文档 |
@@ -129,7 +139,7 @@ requirements/ planning/ → engineering/ → 代码 → research/ postmortem/ re
 1. **语言**：文档用简体中文；代码、命令、字段名、commit message 用英文。
 2. **单一入口**：新增、删除、移动文档时同步更新本页；索引只列存在的文件。
 3. **文档即事实**：路径、命令、路由、字段名必须与当前代码一致；改代码时同步清理旧引用。
-4. **不把计划当现状**：未完成的内容放 `planning/backlog.md` 或阶段方案，正文只写已经成立的事实；当前命令以 `package.json` 为准。
+4. **不把计划当现状**：未完成的内容放 `planning/backlog.md` 或进行中的方案，正文只写已经成立的事实；当前命令以 `package.json` 为准。完成的方案移入 `archive/`，backlog 只留未完成项。
 5. **写作**：按 [writing-style.md](./writing-style.md) 执行。不堆形容词和黑话，数字带单位，链接写清指向。
 6. **复盘 blameless**：postmortem 归因于系统条件，不归因于个人。
 7. **存档不主动读取**：`archive/` 只作历史参考。

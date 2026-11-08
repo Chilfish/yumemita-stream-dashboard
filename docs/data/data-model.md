@@ -1,6 +1,6 @@
 # 数据模型
 
-> **2026-11-04 更新**：页面只读 **PostgreSQL**（`src/db/schema.ts`、`src/db/queries/`）。本文保留 pack / manifest 的字段口径，供 ingest 与本地派生参考；字段到表的映射见 [astro-ssr-migration.md §6](../planning/astro-ssr-migration.md#6-数据模型)。`index.json` / `manifest.json` / `insights.json` / `group-*.json` 不再上传对象存储，也不再被页面读取。
+> **2026-11-04 更新**：页面只读 **PostgreSQL**（`src/db/schema.ts`、`src/db/queries/`）。本文保留 pack / manifest 的字段口径，供 ingest 与本地派生参考；字段到表的映射见 [astro-ssr-migration.md §6](../archive/astro-ssr-migration.md#6-数据模型)。`index.json` / `manifest.json` / `insights.json` / `group-*.json` 不再上传对象存储，也不再被页面读取。
 
 成员页的数据来源是 **`streams` + `dataset_insights`**；组首页与全组相册由 `getGroupSummary` / `getGroupGallery` 在 SQL 里聚合。本文第 1–4 节的 JSON 只用于理解派生产物与本地调试。
 

@@ -16,9 +16,10 @@
 - 新增 [docs/research/ai-generated-ui-density.md](docs/research/ai-generated-ui-density.md)：AI 生成界面信息密度问题的外部观察、机制分析、组首页案例与规避方法。
 - 新增 [docs/ui-design/information-density.md](docs/ui-design/information-density.md)：一屏一个焦点、四个冗余信号与生成后的删除清单；同步 `AGENTS.md`、UI 规范、文案规范、postmortem 基线雷区、PR 模板与审查清单。
 - 文档不再写死总场次与 sitemap 条数（本地 pack、数据库与 CDN 会短时不一致），统一改为「以数据库为准」并给出计算公式。
+- **文档清理**：已完成的迁移、数据库优化、UI 重构、逐字稿索引、状态机整改、分享卡片与产品方向方案移入 `docs/archive/`；`planning/backlog.md` 只保留未完成项，已完成条目不再堆积。
 
 - 按模板 `starter-astro-react` 的文档规范重组 `docs/`：拆成 `requirements/`、`planning/`、`engineering/`、`data/`、`ui-design/`、`postmortem/`、`reviews/`、`development-log/`、`archive/`；根目录只保留 `README.md` 与 `writing-style.md`，`docs/README.md` 作为唯一入口。
-- 新增 [docs/planning/astro-ssr-migration.md](docs/planning/astro-ssr-migration.md)：Astro 7 + Cloudflare Workers + PostgreSQL + R2 的完整迁移方案，含数据模型、ingest、`.md` Agent 路由、缓存失效与发布流程。
+- 新增 [docs/archive/astro-ssr-migration.md](docs/archive/astro-ssr-migration.md)：Astro 7 + Cloudflare Workers + PostgreSQL + R2 的完整迁移方案，含数据模型、ingest、`.md` Agent 路由、缓存失效与发布流程（已归档）。
 - 新增需求规格、用户故事、工程规范、设计系统、postmortem / reviews 模板、开发日志与归档索引；移动 `architecture` / `data-model` / `deployment` 等旧文档并更新全仓链接。
 - 新增根目录 `AGENTS.md` 与 `.github/PULL_REQUEST_TEMPLATE.md`。
 

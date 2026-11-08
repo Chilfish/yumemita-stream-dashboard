@@ -2,7 +2,7 @@
 
 > 目标：壳层安静，数据层保持密度；桌面与移动端都能快速扫读。
 > 适用范围：所有页面、组件与交互。写 UI 前逐条自查。
-> 完整的信息架构与设计理由见 [planning/ui-refactor.md](../planning/ui-refactor.md)；组件用法见 [GENERAL.md](./GENERAL.md)。
+> 完整的信息架构与设计理由见 [archive/ui-refactor.md](../archive/ui-refactor.md)；组件用法见 [GENERAL.md](./GENERAL.md)。
 
 ## 0. 写 UI 前的自检
 
