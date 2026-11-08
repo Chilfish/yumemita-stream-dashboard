@@ -43,7 +43,7 @@
 | 管理端 | `src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/lib/admin-auth.ts`、`src/middleware.ts` | 内部编辑页 + Basic / Cookie 鉴权 |
 | 手工关联 | `src/lib/calendar.ts` 的 `matchSchedulesToStreams` | 按成员 + JST 日期 + 时段匹配真实场次 |
 | 今日计划 | `getDayPlan` / `buildDayPlanFromRows`、`calendar/day-timeline.tsx` | 今天 + 明天，组首页与日历页 |
-| 分享卡片 | `src/components/dashboard/calendar/share-card.tsx`、`share-button.tsx`、`public/share/bg_member_list.webp` | React + Tailwind 渲染，modern-screenshot 导出 PNG；设计见 [share-card.md](share-card.md) |
+| 分享卡片 | `src/components/dashboard/calendar/share-card.tsx`、`share-button.tsx`、`public/share/bg_member_list.webp` | React + Tailwind 渲染，modern-screenshot 导出 PNG；设计见 [share-card.md](../archive/share-card.md) |
 | 暂缓 | `FR-CAL-009` ICS | 订阅未做 |
 
 与初版设计的偏差：
@@ -714,7 +714,7 @@ chip 标题     text-footnote text-foreground
 
 - 需求入口：[requirements-spec.md](../requirements/requirements-spec.md)、[user-stories.md](../requirements/user-stories.md)
 - 数据模型与口径：[data-model.md](../data/data-model.md)
-- 现有日历热力图：[calendar-heatmap.tsx](../../src/components/charts/calendar-heatmap.tsx)、[home-calendar.tsx](../../src/components/dashboard/home-calendar.tsx)
+- 现有日历热力图：[calendar-heatmap.tsx](../../src/components/charts/calendar-heatmap.tsx)、[home-calendar.tsx](../../src/components/dashboard/home/home-calendar.tsx)
 - 每日任务：[daily-update.ts](../../scripts/daily-update.ts)、[update-plan.ts](../../scripts/lib/update-plan.ts)
 - 会员限定口径：[visibility.ts](../../src/lib/visibility.ts)
 - Apple Human Interface Guidelines：Clarity、Deference、Depth 三条原则；日历与列表的渐进披露模式
