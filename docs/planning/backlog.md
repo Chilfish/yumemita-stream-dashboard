@@ -34,6 +34,7 @@
 | B25 | 日程管理端：宽容时间输入、编辑页组件拆分、移动端列表、直播链接只保留单输入 | P3 | 无 | 2026-11-07 反馈 | ✅ `TimeInput` + `src/lib/time.ts`；`schedule-editor` 拆成容器 / 表单 / 列表 / 表单状态；`md` 以下改堆叠列表；直播链接去掉 `videoId` 输入，`url` 只作外链。见 [time-input.md](../ui-design/time-input.md) 与 [GENERAL.md](../ui-design/GENERAL.md) §7 |
 | B26 | 逐字稿索引：搜索、标签分面、月份分组折叠、密度与移动端筛选（`FR-TRANSCRIPT-002`） | P2 | 无 | 2026-11-07 逐字稿体验讨论 | ✅ `transcripts-toolbar.tsx` 收成搜索 + 单一筛选入口；`q` / `tags` / `sort` / `dense` 写 URL；默认全展开、逐组收起；标签改为元信息文本；移动端底部筛选面板；`bun run test` 416 通过、构建与路由冒烟通过。见 [transcript-index.md](transcript-index.md) |
 | B27 | 界面冗余清理：首页已删重复指标、口径脚注与自证式导航；其余页面按同一清单逐页扫描 | P1 | 无 | 2026-11-07 首页讨论 | 🚧 首页完成；其余页面待扫，规范见 [information-density.md](../ui-design/information-density.md) |
+| B28 | 隐式状态机显式化：授权闭环、生命周期单点判定、缓存与对象读取结果类型、客户端状态收敛、管线幂等与终态 | P0–P2 | 无 | 2026-11-08 审查 | 🚧 首轮实施完成：P0 全部、P1 大部分、P2 部分；剩余项见审查记录「实施状态」。验收见 [state-machine-remediation.md](state-machine-remediation.md)，问题清单见 [review-2026-11-08](../reviews/review-2026-11-08-implicit-state-machines.md) |
 
 ## 审查承接区
 
@@ -41,7 +42,40 @@
 
 | # | 问题 | 优先级 | 状态 |
 | --- | --- | --- | --- |
-| （暂无） | | | |
+| Z1 | 会员限定门禁在摘要查询失败时被跳过 | P0 | ✅ 摘要失败返回 503；packs 改用 payload 的 `availability` |
+| Z2 | 错误 `?key=` 也能触发不可缓存，形成无凭据 SSR 放大 | P0 | ✅ `keyed` 只在参数被接受时为真 |
+| Z3 | 会话 HMAC 密钥回退为登录密码 | P0 | ✅ 会话密钥独立且必填，缺失 503 |
+| Z4 | 管理端路径靠前缀字符串判断，`/api/admin` 漏网 | P0 | ✅ 显式清单 + 尾斜杠规范化 + 单测 |
+| Z5 | `.md` 的 `HEAD` 跳过会员门禁 | P0 | ✅ HEAD 复用 GET 的可见性与缓存策略 |
+| Z6 | 写请求缺少 `Origin` 时直接放行 | P1 | ✅ 校验 `Sec-Fetch-Site`；无 Origin 时要求 Authorization |
+| Z7 | 会员 key 明文比较、未配置时静默锁定、key 进入 HTML | P1 | ✅ 常数时间比较；未配置 503；HTML 不再输出 key |
+| R1 | purge 把「缓存关闭」报成成功；tag 词表三方漂移 | P0 | ✅ 返回 `skipped`；tag 词表收敛到 `cache-tags.ts`，日常 purge 带宽 tag |
+| R2 | 组页先写缓存后查询，500 被缓存；成员日历页 500 变 404 | P1 | ✅ 查询成功后写缓存；500 不再被 404 覆盖 |
+| R3 | `null` / `0` / 被屏蔽值三义混用 | P1 | 🚧 读数已区分会员限定；完整指标来源类型未做 |
+| R4 | 「受限」有 5 种表示，API 没有 403 | P1 | 🚧 packs / transcripts 改 403；densities 仍以缺键表示 |
+| R5 | R2 未命中 / 无绑定 / 读取错误折叠为 `null` | P1 | ✅ `ObjectReadResult` 判别联合，调用方映射 404 / 503 |
+| R6 | 日程匹配贪心且不落库；PATCH 合并丢弃手工字段 | P1 | 🚧 匹配按 key 稳定排序；合并保留编辑字段；未持久化 `superseded_by` |
+| R7 | 哨兵形成永久负缓存；未来时间也会写不可用 | P1 | ✅ 未来结束时间不再写不可用哨兵；哨兵定期过期未做 |
+| R8 | `live` 存在 24h 与 12h 两套窗口 | P1 | ✅ 统一为 `isLive` 与 12 小时 |
+| R9 | `cancelled` 覆盖 `hasStream`；`pending` 无出口 | P1 | 🚧 `hasStream` 优先；`pending` 清理策略未做 |
+| E1 | 事件状态由三个独立时钟推导 | P1 | ✅ 日历页共用单一 `now` |
+| E2 | 路由兼容层无 `popstate`，`pathname` 不更新 | P1 | ✅ 监听 `popstate` 与 `astro:page-load` |
+| E3 | 参数更新基于旧快照，同 tick 写入互相覆盖 | P1 | ✅ `setSearchParams` 支持函数式更新；日历已改用 |
+| E4 | 主题三个写入方，侧栏丢弃 `system` | P1 | ✅ 侧栏改用 `useSyncExternalStore`，消除首帧错误图标 |
+| E5 | `useTranscript` 重试一次后永久禁用缓存 | P1 | ✅ `force` 只作用于一次请求 |
+| E6 | 派生重置保证至少一帧旧状态 | P2 | 🚧 未统一改 reducer；仅修正了 `force` 生命周期 |
+| E7 | 每日计划 deferral 无终态记录 | P2 | ✅ 新增 `expiredIds`，运行摘要输出「已放弃」 |
+| E8 | `noOwner` 不写标记，重复下载 | P2 | ✅ 写入空 `ownerChats` 作为已确认标记 |
+| E9 | ingest 中断后报告停在 `running` | P2 | ✅ 异常分支关闭报告为 `failed` |
+| E10 | 空 `source_schema` 在两层按相反版本解释 | P2 | ✅ 统一 `isV2Pack`，空值按 v1 |
+| U1 | 空结果与筛选后为空不区分 | P2 | 🚧 场次页已区分；逐字稿与议程未改 |
+| U2 | `pending` 与 `cancelled` 视觉相同 | P2 | ✅ 仅取消项划线 |
+| U3 | `view=transcript` 无稿时无高亮页签；锁定页忽略视图 | P2 | 🚧 不可用视图回退概览；锁定页参数未清理 |
+| U4 | 侧栏与移动标签栏的分区判断不一致 | P2 | 🚧 未统一 |
+| U5 | 分享卡片错误态显示「没有日程」 | P2 | ✅ 生成失败单独显示错误 |
+| U6 | 未知成员筛选无就地恢复动作 | P2 | ✅ 过滤未知成员 id |
+
+> 明细、位置与建议修法见 [review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md)。实施按 [state-machine-remediation.md](state-machine-remediation.md) 的阶段推进。
 
 ## 近期（下一步）
 
@@ -89,6 +123,7 @@
 - [x] 封面图：镜像 `video.thumbnail` 到对象存储，单场页 / 首页 / 相册展示，含成员色兜底。
 - [x] 相册页（成员）：`/:datasetId/gallery`，按 JST 自然月分组、懒加载、`?order=` 可分享。
 - [x] 逐字稿：`content/transcripts/` 手动维护，发布后运行时渲染，支持时间戳跳转与目录。
+- [x] 移动端标签栏：成员入口换成逐字稿入口（成员切换仍走侧栏抽屉；组级页没有逐字稿索引，保留成员 Sheet）。
 - [x] 全组相册与组首页：跨成员封面墙、全组脉搏。
 - [x] 跨成员对比：组级 `/compare`，同一时间段 / 内容类型的横向对比。
 - [ ] 推文联动：先用手动 pin 验证价值，外部服务只做增强。

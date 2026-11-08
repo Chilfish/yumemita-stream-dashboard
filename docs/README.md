@@ -23,6 +23,7 @@ docs/
 │   ├── db-optimization.md
 │   ├── performance-audit.md
 │   ├── live-calendar.md
+│   ├── state-machine-remediation.md
 │   ├── share-card.md
 │   ├── product-direction.md
 │   ├── ui-refactor.md
@@ -60,6 +61,7 @@ docs/
 │   └── TEMPLATE.md
 ├── reviews/                     # 代码审查记录
 │   ├── README.md
+│   ├── review-2026-11-08-implicit-state-machines.md
 │   └── TEMPLATE.md
 ├── development-log/             # 按天开发日志
 │   ├── README.md
@@ -100,6 +102,7 @@ docs/
 | 理解 AI 生成页面的通病 | [ai-generated-ui-density.md](./research/ai-generated-ui-density.md) | 外部观察、机制分析、组首页案例与规避方法 |
 | 写文档 / 界面文案 | [writing-style.md](./writing-style.md) | 语气、用词、术语、反例 |
 | 代码审查 | [reviews/README.md](./reviews/README.md) + [TEMPLATE.md](./reviews/TEMPLATE.md) | 审查视角、问题分级、承接流程 |
+| 状态判定 / 隐式状态机 | [review-2026-11-08-implicit-state-machines.md](./reviews/review-2026-11-08-implicit-state-machines.md) + [state-machine-remediation.md](./planning/state-machine-remediation.md) | 状态清单、问题分级、阶段与验收 |
 | 写代码前防复现 | [postmortem/README.md](./postmortem/README.md) | 基线雷区、高危文件 |
 | 了解历史决策 | [development-log/](./development-log/) + [archive/](./archive/) | 按日期查阅；存档不主动读 |
 

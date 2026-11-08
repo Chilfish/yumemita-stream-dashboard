@@ -10,6 +10,7 @@ planning/（规划与执行：怎么做、做到哪了）
   ├── astro-ssr-migration.md     ← 当前阶段方案：Astro + Workers + PostgreSQL
   ├── transcript-index.md        ← 逐字稿索引：检索、分面、月份导航与移动端
   ├── live-calendar.md           ← 直播日历：未来场次、手工日程与月历视图
+  ├── state-machine-remediation.md ← 隐式状态机显式化：阶段、验收与文件范围
   ├── share-card.md              ← 直播日程分享卡片：层级、间距、配色与导出
   ├── product-direction.md       ← 产品方向与阶段计划
   ├── ui-refactor.md             ← UI 重构方案（已实施）
@@ -25,6 +26,7 @@ planning/（规划与执行：怎么做、做到哪了）
 | [astro-ssr-migration.md](./astro-ssr-migration.md) | Astro 7 + Cloudflare Workers + PostgreSQL + R2 迁移决策与实现记录；SSR、数据模型、`.md` 路由、缓存与发布 | 追溯迁移决策时 |
 | [transcript-index.md](./transcript-index.md) | 逐字稿索引的搜索、标签分面、月份导航、折叠、密度与移动端筛选 | 改逐字稿列表或做长列表交互 |
 | [live-calendar.md](./live-calendar.md) | 直播日历：`scheduled_streams`、手工日程、每日同步、月历与议程视图、缓存与验收 | 规划或实现日历页 |
+| [state-machine-remediation.md](./state-machine-remediation.md) | 隐式状态机显式化：授权、生命周期、缓存、客户端与管线的阶段方案与验收标准 | 承接 2026-11-08 审查或修改状态判定 |
 | [share-card.md](./share-card.md) | 分享卡片的信息层级、间距、配色、导出与验证 | 改分享卡片或截图样式 |
 | [product-direction.md](./product-direction.md) | 封面、相册、逐字稿、组首页、推文联动的产品方向与阶段验收 | 规划产品迭代 |
 | [ui-refactor.md](./ui-refactor.md) | 信息架构、设计系统、coss ui 落地映射与迁移计划（已实施） | 改 UI 结构或设计系统前 |
