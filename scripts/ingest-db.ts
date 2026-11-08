@@ -24,6 +24,7 @@ import type { StreamDatapack } from '../src/types/datapack.ts'
 import { buildStreamSummary } from './lib/dataset-manifest.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 import { syncTranscripts } from './lib/transcripts-db.ts'
+import { backfillSupersededSchedules } from './lib/schedule-match.ts'
 
 interface DataSource {
   id: string
@@ -415,6 +416,11 @@ async function main(): Promise<void> {
       const transcriptCount = await syncTranscripts(db, source.id)
       if (transcriptCount > 0) {
         console.log(`[ingest] ${source.id}: 逐字稿元数据 ${transcriptCount} 篇`)
+      }
+
+      const matchedSchedules = await backfillSupersededSchedules(db, source.id)
+      if (matchedSchedules > 0) {
+        console.log(`[ingest] ${source.id}: 回填日程匹配 ${matchedSchedules} 条`)
       }
     }
 
