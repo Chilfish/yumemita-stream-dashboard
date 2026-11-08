@@ -28,6 +28,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat } from './lib/live-chat.ts'
+import { sentinelIsFresh } from './lib/sentinel.ts'
 import { loadEnvFiles } from './lib/env.ts'
 import { mergeDanmakuFiles } from './lib/danmaku-merge.ts'
 import { readCredentials } from './lib/object-storage.ts'
@@ -642,7 +643,7 @@ async function main(): Promise<void> {
       // 弹幕回放
       const jsonlPath = join(session, 'danmaku', `danmaku_${id}.jsonl`)
       const chatUnavailable = join(session, 'work', 'chat-unavailable.txt')
-      if (!existsSync(jsonlPath) && !existsSync(chatUnavailable)) {
+      if (!existsSync(jsonlPath) && !sentinelIsFresh(chatUnavailable)) {
         try {
           const chatFile = join(session, 'danmaku', `${id}.live_chat.json`)
           if (!existsSync(chatFile)) {
@@ -700,7 +701,7 @@ async function main(): Promise<void> {
       // VSTATS
       const vstatsPath = join(session, 'web', `vstats_video_${id}.html`)
       const vstatsUnavailable = join(session, 'work', 'vstats-unavailable.txt')
-      if ((!existsSync(vstatsPath) || statSync(vstatsPath).size < 1000) && !existsSync(vstatsUnavailable)) {
+      if ((!existsSync(vstatsPath) || statSync(vstatsPath).size < 1000) && !sentinelIsFresh(vstatsUnavailable)) {
         try {
           if (existsSync(vstatsPath))
             unlinkSync(vstatsPath)
@@ -792,11 +793,11 @@ async function main(): Promise<void> {
     // 失败重试一轮
     const stepSatisfied = (session: string, id: string, step: string): boolean => {
       if (step === 'chat')
-        return existsSync(join(session, 'danmaku', `danmaku_${id}.jsonl`)) || existsSync(join(session, 'work', 'chat-unavailable.txt'))
+        return existsSync(join(session, 'danmaku', `danmaku_${id}.jsonl`)) || sentinelIsFresh(join(session, 'work', 'chat-unavailable.txt'))
       if (step === 'comments')
         return isValidInfoJson(join(session, 'comments', `comments_${id}.json`), id)
       if (step === 'vstats')
-        return existsSync(join(session, 'web', `vstats_video_${id}.html`)) || existsSync(join(session, 'work', 'vstats-unavailable.txt'))
+        return existsSync(join(session, 'web', `vstats_video_${id}.html`)) || sentinelIsFresh(join(session, 'work', 'vstats-unavailable.txt'))
       return false
     }
 

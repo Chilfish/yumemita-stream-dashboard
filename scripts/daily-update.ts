@@ -422,7 +422,8 @@ async function main(): Promise<void> {
         })
         if (schedule.changed) {
           purgeTags.add(CACHE_TAGS.schedule)
-          console.log(`[update] ${source.id} 日程：预定 ${schedule.upserted}，直播中 ${schedule.live}`)
+          const pruned = schedule.pruned > 0 ? `，清理过期 ${schedule.pruned}` : ''
+          console.log(`[update] ${source.id} 日程：预定 ${schedule.upserted}，直播中 ${schedule.live}${pruned}`)
         }
       }
       catch (error) {

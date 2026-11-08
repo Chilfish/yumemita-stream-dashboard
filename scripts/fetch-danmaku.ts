@@ -24,6 +24,7 @@
  * 才下载原始 `.live_chat.json`，成功后默认删掉，加 `--keep-raw` 保留。
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { sentinelIsFresh } from './lib/sentinel.ts'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
@@ -383,7 +384,7 @@ await runPool(todo, concurrency, async ({ source, videoId }) => {
     skipped += 1
     return
   }
-  if (!values.force && existsSync(unavailablePath)) {
+  if (!values.force && sentinelIsFresh(unavailablePath)) {
     skipped += 1
     return
   }

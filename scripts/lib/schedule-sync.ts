@@ -6,7 +6,7 @@
  * - `is_live` 只更新直播标记，不新建行；结束后照常由 ingest 写入 `streams`。
  * - 已在 `streams` 里的场次跳过，避免留下过期日程。
  */
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, lt, sql } from 'drizzle-orm'
 import type { Db } from '../../src/db/connection.ts'
 import { scheduledStreams } from '../../src/db/schema.ts'
 import { jstDateKeyFrom, slotForJstTime } from '../../src/lib/schedule.ts'
@@ -78,7 +78,37 @@ export function planScheduleEntries(
 export interface ScheduleSyncResult {
   upserted: number
   live: number
+  pruned: number
   changed: boolean
+}
+
+const STALE_SCHEDULE_DAYS = 30
+const DAY_MS = 86_400_000
+
+/**
+ * 清理长期不再出现在频道列表里的自动日程。
+ *
+ * `pending` 本身没有出口：过期后既不会自动变成已入库，也不会消失。
+ * 这里按 `last_seen_at` 与日期剪掉自动行；手工行不动，已取消行也不动。
+ */
+export async function pruneStaleSchedules(
+  db: Db,
+  datasetId: string,
+  now: Date = new Date(),
+  days: number = STALE_SCHEDULE_DAYS,
+): Promise<number> {
+  const cutoff = new Date(now.getTime() - days * DAY_MS)
+  const today = jstDateKeyFrom(now.toISOString())
+  const deleted = await db
+    .delete(scheduledStreams)
+    .where(and(
+      eq(scheduledStreams.datasetId, datasetId),
+      eq(scheduledStreams.source, 'youtube'),
+      lt(scheduledStreams.lastSeenAt, cutoff),
+      lt(scheduledStreams.date, today),
+    ))
+    .returning({ eventKey: scheduledStreams.eventKey })
+  return deleted.length
 }
 
 export async function syncScheduleFromChannel(
@@ -136,9 +166,12 @@ export async function syncScheduleFromChannel(
       ))
   }
 
+  const pruned = await pruneStaleSchedules(db, datasetId, now)
+
   return {
     upserted: plan.upcoming.length,
     live: plan.live.length,
-    changed: plan.upcoming.length + plan.live.length > 0,
+    pruned,
+    changed: plan.upcoming.length + plan.live.length + pruned > 0,
   }
 }

@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { sentinelIsFresh } from './lib/sentinel.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(APP_ROOT, 'data')
@@ -57,7 +58,7 @@ for (const entry of readdirSync(root, { withFileTypes: true })) {
   const id = /_([A-Za-z0-9_-]{11})$/.exec(entry.name)?.[1]
   if (!id)
     continue
-  if (existsSync(join(root, entry.name, 'work', 'chat-unavailable.txt')))
+  if (sentinelIsFresh(join(root, entry.name, 'work', 'chat-unavailable.txt')))
     unavailableIds.add(id)
   const danmaku = join(root, entry.name, 'danmaku')
   if (!existsSync(danmaku))
