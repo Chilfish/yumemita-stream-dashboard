@@ -100,12 +100,15 @@ function fileFromPayload(payload: TranscriptPayload, fallback: TranscriptFile | 
 }
 
 const transcriptCache = new Map<string, Promise<TranscriptFile>>();
+/** 已解析的正文：切换场次时可以直接显示，不必先闪一帧骨架。 */
+const resolvedTranscriptCache = new Map<string, TranscriptFile>();
 
 function loadTranscript(datasetId: string, videoId: string, force = false): Promise<TranscriptFile> {
   const key = `${datasetId}/${videoId}`;
   if (force) {
     transcriptCache.delete(key);
     localFileCache.delete(key);
+    resolvedTranscriptCache.delete(key);
   }
   const cached = transcriptCache.get(key);
   if (cached) return cached;
@@ -127,6 +130,10 @@ function loadTranscript(datasetId: string, videoId: string, force = false): Prom
       const payload = (await response.json()) as TranscriptPayload;
       const markdown = typeof payload.markdown === "string" ? payload.markdown.trimEnd() : "";
       return fileFromPayload(payload, markdown ? null : await loadLocal());
+    })
+    .then((file) => {
+      resolvedTranscriptCache.set(key, file);
+      return file;
     })
     .catch(async (error: unknown) => {
       // 开发环境没有 R2 或 Worker 暂时不可达时，构建快照还能读。
@@ -198,8 +205,17 @@ export function useTranscript(datasetId: string | null, videoId: string | null):
   };
 
   if (!key) return { file: null, status: "idle", error: null, retry: () => undefined };
+  // 在渲染期同步到新 key：命中已解析缓存时直接显示正文，否则立刻进入 loading，
+  // 不再先返回上一场的数据或额外闪一帧骨架。
   if (state.key !== key) {
-    return { file: null, status: "loading", error: null, retry };
+    const cached = resolvedTranscriptCache.get(key) ?? null;
+    setState({
+      key,
+      file: cached,
+      status: cached ? "ready" : "loading",
+      error: null,
+    });
+    return { file: cached, status: cached ? "ready" : "loading", error: null, retry };
   }
 
   return {
