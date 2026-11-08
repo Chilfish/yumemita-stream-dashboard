@@ -17,7 +17,8 @@ export function sentinelIsFresh(
   if (!existsSync(path)) return false
   try {
     const age = now - statSync(path).mtimeMs
-    return age >= 0 && age < ttlDays * DAY_MS
+    // 文件系统时间戳可能有几毫秒到数秒的精度差，轻微「未来」仍按有效处理。
+    return age > -5 * 60_000 && age < ttlDays * DAY_MS
   }
   catch {
     return false
