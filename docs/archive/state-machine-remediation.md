@@ -1,8 +1,9 @@
 # 隐式状态机显式化（阶段方案）
 
-> 状态：🚧 首轮实施完成（2026-11-08）。阶段 0 / 1 / 3 完成；阶段 2 / 4 / 5 的主要修复已落地，剩余项见文末「实施状态」。
+> **已归档（2026-11-08）**：审查问题已全部关闭；当前状态判定规则以代码与 [architecture.md](../planning/architecture.md) 为准。
+> 状态：✅ 实施完成（2026-11-08）。阶段 0 / 1 / 3 完成；阶段 2 / 4 / 5 的主要修复已落地，剩余项见文末「实施状态」。
 > 来源：[review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md)。
-> 本文写目标形态与实施顺序；已成立的事实以代码和 [architecture.md](./architecture.md) 为准。
+> 本文写目标形态与实施顺序；已成立的事实以代码和 [architecture.md](../planning/architecture.md) 为准。
 
 ## 1. 问题与目标
 
@@ -168,7 +169,7 @@ bun run test:smoke     # 改路由
 ```
 
 - 授权与缓存改动必须在 `bun run dev` 或 `bun run preview` 下手工走查受影响 URL，并记录请求方法与状态码。
-- 数据模型改动先跑本地迁移与 `db:verify`，再考虑远端；远端写量按 [backlog.md](./backlog.md) 的成本约束评估。
+- 数据模型改动先跑本地迁移与 `db:verify`，再考虑远端；远端写量按 [backlog.md](../planning/backlog.md) 的成本约束评估。
 - 未执行的检查标「未验证」。
 
 ## 6. 风险与回滚
@@ -209,5 +210,5 @@ bun run test:smoke     # 改路由
 - 审查问题清单中的 P0、P1、P2 全部关闭，或明确转为 backlog 条目并写明原因。
 - 每个阶段至少有一组在旧实现上会失败的测试。
 - 同一规则在仓库中只有一个实现入口；发现第二份时先删再加。
-- `docs/README.md`、`docs/planning/README.md`、[backlog.md](./backlog.md) 与本档保持一致。
-- 新增的架构取舍补进 [architecture.md](./architecture.md) 的 ADR。
+- `docs/README.md`、`docs/planning/README.md`、[backlog.md](../planning/backlog.md) 与本档保持一致。
+- 新增的架构取舍补进 [architecture.md](../planning/architecture.md) 的 ADR。

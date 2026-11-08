@@ -1,7 +1,8 @@
 # UI 重构实施进度
 
+> **已归档（2026-11-08）**：重构已实施，本文只作历史记录。
 > 方案见 [ui-refactor.md](ui-refactor.md)。本文件只记录**实施状态与文件归属**，避免并行改动互相覆盖。
-> 最近更新：2026-10-30。文中 `publish:data` / `sync:data` 等数据链路描述是迁移前记录，现状见 [architecture.md](./architecture.md)。
+> 最近更新：2026-10-30。文中 `publish:data` / `sync:data` 等数据链路描述是迁移前记录，现状见 [architecture.md](../planning/architecture.md)。
 
 ## 阶段与状态
 

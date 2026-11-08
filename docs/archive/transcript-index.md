@@ -1,5 +1,6 @@
 # 逐字稿索引：检索、分面与长列表
 
+> **已归档（2026-11-08）**：已实现；后续改逐字稿列表直接看代码与 [code-map.md](../engineering/code-map.md)。
 > 状态：✅ 已实现（2026-11-07）。
 > 相关代码：`src/components/dashboard/transcript/transcripts-view.tsx`、`src/components/dashboard/transcript/transcripts-toolbar.tsx`、
 > `src/components/pages/transcripts-page.tsx`、`src/lib/transcripts.ts`、`src/lib/transcript-params.ts`。

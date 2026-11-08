@@ -2,7 +2,7 @@
 
 调研日期：2026-11-02（JST）。对象：`main` 分支的 React Router 8 + Vite 8 站点。
 
-> 2026-11-03 更新：已确定采用 Astro 7 + Cloudflare Workers + PostgreSQL 的 SSR 方案，单场页不再预渲染。完整方案见 [astro-ssr-migration.md](../planning/astro-ssr-migration.md)。本文保留为历史调研，结论以新方案为准。
+> 2026-11-03 更新：已确定采用 Astro 7 + Cloudflare Workers + PostgreSQL 的 SSR 方案，单场页不再预渲染。完整方案见 [astro-ssr-migration.md](./astro-ssr-migration.md)。本文保留为历史调研，结论以新方案为准。
 
 ## 结论
 

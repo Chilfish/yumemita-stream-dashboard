@@ -1,5 +1,6 @@
 # 直播日程分享卡片设计
 
+> **已归档（2026-11-08）**：分享卡片已实现；实现见 `src/components/dashboard/calendar/share-card.tsx`。
 > 目标：从「直播预定」时间线生成一张适合发到社交平台的独立卡片，而不是截取页面。
 > 卡片是真实的 React + Tailwind 节点，固定 1200px 宽、高度由内容决定；导出时用 `modern-screenshot` 抓 DOM，而不是手写 SVG。
 

@@ -1,7 +1,8 @@
 # 产品方向：封面、相册与逐字稿
 
-> 状态：P1 封面与相册、P2 逐字稿、P3 组首页、全组相册与跨成员对比已实施（2026-11-04）。
-> 关联：[backlog.md](backlog.md)、[architecture.md](architecture.md)、[data-model.md](../data/data-model.md)。
+> **已归档（2026-11-08）**：P1–P3 已实施；逐字稿编辑器 / CMS 明确不做，推文联动只保留评估项（见 [backlog.md](../planning/backlog.md) B34）。当前范围与边界以本文为准。
+> 状态：P1 封面与相册、P2 逐字稿、P3 组首页、全组相册与跨成员对比已实施（2026-11-04）；逐字稿编辑器 / CMS 明确不做，推文联动只保留评估项。
+> 关联：[backlog.md](../planning/backlog.md)、[architecture.md](../planning/architecture.md)、[data-model.md](../data/data-model.md)。
 
 ## 1. 定位
 
@@ -197,16 +198,16 @@ bun run transcript:import "D:/messages/archives/…/2026-10-13_ライブ振り�
 - 从任一条目进入后，TOC 锚点、时间戳跳转、返回列表都可用键盘完成。
 - 一篇 5000 字的中文稿在 390px 下通读无字号跳变。
 
-### 6.5 编辑器 / CMS（单独项目，不排期）
+### 6.5 编辑器 / CMS（明确不做）
 
-明确不在本仓库实现。待办清单留给独立项目：
+明确不做，也不排期。以下能力交给仓库外的独立工具，本站只消费 `content/transcripts/`：
 
-- [ ] 本地优先的桌面或 Web 编辑器：打开 `content/transcripts/` 文件夹。
-- [ ] 从 manifest 选择场次，自动带出 `videoId` / 日期 / 标题。
-- [ ] frontmatter 表单 + Markdown 分栏预览。
-- [ ] 图片粘贴即上传到对象存储，回填相对路径。
-- [ ] 一键发布（调用 `publish:transcripts` 或直传 API）。
-- [ ] 草稿、离线、冲突提示；版本交给 git，不自建版本库。
+- 本地优先的桌面或 Web 编辑器：打开 `content/transcripts/` 文件夹。
+- 从清单选择场次，自动带出 `videoId` / 日期 / 标题。
+- frontmatter 表单 + Markdown 分栏预览。
+- 图片粘贴即上传到对象存储，回填相对路径。
+- 一键发布（调用 `publish:transcripts` 或直传 API）。
+- 草稿、离线、冲突提示；版本交给 git，不自建版本库。
 
 过渡方案：`bun run transcript:new <videoId>` 从模板生成文件，减少手写 frontmatter 的成本。
 
@@ -238,7 +239,7 @@ bun run transcript:import "D:/messages/archives/…/2026-10-13_ライブ振り�
 | P3 | 组首页 / 全组相册 | 已完成：首屏回答「最近谁播了」；全组相册可按成员 / 类型筛选并分享 URL |
 | P3 | 跨成员对比 | 已完成：组级 `/compare`，按月份区间 + 内容类型对比；筛选写进 URL |
 | P4 | 推文联动（手动 pin 优先） | 外部服务不可用时页面无变化 |
-| 独立项目 | 逐字稿编辑器 | 不阻塞本站迭代 |
+| 不做 | 逐字稿编辑器 / CMS | 明确不排期，避免扩大维护面 |
 
 每阶段完成时同步更新：`docs/data/data-model.md`（新增字段 / 文件布局）、`docs/planning/architecture.md`（路由与目录）、`docs/data/adding-data.md`（作者工作流）、`README.md`、`CHANGELOG.md`。
 

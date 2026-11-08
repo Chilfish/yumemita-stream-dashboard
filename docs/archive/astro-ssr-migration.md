@@ -1,5 +1,6 @@
 # Astro + Cloudflare 迁移方案
 
+> **已归档（2026-11-08）**：迁移已完成，当前架构以 [architecture.md](../planning/architecture.md) 为准；本文保留决策过程与迁移记录。
 > 状态：已完成（2026-11-04）。阶段 0–5 全部实施：脚手架、schema / ingest / 查询层、全部页面 SSR、`.md` / sitemap / llms / purge，全量场次入库、`db:verify` 0 problems。每日任务为「数据库差集 → ingest → 资产 → purge」；客户端媒体统一走 `PUBLIC_R2_BASE`；逐字稿正文走同源 `/api/transcripts/...`；`public/data/`、旧数据层与 R2 JSON 索引已删除；部署工作流与 R2 迁桶完成。线上实例 `https://ymmt.chilfish.top`，R2 桶 `yumemita-data`（对象在桶根，公开域名 `https://ymmt-s3.chilfish.top`，CORS 见 `scripts/r2-cors.json`）。调研日期 2026-11-03（JST）。
 > 目标：把当前的 React Router 8 + Vite 静态站迁到 Astro 7 + Cloudflare Workers，数据从「R2 上的 JSON + 浏览器运行时拉取」改为「PostgreSQL 查询 + R2 存对象」，单场页改为请求期 SSR，并为 Agent 提供 `{videoId}.md` 的 Markdown 视图。
 > 本文只描述已经验证过 API 的方案，不把未验证的平台行为写成事实。
@@ -35,7 +36,7 @@
 - **Agent 视图用 `.md` 路由后缀作为唯一契约。** 不实现 `Accept: text/markdown` 内容协商，也不依赖 Cloudflare Markdown for Agents。`/{datasetId}/stream/{videoId}.md` 直接返回结构化 Markdown，包含概览、部分指标和原始逐字稿。
 - **缓存用 Astro 7 的 route caching + Cloudflare Workers Cache。** 数据更新后按 tag purge，不靠重新部署。
 
-这套方案替代 [ssg-research.md](../archive/ssg-research.md) 里的「完整重建 / R2 混合 / 全站 SSG」三条路线。那份文档里的静态页预渲染、稳定入口、`asset hash`、Vercel 2048 routes 等问题，在 SSR + 数据库方案里不再出现。
+这套方案替代 [ssg-research.md](./ssg-research.md) 里的「完整重建 / R2 混合 / 全站 SSG」三条路线。那份文档里的静态页预渲染、稳定入口、`asset hash`、Vercel 2048 routes 等问题，在 SSR + 数据库方案里不再出现。
 
 ### 与旧方案的关键差异
 
@@ -1309,9 +1310,9 @@ Worker 的 `r2_buckets` 绑定同名桶，读取 `transcripts.r2_key`（形如 `
 
 ### 本仓库
 
-- [architecture.md](architecture.md) — 现有分层、数据流、路由
+- [architecture.md](../planning/architecture.md) — 现有分层、数据流、路由
 - [data-model.md](../data/data-model.md) — manifest / datapack 字段与口径
 - [deployment.md](../engineering/deployment.md) — 现有构建、R2 发布、定时任务
-- [ssg-research.md](../archive/ssg-research.md) — 旧 SSG 调研；本文替代其结论
+- [ssg-research.md](./ssg-research.md) — 旧 SSG 调研；本文替代其结论
 - `starter-astro-react` 的 `docs/engineering/astro-experiments.md` — 模板已落地的 Astro 实验记录（本地路径 `D:\git\starter-astro-react\docs\engineering\astro-experiments.md`）
 

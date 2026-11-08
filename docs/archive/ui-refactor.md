@@ -1,12 +1,14 @@
 # UI 重构方向：从仪表盘到分层数据产品
 
+> **已归档（2026-11-08）**：UI 重构已实施；当前设计规则见 [ui-design/README.md](../ui-design/README.md) 与 [GENERAL.md](../ui-design/GENERAL.md)。
+
 | 项 | 内容 |
 | --- | --- |
 | 状态 | 已实施（逐项进度见 [ui-refactor-progress.md](ui-refactor-progress.md)） |
 | 原型 | `.commandcode/design/prototype-v2.html`（可直接用浏览器打开） |
 | 数据快照 | 提案时 2026-10-28，宮永ののか 90 场；当前 5 位成员 1891 场 |
 | 适用 | 桌面优先，移动端重排；不改变数据层与抓取流程 |
-| 关联文档 | [architecture.md](architecture.md)、[development.md](../engineering/development.md)、[data-model.md](../data/data-model.md) |
+| 关联文档 | [architecture.md](../planning/architecture.md)、[development.md](../engineering/development.md)、[data-model.md](../data/data-model.md) |
 
 ## 1. 结论摘要
 
