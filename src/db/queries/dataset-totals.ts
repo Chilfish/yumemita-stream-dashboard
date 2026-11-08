@@ -22,6 +22,7 @@ import {
 } from '@/lib/aggregate'
 import type { ChatByKind, CurrencyTotal, EmojiCount } from '@/types/datapack'
 import { isMemberOnly } from '@/lib/visibility'
+import { isV2Pack } from '@/lib/schema-version'
 import { toIso } from './shared'
 
 const TOP_WORDS = 40
@@ -123,10 +124,6 @@ function maxBy<T>(items: T[], value: (item: T) => number | null | undefined): T 
     }
   }
   return best
-}
-
-function isV2(schema: string | null): boolean {
-  return schema?.endsWith('/v2') ?? false
 }
 
 /**
@@ -375,7 +372,7 @@ export async function computeDatasetPublicTotals(
   }
 
   const total = publicRows.length
-  const fullCount = publicRows.filter(row => isV2(row.sourceSchema)).length
+  const fullCount = publicRows.filter(row => isV2Pack(row.sourceSchema)).length
   const bestByAvgRow = maxBy(publicStats, item => item.avg)
   const bestByChatRow = maxBy(publicStats, item => item.chat)
   const bestByScRow = maxBy(publicStats, item => item.sc)

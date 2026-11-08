@@ -22,7 +22,8 @@ const HOUR_MS = 3_600_000;
 const DEFAULT_EXPECTED_MINUTES = 180;
 const LIVE_GRACE_MINUTES = 120;
 const LIVE_MAX_HOURS = 12;
-const LIVE_CHECK_HOURS = 24;
+// 频道检查结果与预计窗口共用同一个上限，避免同一事件在两个入口得出不同状态。
+const LIVE_CHECK_HOURS = 12;
 const PRE_START_MINUTES = 15;
 
 const dateKeyFormat = new Intl.DateTimeFormat("en-CA", {
@@ -227,32 +228,28 @@ export function upcomingEvents(
 
   return events
     .filter(event => {
-      if (event.state !== "upcoming" && event.state !== "live") return false;
-      if (!event.at) return false;
+      if (event.state === "live") return true;
+      if (event.state !== "upcoming" || !event.at) return false;
       const at = Date.parse(event.at);
-      if (!Number.isFinite(at)) return false;
-      // 已经开播但还没结束的也留在「接下来」里，排在最前。
-      return at >= nowMs - LIVE_MAX_HOURS * HOUR_MS && at <= end;
+      return Number.isFinite(at) && at <= end;
     })
     .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
 }
 
-export function deriveCalendarEventState(
-  event: Pick<CalendarEvent, "cancelled" | "hasStream" | "at" | "expectedMinutes" | "lastLiveAt">,
+/** 直播判定：频道检查结果与预计窗口共用同一套常量，供派生状态和「接下来」列表复用。 */
+export function isLive(
+  event: Pick<CalendarEvent, "at" | "expectedMinutes" | "lastLiveAt">,
   now: Date,
-): CalendarEventState {
-  if (event.cancelled) return "cancelled";
-  if (event.hasStream) return "done";
-
+): boolean {
   const nowMs = now.getTime();
   const lastLive = event.lastLiveAt ? Date.parse(event.lastLiveAt) : Number.NaN;
   if (Number.isFinite(lastLive) && nowMs - lastLive <= LIVE_CHECK_HOURS * HOUR_MS) {
-    return "live";
+    return true;
   }
 
-  if (!event.at) return "undated";
+  if (!event.at) return false;
   const start = Date.parse(event.at);
-  if (!Number.isFinite(start)) return "undated";
+  if (!Number.isFinite(start)) return false;
 
   const expectedMinutes = Math.min(
     Math.max(event.expectedMinutes ?? DEFAULT_EXPECTED_MINUTES, 15),
@@ -263,8 +260,24 @@ export function deriveCalendarEventState(
     start + LIVE_MAX_HOURS * HOUR_MS,
   );
 
-  if (nowMs >= start - PRE_START_MINUTES * 60_000 && nowMs <= windowEnd) return "live";
-  if (nowMs < start) return "upcoming";
+  return nowMs >= start - PRE_START_MINUTES * 60_000 && nowMs <= windowEnd;
+}
+
+export function deriveCalendarEventState(
+  event: Pick<CalendarEvent, "cancelled" | "hasStream" | "at" | "expectedMinutes" | "lastLiveAt">,
+  now: Date,
+): CalendarEventState {
+  // 已入库的场次是事实，优先于日程上的取消标记：取消后仍然播出的场次应显示为已结束。
+  if (event.hasStream) return "done";
+  if (event.cancelled) return "cancelled";
+
+  if (isLive(event, now)) return "live";
+
+  if (!event.at) return "undated";
+  const start = Date.parse(event.at);
+  if (!Number.isFinite(start)) return "undated";
+
+  if (now.getTime() < start) return "upcoming";
   return "pending";
 }
 
@@ -304,13 +317,15 @@ export function matchSchedulesToStreams(
   const matches = new Map<string, CalendarEventInput>();
   const streamByVideo = new Map<string, CalendarEventInput>();
   const used = new Set<string>();
+  // 按 key 排序后再分配，避免匹配结果依赖数据库返回顺序。
+  const orderedSchedules = [...schedules].sort((a, b) => a.key.localeCompare(b.key));
 
   for (const stream of streams) {
     if (!stream.videoId) continue;
     streamByVideo.set(`${stream.datasetId}:${stream.videoId}`, stream);
   }
 
-  for (const schedule of schedules) {
+  for (const schedule of orderedSchedules) {
     if (schedule.cancelled || !schedule.videoId) continue;
     const stream = streamByVideo.get(`${schedule.datasetId}:${schedule.videoId}`);
     if (!stream) continue;
@@ -320,10 +335,10 @@ export function matchSchedulesToStreams(
 
   const realEvents = [
     ...streams,
-    ...schedules.filter(event => event.source === "youtube" && !event.cancelled),
-  ];
+    ...orderedSchedules.filter(event => event.source === "youtube" && !event.cancelled),
+  ].sort((a, b) => a.key.localeCompare(b.key));
 
-  for (const schedule of schedules) {
+  for (const schedule of orderedSchedules) {
     if (schedule.cancelled || schedule.source !== "manual" || schedule.videoId) continue;
     if (matches.has(schedule.key)) continue;
 
@@ -396,7 +411,8 @@ export function buildCalendarEvents(input: BuildCalendarInput): CalendarEvent[] 
 
   const seenSchedules = new Set<string>();
   const schedules = [...input.schedules]
-    .sort((a, b) => SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source])
+    .sort((a, b) => SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source]
+      || a.key.localeCompare(b.key))
     .filter(event => {
       if (matches.has(event.key)) return false;
       if (!event.videoId) return true;

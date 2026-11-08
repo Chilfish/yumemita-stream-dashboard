@@ -63,6 +63,13 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
     [searchParams, defaultMonth],
   );
 
+  // URL 里可能存在已不存在的成员 id；先过滤，避免整页被一个无效值筛空。
+  const knownMemberIds = useMemo(() => new Set(data.members.map(member => member.id)), [data.members]);
+  const selectedMembers = useMemo(
+    () => params.members.filter(id => knownMemberIds.has(id)),
+    [params.members, knownMemberIds],
+  );
+
   const baseEvents = useMemo(
     () =>
       data.events.map(event => ({
@@ -74,10 +81,10 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
 
   const visibleEvents = useMemo(
     () =>
-      params.members.length === 0
+      selectedMembers.length === 0
         ? baseEvents
-        : baseEvents.filter(event => params.members.includes(event.datasetId)),
-    [baseEvents, params.members],
+        : baseEvents.filter(event => selectedMembers.includes(event.datasetId)),
+    [baseEvents, selectedMembers],
   );
 
   const monthEvents = useMemo(
@@ -96,10 +103,11 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
   const mode: CalendarViewMode = params.view ?? (isNarrow ? "agenda" : "month");
 
   function updateParams(patch: Partial<CalendarParams>): void {
-    setSearchParams(
-      writeCalendarParams(searchParams, { ...params, ...patch }, defaultMonth),
-      { replace: true },
-    );
+    // 函数式更新：同一 tick 的两次写入都基于最新 URL，不会互相覆盖。
+    setSearchParams((previous) => {
+      const current = parseCalendarParams(previous, defaultMonth);
+      return writeCalendarParams(previous, { ...current, ...patch }, defaultMonth);
+    }, { replace: true });
   }
 
   function navigateToMonth(month: string, day: string | null): void {
@@ -192,13 +200,13 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
               <MemberFilter
                 members={data.members}
                 onChange={members => updateParams({ members })}
-                selected={params.members}
+                selected={selectedMembers}
               />
             )
           : null}
       </div>
 
-      <DayTimeline plan={dayPlan} />
+      <DayTimeline now={now} plan={dayPlan} />
 
       {mode === "month"
         ? (

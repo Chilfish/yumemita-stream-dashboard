@@ -79,8 +79,8 @@ function stream(overrides: Partial<CalendarEventInput> = {}): CalendarEventInput
 describe("deriveCalendarEventState", () => {
   const now = new Date("2026-11-08T19:00:00+09:00");
 
-  it("取消优先于已入库", () => {
-    expect(deriveCalendarEventState(input({ cancelled: true, hasStream: true }), now)).toBe("cancelled");
+  it("已入库优先于取消：取消后仍播出的场次显示为已结束", () => {
+    expect(deriveCalendarEventState(input({ cancelled: true, hasStream: true }), now)).toBe("done");
   });
 
   it("同 video_id 已入库就是已结束", () => {

@@ -289,7 +289,8 @@ function buildPack(
     : null
 
   return {
-    schema: (row.sourceSchema ?? 'yumemita.stream-datapack/v2') as DatapackSchema,
+    // 空 schema 与未知版本按 v1 处理，和汇总层的 isV2Pack 保持一致。
+    schema: (row.sourceSchema ?? 'yumemita.stream-datapack/v1') as DatapackSchema,
     generatedAt: toIso(row.sourceGeneratedAt) ?? '',
     video,
     vstats,

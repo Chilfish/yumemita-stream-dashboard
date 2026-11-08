@@ -31,7 +31,6 @@ function eventMeta(event: CalendarEvent): string | null {
     const seconds = (Date.parse(event.endAt) - Date.parse(event.at)) / 1000;
     return Number.isFinite(seconds) && seconds > 0 ? formatDurationLong(seconds) : null;
   }
-  if (event.expectedMinutes) return `预计 ${event.expectedMinutes} 分钟`;
   if (event.timeTentative) return "时段待定";
   return null;
 }
@@ -147,23 +146,26 @@ function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
 interface DayTimelineProps {
   plan: DayPlan | null;
   action?: ReactNode;
+  /** 父层已有统一时钟时传入，避免同一事件在页头和时间线之间出现状态分歧。 */
+  now?: Date;
 }
 
 /**
  * 今天 + 明天的时间线。跨天朝活放在「明天」组里；
  * 每条事件用成员色圆点 + 时间轴，已结束的链到单场页。
  */
-export function DayTimeline({ plan, action }: DayTimelineProps) {
+export function DayTimeline({ plan, action, now: externalNow }: DayTimelineProps) {
   const [nowMs, setNowMs] = useState(() => (plan ? Date.parse(plan.now) : Date.now()));
 
   useEffect(() => {
+    if (externalNow) return;
     const timer = window.setInterval(() => setNowMs(Date.now()), 60_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [externalNow]);
 
   if (!plan) return null;
 
-  const now = new Date(nowMs);
+  const now = externalNow ?? new Date(nowMs);
   const days = plan.days.filter(day => day.offset === 0 || day.events.length > 0);
   const hasEvents = days.some(day => day.events.length > 0);
 

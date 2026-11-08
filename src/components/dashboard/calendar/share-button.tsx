@@ -23,6 +23,7 @@ export function ShareButton({ plan, now }: ShareButtonProps) {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [blob, setBlob] = useState<Blob | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -51,8 +52,8 @@ export function ShareButton({ plan, now }: ShareButtonProps) {
     }
 
     generate()
-      .catch(error => {
-        if (active) setStatus(error instanceof Error ? error.message : "生成分享卡片失败");
+      .catch(reason => {
+        if (active) setError(reason instanceof Error ? reason.message : "生成分享卡片失败");
       })
       .finally(() => {
         if (active) setGenerating(false);
@@ -111,6 +112,7 @@ export function ShareButton({ plan, now }: ShareButtonProps) {
           setBlob(null);
           setPreview(null);
           setStatus(null);
+          setError(null);
           setGenerating(true);
           setOpen(true);
         }}
@@ -127,7 +129,13 @@ export function ShareButton({ plan, now }: ShareButtonProps) {
         </div>
       ) : null}
 
-      <Dialog onOpenChange={setOpen} open={open}>
+      <Dialog
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setGenerating(false);
+        }}
+        open={open}
+      >
         <DialogPopup>
           <DialogHeader>
             <DialogTitle>分享直播日程</DialogTitle>
@@ -146,8 +154,12 @@ export function ShareButton({ plan, now }: ShareButtonProps) {
                   />
                 )
               : (
-                  <div className="flex h-72 items-center justify-center rounded-xl border border-hairline bg-muted/30 text-caption text-muted-foreground">
-                    {generating ? "正在生成分享卡片…" : "暂时没有可分享的日程"}
+                  <div className="flex h-72 items-center justify-center rounded-xl border border-hairline bg-muted/30 px-6 text-center text-caption text-muted-foreground">
+                    {error
+                      ? `生成分享卡片失败：${error}`
+                      : generating
+                        ? "正在生成分享卡片…"
+                        : "暂时没有可分享的日程"}
                   </div>
                 )}
             {status ? <p className="mt-2 text-caption text-muted-foreground">{status}</p> : null}

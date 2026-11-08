@@ -267,12 +267,34 @@ export const PATCH: APIRoute = async (context) => {
   if (nextKey !== eventKey) {
     const target = await findRow(datasetId, nextKey);
     if (target) {
+      // 合并到已有自动行时保留这次编辑的字段，不能只删掉手工行。
+      const [updated] = await db
+        .update(scheduledStreams)
+        .set({
+          title: input.title?.trim() ? input.title : target.title,
+          url: input.url ?? target.url,
+          date: timing.date ?? target.date,
+          slot: timing.slot ?? target.slot,
+          kind: resolveKind(input.title, input.kind) ?? target.kind,
+          scheduledAt: timing.scheduledAt ? new Date(timing.scheduledAt) : target.scheduledAt,
+          expectedMinutes: input.expectedMinutes ?? target.expectedMinutes,
+          availability: input.availability ?? target.availability,
+          cancelledAt: input.cancelled ? (target.cancelledAt ?? now) : target.cancelledAt,
+          note: input.note ?? target.note,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(scheduledStreams.datasetId, datasetId),
+          eq(scheduledStreams.eventKey, nextKey),
+        ))
+        .returning()
+
       await db.delete(scheduledStreams).where(and(
         eq(scheduledStreams.datasetId, datasetId),
         eq(scheduledStreams.eventKey, eventKey),
       ));
       const invalidated = await invalidate(context, datasetId);
-      return json({ ok: true, item: rowToItem(target), merged: true, invalidated });
+      return json({ ok: true, item: rowToItem(updated ?? target), merged: true, invalidated });
     }
 
     await db.delete(scheduledStreams).where(and(

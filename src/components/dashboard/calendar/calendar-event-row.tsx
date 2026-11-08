@@ -65,11 +65,11 @@ export function CalendarEventRow({ event, className }: CalendarEventRowProps) {
         <span
           className={cn(
             "mt-0.5 line-clamp-2 wrap-anywhere",
-            (event.state === "cancelled" || event.state === "pending") && "line-through",
+            event.state === "cancelled" && "line-through",
           )}
           style={{
             color:
-              event.state === "cancelled" || event.state === "pending"
+              event.state === "cancelled"
                 ? "var(--muted-foreground)"
                 : "var(--foreground)",
             fontSize: "var(--text-footnote)",
