@@ -53,6 +53,9 @@
     "transcript:new": "bun scripts/transcript-new.ts",
     "publish:transcripts": "bun scripts/publish-transcripts.ts"
   },
+  "overrides": {
+    "@emnapi/runtime": "1.11.3"
+  },
   "dependencies": {
     "@astrojs/cloudflare": "^14.4.6",
     "@astrojs/react": "^7.1.4",
