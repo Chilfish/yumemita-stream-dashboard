@@ -34,7 +34,7 @@
 | B25 | 日程管理端：宽容时间输入、编辑页组件拆分、移动端列表、直播链接只保留单输入 | P3 | 无 | 2026-11-07 反馈 | ✅ `TimeInput` + `src/lib/time.ts`；`schedule-editor` 拆成容器 / 表单 / 列表 / 表单状态；`md` 以下改堆叠列表；直播链接去掉 `videoId` 输入，`url` 只作外链。见 [time-input.md](../ui-design/time-input.md) 与 [GENERAL.md](../ui-design/GENERAL.md) §7 |
 | B26 | 逐字稿索引：搜索、标签分面、月份分组折叠、密度与移动端筛选（`FR-TRANSCRIPT-002`） | P2 | 无 | 2026-11-07 逐字稿体验讨论 | ✅ `transcripts-toolbar.tsx` 收成搜索 + 单一筛选入口；`q` / `tags` / `sort` / `dense` 写 URL；默认全展开、逐组收起；标签改为元信息文本；移动端底部筛选面板；`bun run test` 416 通过、构建与路由冒烟通过。见 [transcript-index.md](transcript-index.md) |
 | B27 | 界面冗余清理：首页已删重复指标、口径脚注与自证式导航；其余页面按同一清单逐页扫描 | P1 | 无 | 2026-11-07 首页讨论 | 🚧 首页完成；其余页面待扫，规范见 [information-density.md](../ui-design/information-density.md) |
-| B28 | 隐式状态机显式化：授权闭环、生命周期单点判定、缓存与对象读取结果类型、客户端状态收敛、管线幂等与终态 | P0–P2 | 无 | 2026-11-08 审查 | 🚧 首轮实施完成：P0 全部、P1 大部分、P2 部分；剩余项见审查记录「实施状态」。验收见 [state-machine-remediation.md](state-machine-remediation.md)，问题清单见 [review-2026-11-08](../reviews/review-2026-11-08-implicit-state-machines.md) |
+| B28 | 隐式状态机显式化：授权闭环、生命周期单点判定、缓存与对象读取结果类型、客户端状态收敛、管线幂等与终态 | P0–P2 | 无 | 2026-11-08 审查 | 🚧 两轮实施完成：P0 全部、P1 全部、P2 除 R3 完整指标来源与 U4 导航统一外已落地；见审查记录「实施状态」与 [state-machine-remediation.md](state-machine-remediation.md) |
 
 ## 审查承接区
 
@@ -52,18 +52,18 @@
 | R1 | purge 把「缓存关闭」报成成功；tag 词表三方漂移 | P0 | ✅ 返回 `skipped`；tag 词表收敛到 `cache-tags.ts`，日常 purge 带宽 tag |
 | R2 | 组页先写缓存后查询，500 被缓存；成员日历页 500 变 404 | P1 | ✅ 查询成功后写缓存；500 不再被 404 覆盖 |
 | R3 | `null` / `0` / 被屏蔽值三义混用 | P1 | 🚧 读数已区分会员限定；完整指标来源类型未做 |
-| R4 | 「受限」有 5 种表示，API 没有 403 | P1 | 🚧 packs / transcripts 改 403；densities 仍以缺键表示 |
+| R4 | 「受限」有 5 种表示，API 没有 403 | P1 | ✅ packs / transcripts 改 403；densities 返回 `locked` |
 | R5 | R2 未命中 / 无绑定 / 读取错误折叠为 `null` | P1 | ✅ `ObjectReadResult` 判别联合，调用方映射 404 / 503 |
-| R6 | 日程匹配贪心且不落库；PATCH 合并丢弃手工字段 | P1 | 🚧 匹配按 key 稳定排序；合并保留编辑字段；未持久化 `superseded_by` |
-| R7 | 哨兵形成永久负缓存；未来时间也会写不可用 | P1 | ✅ 未来结束时间不再写不可用哨兵；哨兵定期过期未做 |
+| R6 | 日程匹配贪心且不落库；PATCH 合并丢弃手工字段 | P1 | ✅ 稳定排序 + 合并保留字段；精确 videoId 匹配写入 `superseded_by`；模糊匹配仍读取期 |
+| R7 | 哨兵形成永久负缓存；未来时间也会写不可用 | P1 | ✅ 哨兵 30 天过期；未来结束时间不再写不可用 |
 | R8 | `live` 存在 24h 与 12h 两套窗口 | P1 | ✅ 统一为 `isLive` 与 12 小时 |
-| R9 | `cancelled` 覆盖 `hasStream`；`pending` 无出口 | P1 | 🚧 `hasStream` 优先；`pending` 清理策略未做 |
+| R9 | `cancelled` 覆盖 `hasStream`；`pending` 无出口 | P1 | ✅ `hasStream` 优先；30 天未再出现的自动日程清理 |
 | E1 | 事件状态由三个独立时钟推导 | P1 | ✅ 日历页共用单一 `now` |
 | E2 | 路由兼容层无 `popstate`，`pathname` 不更新 | P1 | ✅ 监听 `popstate` 与 `astro:page-load` |
 | E3 | 参数更新基于旧快照，同 tick 写入互相覆盖 | P1 | ✅ `setSearchParams` 支持函数式更新；日历已改用 |
 | E4 | 主题三个写入方，侧栏丢弃 `system` | P1 | ✅ 侧栏改用 `useSyncExternalStore`，消除首帧错误图标 |
 | E5 | `useTranscript` 重试一次后永久禁用缓存 | P1 | ✅ `force` 只作用于一次请求 |
-| E6 | 派生重置保证至少一帧旧状态 | P2 | 🚧 未统一改 reducer；仅修正了 `force` 生命周期 |
+| E6 | 派生重置保证至少一帧旧状态 | P2 | ✅ 逐字稿命中已解析缓存时直接显示，切换不再闪骨架 |
 | E7 | 每日计划 deferral 无终态记录 | P2 | ✅ 新增 `expiredIds`，运行摘要输出「已放弃」 |
 | E8 | `noOwner` 不写标记，重复下载 | P2 | ✅ 写入空 `ownerChats` 作为已确认标记 |
 | E9 | ingest 中断后报告停在 `running` | P2 | ✅ 异常分支关闭报告为 `failed` |
