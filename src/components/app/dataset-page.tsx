@@ -298,13 +298,20 @@ function CompareBody({ dataset, rows, compareDensities }: DatasetPageProps) {
     fetch(`/api/densities/${encodeURIComponent(dataset.id)}?ids=${query}${accessSuffix}`)
       .then(async (response) => {
         if (!response.ok) throw new Error('逐分钟明细加载失败')
-        return (await response.json()) as Record<string, number[]>
+        return (await response.json()) as {
+          densities?: Record<string, number[]>
+          locked?: string[]
+        }
       })
       .then((payload) => {
         if (cancelled) return
+        const payloadDensities = payload.densities ?? {}
+        const locked = new Set(payload.locked ?? [])
         setDensities((previous) => {
           const next = new Map(previous)
-          for (const videoId of missing) next.set(videoId, payload[videoId] ?? [])
+          // 受限场次记为已加载空值，避免同一请求反复触发；页面按 availability 显示会员限定。
+          for (const videoId of missing)
+            next.set(videoId, locked.has(videoId) ? [] : (payloadDensities[videoId] ?? []))
           return next
         })
         setStatus('ready')

@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro'
 import { db } from '@/db/client'
-import { getCompareDensities } from '@/db/queries/packs'
+import { getCompareDensityResult } from '@/db/queries/packs'
 import { memberOnlyAccess } from '@/lib/member-access'
 import { parseCompareIds } from '@/lib/routes'
 
@@ -15,14 +15,19 @@ export const GET: APIRoute = async (context) => {
 
   const videoIds = parseCompareIds(context.url.searchParams.get('ids'), 8)
   if (videoIds.length === 0) {
-    return Response.json({}, { headers: { 'cache-control': 'no-store' } })
+    return Response.json(
+      { densities: {}, locked: [] },
+      { headers: { 'cache-control': 'no-store' } },
+    )
   }
 
   const { unlocked, keyed } = memberOnlyAccess(context.url)
   if (keyed) context.cache.set(false)
 
   try {
-    const densities = await getCompareDensities(db, datasetId, videoIds, { includeMemberOnly: unlocked })
+    const { densities, locked } = await getCompareDensityResult(db, datasetId, videoIds, {
+      includeMemberOnly: unlocked,
+    })
 
     if (!keyed) {
       context.cache.set({
@@ -32,7 +37,7 @@ export const GET: APIRoute = async (context) => {
       })
     }
 
-    return Response.json(densities, {
+    return Response.json({ densities, locked }, {
       headers: {
         'cache-control': keyed
           ? 'private, no-store'

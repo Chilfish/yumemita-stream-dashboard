@@ -308,15 +308,15 @@ function buildPack(
 /** 对比页只需要逐分钟弹幕，不必还原整份 pack。 */
 export type CompareDensityMap = Record<string, number[]>
 
-export async function getCompareDensities(
-  db: Db,
-  datasetId: string,
-  videoIds: string[],
-  options: { includeMemberOnly?: boolean } = {},
-): Promise<CompareDensityMap> {
-  if (videoIds.length === 0) return {}
+interface DensityRow {
+  videoId: string
+  availability: string | null
+  density: unknown
+}
 
-  const rows = await db
+async function fetchDensityRows(db: Db, datasetId: string, videoIds: string[]): Promise<DensityRow[]> {
+  if (videoIds.length === 0) return []
+  return db
     .select({
       videoId: streams.videoId,
       availability: streams.availability,
@@ -325,16 +325,54 @@ export async function getCompareDensities(
     .from(streams)
     .leftJoin(streamDetails, eq(streamDetails.streamId, streams.id))
     .where(and(eq(streams.datasetId, datasetId), inArray(streams.videoId, videoIds)))
+}
 
+function densityOf(row: DensityRow): number[] {
+  const density = (row.density ?? {}) as { perMinute?: unknown }
+  return Array.isArray(density.perMinute)
+    ? density.perMinute.filter((value): value is number => typeof value === 'number')
+    : []
+}
+
+export async function getCompareDensities(
+  db: Db,
+  datasetId: string,
+  videoIds: string[],
+  options: { includeMemberOnly?: boolean } = {},
+): Promise<CompareDensityMap> {
+  const rows = await fetchDensityRows(db, datasetId, videoIds)
   const densities: CompareDensityMap = {}
   for (const row of rows) {
     if (!options.includeMemberOnly && isMemberOnly(row.availability)) continue
-    const density = (row.density ?? {}) as { perMinute?: unknown }
-    densities[row.videoId] = Array.isArray(density.perMinute)
-      ? density.perMinute.filter((value): value is number => typeof value === 'number')
-      : []
+    densities[row.videoId] = densityOf(row)
   }
   return densities
+}
+
+export interface CompareDensityResult {
+  densities: CompareDensityMap
+  /** 因会员限定被跳过的场次；调用方据此区分「受限」与「没有数据」。 */
+  locked: string[]
+}
+
+/** API 用：返回密度与受限场次，避免用「字段缺失」同时表示未命中与受限。 */
+export async function getCompareDensityResult(
+  db: Db,
+  datasetId: string,
+  videoIds: string[],
+  options: { includeMemberOnly?: boolean } = {},
+): Promise<CompareDensityResult> {
+  const rows = await fetchDensityRows(db, datasetId, videoIds)
+  const densities: CompareDensityMap = {}
+  const locked: string[] = []
+  for (const row of rows) {
+    if (!options.includeMemberOnly && isMemberOnly(row.availability)) {
+      locked.push(row.videoId)
+      continue
+    }
+    densities[row.videoId] = densityOf(row)
+  }
+  return { densities, locked }
 }
 
 export type StreamPackParts = [
