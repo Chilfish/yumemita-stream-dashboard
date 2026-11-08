@@ -96,6 +96,8 @@ export const scheduledStreams = pgTable(
     /** `yt:<videoId>` 或 `manual:<id>`；有 videoId 时统一用前者。 */
     eventKey: text('event_key').notNull(),
     videoId: text('video_id'),
+    /** ingest 已找到对应 `streams` 行时写入 videoId；读取时优先据此判定已结束。 */
+    supersededBy: text('superseded_by'),
     title: text('title').notNull(),
     url: text('url'),
     /** JST 自然日；只知道日期和时段时由管理端写入。 */

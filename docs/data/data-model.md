@@ -424,6 +424,7 @@ bun run fetch:live-chat --video <videoId>                       # 已结束时�
 | `dataset_id` | text | 成员 id，外键到 `datasets` |
 | `event_key` | text | `yt:<videoId>` 或 `manual:<slug>`，与 `dataset_id` 组成主键 |
 | `video_id` | text \| null | 已知的 YouTube video id；有值时主键用 `yt:` |
+| `superseded_by` | text \| null | ingest 确认已有对应 `streams` 行时写入的 video id；读取时优先据此判定已结束 |
 | `title` | text | 日程标题；空字符串表示「待定」 |
 | `url` | text \| null | YouTube 链接 |
 | `date` | date \| null | JST 自然日；只知道日期和时段时由管理端写入 |

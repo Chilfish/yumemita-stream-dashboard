@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
@@ -14,6 +14,7 @@ import {
   datasets,
   ingestReports,
   paidEvents,
+  scheduledStreams,
   streamAuthors,
   streamDetails,
   streams,
@@ -706,6 +707,16 @@ async function ingestPack(
     for (const part of chunk(wordRows, 1000)) {
       if (part.length) await tx.insert(streamWords).values(part)
     }
+
+    // 精确匹配的日程写入持久标记；读取时不必只依赖请求期的 videoId 集合。
+    await tx
+      .update(scheduledStreams)
+      .set({ supersededBy: video.id, updatedAt: new Date() })
+      .where(and(
+        eq(scheduledStreams.datasetId, source.id),
+        eq(scheduledStreams.videoId, video.id),
+        isNull(scheduledStreams.supersededBy),
+      ))
   })
 }
 

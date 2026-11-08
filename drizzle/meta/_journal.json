@@ -57,6 +57,13 @@
       "when": 1794037076062,
       "tag": "0007_mixed_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794129923712,
+      "tag": "0008_clear_taskmaster",
+      "breakpoints": true
     }
   ]
 }

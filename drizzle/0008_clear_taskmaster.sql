@@ -1,0 +1,1 @@
+ALTER TABLE "scheduled_streams" ADD COLUMN "superseded_by" text;

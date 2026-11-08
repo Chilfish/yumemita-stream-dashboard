@@ -87,6 +87,7 @@ export function buildScheduleQueries(
       datasetId: scheduledStreams.datasetId,
       eventKey: scheduledStreams.eventKey,
       videoId: scheduledStreams.videoId,
+      supersededBy: scheduledStreams.supersededBy,
       title: scheduledStreams.title,
       url: scheduledStreams.url,
       date: scheduledStreams.date,
@@ -165,7 +166,8 @@ function mapScheduleEvent(row: ScheduleQueryRow, streamKeys: Set<string>): Calen
     slot: isScheduleSlot(row.slot) ? row.slot : null,
     scheduledAt,
   });
-  const hasStream = row.videoId ? streamKeys.has(`${row.datasetId}:${row.videoId}`) : false;
+  const hasStream = Boolean(row.supersededBy)
+    || (row.videoId ? streamKeys.has(`${row.datasetId}:${row.videoId}`) : false);
 
   return {
     key: `schedule:${row.datasetId}:${row.eventKey}`,
