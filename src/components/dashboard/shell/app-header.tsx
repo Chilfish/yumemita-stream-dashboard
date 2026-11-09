@@ -45,8 +45,10 @@ export function AppHeader({
   chatTotal,
   onOpenCommand,
 }: AppHeaderProps) {
+  // 常驻栏不用 backdrop-filter：Chromium 在吸顶 + 合成层上滚动时会跳色闪烁，
+  // 长页面尤其明显。改用实色 Token 背景，层级仍由亮度区分。
   return (
-    <header className="scroll-edge sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-background/88 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/72 md:px-4">
+    <header className="scroll-edge sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-background px-3 md:px-4">
       <SidebarTrigger className="size-7 text-muted-foreground" />
       <Breadcrumb className="min-w-0">
         <BreadcrumbList className="flex-nowrap">

@@ -34,7 +34,7 @@ export function GroupHeader({
   chatTotal,
 }: GroupHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-background/88 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/72 md:px-4">
+    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-hairline bg-background px-3 md:px-4">
       <SidebarTrigger className="size-7 text-muted-foreground" />
       <Breadcrumb className="min-w-0">
         <BreadcrumbList className="flex-nowrap">

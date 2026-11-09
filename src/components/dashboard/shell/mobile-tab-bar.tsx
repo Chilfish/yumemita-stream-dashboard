@@ -77,7 +77,7 @@ export function MobileTabBar({
     <>
       <nav
         aria-label="主导航"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-card/92 backdrop-blur-xl md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-card md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <ul
