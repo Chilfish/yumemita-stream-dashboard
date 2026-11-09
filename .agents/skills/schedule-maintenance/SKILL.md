@@ -71,6 +71,43 @@ metadata:
 
 - 不确定就省略，服务端会按标题推断；标题也为空时留空。
 
+## 步骤 2.5：有 YouTube 链接时补全元信息
+
+预告里带 YouTube 链接时，标题与开播时间以 yt-dlp 为准，推文文案只作兜底：
+
+- 推文标题常被手写缩写（「リベンジ！歌枠！！」），完整标题里才有【#歌枠】、成员名等可检索信息。
+- `release_timestamp` 给出精确开播时刻，比「22:00」这类口头时间可靠。
+- `availability` 能区分会员限定，避免把 `subscriber_only` 的场次当公开场。
+
+```powershell
+$url = 'https://www.youtube.com/live/z0GRgSUrY0A'
+$meta = yt-dlp -J --skip-download --no-warnings --ignore-no-formats-error $url | ConvertFrom-Json
+
+$meta.id, $meta.title, $meta.live_status, $meta.availability, $meta.channel_id, $meta.duration
+[DateTimeOffset]::FromUnixTimeSeconds($meta.release_timestamp).ToOffset([TimeSpan]::FromHours(9)).ToString('yyyy-MM-ddTHH:mm:ss+09:00')
+```
+
+- `--ignore-no-formats-error` 必加：未开播的直播本来没有任何格式，不加会直接报
+  `This live event will begin in X hours` 且 stdout 为空。
+- 命中 bot 检查、`subscriber_only` 或会员限定场次时，先导出登录态再重试：
+  `bun scripts/export-yt-cookies.ts` 写出 `~/yt-cookies.txt`，命令加 `--cookies ~/yt-cookies.txt`；
+  也可以直接 `--cookies-from-browser firefox`。cookie 文件是凭据，不要落进仓库或贴到回复里。
+- 本地已装 `yt-dlp`（2026.10+）与 `deno`（解 JS challenge 用），无需额外安装。
+
+字段映射：
+
+| yt-dlp 字段 | 用法 |
+| --- | --- |
+| `title` | 直接作 `title`，保留完整标题，不改写、不截断 |
+| `release_timestamp` | 转成带 `+09:00` 的 ISO 时间作 `scheduledAt`，`date` / `slot` 由服务端派生 |
+| `availability` | `subscriber_only` 原样传；`public` 可省略 |
+| `duration` | 仅已结束场次有值；取分钟数作 `expectedMinutes`（服务端限制 15–720） |
+| `channel_id` | 对照 `data-sources.json` 校验成员，防止贴错链接 |
+| `live_status` | `is_upcoming` 正常录入；`is_live` / `was_live` 说明已经开播或结束，按「已开始」处理，不要再建未来场 |
+
+兜底：命令非 0 退出、输出为空（bot 检查 / 区域限制 / 链接失效 / 非 YouTube 站点）时，
+直接退回推文预告的标题与时间继续录入，不要为补元信息卡住日程。
+
 ## 步骤 3：写入
 
 设置变量后调用：
@@ -106,6 +143,12 @@ curl -s -u "$AUTH" \
 -d '{"datasetId":"ritsu","title":"歌枠","date":"2026-11-09","slot":"early","kind":"sing"}'
 ```
 
+已经有 yt-dlp 元信息时，一次带全（标题取完整标题，时间用 `+09:00`）：
+
+```bash
+-d '{"datasetId":"ritsu","title":"【#歌枠 】リベンジ！！！！！歌枠【峰月律/ゆめみた】","scheduledAt":"2026-11-09T22:00:00+09:00","kind":"sing","url":"https://www.youtube.com/live/z0GRgSUrY0A","source":"manual"}'
+```
+
 ## 步骤 4：验证
 
 查询同一日期范围，确认行与状态：
@@ -117,7 +160,7 @@ curl -s -u "$AUTH" "$BASE/api/admin/schedule?from=2026-11-08&to=2026-11-09"
 检查：
 
 - `items[].date` 与 `slot` 是否符合预告。
-- `title` 为空是正常的。
+- 有 yt-dlp 元信息时，`title` 应与视频完整标题一致，`timeTentative=false`；只有推文兜底时才允许 `title` 为空。
 - `matchedStream` 非空表示已关联到真实场次。
 - `state` 为 `upcoming` / `live` / `done` / `cancelled` / `pending`。
 
