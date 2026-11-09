@@ -10,7 +10,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { agendaDayLabel, groupEventsByDate } from "@/lib/calendar";
+import {
+  addDays,
+  currentJstDay,
+  groupEventsByDate,
+  monthDayLabel,
+  weekdayLabel,
+} from "@/lib/calendar";
 import type { CalendarEvent } from "@/types/calendar";
 
 interface AgendaListProps {
@@ -25,7 +31,7 @@ interface AgendaListProps {
 }
 
 /**
- * 窄屏默认视图：按 JST 自然日分组，日期头吸附在顶栏下方。
+ * 窄屏默认视图：按 JST 自然日分组，整月共用一张卡片，日期头只做分组。
  * 月网格在手机上只剩日期和圆点，议程列表承担真正可读的那一层。
  */
 export function AgendaList({
@@ -42,6 +48,8 @@ export function AgendaList({
     () => [...byDate.keys()].filter(date => date.startsWith(month)).sort(),
     [byDate, month],
   );
+  const today = currentJstDay(now);
+  const tomorrow = addDays(today, 1);
 
   if (dates.length === 0) {
     return (
@@ -77,18 +85,28 @@ export function AgendaList({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="overflow-hidden rounded-xl border border-hairline bg-card">
       {dates.map(date => {
         const dayEvents = byDate.get(date) ?? [];
+        const relative = date === today ? "今天" : date === tomorrow ? "明天" : null;
+        const dateLabel = `${monthDayLabel(date)} · ${weekdayLabel(date)}`;
 
         return (
-          <section
-            className="overflow-hidden rounded-xl border border-hairline bg-card"
-            key={date}
-          >
-            <h2 className="flex items-baseline gap-2 border-b border-hairline px-3 py-2">
-              <span className="text-footnote font-medium text-foreground">
-                {agendaDayLabel(date, now)}
+          <section className="border-t border-hairline first:border-t-0" key={date}>
+            <h2 className="flex items-baseline gap-2 bg-muted/30 px-3 py-2">
+              {relative ? (
+                <span className="text-footnote font-semibold text-foreground">{relative}</span>
+              ) : null}
+              <span
+                className={relative ? "text-ink-3" : "font-medium text-foreground"}
+                style={{
+                  fontSize: relative ? "var(--text-caption)" : "var(--text-footnote)",
+                  lineHeight: relative
+                    ? "var(--text-caption--line-height)"
+                    : "var(--text-footnote--line-height)",
+                }}
+              >
+                {dateLabel}
               </span>
               <span className="ms-auto text-caption tabular-nums text-ink-3">
                 {dayEvents.length} 场

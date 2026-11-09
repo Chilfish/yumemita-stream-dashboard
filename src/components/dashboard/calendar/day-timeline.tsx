@@ -1,5 +1,6 @@
 import { ArrowRight, Lock } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ContentTypeIcon } from "@/components/dashboard/calendar/content-type-icon";
 import { ShareButton } from "@/components/dashboard/calendar/share-button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,7 +24,7 @@ function StateBadge({ state }: { state: CalendarEventState }) {
   if (state === "pending") return <Badge size="sm" variant="warning">待补录</Badge>;
   if (state === "upcoming") return <Badge size="sm" variant="outline">预定</Badge>;
   if (state === "cancelled") return <Badge size="sm" variant="secondary">已取消</Badge>;
-  return <Badge size="sm" variant="secondary">已结束</Badge>;
+  return null;
 }
 
 function eventMeta(event: CalendarEvent): string | null {
@@ -39,11 +40,11 @@ function TimelineRow({ event }: { event: CalendarEvent }) {
   const meta = eventMeta(event);
   const content = (
     <>
-      <span className="w-12 shrink-0 pt-0.5 text-right text-caption tabular-nums text-ink-3">
+      <span className="w-10 shrink-0 pt-0.5 text-right text-caption tabular-nums text-ink-3">
         {eventTimeLabel(event)}
       </span>
 
-      <span className="relative flex w-3 shrink-0 justify-center">
+      <span className="relative hidden w-3 shrink-0 justify-center sm:flex">
         <span aria-hidden="true" className="absolute top-0 bottom-0 w-px bg-hairline" />
         <span
           aria-hidden="true"
@@ -52,28 +53,35 @@ function TimelineRow({ event }: { event: CalendarEvent }) {
         />
       </span>
 
-      <span className="min-w-0 flex-1 pb-4">
-        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="shrink-0 text-caption font-medium text-muted-foreground">
+      <span className="min-w-0 flex-1 pb-3">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate text-caption font-medium text-muted-foreground">
             {event.memberLabel}
           </span>
-          <span className="min-w-0 text-footnote font-medium wrap-anywhere text-foreground">
-            {eventTitle(event)}
-          </span>
           {event.kind ? (
-            <Badge size="sm" variant="outline">{CONTENT_TYPE_LABELS[event.kind]}</Badge>
-          ) : null}
-          <StateBadge state={event.state} />
-        </span>
-        <span className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-caption text-muted-foreground">
-          {meta ? <span className="tabular-nums">{meta}</span> : null}
-          {event.memberOnly ? (
             <>
-              <Lock aria-hidden="true" className="size-3" />
-              <span>会员限定</span>
+              <ContentTypeIcon className="size-3.5 text-ink-3" kind={event.kind} />
+              <span className="shrink-0 text-caption text-ink-3">
+                {CONTENT_TYPE_LABELS[event.kind]}
+              </span>
             </>
           ) : null}
+          {event.memberOnly ? (
+            <>
+              <Lock aria-hidden="true" className="size-3 shrink-0 text-ink-3" />
+              <span className="sr-only">会员限定</span>
+            </>
+          ) : null}
+          <span className="ms-auto shrink-0">
+            <StateBadge state={event.state} />
+          </span>
         </span>
+        <span className="mt-0.5 block text-footnote font-medium leading-snug wrap-anywhere text-foreground">
+          {eventTitle(event)}
+        </span>
+        {meta ? (
+          <span className="mt-0.5 block text-caption tabular-nums text-ink-3">{meta}</span>
+        ) : null}
       </span>
     </>
   );
@@ -117,7 +125,7 @@ function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
   return (
     <section className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0">
       <h3 className="flex items-baseline gap-2">
-        <span className="text-footnote font-medium text-foreground">
+        <span className="text-footnote font-semibold text-foreground">
           {day.offset === 0 ? "今天" : "明天"}
         </span>
         <span className="text-caption text-ink-3">
@@ -129,7 +137,7 @@ function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
       </h3>
 
       {events.length === 0
-        ? <p className="ps-15 text-caption text-muted-foreground">没有排播。</p>
+        ? <p className="ps-12 text-caption text-muted-foreground">没有排播。</p>
         : (
             <ol className="flex flex-col">
               {events.map(event => (

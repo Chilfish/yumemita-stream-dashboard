@@ -35,7 +35,7 @@ import type {
 } from "@/types/calendar";
 
 const CHIP_CLASS =
-  "gap-1.5 rounded-full px-2.5 text-footnote text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background";
+  "gap-1.5 rounded-full px-2.5 text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background";
 
 interface CalendarViewProps {
   data: CalendarPageData;
@@ -165,9 +165,8 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
           { label: "今天与明天", value: formatInteger(nearTermCount) },
         ]}
         title="日历"
-      >
-        按 JST 自然日 · 未来场次开播后自动收录
-      </PageHeader>
+        titleClassName="text-headline lg:text-display"
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
@@ -264,6 +263,10 @@ function MemberFilter({
             aria-label={`成员：${member.label}`}
             className={CHIP_CLASS}
             key={member.id}
+            style={{
+              fontSize: "var(--text-footnote)",
+              lineHeight: "var(--text-footnote--line-height)",
+            }}
             value={member.id}
           >
             <MemberDot color={member.color ?? "var(--member-color)"} />
