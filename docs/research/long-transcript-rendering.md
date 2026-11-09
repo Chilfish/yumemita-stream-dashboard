@@ -3,6 +3,8 @@
 > 现象：3,000–4,000 行的逐字稿（Markdown 约 250 KB）渲染后页面高 11.7 万 px（390px 视口下 17 万 px），滚动卡顿，固定栏与吸顶栏一起闪烁。
 > 调研与实测日期：2026-11-09。外部资料与「本仓库实测」分开写，实测只代表本机 Chromium。
 
+> 业界（Notion、GitHub、Google Docs、Wikipedia 等）如何应对同类问题的横向调研见 [long-document-rendering-practices.md](./long-document-rendering-practices.md)；本文只记录本站这一页的取舍。
+
 ## 一、先分清两件事
 
 | 症状 | 根因类别 | 本机数据 |

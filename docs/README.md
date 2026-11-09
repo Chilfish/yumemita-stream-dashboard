@@ -91,7 +91,7 @@ docs/
 | 架构级变更 | [architecture.md](./planning/architecture.md) | 分层、数据流、路由与关键决策 |
 | 规划下一阶段 | [backlog.md](./planning/backlog.md) | 未决任务、优先级、前置条件 |
 | 改逐字稿索引 / 长列表 | [code-map.md](./engineering/code-map.md) + [transcript-index.md](./archive/transcript-index.md) | 先看代码入口，设计背景见 archive |
-| 长逐字稿卡顿 / 附录中日字幕 | [long-transcript-rendering.md](./research/long-transcript-rendering.md) | 默认中文只挂载译文；常驻栏去模糊与 `content-visibility` 取舍 |
+| 长逐字稿卡顿 / 附录中日字幕 | [long-transcript-rendering.md](./research/long-transcript-rendering.md) + [long-document-rendering-practices.md](./research/long-document-rendering-practices.md) | 本站取舍；业界 SSR / 虚拟化 / Canvas / 折叠对照 |
 | 追溯迁移决策 / 数据模型 | [astro-ssr-migration.md](./archive/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 已完成的迁移方案、数据模型、`.md` 路由、缓存与发布 |
 | 继续做直播日历 | [live-calendar.md](./planning/live-calendar.md) + [backlog.md](./planning/backlog.md) | 剩余首页 / 场次页入口与 ICS |
 | 优化数据库读路径 | [performance.md](./engineering/performance.md) + [db-optimization.md](./archive/db-optimization.md) | 当前结论与历史压测 |
