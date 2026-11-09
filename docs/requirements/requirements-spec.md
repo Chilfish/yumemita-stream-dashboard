@@ -67,6 +67,7 @@
 | `FR-TREND-001` | P1 | 趋势页提供月度与类型分析 | `AC-TREND-001`：`/:datasetId/trends` 展示月度趋势、月度明细、内容类型对比、典型节奏曲线、全期榜单（手工） | ✅ | README / roadmap |
 | `FR-GALLERY-001` | P1 | 成员相册按 JST 自然月分组 | `AC-GALLERY-001`：`/:datasetId/gallery` 按月份分组，图片懒加载，`?order=` 可分享；390 / 320px 无横向滚动（手工） | ✅ | archive/product-direction |
 | `FR-GALLERY-002` | P1 | 全组相册支持跨成员筛选 | `AC-GALLERY-002`：`/gallery` 展示全部成员封面，`?member=` / `?type=` 写进 URL（手工） | ✅ | archive/product-direction |
+| `FR-GALLERY-003` | P2 | 那年今日：回看往期同一天 | `AC-GALLERY-003`：`/gallery?day=MM-DD` 列出全员往期同月日的场次，按年份分组；只收今天之前的场次；日期选择器与「那年今日」chip 可写回 URL；组首页显示当日预览并链到该筛选；非法月日回落为全部（单测 + 手工） | ✅ | 2026-11-09 需求 |
 | `FR-COMPARE-001` | P1 | 同一成员内最多 4 场对比 | `AC-COMPARE-001`：`?ids=a,b,c` 可分享；逐分钟曲线叠加；指标横表；超过 4 场有明确限制（手工） | ✅ | README |
 | `FR-COMPARE-002` | P2 | 跨成员对比 | `AC-COMPARE-002`：组级 `/compare` 按同一月份区间与内容类型横向对比；`?members=` / `?type=` / `?months=` 可分享；样本不足时标注（手工） | ✅ | roadmap |
 | `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签（手工） | ✅ | archive/product-direction |
@@ -126,3 +127,4 @@
 | 2026-11-04 | 直播日历读取路径、月历 / 议程、自动同步与缓存落地；`FR-CAL-003` 手工维护按用户要求暂缓，`FR-CAL-009` ICS 未做 | v1.3 |
 | 2026-11-07 | 新增管理端 `FR-CAL-010`、今日计划 `FR-CAL-011`、读取时关联 `FR-CAL-012`；`FR-CAL-003` 改为 `/admin/schedule` 与 `/api/admin/schedule` | v1.4 |
 | 2026-11-07 | 新增「信息密度」非功能约束；组首页删除重复指标、口径脚注与自证式导航 | v1.5 |
+| 2026-11-09 | 新增 `FR-GALLERY-003` 那年今日：`/gallery?day=MM-DD` 按年回看往期同一天，组首页提供预览 | v1.6 |

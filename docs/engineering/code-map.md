@@ -22,6 +22,7 @@
 | 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-danmaku.ts`、`fetch-live-chat.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts` | 手写 Markdown，发布到 R2 |
 | 逐字稿索引 / 长列表 | `src/lib/transcript-params.ts`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/components/dashboard/transcript/transcripts-toolbar.tsx`、`docs/archive/transcript-index.md` | 搜索、标签分面、月份折叠；筛选写 URL |
+| 那年今日 / 同一天回看 | `src/lib/gallery-params.ts`、`src/db/queries/group.ts`、`src/components/pages/group-gallery-page.tsx`、`src/components/dashboard/group/group-on-this-day.tsx` | `?day=MM-DD` 按年分组；首页预览只收今天之前；日期选择器写回 URL |
 | 数据字段 / 口径 | `docs/data/data-model.md`、`src/types/` | 改字段同步文档与类型 |
 | 会员限定公开范围 | `src/lib/visibility.ts`、`src/lib/member-access.ts`、`src/db/queries/shared.ts` | 元数据（封面 / 标题 / 时间）公开；派生指标清零，单场复用详情模板 |
 | 未来日程 / 管理端 | `src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/lib/schedule.ts`、`src/lib/admin-auth.ts`、`.agents/skills/schedule-maintenance/SKILL.md` | 手工日程、类型与鉴权；接口见 [schedule-admin.md](./schedule-admin.md) |
