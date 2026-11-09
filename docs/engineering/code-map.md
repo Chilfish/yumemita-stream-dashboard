@@ -18,7 +18,7 @@
 | SEO | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | 请求期输出 head / sitemap |
 | Agent 视图 | `src/lib/agent-markdown.ts`、`src/pages/[datasetId]/stream/[videoId].md.ts` | `text/markdown` + 逐字稿 |
 | 数据发布 | `scripts/publish-data.ts`、`scripts/publish-transcripts.ts` | `--assets-only`：thumbs / emoji / archive；逐字稿单独发 |
-| 每日增量 | `scripts/daily-update.ts`、`.github/workflows/data.yml` | 频道差集，安静日不发布 |
+| 增量更新 | `scripts/daily-update.ts`、`.github/workflows/data.yml` | 频道差集，安静日不发布 |
 | 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-danmaku.ts`、`fetch-live-chat.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts` | 手写 Markdown，发布到 R2 |
 | 逐字稿索引 / 长列表 | `src/lib/transcript-params.ts`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/components/dashboard/transcript/transcripts-toolbar.tsx`、`docs/archive/transcript-index.md` | 搜索、标签分面、月份折叠；筛选写 URL |

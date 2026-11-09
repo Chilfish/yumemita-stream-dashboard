@@ -116,7 +116,7 @@ Content-Type: application/json
 
 ## 每日数据流程
 
-`.github/workflows/data.yml` 每天 05:17 UTC（14:17 JST）运行；GitHub 的 `schedule` 可能延迟数小时。
+`.github/workflows/data.yml` 只支持手动 `workflow_dispatch`。原来的每日 05:17 UTC（14:17 JST）cron 已于 2026-11-09 取消；需要定时改用外部调度器触发 `workflow_dispatch`。
 
 ```text
 checkout → Bun / Node / Deno / yt-dlp / PO token / mihomo

@@ -97,7 +97,7 @@ yt-dlp --flat-playlist --print "%(id)s" `
 
 ## 更新流程
 
-日常更新用 `bun scripts/daily-update.ts`（仓库里的定时工作流也调用它）：先和数据库 `streams` 表
+日常更新用 `bun scripts/daily-update.ts`（`.github/workflows/data.yml` 手动触发时也调用它）：先和数据库 `streams` 表
 求差集，只处理有新场次或缺 VSTATS / 弹幕的成员，再固定顺序 ingest → 资产 → purge。没有变化时不会恢复 datapack，
 也不会重新上传。
 
@@ -107,8 +107,8 @@ bun scripts/daily-update.ts --force         # 额外重抓最近 24 小时
 bun scripts/daily-update.ts --dry-run       # 只列候选
 ```
 
-定时任务在 `.github/workflows/data.yml`，按 14:17 JST 的 cron 跑（GitHub 调度延迟常见几小时）；配置与 cookie 导出见
-[deployment.md](../engineering/deployment.md) 的「定时增量更新」。
+数据更新工作流在 `.github/workflows/data.yml`，只支持手动 `workflow_dispatch`（每日 cron 已于 2026-11-09 取消）；配置与 cookie 导出见
+[deployment.md](../engineering/deployment.md) 的「每日数据流程」。
 
 下面的 `fetch-streams` 是底层命令，用于首次建档、强制返工或需要手动控制批次的场景：
 

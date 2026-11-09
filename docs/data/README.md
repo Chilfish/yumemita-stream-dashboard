@@ -13,7 +13,7 @@
 
 相关文档：
 
-- [engineering/deployment.md](../engineering/deployment.md)：R2 发布、缓存、定时任务
+- [engineering/deployment.md](../engineering/deployment.md)：R2 发布、缓存、数据更新工作流
 - [engineering/troubleshooting.md](../engineering/troubleshooting.md)：数据异常与口径排查
 - [scripts/README.md](../../scripts/README.md)：抓取、封面、表情、逐字稿脚本
 - [content/transcripts/README.md](../../content/transcripts/README.md)：逐字稿字段与命令

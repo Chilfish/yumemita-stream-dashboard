@@ -1,13 +1,8 @@
 name: Data update
 
-# 每天 05:17 UTC（14:17 JST）补一次增量：这个时间点前一天的直播基本都结束，
-# 回放 / 弹幕 / VSTATS 也已经开放；避开整点可以减少 GitHub 调度延迟。
+# 只手动触发。原来的每日 cron（05:17 UTC / 14:17 JST）已于 2026-11-09 取消：
+# GitHub 的 schedule 实测会晚 5–6 小时，需要定时请用外部调度器打 workflow_dispatch。
 on:
-  schedule:
-    # GitHub 的 schedule 只是「理想时间」：高负载会排队，实测晚了 5–6 小时。
-    # 2026-10-31 的 05:17Z 那次 10:55Z 才真正开始，11-01 的 05:17Z 这次是 11:50Z，
-    # 对应北京时间 19 点左右。想要卡准 14:17 JST 得靠外部调度器打 workflow_dispatch。
-    - cron: '17 5 * * *'
   workflow_dispatch:
     inputs:
       force:
@@ -25,7 +20,7 @@ permissions:
   actions: read
   checks: read
 
-# 定时与手动可能撞车；不取消正在跑的那次，排队即可。
+# 重复触发不取消正在跑的那次，排队即可。
 concurrency:
   group: data-update
   cancel-in-progress: false
@@ -251,7 +246,7 @@ jobs:
           tail -n 100 /tmp/mihomo/core.log || true
           docker logs bgutil-provider 2>&1 | tail -n 100 || true
 
-      # cron 健康通知：失败时开 issue，避免静默断更。
+      # 失败通知：手动运行失败也开 issue，避免静默断更。
       # annotation 没有环境变量，只能按本次运行的 check run 反查；写进正文省得每次翻日志。
       - name: Notify on failure
         if: failure()
@@ -278,7 +273,7 @@ jobs:
             annotations="- （本次没有 failure / warning annotation，失败步骤的日志请看运行页面）"
           fi
           {
-            echo "定时数据更新失败：${RUN_URL}"
+            echo "数据更新失败：${RUN_URL}"
             echo
             echo "## Annotations"
             printf '%s\n' "$annotations"

@@ -282,7 +282,7 @@ T+1d   日历读取时命中 streams → done，链到单场页
 - 触发：`push` 命中 `content/schedule/**`、`workflow_dispatch`。
 - 步骤：安装 Bun → `bun install --frozen-lockfile` → `bun run schedule:check` → `bun run schedule:sync` → 调 purge 端点（`schedule`）。
 - 不安装 yt-dlp、不跑抓取，几十秒内完成。
-- 每日 `data.yml` 里在 `daily-update` 前也跑一次 `schedule:sync`，处理自动同步失败或手工文件漏同步的情况。
+- 日程同步已并入 `daily-update.ts`，随 `data.yml` 手动触发执行；需要定时由外部调度器打 `workflow_dispatch`（cron 已于 2026-11-09 取消）。
 - 失败开 issue 的规则沿用 `data.yml`。
 
 ## 7. UI 设计
