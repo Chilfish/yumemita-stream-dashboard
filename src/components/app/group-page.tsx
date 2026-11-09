@@ -79,7 +79,7 @@ function GroupShell({ datasets, data, compare, calendar, dayPlan, section, pathn
           streamCount={streamCount}
         />
 
-        <div className="mx-auto w-full max-w-[82.5rem] px-4 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
+        <div className="mx-auto w-full max-w-[82.5rem] px-2 pt-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
           <div className="motion-view" key={section}>
             {section === 'compare' && compare
               ? <GroupComparePage data={compare} datasets={datasets} />
