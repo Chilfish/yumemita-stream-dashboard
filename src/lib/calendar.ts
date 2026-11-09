@@ -18,12 +18,8 @@ import type {
 
 const JST = "Asia/Tokyo";
 const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
-const DEFAULT_EXPECTED_MINUTES = 180;
-const LIVE_GRACE_MINUTES = 120;
-const LIVE_MAX_HOURS = 12;
-// 频道检查结果与预计窗口共用同一个上限，避免同一事件在两个入口得出不同状态。
-const LIVE_CHECK_HOURS = 12;
+// 结束时间不可预测，开播后最多保留 1 小时「直播中」，之后交给「待补录」等场次入库。
+const LIVE_WINDOW_MINUTES = 60;
 const PRE_START_MINUTES = 15;
 
 const dateKeyFormat = new Intl.DateTimeFormat("en-CA", {
@@ -236,35 +232,30 @@ export function upcomingEvents(
     .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
 }
 
-/** 直播判定：频道检查结果与预计窗口共用同一套常量，供派生状态和「接下来」列表复用。 */
+/**
+ * 直播判定：开播前 15 分钟到开播后 1 小时。
+ * 结束时间不可预测，不再按预计时长推算；超过窗口后显示「待补录」，直到场次入库。
+ */
 export function isLive(
-  event: Pick<CalendarEvent, "at" | "expectedMinutes" | "lastLiveAt">,
+  event: Pick<CalendarEvent, "at" | "lastLiveAt">,
   now: Date,
 ): boolean {
   const nowMs = now.getTime();
-  const lastLive = event.lastLiveAt ? Date.parse(event.lastLiveAt) : Number.NaN;
-  if (Number.isFinite(lastLive) && nowMs - lastLive <= LIVE_CHECK_HOURS * HOUR_MS) {
-    return true;
+  const windowMs = LIVE_WINDOW_MINUTES * 60_000;
+
+  if (event.at) {
+    const start = Date.parse(event.at);
+    if (!Number.isFinite(start)) return false;
+    return nowMs >= start - PRE_START_MINUTES * 60_000 && nowMs <= start + windowMs;
   }
 
-  if (!event.at) return false;
-  const start = Date.parse(event.at);
-  if (!Number.isFinite(start)) return false;
-
-  const expectedMinutes = Math.min(
-    Math.max(event.expectedMinutes ?? DEFAULT_EXPECTED_MINUTES, 15),
-    LIVE_MAX_HOURS * 60,
-  );
-  const windowEnd = Math.min(
-    start + (expectedMinutes + LIVE_GRACE_MINUTES) * 60_000,
-    start + LIVE_MAX_HOURS * HOUR_MS,
-  );
-
-  return nowMs >= start - PRE_START_MINUTES * 60_000 && nowMs <= windowEnd;
+  // 没有精确开播时间时，以频道检查时刻为起点，同样最多保留 1 小时。
+  const lastLive = event.lastLiveAt ? Date.parse(event.lastLiveAt) : Number.NaN;
+  return Number.isFinite(lastLive) && nowMs >= lastLive && nowMs - lastLive <= windowMs;
 }
 
 export function deriveCalendarEventState(
-  event: Pick<CalendarEvent, "cancelled" | "hasStream" | "at" | "expectedMinutes" | "lastLiveAt">,
+  event: Pick<CalendarEvent, "cancelled" | "hasStream" | "at" | "lastLiveAt">,
   now: Date,
 ): CalendarEventState {
   // 已入库的场次是事实，优先于日程上的取消标记：取消后仍然播出的场次应显示为已结束。

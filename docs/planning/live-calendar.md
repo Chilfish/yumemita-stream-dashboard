@@ -149,13 +149,13 @@ export const scheduledStreams = pgTable(
 | `title` | 标题；管理端可省略，空字符串表示「待定」；自动来源取频道列表 |
 | `url` | YouTube 链接，可空 |
 | `scheduled_at` | 预定开播时刻，可空；为空时进「日期待定」 |
-| `expected_minutes` | 预计时长，用于计算「直播中」窗口 |
+| `expected_minutes` | 预计时长；仅作管理端记录，不参与状态派生 |
 | `cancelled_at` | 取消标记；非空即已取消 |
 | `availability` | `public` / `subscriber_only`，与 `streams` 同口径 |
 | `source` | `youtube` / `manual` |
 | `note` | 备注，例如联动、延期 |
 | `last_seen_at` | 最近一次在频道列表里看到的时刻，用于清理自动行 |
-| `last_live_at` | 最近一次频道检查报告 `is_live` 的时刻，用于派生直播中 |
+| `last_live_at` | 最近一次频道检查报告 `is_live` 的时刻；没有精确开播时间时作为 1 小时直播窗口的起点 |
 
 索引与约束：
 
@@ -170,13 +170,13 @@ export const scheduledStreams = pgTable(
 
 | 顺序 | 条件 | 状态 | 说明 |
 | --- | --- | --- | --- |
-| 1 | `cancelled_at` 非空 | `cancelled` | 取消优先于一切 |
-| 2 | 存在同 `(dataset_id, video_id)` 的 `streams` 行 | `done` | 已入库，链到单场页 |
-| 3 | `last_live_at` 在 24 小时内 | `live` | 频道检查报告过 `is_live`；见 6.3 |
-| 4 | `scheduled_at` 为空 | `undated` | 日期待定，不进月网格 |
-| 5 | `now` 在 `[scheduled_at - 15 分钟, scheduled_at + 窗口]` 内 | `live` | 窗口 = `expected_minutes` 或 180 分钟，加 120 分钟宽限，上限 12 小时 |
+| 1 | 存在同 `(dataset_id, video_id)` 的 `streams` 行 | `done` | 已入库，链到单场页；优先于取消标记 |
+| 2 | `cancelled_at` 非空 | `cancelled` | 已取消 |
+| 3 | `now` 在 `[scheduled_at - 15 分钟, scheduled_at + 1 小时]` 内 | `live` | 结束时间不可预测，开播后最多保留 1 小时 |
+| 4 | `scheduled_at` 为空且 `last_live_at` 在 1 小时内 | `live` | 没有精确时间时退回频道检查时刻；见 6.3 |
+| 5 | `scheduled_at` 为空 | `undated` | 日期待定，不进月网格 |
 | 6 | `now < scheduled_at` | `upcoming` | 预定 |
-| 7 | 其余 | `pending` | 已过预定时间但没有入库，显示「待补录」 |
+| 7 | 其余 | `pending` | 已过开播时间但没有入库，显示「待补录」 |
 
 ```ts
 export type CalendarEventState =
@@ -314,7 +314,7 @@ await syncScheduleFromChannel(db, datasetId, entries);
 ```text
 T-7d   手工或自动写入 scheduled_streams
 T-0    scheduled_at 到达，页面派生 live
-T+2h   预计结束；若仍未入库，派生 pending（待补录）
+T+1h   直播窗口结束；若仍未入库，派生 pending（待补录）
 T+1d   daily-update 抓到回放 → ingest → streams
 T+1d   日历读取时命中 streams → done，链到单场页
 ```
@@ -655,8 +655,9 @@ chip 标题     text-footnote text-foreground
 | `calendar.test.ts` | 同 `video_id` 同时存在日程与场次 → `done` | 把 `hasStream` 判断去掉 |
 | | `cancelled_at` 非空且已入库 → `cancelled` | 把取消判断放到 `done` 之后 |
 | | `scheduled_at` 为空 → `undated` | 让空时间落进 `upcoming` |
-| | 预计 120 分钟，`now = scheduled + 100 分钟` → `live` | 把窗口算成 0 |
-| | 过窗口且未入库 → `pending` | 返回 `done` |
+| | `now = scheduled + 40 分钟` → `live` | 把窗口算成 0 |
+| | `now = scheduled + 61 分钟` 且未入库 → `pending` | 把窗口算成预计时长 |
+| | 有 `scheduled_at` 时不再用 `last_live_at` 延长直播中 | 让频道检查覆盖开播窗口 |
 | | 23:59 JST 的事件归到当天，不是 UTC 次日 | 用 `toISOString().slice(0,10)` 分组 |
 | | 月网格从周日开始，补齐前后整周 | 从周一开始 |
 | | 一天 5 场 → 5 条全部渲染 | 截断成 2 条或加回 `+N` 折叠 |
@@ -696,7 +697,7 @@ chip 标题     text-footnote text-foreground
 | 两个「日历」命名冲突 | 用户混淆 | 旧热力图改名「开播热力图」；侧栏只保留一个「日历」 |
 | 手工文件与自动行重复 | 同场出现两条 | 有 `videoId` 时统一 `event_key = yt:*`，部分唯一索引兜底 |
 | 自动行残留 | 频道删档后仍显示 | `--prune` 清理过期且未入库的自动行 |
-| 状态边界（跨午夜、超长直播） | 显示错误 | 单测覆盖 23:59 JST 与 12 小时上限 |
+| 状态边界（跨午夜、开播窗口） | 显示错误 | 单测覆盖 23:59 JST 与 1 小时窗口 |
 | 会员限定范围 | 误公开指标 | 日历只读元数据；指标字段不进入 DTO |
 | `VIEWS` 插入位置 | 数字快捷键错位 | 只追加在末尾 |
 | 缓存残留 | 改完日程 60 秒后才可见 | 文档写明；purge 走 `schedule` tag |

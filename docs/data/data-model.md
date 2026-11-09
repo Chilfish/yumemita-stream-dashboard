@@ -432,12 +432,12 @@ bun run fetch:live-chat --video <videoId>                       # 已结束时�
 | `kind` | text \| null | `sing` / `event` / `talk` / `game`；空值时按标题推断 |
 | `thumbnail_key` | text \| null | 预留列，当前不写入、不展示；正式封面仍从 `streams.thumbnail_key` 读取 |
 | `scheduled_at` | timestamptz \| null | 精确开播时间；只有时段时为空 |
-| `expected_minutes` | integer \| null | 预计时长 |
+| `expected_minutes` | integer \| null | 预计时长；仅作管理端记录，不参与状态派生 |
 | `cancelled_at` | timestamptz \| null | 非空表示已取消 |
 | `availability` | text \| null | `public` / `subscriber_only` |
 | `source` | text | `youtube`（频道自动同步）/ `manual`（管理端） |
 | `note` | text \| null | 备注 |
-| `last_seen_at` / `last_live_at` | timestamptz \| null | 频道检查时间，用于派生直播中 |
+| `last_seen_at` / `last_live_at` | timestamptz \| null | 频道检查时间；`last_live_at` 仅在缺少精确开播时间时作为 1 小时直播窗口的起点 |
 | `created_at` / `updated_at` | timestamptz | 审计时间 |
 
 索引：

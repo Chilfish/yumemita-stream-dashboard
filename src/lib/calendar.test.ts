@@ -87,13 +87,22 @@ describe("deriveCalendarEventState", () => {
     expect(deriveCalendarEventState(input({ hasStream: true }), now)).toBe("done");
   });
 
-  it("频道检查到 is_live 时是直播中", () => {
+  it("没有精确开播时间时，频道检查 1 小时内是直播中", () => {
     expect(
       deriveCalendarEventState(
-        input({ lastLiveAt: new Date(now.getTime() - 60 * 60_000).toISOString() }),
+        input({ at: null, lastLiveAt: new Date(now.getTime() - 30 * 60_000).toISOString() }),
         now,
       ),
     ).toBe("live");
+  });
+
+  it("没有精确开播时间时，频道检查超过 1 小时是日期待定", () => {
+    expect(
+      deriveCalendarEventState(
+        input({ at: null, lastLiveAt: new Date(now.getTime() - 2 * 60 * 60_000).toISOString() }),
+        now,
+      ),
+    ).toBe("undated");
   });
 
   it("没有时间也没有直播标记时是日期待定", () => {
@@ -104,8 +113,18 @@ describe("deriveCalendarEventState", () => {
     expect(deriveCalendarEventState(input(), new Date("2026-11-08T18:00:00+09:00"))).toBe("upcoming");
   });
 
-  it("预计窗口内是直播中", () => {
-    expect(deriveCalendarEventState(input(), new Date("2026-11-08T21:40:00+09:00"))).toBe("live");
+  it("开播前 15 分钟内是直播中", () => {
+    expect(deriveCalendarEventState(input(), new Date("2026-11-08T19:50:00+09:00"))).toBe("live");
+  });
+
+  it("开播后 1 小时内是直播中", () => {
+    expect(deriveCalendarEventState(input(), new Date("2026-11-08T20:40:00+09:00"))).toBe("live");
+  });
+
+  it("开播 1 小时后仍未入库是待补录，不再按预计时长延长", () => {
+    expect(
+      deriveCalendarEventState(input({ expectedMinutes: 180 }), new Date("2026-11-08T21:01:00+09:00")),
+    ).toBe("pending");
   });
 
   it("超过预计窗口仍未入库是待补录", () => {
