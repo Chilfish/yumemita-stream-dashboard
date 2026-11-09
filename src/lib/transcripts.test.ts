@@ -6,6 +6,7 @@ import {
   groupTranscriptsByMonth,
   matchesTranscriptQuery,
   parseFrontmatter,
+  parseSubtitleAppendix,
   parseTranscriptFile,
   rewriteTimecodes,
   slugifyHeading,
@@ -384,5 +385,75 @@ describe("index search helpers", () => {
   it("uses compact month labels for navigation", () => {
     expect(transcriptMonthShortLabel("2026-10")).toBe("2026.10");
     expect(transcriptMonthShortLabel("")).toBe("未标注");
+  });
+});
+
+const APPENDIX_SAMPLE = `## 正文
+
+[00:00:12] 前情。
+
+## 附录：中日对照字幕（整理版）
+
+> 时间为视频内偏移。
+
+### ① 开场（00:02:44–00:06:40）
+
+**（a）00:02:46 おでましだぞ**
+
+> のののの……。みんな大好き、ののちゃんのおでましだぞ〜。
+
+大家最喜欢的、ののちゃん登场啦～。
+
+**（b）00:03:03 コメント欄**
+
+> 何も見てないですね、皆さん。
+
+大家好像什么都没看呢。
+
+### ② 照片
+
+**（c）没有时间码的标签**
+
+> テキスト。
+
+文本。
+`;
+
+describe("parseSubtitleAppendix", () => {
+  it("parses sections, cues and both languages", () => {
+    const appendix = parseSubtitleAppendix(APPENDIX_SAMPLE);
+    expect(appendix).not.toBeNull();
+    expect(appendix?.startLine).toBe(9);
+    expect(appendix?.sections).toHaveLength(2);
+    expect(appendix?.sections[0]?.heading).toBe("① 开场（00:02:44–00:06:40）");
+    expect(appendix?.sections[0]?.cues[0]).toEqual({
+      marker: "a",
+      time: "00:02:46",
+      title: "おでましだぞ",
+      japanese: "のののの……。みんな大好き、ののちゃんのおでましだぞ〜。",
+      chinese: "大家最喜欢的、ののちゃん登场啦～。",
+    });
+    expect(appendix?.sections[0]?.cues[1]?.chinese).toBe("大家好像什么都没看呢。");
+    expect(appendix?.sections[1]?.cues[0]).toMatchObject({
+      marker: "c",
+      time: null,
+      title: "没有时间码的标签",
+    });
+  });
+
+  it("returns null when there is no appendix", () => {
+    expect(parseSubtitleAppendix("## 正文\n\n没有附录。")).toBeNull();
+  });
+
+  it("returns null when the appendix has no fixed-format cues", () => {
+    const text = "## 附录：字幕\n\n### ① 小节\n\n普通段落，没有标签与引用。\n";
+    expect(parseSubtitleAppendix(text)).toBeNull();
+  });
+
+  it("stops at the next level-two heading", () => {
+    const text = `${APPENDIX_SAMPLE}\n## 之后\n\n### 不是附录\n\n**（z）00:00:00 标题**\n\n> 原文\n\n译文\n`;
+    const appendix = parseSubtitleAppendix(text);
+    expect(appendix?.sections).toHaveLength(2);
+    expect(appendix?.sections.some(section => section.heading === "不是附录")).toBe(false);
   });
 });

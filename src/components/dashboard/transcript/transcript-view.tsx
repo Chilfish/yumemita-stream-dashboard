@@ -1,15 +1,22 @@
 import { ExternalLink, ListTree, RotateCcw, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { Link } from "@/lib/router-compat";
 import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  SubtitleModeControl,
+  TranscriptAppendixView,
+} from "@/components/dashboard/transcript/transcript-appendix";
 import { useTranscript } from "@/hooks/use-transcript";
+import { readSubtitleMode, rememberSubtitleMode } from "@/lib/preferences";
 import { transcriptsPath } from "@/lib/routes";
 import {
+  parseSubtitleAppendix,
+  type SubtitleMode,
   type TranscriptFile,
   type TranscriptHeading,
   rewriteTimecodes,
@@ -21,6 +28,8 @@ import { cn } from "@/lib/utils";
 const YOUTUBE_TIME_LINK = /^https:\/\/www\.youtube\.com\/watch\?v=[^&]+&t=\d+s$/;
 
 const EMPTY_TOC: TranscriptHeading[] = [];
+
+const REMARK_PLUGINS = [remarkGfm];
 
 const BODY_CLASS =
   "mx-auto w-full max-w-[80ch] text-[0.9375rem] leading-[1.75] text-foreground wrap-anywhere md:leading-[1.8]";
@@ -92,10 +101,8 @@ function idForHeading(node: MarkdownNode | undefined, idsByLine: Map<number, str
   return typeof line === "number" ? idsByLine.get(line) : undefined;
 }
 
-function useMarkdownComponents(idsByLine: Map<number, string>): Components {
-  return useMemo(
-    () =>
-      ({
+function createMarkdownComponents(idsByLine: Map<number, string>): Components {
+  return ({
         h1: ({ node, children }: HeadingProps) => (
           <h2
             className="mt-8 mb-3 scroll-mt-20 text-title text-foreground first:mt-0"
@@ -129,7 +136,7 @@ function useMarkdownComponents(idsByLine: Map<number, string>): Components {
         h6: ({ children }: HeadingProps) => (
           <h6 className="mt-4 mb-1 text-body font-semibold text-foreground">{children}</h6>
         ),
-        p: ({ children }: TextProps) => <p className="my-3">{children}</p>,
+        p: ({ children }: TextProps) => <p className="">{children}</p>,
         strong: ({ children }: TextProps) => (
           <strong className="font-semibold text-foreground">{children}</strong>
         ),
@@ -214,9 +221,7 @@ function useMarkdownComponents(idsByLine: Map<number, string>): Components {
             type="checkbox"
           />
         ),
-      }) as unknown as Components,
-    [idsByLine],
-  );
+  }) as unknown as Components;
 }
 
 function TranscriptSkeleton() {
@@ -295,15 +300,22 @@ function TranscriptError({
   );
 }
 
-function TranscriptHeader({ file }: { file: TranscriptFile }) {
+function TranscriptHeader({
+  file,
+  subtitleControl,
+}: {
+  file: TranscriptFile;
+  subtitleControl?: ReactNode;
+}) {
   const { summary } = file.frontmatter;
   return (
-    <header className="flex flex-col gap-2 border-b border-hairline pb-4">
+    <header className="flex flex-col gap-3 border-b border-hairline pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       {summary ? (
         <p className="text-body text-muted-foreground">
           {stripInlineMarkdown(summary)}
         </p>
       ) : null}
+      {subtitleControl}
     </header>
   );
 }
@@ -317,16 +329,41 @@ export interface TranscriptViewProps {
 export function TranscriptView({ datasetId, videoId, className }: TranscriptViewProps) {
   const { file, status, error, retry } = useTranscript(datasetId, videoId);
 
+  const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>(readSubtitleMode);
+
   const toc = file?.toc ?? EMPTY_TOC;
+  const appendix = useMemo(
+    () => (file ? parseSubtitleAppendix(file.markdown) : null),
+    [file],
+  );
   const idsByLine = useMemo(
     () => new Map<number, string>((file?.toc ?? EMPTY_TOC).map(item => [item.line, item.id])),
     [file],
   );
-  const components = useMarkdownComponents(idsByLine);
+  const components = useMemo(() => createMarkdownComponents(idsByLine), [idsByLine]);
   const markdown = useMemo(
     () => (file ? rewriteTimecodes(file.markdown, videoId) : ""),
     [file, videoId],
   );
+  // 附录按固定格式单独渲染：只挂载当前语言，日文默认不进入 DOM。
+  const bodyMarkdown = useMemo(
+    () =>
+      appendix
+        ? markdown.split("\n").slice(0, appendix.startLine - 1).join("\n").trimEnd()
+        : markdown,
+    [appendix, markdown],
+  );
+  const appendixIds = useMemo(() => {
+    if (!file || !appendix) return [];
+    return file.toc
+      .filter(item => item.depth === 3 && item.line >= appendix.startLine)
+      .map(item => item.id);
+  }, [appendix, file]);
+
+  function changeSubtitleMode(next: SubtitleMode): void {
+    setSubtitleMode(next);
+    rememberSubtitleMode(next);
+  }
 
   if (status === "idle" || status === "loading") return <TranscriptSkeleton />;
   if (status === "empty") return <TranscriptEmpty datasetId={datasetId} videoId={videoId} />;
@@ -338,7 +375,14 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
 
   return (
     <div className={cn("flex flex-col gap-5", className)}>
-      <TranscriptHeader file={file} />
+      <TranscriptHeader
+        file={file}
+        subtitleControl={
+          appendix ? (
+            <SubtitleModeControl mode={subtitleMode} onChange={changeSubtitleMode} />
+          ) : null
+        }
+      />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_13.5rem] xl:gap-10">
         <div className="min-w-0">
@@ -352,9 +396,16 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
           ) : null}
 
           <article className={BODY_CLASS}>
-            <Markdown components={components} remarkPlugins={[remarkGfm]}>
-              {markdown}
+            <Markdown components={components} remarkPlugins={REMARK_PLUGINS}>
+              {bodyMarkdown}
             </Markdown>
+            {appendix ? (
+              <TranscriptAppendixView
+                appendix={appendix}
+                ids={appendixIds}
+                mode={subtitleMode}
+              />
+            ) : null}
           </article>
 
           <footer className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hairline pt-3 text-caption text-ink-3">
@@ -388,4 +439,3 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
     </div>
   );
 }
-

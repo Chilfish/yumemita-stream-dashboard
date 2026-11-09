@@ -271,6 +271,154 @@ export function extractToc(markdown: string): TranscriptHeading[] {
 }
 
 // ---------------------------------------------------------------------------
+// 中日对照附录
+// ---------------------------------------------------------------------------
+
+/**
+ * 附录字幕的固定格式（作者手写约定）：
+ *
+ * ```md
+ * ## 附录：中日对照字幕
+ *
+ * ### ① 小节标题（00:00:00–00:00:00）
+ *
+ * **（a）00:02:46 小标题**
+ *
+ * > 日语原文
+ *
+ * 中文译文
+ * ```
+ *
+ * 只在这种结构成立时启用语言筛选；其它写法按普通 Markdown 渲染。
+ */
+export const SUBTITLE_MODES = ["bilingual", "zh", "jp"] as const;
+
+export type SubtitleMode = (typeof SUBTITLE_MODES)[number];
+
+export function isSubtitleMode(value: unknown): value is SubtitleMode {
+  return typeof value === "string" && (SUBTITLE_MODES as readonly string[]).includes(value);
+}
+
+export interface SubtitleCue {
+  /** 标签里的序号，如 `a`。 */
+  marker: string;
+  /** 视频内偏移，如 `00:02:46`；标签里没有时间时为 null。 */
+  time: string | null;
+  title: string;
+  japanese: string;
+  chinese: string;
+}
+
+export interface SubtitleSection {
+  /** 原始标题文本，用于和 `extractToc` 的结果对齐锚点。 */
+  heading: string;
+  cues: SubtitleCue[];
+}
+
+export interface SubtitleAppendix {
+  /** 附录第一个 `###` 的行号（1 起）；此前的内容仍按普通 Markdown 渲染。 */
+  startLine: number;
+  sections: SubtitleSection[];
+}
+
+const APPENDIX_HEADING = /^##[ \t]+附录/;
+const SECTION_HEADING = /^###[ \t]+(.+?)[ \t]*$/;
+const CUE_LABEL = /^\*\*[（(]([^）)]+)[）)][ \t]*(.*?)\*\*[ \t]*$/;
+const CUE_TIME = /^(\d{1,2}:\d{2}(?::\d{2})?)[ \t]*(.*)$/;
+
+function parseCueLabel(rest: string): Pick<SubtitleCue, "time" | "title"> {
+  const match = CUE_TIME.exec(rest);
+  if (!match) return { time: null, title: rest };
+  return { time: match[1] ?? null, title: (match[2] ?? "").trim() };
+}
+
+function readCue(
+  lines: string[],
+  labelIndex: number,
+  marker: string,
+): { cue: SubtitleCue; next: number } {
+  let index = labelIndex + 1;
+  const skipBlank = (): void => {
+    while (index < lines.length && (lines[index] ?? "").trim() === "") index += 1;
+  };
+
+  skipBlank();
+  const japanese: string[] = [];
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    if (!/^[ \t]*>/.test(line)) break;
+    japanese.push(line.replace(/^[ \t]*>[ \t]?/, ""));
+    index += 1;
+  }
+
+  skipBlank();
+  const chinese: string[] = [];
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    if (line.trim() === "") break;
+    if (CUE_LABEL.test(line) || SECTION_HEADING.test(line) || /^##[ \t]/.test(line)) break;
+    chinese.push(line);
+    index += 1;
+  }
+
+  return {
+    cue: {
+      marker,
+      ...parseCueLabel((CUE_LABEL.exec(lines[labelIndex] ?? "")?.[2] ?? "").trim()),
+      japanese: japanese.join("\n").trim(),
+      chinese: chinese.join("\n").trim(),
+    },
+    next: index,
+  };
+}
+
+/**
+ * 解析中日对照附录。找不到「附录」二级标题、或没有任何符合固定格式的条目时返回 null，
+ * 调用方继续把整篇当普通 Markdown 渲染。
+ */
+export function parseSubtitleAppendix(markdown: string): SubtitleAppendix | null {
+  const lines = markdown.split("\n");
+  const sections: SubtitleSection[] = [];
+  let startLine = -1;
+  let current: SubtitleSection | null = null;
+  let inAppendix = false;
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    if (!inAppendix) {
+      if (APPENDIX_HEADING.test(line)) inAppendix = true;
+      index += 1;
+      continue;
+    }
+    // 附录之后的下一个二级标题即离开附录。
+    if (/^##[ \t]/.test(line)) break;
+
+    const sectionMatch = SECTION_HEADING.exec(line);
+    if (sectionMatch) {
+      if (startLine < 0) startLine = index + 1;
+      current = { heading: sectionMatch[1] ?? "", cues: [] };
+      sections.push(current);
+      index += 1;
+      continue;
+    }
+
+    const label = CUE_LABEL.exec(line);
+    if (label && current) {
+      const { cue, next } = readCue(lines, index, label[1] ?? "");
+      current.cues.push(cue);
+      index = next;
+      continue;
+    }
+    index += 1;
+  }
+
+  const populated = sections.filter(section => section.cues.length > 0);
+  if (startLine < 0 || populated.length === 0) return null;
+  return { startLine, sections: populated };
+}
+
+// ---------------------------------------------------------------------------
 // 仅归档的段落
 // ---------------------------------------------------------------------------
 
