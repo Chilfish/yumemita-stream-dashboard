@@ -422,8 +422,9 @@ async function main(): Promise<void> {
         })
         if (schedule.changed) {
           purgeTags.add(CACHE_TAGS.schedule)
+          const normalized = schedule.normalized > 0 ? `，归一重复 ${schedule.normalized}` : ''
           const pruned = schedule.pruned > 0 ? `，清理过期 ${schedule.pruned}` : ''
-          console.log(`[update] ${source.id} 日程：预定 ${schedule.upserted}，直播中 ${schedule.live}${pruned}`)
+          console.log(`[update] ${source.id} 日程：预定 ${schedule.upserted}，直播中 ${schedule.live}${normalized}${pruned}`)
         }
       }
       catch (error) {

@@ -9,8 +9,14 @@
 import { and, eq, inArray, lt, sql } from 'drizzle-orm'
 import type { Db } from '../../src/db/connection.ts'
 import { scheduledStreams } from '../../src/db/schema.ts'
-import { jstDateKeyFrom, slotForJstTime } from '../../src/lib/schedule.ts'
+import {
+  jstDateKeyFrom,
+  scheduleNaturalKey,
+  slotForJstTime,
+  videoIdFromUrl,
+} from '../../src/lib/schedule.ts'
 import type { ChannelEntry } from './update-plan.ts'
+import { normalizeScheduleKeys } from './schedule-match.ts'
 
 export interface PlannedScheduleEntry {
   videoId: string
@@ -58,13 +64,16 @@ export function planScheduleEntries(
     }
 
     const scheduledAt = parseScheduledAt(entry.scheduledAt)
+    const date = jstDateKeyFrom(scheduledAt)
+    const slot = slotForJstTime(scheduledAt)
     upcoming.push({
       videoId: entry.id,
-      eventKey: `yt:${entry.id}`,
+      // 日期 + 时段已知时统一用自然键；时间未知才退回 yt。
+      eventKey: scheduleNaturalKey(date, slot) ?? `yt:${entry.id}`,
       title: entry.title?.trim() || '未命名直播',
       url: `https://www.youtube.com/watch?v=${entry.id}`,
-      date: jstDateKeyFrom(scheduledAt),
-      slot: slotForJstTime(scheduledAt),
+      date,
+      slot,
       scheduledAt,
       expectedMinutes: entry.durationSec
         ? Math.max(1, Math.round(entry.durationSec / 60))
@@ -78,6 +87,7 @@ export function planScheduleEntries(
 export interface ScheduleSyncResult {
   upserted: number
   live: number
+  normalized: number
   pruned: number
   changed: boolean
 }
@@ -111,21 +121,92 @@ export async function pruneStaleSchedules(
   return deleted.length
 }
 
-export async function syncScheduleFromChannel(
+interface ExistingScheduleRow {
+  eventKey: string
+  videoId: string | null
+  url: string | null
+}
+
+/**
+ * 逐条写入未来场。已有行就地更新，主键保持稳定：
+ * 手工自然键行不会被自动同步接管成 `yt:`，`yt:` 行拿到日期后再统一归一。
+ */
+async function upsertScheduleEntries(
   db: Db,
   datasetId: string,
-  entries: ChannelEntry[],
-  options: { now?: Date; knownIds?: Set<string> } = {},
-): Promise<ScheduleSyncResult> {
-  const now = options.now ?? new Date()
-  const plan = planScheduleEntries(entries, { knownIds: options.knownIds })
+  entries: PlannedScheduleEntry[],
+  now: Date,
+): Promise<void> {
+  if (entries.length === 0) return
 
-  if (plan.upcoming.length > 0) {
+  const rows = await db
+    .select({
+      eventKey: scheduledStreams.eventKey,
+      videoId: scheduledStreams.videoId,
+      url: scheduledStreams.url,
+    })
+    .from(scheduledStreams)
+    .where(eq(scheduledStreams.datasetId, datasetId))
+
+  const byKey = new Map<string, ExistingScheduleRow>(rows.map(row => [row.eventKey, row]))
+  const byVideo = new Map<string, ExistingScheduleRow>(
+    rows.filter(row => row.videoId).map(row => [row.videoId as string, row]),
+  )
+  const byUrlId = new Map<string, ExistingScheduleRow>()
+  for (const row of rows) {
+    if (row.videoId) continue
+    const videoId = videoIdFromUrl(row.url)
+    if (videoId) byUrlId.set(videoId, row)
+  }
+
+  for (const entry of entries) {
+    const target = byKey.get(entry.eventKey)
+      ?? byVideo.get(entry.videoId)
+      ?? byUrlId.get(entry.videoId)
+
+    if (target) {
+      // 同一个视频已经挂在另一行时先删掉，避免 `(dataset_id, video_id)` 唯一索引冲突。
+      const duplicate = byVideo.get(entry.videoId)
+      if (duplicate && duplicate.eventKey !== target.eventKey) {
+        await db.delete(scheduledStreams).where(and(
+          eq(scheduledStreams.datasetId, datasetId),
+          eq(scheduledStreams.eventKey, duplicate.eventKey),
+        ))
+        byVideo.delete(entry.videoId)
+        byKey.delete(duplicate.eventKey)
+      }
+
+      await db
+        .update(scheduledStreams)
+        .set({
+          videoId: entry.videoId,
+          title: entry.title,
+          url: entry.url,
+          lastSeenAt: now,
+          updatedAt: now,
+          // 频道暂时没给时刻时保留旧值，不把已有排期擦掉。
+          scheduledAt: sql`coalesce(${entry.scheduledAt}, ${scheduledStreams.scheduledAt})`,
+          date: sql`coalesce(${entry.date}, ${scheduledStreams.date})`,
+          slot: sql`coalesce(${entry.slot}, ${scheduledStreams.slot})`,
+          expectedMinutes: sql`coalesce(${entry.expectedMinutes}, ${scheduledStreams.expectedMinutes})`,
+        })
+        .where(and(
+          eq(scheduledStreams.datasetId, datasetId),
+          eq(scheduledStreams.eventKey, target.eventKey),
+        ))
+      continue
+    }
+
+    // 同一时段已被另一条视频占用时退回 yt，避免覆盖别人的自然键。
+    let eventKey = entry.eventKey
+    const occupant = byKey.get(eventKey)
+    if (occupant && occupant.videoId !== entry.videoId) eventKey = `yt:${entry.videoId}`
+
     await db
       .insert(scheduledStreams)
-      .values(plan.upcoming.map(entry => ({
+      .values({
         datasetId,
-        eventKey: entry.eventKey,
+        eventKey,
         videoId: entry.videoId,
         title: entry.title,
         url: entry.url,
@@ -136,25 +217,38 @@ export async function syncScheduleFromChannel(
         source: 'youtube',
         lastSeenAt: now,
         updatedAt: now,
-      })))
+      })
       .onConflictDoUpdate({
         target: [scheduledStreams.datasetId, scheduledStreams.eventKey],
         set: {
           videoId: sql`excluded.video_id`,
           title: sql`excluded.title`,
           url: sql`excluded.url`,
-          source: sql`excluded.source`,
           lastSeenAt: sql`excluded.last_seen_at`,
           updatedAt: sql`excluded.updated_at`,
-          // 频道暂时没给时刻时保留旧值，不把已有排期擦掉。
           scheduledAt: sql`coalesce(excluded.scheduled_at, ${scheduledStreams.scheduledAt})`,
-          // 同样不覆盖已有的日期与时段：手工补过的信息优先保留。
           date: sql`coalesce(excluded.date, ${scheduledStreams.date})`,
           slot: sql`coalesce(excluded.slot, ${scheduledStreams.slot})`,
           expectedMinutes: sql`coalesce(excluded.expected_minutes, ${scheduledStreams.expectedMinutes})`,
         },
       })
+
+    // 同一轮里后续条目要能看到刚写入的键，避免同一时段互相覆盖。
+    byKey.set(eventKey, { eventKey, videoId: entry.videoId, url: entry.url })
+    byVideo.set(entry.videoId, { eventKey, videoId: entry.videoId, url: entry.url })
   }
+}
+
+export async function syncScheduleFromChannel(
+  db: Db,
+  datasetId: string,
+  entries: ChannelEntry[],
+  options: { now?: Date; knownIds?: Set<string> } = {},
+): Promise<ScheduleSyncResult> {
+  const now = options.now ?? new Date()
+  const plan = planScheduleEntries(entries, { knownIds: options.knownIds })
+
+  await upsertScheduleEntries(db, datasetId, plan.upcoming, now)
 
   if (plan.live.length > 0) {
     await db
@@ -166,12 +260,15 @@ export async function syncScheduleFromChannel(
       ))
   }
 
+  // 频道列表可能先拿到 videoId，手工行后补了日期；归一到自然键再清理。
+  const normalized = (await normalizeScheduleKeys(db, datasetId, now)).length
   const pruned = await pruneStaleSchedules(db, datasetId, now)
 
   return {
     upserted: plan.upcoming.length,
     live: plan.live.length,
+    normalized,
     pruned,
-    changed: plan.upcoming.length + plan.live.length + pruned > 0,
+    changed: plan.upcoming.length + plan.live.length + normalized + pruned > 0,
   }
 }

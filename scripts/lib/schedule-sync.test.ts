@@ -21,7 +21,7 @@ describe("planScheduleEntries", () => {
     expect(plan.upcoming).toHaveLength(1);
     expect(plan.upcoming[0]).toMatchObject({
       videoId: "abc12345678",
-      eventKey: "yt:abc12345678",
+      eventKey: "manual:2026-11-08-late",
       title: "雑談",
       url: "https://www.youtube.com/watch?v=abc12345678",
       date: "2026-11-08",
@@ -41,6 +41,7 @@ describe("planScheduleEntries", () => {
     expect(plan.upcoming[0]?.scheduledAt).toBeNull();
     expect(plan.upcoming[0]?.date).toBeNull();
     expect(plan.upcoming[0]?.slot).toBeNull();
+    expect(plan.upcoming[0]?.eventKey).toBe("yt:abc12345678");
     expect(plan.upcoming[0]?.expectedMinutes).toBeNull();
   });
 

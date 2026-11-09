@@ -16,6 +16,7 @@ import {
   isScheduleSlot,
   resolveScheduleTiming,
   slotForJstTime,
+  videoIdFromUrl,
 } from "@/lib/schedule";
 import { isMemberOnly } from "@/lib/visibility";
 import type {
@@ -87,7 +88,6 @@ export function buildScheduleQueries(
       datasetId: scheduledStreams.datasetId,
       eventKey: scheduledStreams.eventKey,
       videoId: scheduledStreams.videoId,
-      supersededBy: scheduledStreams.supersededBy,
       title: scheduledStreams.title,
       url: scheduledStreams.url,
       date: scheduledStreams.date,
@@ -166,8 +166,10 @@ function mapScheduleEvent(row: ScheduleQueryRow, streamKeys: Set<string>): Calen
     slot: isScheduleSlot(row.slot) ? row.slot : null,
     scheduledAt,
   });
-  const hasStream = Boolean(row.supersededBy)
-    || (row.videoId ? streamKeys.has(`${row.datasetId}:${row.videoId}`) : false);
+  const streamVideoId = row.videoId ?? videoIdFromUrl(row.url);
+  const hasStream = streamVideoId
+    ? streamKeys.has(`${row.datasetId}:${streamVideoId}`)
+    : false;
 
   return {
     key: `schedule:${row.datasetId}:${row.eventKey}`,
@@ -188,7 +190,9 @@ function mapScheduleEvent(row: ScheduleQueryRow, streamKeys: Set<string>): Calen
     lastLiveAt: toIso(row.lastLiveAt),
     memberOnly: isMemberOnly(row.availability),
     source: row.source === "youtube" ? "youtube" : "manual",
-    href: hasStream && row.videoId ? streamPath(row.datasetId, row.videoId) : null,
+    href: hasStream && streamVideoId
+      ? streamPath(row.datasetId, streamVideoId)
+      : null,
     url: row.url,
   };
 }

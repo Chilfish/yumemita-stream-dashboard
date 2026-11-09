@@ -64,6 +64,13 @@
       "when": 1794129923712,
       "tag": "0008_clear_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794193993364,
+      "tag": "0009_drop_superseded_by",
+      "breakpoints": true
     }
   ]
 }

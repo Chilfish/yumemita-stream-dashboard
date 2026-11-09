@@ -5,9 +5,11 @@ import {
   isDateKey,
   jstDateKeyFrom,
   nominalStart,
+  resolveEventKey,
   resolveScheduleTiming,
   slotForJstTime,
   validateScheduleInput,
+  videoIdFromUrl,
 } from "./schedule";
 import type { AdminScheduleItem } from "@/types/calendar";
 
@@ -104,7 +106,58 @@ describe("管理端列表分组", () => {
   });
 });
 
+describe("链接解析", () => {
+  it("从常见 YouTube 链接里取 video id", () => {
+    expect(videoIdFromUrl("https://www.youtube.com/watch?v=L_WHcvB4dfQ")).toBe("L_WHcvB4dfQ");
+    expect(videoIdFromUrl("https://youtu.be/L_WHcvB4dfQ?t=30")).toBe("L_WHcvB4dfQ");
+    expect(videoIdFromUrl("https://www.youtube.com/live/L_WHcvB4dfQ")).toBe("L_WHcvB4dfQ");
+    expect(videoIdFromUrl("https://www.youtube.com/shorts/L_WHcvB4dfQ")).toBe("L_WHcvB4dfQ");
+    expect(videoIdFromUrl("https://www.youtube.com/watch?v=L_WHcvB4dfQ&list=PL1")).toBe("L_WHcvB4dfQ");
+    expect(videoIdFromUrl("https://example.com/watch?v=short")).toBeNull();
+    expect(videoIdFromUrl(null)).toBeNull();
+  });
+});
+
 describe("输入校验", () => {
+  it("带链接的手工行仍用日期 + 时段自然键", () => {
+    const result = validateScheduleInput(
+      {
+        datasetId: "miyako",
+        date: "2026-11-11",
+        slot: "late",
+        url: "https://www.youtube.com/watch?v=L_WHcvB4dfQ",
+      },
+      "create",
+    );
+
+    expect(result.ok && result.value.videoId).toBeUndefined();
+    expect(
+      resolveEventKey(result.ok ? result.value : {}, "2026-11-11-late"),
+    ).toBe("manual:2026-11-11-late");
+  });
+
+  it("没有日期时段时才退回 yt 主键", () => {
+    expect(
+      resolveEventKey({ videoId: "L_WHcvB4dfQ" }, null),
+    ).toBe("yt:L_WHcvB4dfQ");
+  });
+
+  it("url 与显式 videoId 冲突时拒绝", () => {
+    const result = validateScheduleInput(
+      {
+        datasetId: "miyako",
+        date: "2026-11-11",
+        slot: "late",
+        videoId: "aaaaaaaaaaa",
+        url: "https://www.youtube.com/watch?v=L_WHcvB4dfQ",
+      },
+      "create",
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.field).toBe("videoId");
+  });
+
   it("接受只给日期+时段", () => {
     const result = validateScheduleInput(
       { datasetId: "nonoka", title: "雑談", date: "2026-11-08", slot: "late" },

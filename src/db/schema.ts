@@ -84,8 +84,8 @@ export const streams = pgTable(
 )
 
 /**
- * 直播日历里的未来场次。与 `streams` 平行：这里只存还没结束的安排，
- * 开播结束后由每日任务照常写入 `streams`，日历读取时按 video_id 关联。
+ * 直播日历里的未来场次。与 `streams` 平行：这里只存还没入库的安排，
+ * 开播结束后由每日任务照常写入 `streams`，并在这里删除对应日程。
  */
 export const scheduledStreams = pgTable(
   'scheduled_streams',
@@ -93,11 +93,9 @@ export const scheduledStreams = pgTable(
     datasetId: text('dataset_id')
       .notNull()
       .references(() => datasets.id, { onDelete: 'cascade' }),
-    /** `yt:<videoId>` 或 `manual:<id>`；有 videoId 时统一用前者。 */
+    /** 已知日期 + 时段时用 `manual:<date>-<slot>`；时间未知时才用 `yt:<videoId>`。 */
     eventKey: text('event_key').notNull(),
     videoId: text('video_id'),
-    /** ingest 已找到对应 `streams` 行时写入 videoId；读取时优先据此判定已结束。 */
-    supersededBy: text('superseded_by'),
     title: text('title').notNull(),
     url: text('url'),
     /** JST 自然日；只知道日期和时段时由管理端写入。 */

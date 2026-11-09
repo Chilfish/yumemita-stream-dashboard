@@ -310,6 +310,60 @@ describe("手工日程匹配真实场次", () => {
     expect(events.some(event => event.source === "manual")).toBe(true);
   });
 
+  it("手工行带链接时按 video id 认领，不靠日期时段", () => {
+    const events = buildCalendarEvents({
+      streams: [stream({ videoId: "L_WHcvB4dfQ" })],
+      schedules: [
+        manual({
+          url: "https://www.youtube.com/watch?v=L_WHcvB4dfQ",
+          at: "2026-11-08T09:00:00+09:00",
+        }),
+      ],
+      members: [member],
+      now,
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.source).toBe("stream");
+  });
+
+  it("同一条未来场的手工行与自动行合并，保留手工行的日期与时段", () => {
+    const events = buildCalendarEvents({
+      streams: [],
+      schedules: [
+        manual({
+          key: "schedule:manual",
+          title: "手工",
+          at: nominalStart("2026-11-11", "late"),
+          date: "2026-11-11",
+          slot: "late",
+          timeTentative: true,
+          url: "https://www.youtube.com/watch?v=L_WHcvB4dfQ",
+        }),
+        input({
+          key: "schedule:yt",
+          title: "自动",
+          videoId: "L_WHcvB4dfQ",
+          at: null,
+          date: null,
+          slot: null,
+          source: "youtube",
+        }),
+      ],
+      members: [member],
+      now,
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      source: "youtube",
+      title: "自动",
+      date: "2026-11-11",
+      slot: "late",
+      at: nominalStart("2026-11-11", "late"),
+    });
+  });
+
   it("手工行与自动同步行同日同时段时只保留自动行", () => {
     const events = buildCalendarEvents({
       streams: [],

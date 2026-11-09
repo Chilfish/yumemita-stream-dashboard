@@ -1,0 +1,1 @@
+ALTER TABLE "scheduled_streams" DROP COLUMN "superseded_by";

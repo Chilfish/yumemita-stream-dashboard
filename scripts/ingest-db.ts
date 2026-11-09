@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { basename, resolve } from 'node:path'
 import process from 'node:process'
 import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
@@ -14,7 +14,6 @@ import {
   datasets,
   ingestReports,
   paidEvents,
-  scheduledStreams,
   streamAuthors,
   streamDetails,
   streams,
@@ -24,7 +23,7 @@ import type { StreamDatapack } from '../src/types/datapack.ts'
 import { buildStreamSummary } from './lib/dataset-manifest.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 import { syncTranscripts } from './lib/transcripts-db.ts'
-import { backfillSupersededSchedules } from './lib/schedule-match.ts'
+import { pruneMatchedSchedules } from './lib/schedule-match.ts'
 
 interface DataSource {
   id: string
@@ -418,9 +417,9 @@ async function main(): Promise<void> {
         console.log(`[ingest] ${source.id}: 逐字稿元数据 ${transcriptCount} 篇`)
       }
 
-      const matchedSchedules = await backfillSupersededSchedules(db, source.id)
-      if (matchedSchedules > 0) {
-        console.log(`[ingest] ${source.id}: 回填日程匹配 ${matchedSchedules} 条`)
+      const prunedSchedules = await pruneMatchedSchedules(db, source.id)
+      if (prunedSchedules.length > 0) {
+        console.log(`[ingest] ${source.id}: 清理已入库日程 ${prunedSchedules.length} 条`)
       }
     }
 
@@ -713,16 +712,6 @@ async function ingestPack(
     for (const part of chunk(wordRows, 1000)) {
       if (part.length) await tx.insert(streamWords).values(part)
     }
-
-    // 精确匹配的日程写入持久标记；读取时不必只依赖请求期的 videoId 集合。
-    await tx
-      .update(scheduledStreams)
-      .set({ supersededBy: video.id, updatedAt: new Date() })
-      .where(and(
-        eq(scheduledStreams.datasetId, source.id),
-        eq(scheduledStreams.videoId, video.id),
-        isNull(scheduledStreams.supersededBy),
-      ))
   })
 }
 

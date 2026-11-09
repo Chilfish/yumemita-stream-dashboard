@@ -38,6 +38,7 @@
     "db:query": "bun scripts/db-query-smoke.ts",
     "db:bench": "bun scripts/bench-db.ts",
     "db:latest": "bun scripts/db-latest-video.ts",
+    "schedule:prune": "bun scripts/prune-schedules.ts",
     "publish:data": "bun scripts/publish-data.ts",
     "publish:assets": "bun scripts/publish-data.ts --assets-only",
     "purge:cache": "bun scripts/purge-cache.ts",

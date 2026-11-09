@@ -1,4 +1,4 @@
-import { jstHour, slotForJstTime } from "@/lib/schedule";
+import { jstHour, slotForJstTime, videoIdFromUrl } from "@/lib/schedule";
 import type {
   CalendarEvent,
   CalendarEventInput,
@@ -297,6 +297,11 @@ function minutesApart(a: CalendarEventInput, b: CalendarEventInput): number | nu
   return Math.abs(left - right) / 60_000;
 }
 
+/** 日程行自身的视频 id：优先显式字段，其次从链接里推。 */
+export function scheduleVideoId(event: Pick<CalendarEventInput, "videoId" | "url">): string | null {
+  return event.videoId ?? videoIdFromUrl(event.url);
+}
+
 /**
  * 把没有 videoId 的手工日程按「成员 + JST 日期 + 时段」匹配到真实事件。
  * 返回 `schedule.key -> 命中的事件`；命中的日程在日历里被隐藏，改显真实场次。
@@ -317,8 +322,10 @@ export function matchSchedulesToStreams(
   }
 
   for (const schedule of orderedSchedules) {
-    if (schedule.cancelled || !schedule.videoId) continue;
-    const stream = streamByVideo.get(`${schedule.datasetId}:${schedule.videoId}`);
+    if (schedule.cancelled) continue;
+    const videoId = scheduleVideoId(schedule);
+    if (!videoId) continue;
+    const stream = streamByVideo.get(`${schedule.datasetId}:${videoId}`);
     if (!stream) continue;
     matches.set(schedule.key, stream);
     used.add(stream.key);
@@ -330,7 +337,8 @@ export function matchSchedulesToStreams(
   ].sort((a, b) => a.key.localeCompare(b.key));
 
   for (const schedule of orderedSchedules) {
-    if (schedule.cancelled || schedule.source !== "manual" || schedule.videoId) continue;
+    // 已知 video id（含链接里带出的）就只认它，不再按时间猜，避免认领到另一场。
+    if (schedule.cancelled || schedule.source !== "manual" || scheduleVideoId(schedule)) continue;
     if (matches.has(schedule.key)) continue;
 
     const anchor = eventAnchor(schedule);
@@ -388,6 +396,50 @@ export interface BuildCalendarInput {
 }
 
 /**
+ * 同一条未来场被手工行与自动行同时记录时合并成一行：
+ * 自动行决定标题与身份，手工行补齐日期、时段等自动同步拿不到的信息。
+ */
+function mergeDuplicateSchedules(schedules: CalendarEventInput[]): CalendarEventInput[] {
+  const ordered = [...schedules].sort(
+    (a, b) => SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source]
+      || a.key.localeCompare(b.key),
+  );
+  const merged: CalendarEventInput[] = [];
+  const index = new Map<string, number>();
+
+  for (const event of ordered) {
+    const videoId = scheduleVideoId(event);
+    if (!videoId) {
+      merged.push({ ...event });
+      continue;
+    }
+    const identity = `${event.datasetId}:${videoId}`;
+    const position = index.get(identity);
+    if (position === undefined) {
+      index.set(identity, merged.length);
+      merged.push({ ...event });
+      continue;
+    }
+    const base = merged[position] as CalendarEventInput;
+    merged[position] = {
+      ...base,
+      at: base.at ?? event.at,
+      date: base.date ?? event.date,
+      slot: base.slot ?? event.slot,
+      timeTentative: base.at ? base.timeTentative : event.timeTentative,
+      kind: base.kind ?? event.kind,
+      hasStream: base.hasStream || event.hasStream,
+      expectedMinutes: base.expectedMinutes ?? event.expectedMinutes,
+      lastLiveAt: base.lastLiveAt ?? event.lastLiveAt,
+      href: base.href ?? event.href,
+      url: base.url ?? event.url,
+    };
+  }
+
+  return merged;
+}
+
+/**
  * 合并已结束场次与未来日程。同一个 video_id 只保留一条：
  * `streams` 优先于自动同步，自动同步优先于手工行。
  * 手工行还会按日期 + 时段匹配真实事件，命中后不再单独显示。
@@ -400,18 +452,12 @@ export function buildCalendarEvents(input: BuildCalendarInput): CalendarEvent[] 
     if (event.videoId) streamKeys.add(`${event.datasetId}:${event.videoId}`);
   }
 
-  const seenSchedules = new Set<string>();
-  const schedules = [...input.schedules]
-    .sort((a, b) => SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source]
-      || a.key.localeCompare(b.key))
-    .filter(event => {
-      if (matches.has(event.key)) return false;
-      if (!event.videoId) return true;
-      const key = `${event.datasetId}:${event.videoId}`;
-      if (streamKeys.has(key) || seenSchedules.has(key)) return false;
-      seenSchedules.add(key);
-      return true;
-    });
+  const schedules = mergeDuplicateSchedules(
+    input.schedules.filter(event => !matches.has(event.key)),
+  ).filter(event => {
+    const videoId = scheduleVideoId(event);
+    return !videoId || !streamKeys.has(`${event.datasetId}:${videoId}`);
+  });
 
   const memberById = new Map(input.members.map(member => [member.id, member]));
 

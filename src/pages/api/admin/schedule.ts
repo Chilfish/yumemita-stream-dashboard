@@ -7,10 +7,12 @@ import { deriveCalendarEventState, addDays, currentJstDay } from "@/lib/calendar
 import { isContentType } from "@/lib/classify";
 import {
   isDateKey,
+  isNaturalEventKey,
   isScheduleSlot,
   resolveEventKey,
   resolveKind,
   resolveScheduleTiming,
+  scheduleNaturalKey,
   validateScheduleInput,
 } from "@/lib/schedule";
 import type { AdminScheduleItem, CalendarEventState } from "@/types/calendar";
@@ -76,7 +78,6 @@ function rowToItem(row: typeof scheduledStreams.$inferSelect): AdminScheduleItem
       cancelled,
       hasStream: false,
       at: timing.at,
-      expectedMinutes: row.expectedMinutes,
       lastLiveAt: iso(row.lastLiveAt),
     },
     new Date(),
@@ -195,13 +196,14 @@ export const POST: APIRoute = async (context) => {
     .onConflictDoUpdate({
       target: [scheduledStreams.datasetId, scheduledStreams.eventKey],
       set: {
-        videoId: sql`excluded.video_id`,
-        title: sql`excluded.title`,
-        url: sql`excluded.url`,
+        // 重新提交同一条日程时，不擦掉自动同步补上的标题、链接与关联视频。
+        videoId: sql`coalesce(excluded.video_id, ${scheduledStreams.videoId})`,
+        title: sql`case when excluded.title = '' then ${scheduledStreams.title} else excluded.title end`,
+        url: sql`coalesce(excluded.url, ${scheduledStreams.url})`,
         date: sql`excluded.date`,
         slot: sql`excluded.slot`,
         scheduledAt: sql`excluded.scheduled_at`,
-        expectedMinutes: sql`excluded.expected_minutes`,
+        expectedMinutes: sql`coalesce(excluded.expected_minutes, ${scheduledStreams.expectedMinutes})`,
         cancelledAt: sql`excluded.cancelled_at`,
         availability: sql`excluded.availability`,
         note: sql`excluded.note`,
@@ -261,7 +263,9 @@ export const PATCH: APIRoute = async (context) => {
   const input = parsed.value;
 
   const timing = resolveScheduleTiming(input);
-  const nextKey = input.videoId ? `yt:${input.videoId}` : eventKey;
+  // 已知日期 + 时段时主键始终是自然键；改期时同步改名，显式 id 行保持原键。
+  const naturalKey = scheduleNaturalKey(timing.date, timing.slot);
+  const nextKey = isNaturalEventKey(eventKey) && naturalKey ? naturalKey : eventKey;
   const now = new Date();
 
   if (nextKey !== eventKey) {

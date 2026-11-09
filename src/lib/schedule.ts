@@ -131,6 +131,21 @@ export function groupSchedulesByDate(
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
+/** 从常见 YouTube 链接里取出 11 位 video id；不是视频链接时返回 null。 */
+export function videoIdFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const patterns = [
+    /[?&]v=([A-Za-z0-9_-]{11})(?:$|[&#/])/,
+    /youtu\.be\/([A-Za-z0-9_-]{11})(?:$|[?&#/])/,
+    /youtube(?:-nocookie)?\.com\/(?:live|shorts|embed)\/([A-Za-z0-9_-]{11})(?:$|[?&#/])/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1] ?? null;
+  }
+  return null;
+}
+
 export function manualEventKey(id: string): string {
   return `manual:${id}`;
 }
@@ -139,8 +154,24 @@ export function youtubeEventKey(videoId: string): string {
   return `yt:${videoId}`;
 }
 
+/**
+ * 已知日期 + 时段时统一用自然键 `manual:<date>-<slot>`；
+ * 只有时间未知时才退回 `yt:<videoId>`。链接不改变主键。
+ */
+export function scheduleNaturalKey(
+  date: string | null | undefined,
+  slot: ScheduleSlot | null | undefined,
+): string | null {
+  return date && slot ? manualEventKey(`${date}-${slot}`) : null;
+}
+
 export function isManualEventKey(eventKey: string): boolean {
   return eventKey.startsWith("manual:");
+}
+
+/** `manual:<YYYY-MM-DD>-<slot>`：由日期 + 时段自然键生成的主键。 */
+export function isNaturalEventKey(eventKey: string): boolean {
+  return /^manual:\d{4}-\d{2}-\d{2}-(early|mid|late)$/.test(eventKey);
 }
 
 export function isYoutubeEventKey(eventKey: string): boolean {
@@ -205,6 +236,11 @@ export function validateScheduleInput(input: unknown, mode: "create" | "patch"):
     return { ok: false, error: "只给日期时还需要 slot（早上/中午/晚上）", field: "slot" };
   }
 
+  const fromUrl = videoIdFromUrl(value.url);
+  if (value.videoId && fromUrl && fromUrl !== value.videoId) {
+    return { ok: false, error: "url 与 videoId 指向不同视频", field: "videoId" };
+  }
+
   return { ok: true, value };
 }
 
@@ -219,15 +255,16 @@ export function resolveKind(
 }
 
 /**
- * 有 videoId 时一律用 `yt:` 主键，避免与自动同步撞上部分唯一索引。
- * 其余情况优先沿用显式 eventKey / id，最后落到自然键。
+ * 主键优先级：显式 `eventKey` / `id` > 日期 + 时段自然键 > `videoId`。
+ * 链接只作为外链与匹配线索，不改变主键；已有 `yt:` 行会在同步时归一到自然键。
  */
 export function resolveEventKey(
   input: Pick<ScheduleWriteInput, "eventKey" | "id" | "videoId">,
   naturalKey?: string | null,
 ): string | null {
-  if (input.videoId) return youtubeEventKey(input.videoId);
   if (input.eventKey) return input.eventKey;
   if (input.id) return manualEventKey(input.id);
-  return naturalKey ? manualEventKey(naturalKey) : null;
+  if (naturalKey) return manualEventKey(naturalKey);
+  if (input.videoId) return youtubeEventKey(input.videoId);
+  return null;
 }
