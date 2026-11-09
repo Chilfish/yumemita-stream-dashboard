@@ -37,10 +37,15 @@ export function ScheduleEditor(props: ScheduleEditorProps) {
   );
 }
 
+interface EditingTarget {
+  datasetId: string;
+  eventKey: string;
+}
+
 function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
   const [items, setItems] = useState(initialItems);
   const [form, setForm] = useState<FormState>(() => emptyForm(datasets, today));
-  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editing, setEditing] = useState<EditingTarget | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminScheduleItem | null>(null);
@@ -51,7 +56,7 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
 
   function resetForm(): void {
     setForm(emptyForm(datasets, today));
-    setEditingKey(null);
+    setEditing(null);
     setError(null);
   }
 
@@ -75,7 +80,7 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
       return;
     }
 
-    setEditingKey(item.eventKey);
+    setEditing({ datasetId: item.datasetId, eventKey: item.eventKey });
     setForm({
       datasetId: item.datasetId,
       title: item.title,
@@ -96,6 +101,10 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
+    if (form.timeMode === "time" && !form.time) {
+      setError("请填写精确时间，或切换到时段模式");
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -113,15 +122,14 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
     if (form.timeMode === "time") payload.scheduledAt = `${form.date}T${form.time}:00+09:00`;
     else payload.slot = form.slot;
 
-    if (editingKey) {
-      const item = items.find(candidate => candidate.eventKey === editingKey);
-      payload.eventKey = editingKey;
-      if (item) payload.datasetId = item.datasetId;
+    if (editing) {
+      payload.datasetId = editing.datasetId;
+      payload.eventKey = editing.eventKey;
     }
 
     try {
       const response = await fetch("/api/admin/schedule", {
-        method: editingKey ? "PATCH" : "POST",
+        method: editing ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -138,7 +146,7 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
 
       toastManager.add({
         type: "success",
-        title: editingKey ? "已更新日程" : "已添加日程",
+        title: editing ? "已更新日程" : "已添加日程",
         description: payload.title as string,
       });
       resetForm();
@@ -172,7 +180,9 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
     }
 
     toastManager.add({ type: "success", title: "已删除日程" });
-    if (editingKey === target.eventKey) resetForm();
+    if (editing?.datasetId === target.datasetId && editing.eventKey === target.eventKey) {
+      resetForm();
+    }
     await refresh();
   }
 
@@ -196,7 +206,7 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
 
       <ScheduleForm
         datasets={datasets}
-        editingKey={editingKey}
+        editingKey={editing?.eventKey ?? null}
         error={error}
         form={form}
         onChange={patchForm}

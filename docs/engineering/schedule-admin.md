@@ -185,6 +185,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 
 ## 5. 幂等与主键
 
+- 一行由 `dataset_id + event_key` 唯一确定；不同成员可以有相同的 `eventKey`（例如同一天同一时段的 `manual:2026-11-08-late`），所以 PATCH / DELETE 必须同时带 `datasetId`，前端也不能只用 `eventKey` 定位行。
 - 显式 `eventKey` / `id` → 按该键写入。
 - 已知日期 + 时段 → `eventKey = manual:<date>-<slot>`；改期时自然键跟着改，显式 `id` 的行保持原键。
 - 只有时间未知、且没有自然键时才用 `yt:<videoId>`。

@@ -1,5 +1,4 @@
 import type { ContentTypeKey } from "@/lib/classify";
-import { jstHour } from "@/lib/schedule";
 import type { ScheduleSlot } from "@/types/calendar";
 
 export interface DatasetOption {
@@ -23,9 +22,11 @@ export interface FormState {
   cancelled: boolean;
 }
 
-const jstMinuteFormat = new Intl.DateTimeFormat("en-GB", {
+const jstTimeFormat = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Tokyo",
+  hour: "2-digit",
   minute: "2-digit",
+  hourCycle: "h23",
 });
 
 export function emptyForm(datasets: DatasetOption[], today: string): FormState {
@@ -48,7 +49,5 @@ export function emptyForm(datasets: DatasetOption[], today: string): FormState {
 /** 把带时区的 ISO 时刻转成 JST 的 `HH:mm`，用于回填表单。 */
 export function jstTime(iso: string | null): string {
   if (!iso) return "20:00";
-  const hour = jstHour(iso) ?? 20;
-  const minute = jstMinuteFormat.format(new Date(iso));
-  return `${String(hour).padStart(2, "0")}:${minute}`;
+  return jstTimeFormat.format(new Date(iso));
 }
