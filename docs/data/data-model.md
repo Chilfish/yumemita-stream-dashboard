@@ -417,14 +417,16 @@ bun run fetch:live-chat --video <videoId>                       # 已结束时�
 
 ## 9. 直播日程（`scheduled_streams`）
 
-未来场次单独存在 `scheduled_streams`，不写 `streams`。日历读取时再与已结束场次合并。
+未来场次单独存在 `scheduled_streams`，不写 `streams`。这张表只保留**还没入库**的安排：
+`ingest` 写入 `streams` 后，会按 `video_id`、链接里的 video id、或「成员 + 日期 + 时段」删除对应日程；
+同一条未来场被手工行与自动行同时记录时合并成一行：保留日期 + 时段的自然键，
+自动行补上 `video_id` / 标题 / 链接。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `dataset_id` | text | 成员 id，外键到 `datasets` |
-| `event_key` | text | `yt:<videoId>` 或 `manual:<slug>`，与 `dataset_id` 组成主键 |
-| `video_id` | text \| null | 已知的 YouTube video id；有值时主键用 `yt:` |
-| `superseded_by` | text \| null | ingest 确认已有对应 `streams` 行时写入的 video id；读取时优先据此判定已结束 |
+| `event_key` | text | 已知日期 + 时段时用 `manual:<date>-<slot>`；时间未知时才用 `yt:<videoId>`。与 `dataset_id` 组成主键 |
+| `video_id` | text \| null | 已知的 YouTube video id；链接里的 id 只用于匹配，不改变主键 |
 | `title` | text | 日程标题；空字符串表示「待定」 |
 | `url` | text \| null | YouTube 链接 |
 | `date` | date \| null | JST 自然日；只知道日期和时段时由管理端写入 |
@@ -447,7 +449,8 @@ bun run fetch:live-chat --video <videoId>                       # 已结束时�
 - `(dataset_id, date)` 与 `(scheduled_at)` 服务日期范围查询。
 
 读取时按「成员 + JST 日期 + 时段」把没有 `video_id` 的手工行匹配到 `streams`；
-命中后不再显示手工行，直接显示真实场次。匹配规则见 [schedule-admin.md](../engineering/schedule-admin.md) 第 3 节。
+命中后不再显示手工行，直接显示真实场次。带链接、`video_id` 或自动同步的行按 video id 精确匹配。
+匹配与清理规则见 [schedule-admin.md](../engineering/schedule-admin.md) 第 3 节。
 
 ## 口径与限制
 

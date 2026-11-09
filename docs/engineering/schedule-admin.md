@@ -37,7 +37,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" https://ymmt.chilfish.top/api/admin/schedu
 
 - 只知道「某天晚上」时，传 `date + slot`，不要编造 `scheduledAt`。
 - 管理端的「精确时间」用 `TimeInput`：可以直接写 `9:30`、`930`、`下午3点`，失焦或按 `Enter` 后规范化为 `HH:mm`，提交时拼成 `scheduledAt`。规则见 [time-input.md](../ui-design/time-input.md)。
-- 管理端只保留 `url` 输入，链接只作为外链展示，不参与 `eventKey` 和真实场次匹配；手工行仍按自然键或显式 `id` 写入。
+- 管理端只保留 `url` 输入；链接只作为外链与匹配线索，不改变主键。已知日期 + 时段时主键固定为 `manual:<date>-<slot>`，`yt:<videoId>` 只用于时间未知的自动同步行。链接与显式 `videoId` 冲突时返回 400。
 - 官方预告常常没有标题，`title` 可以整个省略；返回与列表里的 `title` 为空字符串，页面显示「待定」。
 - 知道精确时间时传 `scheduledAt`，服务端会派生 `date` 与 `slot`。
 - 两者都传时以 `scheduledAt` 为准。
@@ -46,15 +46,24 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" https://ymmt.chilfish.top/api/admin/schedu
 
 管理端只写 `scheduled_streams`，不写 `streams`。
 
-手工日程默认没有 `videoId`。当天直播结束后，每日任务照常把真实场次写入 `streams`；
-日历读取时按下面的规则自动匹配，命中后隐藏手工行，显示真实场次的标题、时长与站内链接：
+这张表只保留还没入库的未来场。每日任务把真实场次写入 `streams` 后，会同步删除对应日程：
 
-1. 同一成员、同一 JST 日期、同一时段；
-2. 同日同时段有多场时，取开播时间最近的一场；
-3. `late` 跨午夜：23:30 与次日 00:30 视为同一晚；
-4. 自动同步的 `youtube` 行优先于手工行；
-5. 已取消的日程不参与匹配；
-6. 匹配不到时保留手工行，状态显示「待补录」。
+1. `videoId` 命中 `streams.video_id`；
+2. 手工行的 `url` 能解析出 video id 且命中 `streams`；
+3. 没有 `videoId` 也没有链接时，按「成员 + JST 日期 + 时段」匹配，规则与读取期一致：
+   - 同一成员、同一 JST 日期、同一时段；
+   - 同日同时段有多场时，取开播时间最近的一场；
+   - `late` 跨午夜：23:30 与次日 00:30 视为同一晚；
+   - 已取消的日程不参与自然键匹配，但 video id / 链接命中时照常删除。
+
+标题不参与匹配：预告阶段的标题经常缺失或只是「ゲーム」「朝活」这类占位词，按标题删容易误伤。
+链接能解析出 video id 时只认链接，不会因为时间相近去认领另一场。
+
+还没入库时，日历读取仍会把手工行按同样规则匹配到临时事件，命中后隐藏手工行；
+自动同步行优先于手工行展示。
+
+同一条未来场被手工行与自动行同时记录时，合并为日期 + 时段的自然键一行：保留手工行的 `date` / `slot` / `scheduledAt` / `expectedMinutes`，
+自动行补上 `videoId`、标题与链接。`yt:` 行后来拿到日期/时段时，会直接改名为 `manual:<date>-<slot>`。
 
 `GET` 返回的 `matchedStream` 可以用来确认某条日程已经关联到哪一场。
 
@@ -141,7 +150,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 | `source` | 否 | 只允许 `manual`（默认）；管理端不会创建自动同步行 |
 | `note` | 否 | ≤500 字 |
 | `url` | 否 | http(s) 链接，只作为外链展示 |
-| `videoId` | 否 | 11 位 YouTube id；传了会合并到 `yt:<videoId>` 自动行 |
+| `videoId` | 否 | 11 位 YouTube id；只记录关联视频，不改变主键 |
 | `id` | 否 | slug，拼成 `manual:<id>` |
 | `eventKey` | 否 | 直接指定已有行的主键 |
 
@@ -161,7 +170,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 ```
 
 - 传 `cancelled: true` 标记取消；传 `false` 恢复。
-- 补 `videoId` 会把主键合并到 `yt:<videoId>`；如果该行已存在，当前手工行会被删除并返回已有行。
+- 补 `videoId` 只更新关联视频，不会把主键改成 `yt:`。
 - 不允许修改 `datasetId`。
 
 ### `DELETE /api/admin/schedule?datasetId=&eventKey=`
@@ -176,11 +185,11 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 
 ## 5. 幂等与主键
 
-- 有 `videoId` → `eventKey = yt:<videoId>`。
-- 没有 `videoId`、但传了 `eventKey` / `id` → 按该键 upsert。
-- 都没传 → 按自然键 `datasetId + date + slot` 找未取消的手工行并更新；找不到才新建 `manual:<date>-<slot>`。
-- 因此同一条预告重复 POST 不会产生多行。
+- 显式 `eventKey` / `id` → 按该键写入。
+- 已知日期 + 时段 → `eventKey = manual:<date>-<slot>`；改期时自然键跟着改，显式 `id` 的行保持原键。
+- 只有时间未知、且没有自然键时才用 `yt:<videoId>`。
 - 同一成员同一天同一时段确实有两场时，显式传 `id`，例如 `id: "2026-11-08-late-2"`。
+- 链接只填 `url`，不参与主键；已有自动同步行会更新同一行，而不是另建一条。
 
 ## 6. 错误
 
@@ -209,8 +218,24 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 
 **只知道日期、时段待定**：至少传 `date`；但日历需要时段才能定位，建议先按时段录入，确定后再 PATCH 补 `scheduledAt`。
 
-**直播前拿到链接**：PATCH 传 `url`，只作为外链展示；要让主键合并到 `yt:<videoId>` 才传 `videoId`。
+**直播前拿到链接**：PATCH 传 `url` 即可，主键保持 `manual:<date>-<slot>`；自动同步会用同一把自然键更新标题与链接。
 
 **取消**：PATCH `{ "cancelled": true }`，不要 DELETE，保留取消记录。
 
 **查某天**：`GET ?from=2026-11-08&to=2026-11-08`。
+
+## 9. 清理与对账
+
+正常情况下 `ingest` 与每日任务会自己清掉已入库的日程、合并重复行。需要手工核对或一次补齐时：
+
+```bash
+bun run schedule:prune                     # dry-run，列出会删除 / 会合并的行
+bun run schedule:prune --apply             # 写库
+bun run schedule:prune --apply --dataset miyako
+LOCAL=0 bun run schedule:prune --apply     # 线上，使用 .dev.vars 的 DATABASE_URL_ONLINE
+```
+
+- 默认 dry-run；输出里 `-` 是删除、`~` 是合并，并注明命中原因（`video_id` / `链接` / `日期+时段`）。
+- 只处理已能在 `streams` 找到对应场次的行；还没入库的「待补录」不会动。
+- 未来场里手工行与自动行重复时，补齐 `date` / `slot` / `scheduledAt` / `expectedMinutes` 后删除手工行。
+- 环境由 `LOCAL` 统一决定：`LOCAL=1` 本机库，`LOCAL=0` 线上库。

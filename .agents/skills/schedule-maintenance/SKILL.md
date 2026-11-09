@@ -16,7 +16,7 @@ metadata:
 - 只知道「某天早上 / 中午 / 晚上」时传 `date + slot`，不要编造精确时间。
 - 重复提交同一 `datasetId + date + slot` 是幂等的；同一天同一时段确实有两场时才显式传 `id`。
 - 所有新建日程都固定用 `"source": "manual"`，这样之后能在 `/admin/schedule` 继续编辑。
-- **本 skill 的请求体永远不要包含 `videoId`**；需要链接时只填 `url`。这样日程与自动同步的 `yt:*` 行保持分离，也不会因为关联视频被每日任务接管成只读行。
+- **本 skill 的请求体永远不要包含 `videoId`**；需要链接时只填 `url`。主键由日期 + 时段决定（`manual:<date>-<slot>`），链接不会改变它；自动同步会更新同一行，而不是另建 `yt:` 行。
 - 不要创建 `source = youtube` 的行，也不要删除自动同步行。
 
 ## 步骤 1：确定目标环境
@@ -147,7 +147,7 @@ curl -s -u "$AUTH" -H "content-type: application/json" \
 
 **恢复**：同一 PATCH 传 `"cancelled": false`。
 
-**补直播链接**：PATCH 只传 `url`。本 skill 不写 `videoId`，避免主键变成 `yt:<videoId>` 后被每日同步接管。
+**补直播链接**：PATCH 只传 `url`；主键保持 `manual:<date>-<slot>`，链接只用于匹配与外链。
 
 **删除手工行**：
 

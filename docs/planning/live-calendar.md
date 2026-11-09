@@ -96,7 +96,7 @@
 | `FR-CAL-010` | P1 | 管理端鉴权 | `AC-CAL-010`：页面与接口未认证返回 401；页面用 Basic 登录后由 HttpOnly Cookie 维持；Agent 可直接带 Basic 头；写操作带 `Origin` 时校验同源 | ✅ |
 | `FR-CAL-011` | P1 | 今日直播计划 | `AC-CAL-011`：组首页与日历页显示今天（JST）全部日程 / 场次；状态每 60 秒重算；空态说明「今天还没有排播」 | ✅ |
 | `FR-CAL-013` | P2 | 日程分享卡片 | `AC-CAL-013`：时间线右上角有低调的分享按钮；用 React + Tailwind 渲染独立卡片并由 modern-screenshot 导出 PNG，使用官方背景、成员头像与类型图标；可下载、复制（手工 + 导出） | ✅ |
-| `FR-CAL-012` | P1 | 手工日程与真实场次关联 | `AC-CAL-012`：读取时按成员 + JST 日期 + 时段匹配；跨午夜晚场归一；同日同时段取时间最近；命中后隐藏手工行并链到单场页；无匹配保持「待补录」 | ✅ |
+| `FR-CAL-012` | P1 | 手工日程与真实场次关联 | `AC-CAL-012`：读取时按成员 + JST 日期 + 时段匹配；跨午夜晚场归一；同日同时段取时间最近；命中后隐藏手工行并链到单场页；无匹配保持「待补录」；入库后由 ingest 删除对应日程 | ✅ |
 | `FR-CAL-004` | P1 | 每日任务自动同步未来场 | `AC-CAL-004`：`daily-update` 读取频道列表后，把 `is_upcoming` 且能确定时间的场次 upsert 为 `source='youtube'`；同一轮重跑幂等；同步后 purge `schedule` tag | 🚧 已接入；未在真实频道跑过 |
 | `FR-CAL-005` | P1 | 月历视图与议程视图 | `AC-CAL-005`：桌面默认月网格，列出当天全部场次，格子随内容长高；移动端默认议程列表；`view` 显式写入时固定；今天、选中日、非本月日期有明确区分 | ✅ |
 | `FR-CAL-006` | P1 | 会员限定日程展示 | `AC-CAL-006`：会限场次显示标题、时间、成员与锁标记；不显示任何派生指标；锁标记有可访问名称；日历页不因 `?key=` 改变缓存策略 | ✅ |
@@ -108,61 +108,15 @@
 
 ### 5.1 新表 `scheduled_streams`
 
-```ts
-// src/db/schema.ts（计划新增）
-export const scheduledStreams = pgTable(
-  "scheduled_streams",
-  {
-    datasetId: text("dataset_id")
-      .notNull()
-      .references(() => datasets.id, { onDelete: "cascade" }),
-    eventKey: text("event_key").notNull(),
-    videoId: text("video_id"),
-    title: text("title").notNull(),
-    url: text("url"),
-    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
-    expectedMinutes: integer("expected_minutes"),
-    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
-    availability: text("availability"),
-    source: text("source").notNull().default("manual"),
-    note: text("note"),
-    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
-    lastLiveAt: timestamp("last_live_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  table => [
-    primaryKey({ columns: [table.datasetId, table.eventKey] }),
-    uniqueIndex("scheduled_streams_video_unique")
-      .on(table.datasetId, table.videoId)
-      .where(sql`${table.videoId} is not null`),
-    index("scheduled_streams_at_idx").on(table.scheduledAt),
-  ],
-);
-```
-
-| 字段 | 说明 |
-| --- | --- |
-| `dataset_id` | 成员，等于一个 dataset |
-| `event_key` | `yt:<videoId>` 或 `manual:<id>`。有 `videoId` 时一律用前者，避免手工行与自动行重复 |
-| `video_id` | 可空；未定或纯手工时为空 |
-| `title` | 标题；管理端可省略，空字符串表示「待定」；自动来源取频道列表 |
-| `url` | YouTube 链接，可空 |
-| `scheduled_at` | 预定开播时刻，可空；为空时进「日期待定」 |
-| `expected_minutes` | 预计时长；仅作管理端记录，不参与状态派生 |
-| `cancelled_at` | 取消标记；非空即已取消 |
-| `availability` | `public` / `subscriber_only`，与 `streams` 同口径 |
-| `source` | `youtube` / `manual` |
-| `note` | 备注，例如联动、延期 |
-| `last_seen_at` | 最近一次在频道列表里看到的时刻，用于清理自动行 |
-| `last_live_at` | 最近一次频道检查报告 `is_live` 的时刻；没有精确开播时间时作为 1 小时直播窗口的起点 |
+这张表只保留**还没入库**的未来场：`ingest` 写入 `streams` 后按 video id / 链接 / 日期+时段删除对应日程
+（迁移 `0009` 已移除旧的 `superseded_by` 标记）。字段以 [data-model.md](../data/data-model.md#9-直播日程scheduled_streams) 为准。
 
 索引与约束：
 
 - 主键 `(dataset_id, event_key)` 是同步脚本的幂等冲突键。
 - `(dataset_id, video_id)` 的部分唯一索引防止手工行与自动行同时挂同一个视频。
 - `scheduled_at` 单列索引服务月份范围查询。
-- 不建 `date` 列。日期由 `scheduled_at` 按 JST 派生，避免两个日期字段漂移。
+- `date` / `slot` 与 `scheduled_at` 并存：前者给只知道早中晚的预告，后者给精确时刻；写入时统一由 `resolveScheduleTiming` 派生。
 
 ### 5.2 状态派生
 
@@ -297,7 +251,7 @@ await syncScheduleFromChannel(db, datasetId, entries);
 ```
 
 - 输入：`entries` 里的 `id / title / durationSec / liveStatus`，以及能拿到的 `release_timestamp`。
-- `is_upcoming` 且有确定时间 → upsert `yt:<videoId>`，`source='youtube'`，`scheduled_at` 取时间。
+- `is_upcoming` 且有确定时间 → upsert `manual:<date>-<slot>` 自然键，`source` 保持已有值（新建为 `youtube`），`scheduled_at` 取时间；时间未知时才用 `yt:<videoId>`。
 - `is_upcoming` 但没有确定时间 → upsert，`scheduled_at = null`，进「日期待定」。
 - `is_live` → 更新 `last_seen_at` 与 `last_live_at = now()`；不新建行（如果之前没有排期，这场会在结束后由 ingest 进 `streams`）。
 - 每次同步更新 `last_seen_at = now()`。
@@ -695,8 +649,8 @@ chip 标题     text-footnote text-foreground
 | `started_at` 可空 | 已结束场次可能没有时刻 | 用 `date` 当天 00:00 JST 兜底，并在页脚说明 |
 | 预取 10 个月的数据量 | 岛屿 props 变大 | 当前规模约 300–800 行；超过 1500 行时改为按月请求 |
 | 两个「日历」命名冲突 | 用户混淆 | 旧热力图改名「开播热力图」；侧栏只保留一个「日历」 |
-| 手工文件与自动行重复 | 同场出现两条 | 有 `videoId` 时统一 `event_key = yt:*`，部分唯一索引兜底 |
-| 自动行残留 | 频道删档后仍显示 | `--prune` 清理过期且未入库的自动行 |
+| 手工文件与自动行重复 | 同场出现两条 | 日期 + 时段已知时统一自然键 `manual:<date>-<slot>`；自动行拿到时间后归一到同一键，重复行合并 |
+| 已入库日程残留 | 表里越积越多旧场次 | `ingest` 按 video id / 链接 / 日期+时段删除；`schedule:prune` 可手工对账 |
 | 状态边界（跨午夜、开播窗口） | 显示错误 | 单测覆盖 23:59 JST 与 1 小时窗口 |
 | 会员限定范围 | 误公开指标 | 日历只读元数据；指标字段不进入 DTO |
 | `VIEWS` 插入位置 | 数字快捷键错位 | 只追加在末尾 |
