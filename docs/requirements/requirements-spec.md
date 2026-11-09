@@ -70,7 +70,7 @@
 | `FR-GALLERY-003` | P2 | 那年今日：回看往期同一天 | `AC-GALLERY-003`：`/gallery?day=MM-DD` 列出全员往期同月日的场次，按年份分组；只收今天之前的场次；日期选择器与「那年今日」chip 可写回 URL；组首页显示当日预览并链到该筛选；非法月日回落为全部（单测 + 手工） | ✅ | 2026-11-09 需求 |
 | `FR-COMPARE-001` | P1 | 同一成员内最多 4 场对比 | `AC-COMPARE-001`：`?ids=a,b,c` 可分享；逐分钟曲线叠加；指标横表；超过 4 场有明确限制（手工） | ✅ | README |
 | `FR-COMPARE-002` | P2 | 跨成员对比 | `AC-COMPARE-002`：组级 `/compare` 按同一月份区间与内容类型横向对比；`?members=` / `?type=` / `?months=` 可分享；样本不足时标注（手工） | ✅ | roadmap |
-| `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签（手工） | ✅ | archive/product-direction |
+| `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签；附录中日对照默认只显示中文，可切双语 / 日文并按条展开，选择记在浏览器本地（手工） | ✅ | archive/product-direction |
 | `FR-TRANSCRIPT-002` | P2 | 逐字稿索引的检索、分面与长列表 | `AC-TRANSCRIPT-002`：搜索匹配标题 / 摘要 / 标签 / 日期 / `videoId`；标签多选同时命中；`q` / `tags` / `sort` / `dense` 写入 URL；标签、排序与密度收进单一筛选入口；月份分组可折叠；移动端筛选面板可用；320px 无横向溢出（手工 + 单测） | ✅ | transcript-index |
 | `FR-DATA-001` | P0 | 由 pack 派生 streams / insights | `AC-DATA-001`：`bun run db:ingest` 重建 `streams` + `dataset_insights`；`db:verify` 0 problems；不手改数据库（手工 / 脚本） | ✅ | data-model |
 | `FR-DATA-002` | P0 | 资产发布到 R2 | `AC-DATA-002`：`publish:assets` 上传顺序为 thumbs → emoji → archive；逐字稿单独发布；对象可达（手工） | ✅ | deployment |
@@ -112,7 +112,7 @@
 | `FR-GALLERY-*` | `src/components/dashboard/gallery/gallery-view.tsx`、`group-gallery-page.tsx` | 相册 |
 | `FR-COMPARE-001` | `src/components/dashboard/compare/compare-view.tsx`、`multi-line-chart.tsx` | 同成员场次对比 |
 | `FR-COMPARE-002` | `src/pages/compare.astro`、`src/components/pages/group-compare-page.tsx`、`src/lib/compare.ts`、`src/db/queries/group-compare.ts` | 组级全员对比 |
-| `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript/transcript-view.tsx`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/db/queries/transcripts.ts`、`src/pages/[datasetId]/transcripts.astro`、`scripts/publish-transcripts.ts` | 逐字稿 |
+| `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript/transcript-view.tsx`、`src/components/dashboard/transcript/transcript-appendix.tsx`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/lib/preferences.ts`、`src/db/queries/transcripts.ts`、`src/pages/[datasetId]/transcripts.astro`、`scripts/publish-transcripts.ts` | 逐字稿与附录语言筛选 |
 | `FR-DATA-*` | `scripts/publish-data.ts`、`scripts/daily-update.ts`、`scripts/lib/` | 数据链路 |
 | `FR-SEO-*` | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | SEO |
 | `FR-AGENT-001` / `FR-ARCH-001` | `src/pages/[datasetId]/stream/[videoId].md.ts`、`src/lib/agent-markdown.ts`、`src/db/queries/` | Agent 视图与数据库查询 |
@@ -128,3 +128,4 @@
 | 2026-11-07 | 新增管理端 `FR-CAL-010`、今日计划 `FR-CAL-011`、读取时关联 `FR-CAL-012`；`FR-CAL-003` 改为 `/admin/schedule` 与 `/api/admin/schedule` | v1.4 |
 | 2026-11-07 | 新增「信息密度」非功能约束；组首页删除重复指标、口径脚注与自证式导航 | v1.5 |
 | 2026-11-09 | 新增 `FR-GALLERY-003` 那年今日：`/gallery?day=MM-DD` 按年回看往期同一天，组首页提供预览 | v1.6 |
+| 2026-11-09 | `FR-TRANSCRIPT-001` 补充附录中日对照的语言开关：默认中文、可切双语 / 日文、逐条展开，偏好存本地 | v1.7 |

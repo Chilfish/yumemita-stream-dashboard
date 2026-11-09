@@ -20,7 +20,7 @@
 | 数据发布 | `scripts/publish-data.ts`、`scripts/publish-transcripts.ts` | `--assets-only`：thumbs / emoji / archive；逐字稿单独发 |
 | 增量更新 | `scripts/daily-update.ts`、`.github/workflows/data.yml` | 频道差集，安静日不发布 |
 | 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-danmaku.ts`、`fetch-live-chat.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
-| 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts` | 手写 Markdown，发布到 R2 |
+| 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts`、`src/components/dashboard/transcript/transcript-view.tsx`、`transcript-appendix.tsx`、`src/lib/preferences.ts` | 手写 Markdown，发布到 R2；附录中日对照按语言挂载，默认中文，偏好存本地 |
 | 逐字稿索引 / 长列表 | `src/lib/transcript-params.ts`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/components/dashboard/transcript/transcripts-toolbar.tsx`、`docs/archive/transcript-index.md` | 搜索、标签分面、月份折叠；筛选写 URL |
 | 那年今日 / 同一天回看 | `src/lib/gallery-params.ts`、`src/db/queries/group.ts`、`src/components/pages/group-gallery-page.tsx`、`src/components/dashboard/group/group-on-this-day.tsx` | `?day=MM-DD` 按年分组；首页预览只收今天之前；日期选择器写回 URL |
 | 数据字段 / 口径 | `docs/data/data-model.md`、`src/types/` | 改字段同步文档与类型 |
