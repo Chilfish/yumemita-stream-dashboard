@@ -15,6 +15,8 @@ import type { GroupStreamSummary } from "@/types/group";
 
 export type { GalleryOrder };
 
+export type GalleryGroupBy = "month" | "year";
+
 /** 相册的一行：精简场次字段自带归属成员，单成员与混合成员共用同一份渲染。 */
 export interface GalleryRow extends GroupStreamSummary {
   memberLabel?: string;
@@ -25,13 +27,17 @@ interface GalleryViewProps {
   rows: GalleryRow[];
   /** 混合成员的相册：每张卡多一条成员标识（原始色点 + 按主题校正的可读色文字）。 */
   showMember?: boolean;
+  /** 分组维度：常规相册按 JST 自然月；「那年今日」按年份。 */
+  groupBy?: GalleryGroupBy;
+  /** 卡片上是否显示 `MM/DD`；按年分组时同一天反复出现，关掉。 */
+  showDate?: boolean;
   /** 额外筛选条（组页的成员 / 类型 chip），渲染在摘要上方。 */
   filters?: ReactNode;
   /** 筛选后为空时替换默认空态，方便给出「清除筛选」。 */
   emptyState?: ReactNode;
 }
 
-interface MonthGroup {
+interface GalleryGroup {
   key: string;
   label: string;
   rows: GalleryRow[];
@@ -85,14 +91,18 @@ function MemberTag({ label, color }: { label: string; color: string }) {
   );
 }
 
-/** `2026-10` → `2026 年 10 月`；缺日期的旧数据单独成组，不静默丢弃。 */
-function monthLabel(key: string): string {
+/** 月份分组：`2026-10` → `2026 年 10 月`；年份分组：`2026` → `2026 年`。 */
+function groupLabel(key: string, groupBy: GalleryGroupBy): string {
   if (key === UNKNOWN_MONTH) return "日期未知";
+  if (groupBy === "year") return `${key} 年`;
   const [year, month] = key.split("-");
   return `${year} 年 ${Number(month)} 月`;
 }
 
-function monthKey(row: GroupStreamSummary): string {
+function groupKey(row: GroupStreamSummary, groupBy: GalleryGroupBy): string {
+  if (groupBy === "year") {
+    return row.date && row.date.length >= 4 ? row.date.slice(0, 4) : UNKNOWN_MONTH;
+  }
   return row.date && row.date.length >= 7 ? row.date.slice(0, 7) : UNKNOWN_MONTH;
 }
 
@@ -109,11 +119,15 @@ function cardMetric(row: GroupStreamSummary): { label: string; value: string } |
   return { label: "弹幕", value: formatInteger(row.chatTotal) };
 }
 
-function buildGroups(rows: GalleryRow[], order: GalleryOrder): MonthGroup[] {
+function buildGroups(
+  rows: GalleryRow[],
+  order: GalleryOrder,
+  groupBy: GalleryGroupBy,
+): GalleryGroup[] {
   const buckets = new Map<string, GalleryRow[]>();
 
   for (const row of rows) {
-    const key = monthKey(row);
+    const key = groupKey(row, groupBy);
     const bucket = buckets.get(key);
     if (bucket) bucket.push(row);
     else buckets.set(key, [row]);
@@ -124,19 +138,19 @@ function buildGroups(rows: GalleryRow[], order: GalleryOrder): MonthGroup[] {
       const sorted = [...bucket].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
       return {
         key,
-        label: monthLabel(key),
+        label: groupLabel(key, groupBy),
         rows: order === "asc" ? sorted : sorted.reverse(),
       };
     })
     .sort((a, b) => (order === "asc" ? a.key.localeCompare(b.key) : b.key.localeCompare(a.key)));
 }
 
-/** 按月份顺序取前 `limit` 行，保留分组本身的场次数用于标题。 */
+/** 按分组顺序取前 `limit` 行，保留分组本身的场次数用于标题。 */
 function takeVisibleGroups(
-  groups: MonthGroup[],
+  groups: GalleryGroup[],
   limit: number,
-): (MonthGroup & { visibleRows: GalleryRow[] })[] {
-  const result: (MonthGroup & { visibleRows: GalleryRow[] })[] = [];
+): (GalleryGroup & { visibleRows: GalleryRow[] })[] {
+  const result: (GalleryGroup & { visibleRows: GalleryRow[] })[] = [];
   let consumed = 0;
   for (const group of groups) {
     const take = Math.max(0, Math.min(group.rows.length, limit - consumed));
@@ -163,15 +177,17 @@ function GalleryEmpty() {
 export function GalleryView({
   rows,
   showMember = false,
+  groupBy = "month",
+  showDate = true,
   filters,
   emptyState,
 }: GalleryViewProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const order = parseGalleryOrder(searchParams.get("order"));
-  const groups = useMemo(() => buildGroups(rows, order), [rows, order]);
+  const groups = useMemo(() => buildGroups(rows, order, groupBy), [rows, order, groupBy]);
 
   // 全组相册有近两千张封面：首屏只铺前 60 张，其余由「显示更多」接管。
-  const viewKey = `${order}|${rows.length}`;
+  const viewKey = `${groupBy}|${order}|${rows.length}`;
   const [page, setPage] = useState({ key: viewKey, limit: INITIAL_VISIBLE_ROWS });
   const limit = page.key === viewKey ? page.limit : INITIAL_VISIBLE_ROWS;
 
@@ -221,7 +237,7 @@ export function GalleryView({
         : (
           <>
             {visibleGroups.map(group => {
-            const headingId = `gallery-month-${group.key}`;
+            const headingId = `gallery-group-${group.key}`;
 
             return (
               <section
@@ -258,7 +274,9 @@ export function GalleryView({
                           />
                           <div className="flex min-w-0 flex-col gap-0.5">
                             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-muted-foreground">
-                              <span className="tabular-nums">{formatDate(row.startedAt)}</span>
+                              {showDate ? (
+                                <span className="tabular-nums">{formatDate(row.startedAt)}</span>
+                              ) : null}
                               {showMember ? (
                                 <MemberTag color={memberColor} label={memberLabel} />
                               ) : null}

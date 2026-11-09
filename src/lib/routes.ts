@@ -52,6 +52,11 @@ export function groupGalleryPath(): string {
   return "/gallery";
 }
 
+/** 那年今日：`MM-DD` 只带月和日，跨年份复用同一个筛选。 */
+export function groupGalleryDayPath(monthDay: string): string {
+  return `${groupGalleryPath()}?day=${encodeURIComponent(monthDay)}`;
+}
+
 export function groupComparePath(): string {
   return "/compare";
 }

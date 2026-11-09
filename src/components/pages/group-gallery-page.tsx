@@ -1,10 +1,13 @@
-import { RotateCcw } from "lucide-react";
-import { useMemo } from "react";
+import { zhCN } from "@daypicker/react/locale/zh-CN";
+import { CalendarDays, RotateCcw } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "@/lib/router-compat";
 import { GalleryView } from "@/components/dashboard/gallery/gallery-view";
 import { useGroupDataContext } from "@/components/dashboard/contexts/group-data-context";
 import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   CONTENT_TYPE_LABELS,
@@ -15,11 +18,13 @@ import { formatInteger } from "@/lib/format";
 import {
   GALLERY_ALL_MEMBERS,
   GALLERY_TYPE_FILTERS,
-  type GalleryParams,
-  type GalleryTypeFilter,
+  galleryDayLabel,
+  matchesGalleryDay,
   parseGalleryParams,
   parseGalleryType,
   writeGalleryParams,
+  type GalleryParams,
+  type GalleryTypeFilter,
 } from "@/lib/gallery-params";
 import { DEFAULT_MEMBER_COLOR } from "@/lib/group";
 
@@ -34,6 +39,21 @@ const TYPE_OPTIONS: { value: (typeof GALLERY_TYPE_FILTERS)[number]; label: strin
     label: value === "all" ? "全部" : CONTENT_TYPE_LABELS[value],
   }));
 
+function padded(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+/** 月日 → 日历控件用的 Date；2/29 固定借闰年，避免平年变成 3/1。 */
+function monthDayToDate(monthDay: string, today: string): Date | undefined {
+  if (!monthDay) return undefined;
+  const year = monthDay === "02-29" ? 2024 : Number(today.slice(0, 4));
+  return new Date(year, Number(monthDay.slice(0, 2)) - 1, Number(monthDay.slice(3)));
+}
+
+function dateToMonthDay(date: Date): string {
+  return `${padded(date.getMonth() + 1)}-${padded(date.getDate())}`;
+}
+
 interface GalleryCounts {
   byMember: Map<string, number>;
   byType: Map<ContentTypeKey, number>;
@@ -42,9 +62,11 @@ interface GalleryCounts {
 }
 
 function countChips(
-  rows: { datasetId: string; title: string }[],
+  rows: { datasetId: string; title: string; date: string }[],
   member: string | null,
   type: GalleryTypeFilter,
+  day: string | null,
+  before: string,
 ): GalleryCounts {
   const byMember = new Map<string, number>();
   const byType = new Map<ContentTypeKey, number>();
@@ -52,6 +74,9 @@ function countChips(
   let typeTotal = 0;
 
   for (const row of rows) {
+    // 日子筛选先生效：成员 / 类型的计数与下方实际看到的场次一致。
+    if (!matchesGalleryDay(row.date, day, before)) continue;
+
     const rowType = classifyTitle(row.title).key;
     // 每个 chip 的计数按「另一维筛选已生效」来算，点下去看到的就是这个数。
     if (type === "all" || rowType === type) {
@@ -67,29 +92,41 @@ function countChips(
   return { byMember, byType, memberTotal, typeTotal };
 }
 
+interface GroupGalleryPageProps {
+  /** JST 今天 `YYYY-MM-DD`；「那年今日」不重复今天的场次。 */
+  today: string;
+  /** JST 今天的 `MM-DD`。 */
+  todayMonthDay: string;
+}
+
 /**
  * 全组相册：所有成员的场次混在一条时间线上，按 JST 自然月分组。
  * 成员 / 内容类型筛选写进 URL（默认值不写），可分享、可回退。
  */
-export function GroupGalleryPage() {
+export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps) {
   const { rows, members, totals } = useGroupDataContext();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
 
   const memberIds = useMemo(() => members.map(member => member.dataset.id), [members]);
   const params = parseGalleryParams(searchParams, memberIds);
-  const { member, type } = params;
+  const { member, type, day } = params;
 
   const visibleRows = useMemo(
     () =>
       rows.filter(
         row =>
+          matchesGalleryDay(row.date, day, today) &&
           (member === null || row.datasetId === member) &&
           (type === "all" || classifyTitle(row.title).key === type),
       ),
-    [rows, member, type],
+    [rows, member, type, day, today],
   );
 
-  const counts = useMemo(() => countChips(rows, member, type), [rows, member, type]);
+  const counts = useMemo(
+    () => countChips(rows, member, type, day, today),
+    [rows, member, type, day, today],
+  );
 
   function updateParams(patch: Partial<GalleryParams>): void {
     // 筛选不进历史记录，默认值也不写进 URL。
@@ -107,14 +144,30 @@ export function GroupGalleryPage() {
     updateParams({ type: parseGalleryType(value) });
   }
 
-  function resetFilters(): void {
-    updateParams({ member: null, type: "all" });
+  function changeDay(next: string[]): void {
+    const [value] = next;
+    // 再点一次已选中的 chip 会得到空数组，按「全部日子」处理。
+    updateParams({ day: value === "today" ? todayMonthDay : null });
   }
 
+  function changePickedDay(next: Date | undefined): void {
+    if (!next) return;
+    // 只取月和日，年份由筛选本身跨年复用。
+    updateParams({ day: dateToMonthDay(next) });
+    setDayPickerOpen(false);
+  }
+
+  function resetFilters(): void {
+    updateParams({ member: null, type: "all", day: null });
+  }
+
+  const dayLabel = day ? galleryDayLabel(day) : null;
+  const selectedDay = monthDayToDate(day ?? "", today);
   const memberLabel =
     members.find(item => item.dataset.id === member)?.dataset.label ?? null;
   const typeLabel = type === "all" ? null : CONTENT_TYPE_LABELS[type];
   const activeLabels = [
+    dayLabel ? `日期「${dayLabel}」` : null,
     memberLabel ? `成员「${memberLabel}」` : null,
     typeLabel ? `类型「${typeLabel}」` : null,
   ].filter((label): label is string => label !== null);
@@ -122,6 +175,56 @@ export function GroupGalleryPage() {
 
   const filters = (
     <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-3">
+        <p className="shrink-0 text-caption text-ink-3">日子</p>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <ToggleGroup
+            aria-label="按日子筛选"
+            className={CHIP_ROW_CLASS}
+            onValueChange={changeDay}
+            size="sm"
+            value={day === null ? ["all"] : day === todayMonthDay ? ["today"] : []}
+          >
+            <ToggleGroupItem
+              aria-label={`全部日子 · ${formatInteger(rows.length)} 场`}
+              className={CHIP_CLASS}
+              value="all"
+            >
+              全部
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              aria-label={`那年今日 · ${galleryDayLabel(todayMonthDay)}`}
+              className={CHIP_CLASS}
+              value="today"
+            >
+              那年今日
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <Popover onOpenChange={setDayPickerOpen} open={dayPickerOpen}>
+            <PopoverTrigger
+              render={(
+                <Button
+                  aria-label={dayLabel ? `回看日期：${dayLabel}` : "选择回看日期"}
+                  size="sm"
+                  variant="outline"
+                >
+                  <CalendarDays aria-hidden="true" />
+                  {dayLabel ?? "选择日期"}
+                </Button>
+              )}
+            />
+            <PopoverPopup align="start">
+              <Calendar
+                locale={zhCN}
+                mode="single"
+                onSelect={changePickedDay}
+                selected={selectedDay}
+              />
+            </PopoverPopup>
+          </Popover>
+        </div>
+      </div>
+
       <div className="flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-3">
         <p className="shrink-0 text-caption text-ink-3">成员</p>
         <ToggleGroup
@@ -216,10 +319,21 @@ export function GroupGalleryPage() {
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <PageHeader
-        eyebrow={`${formatInteger(members.length)} 名成员 · ${formatInteger(totals.streamCount)} 场`}
-        title="全组相册"
+        eyebrow={
+          dayLabel
+            ? dayLabel
+            : `${formatInteger(members.length)} 名成员 · ${formatInteger(totals.streamCount)} 场`
+        }
+        title={dayLabel ? "那年今日" : "全组相册"}
       />
-      <GalleryView emptyState={emptyState} filters={filters} rows={visibleRows} showMember />
+      <GalleryView
+        emptyState={emptyState}
+        filters={filters}
+        groupBy={dayLabel ? "year" : "month"}
+        rows={visibleRows}
+        showDate={!dayLabel}
+        showMember
+      />
     </div>
   );
 }
