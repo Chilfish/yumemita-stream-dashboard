@@ -6,6 +6,7 @@ import { addDays, currentJstDay } from '@/lib/calendar'
 import type { CalendarMember, DayPlan } from '@/types/calendar'
 import type { DatasetIndexEntry, StreamNavItem, StreamSummary } from '@/types/dataset'
 import type { StreamDatapack } from '@/types/datapack'
+import type { GroupStreamSummary } from '@/types/group'
 import {
   buildScheduleQueries,
   buildStreamQueries,
@@ -23,6 +24,7 @@ import {
   assembleGroupSummary,
   buildGroupGalleryQuery,
   buildGroupSummaryQueries,
+  buildOnThisDayQuery,
   mapGroupStreams,
   type GroupSummaryParts,
 } from './group'
@@ -65,6 +67,12 @@ export interface GroupPageData {
   data: GroupData
   /** 组首页的今天 / 明天计划；其他页面为 null。 */
   dayPlan: DayPlan | null
+  /** JST 今天的完整日期 `YYYY-MM-DD`，相册据此排除今天的场次。 */
+  today: string
+  /** JST 今天的月和日 `MM-DD`，用作「那年今日」的默认筛选。 */
+  todayMonthDay: string
+  /** 组首页「那年今日」的往期场次；其他页面为空数组。 */
+  onThisDay: GroupStreamSummary[]
 }
 
 export function toIndex(rows: Awaited<ReturnType<typeof getDatasets>>): DatasetIndexEntry[] {
@@ -174,6 +182,11 @@ export async function getGroupPageData(
   view: 'home' | 'gallery',
   options: { withToday?: boolean } = {},
 ): Promise<GroupPageData> {
+  const now = new Date()
+  const today = currentJstDay(now)
+  const todayMonthDay = today.slice(5)
+  const tomorrow = addDays(today, 1)
+
   if (view === 'gallery') {
     const [datasetRows, streamRows] = await runBatch<[
       DatasetQueryRow[],
@@ -187,12 +200,11 @@ export async function getGroupPageData(
       datasets,
       data: buildGroupDataFromStreams(datasets, mapGroupStreams(streamRows)),
       dayPlan: null,
+      today,
+      todayMonthDay,
+      onThisDay: [],
     }
   }
-
-  const now = new Date()
-  const today = currentJstDay(now)
-  const tomorrow = addDays(today, 1)
 
   if (!options.withToday) {
     const [datasetRows, members, days, latest, recent] = await runBatch<
@@ -206,16 +218,35 @@ export async function getGroupPageData(
       datasets,
       data: buildGroupDataFromSummary(datasets, assembleGroupSummary(members, days, latest, recent)),
       dayPlan: null,
+      today,
+      todayMonthDay,
+      onThisDay: [],
     }
   }
 
-  const [datasetRows, members, days, latest, recent, todayStreams, todaySchedules] = await runBatch<
-    [DatasetQueryRow[], ...GroupSummaryParts, CalendarStreamRow[], CalendarScheduleRow[]]
+  const [
+    datasetRows,
+    members,
+    days,
+    latest,
+    recent,
+    todayStreams,
+    todaySchedules,
+    onThisDayRows,
+  ] = await runBatch<
+    [
+      DatasetQueryRow[],
+      ...GroupSummaryParts,
+      CalendarStreamRow[],
+      CalendarScheduleRow[],
+      Awaited<ReturnType<typeof buildOnThisDayQuery>>,
+    ]
   >(db, [
     selectDatasetsQuery(db, undefined),
     ...buildGroupSummaryQueries(db),
     buildStreamQueries(db, { from: today, to: tomorrow }),
     buildScheduleQueries(db, { from: today, to: tomorrow }),
+    buildOnThisDayQuery(db, todayMonthDay, today),
   ])
   const datasets = toIndex(datasetRows.map(mapDataset))
   const summary = assembleGroupSummary(members, days, latest, recent)
@@ -231,6 +262,9 @@ export async function getGroupPageData(
     datasets,
     data: buildGroupDataFromSummary(datasets, summary),
     dayPlan: buildDayPlanFromRows(todayStreams, todaySchedules, calendarMembers, now, 2),
+    today,
+    todayMonthDay,
+    onThisDay: mapGroupStreams(onThisDayRows),
   }
 }
 

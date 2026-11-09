@@ -43,7 +43,10 @@ const meta = pageSeo(Astro, {
           pathname={Astro.url.pathname}
           search={requestSearch(Astro)}
           dayPlan={data.dayPlan}
+          onThisDay={data.onThisDay}
           section="home"
+          today={data.today}
+          todayMonthDay={data.todayMonthDay}
           view="home"
         />
       )

@@ -202,6 +202,18 @@ export function buildGroupGalleryQuery(db: Db) {
     .orderBy(NEWEST_FIRST)
 }
 
+/**
+ * 那年今日：`MM-DD` 相同的往期场次，按开播时间倒序。
+ * 今天的场次由今日计划承担，这里只取 `< before`，避免同一屏重复。
+ */
+export function buildOnThisDayQuery(db: Db, monthDay: string, before: string) {
+  return db
+    .select(GROUP_STREAM_COLUMNS)
+    .from(streams)
+    .where(sql`to_char(${streams.date}, 'MM-DD') = ${monthDay}::text and ${streams.date} < ${before}::date`)
+    .orderBy(NEWEST_FIRST)
+}
+
 export async function getGroupGallery(db: Db): Promise<GroupGalleryFile> {
   const rows = await buildGroupGalleryQuery(db)
   return {

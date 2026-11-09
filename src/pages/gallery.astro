@@ -41,6 +41,8 @@ const meta = pageSeo(Astro, {
           pathname={Astro.url.pathname}
           search={requestSearch(Astro)}
           section="gallery"
+          today={data.today}
+          todayMonthDay={data.todayMonthDay}
           view="gallery"
         />
       )

@@ -14,6 +14,7 @@ import type { GroupData } from '@/lib/group'
 import type { CalendarPageData, DayPlan } from '@/types/calendar'
 import type { GroupCompareData } from '@/types/compare'
 import type { DatasetIndexEntry } from '@/types/dataset'
+import type { GroupStreamSummary } from '@/types/group'
 import { useShellTheme } from './shell-theme'
 
 export type GroupView = 'home' | 'gallery' | 'about' | 'compare' | 'calendar'
@@ -24,6 +25,12 @@ export interface GroupPageProps {
   compare: GroupCompareData | null
   calendar?: CalendarPageData | null
   dayPlan?: DayPlan | null
+  /** JST 今天 `YYYY-MM-DD`；相册用它排除今天的场次。 */
+  today?: string
+  /** JST 今天的 `MM-DD`；「那年今日」的默认筛选。 */
+  todayMonthDay?: string
+  /** 组首页「那年今日」的往期场次。 */
+  onThisDay?: GroupStreamSummary[]
   view: GroupView
   section: GroupViewKey
   pathname: string
@@ -39,7 +46,18 @@ export function GroupPage(props: GroupPageProps) {
   )
 }
 
-function GroupShell({ datasets, data, compare, calendar, dayPlan, section, pathname }: GroupPageProps) {
+function GroupShell({
+  datasets,
+  data,
+  compare,
+  calendar,
+  dayPlan,
+  today,
+  todayMonthDay,
+  onThisDay,
+  section,
+  pathname,
+}: GroupPageProps) {
   const { theme, onToggleTheme } = useShellTheme()
   const navigate = useNavigate()
   const allBuckets = compare?.buckets.filter(bucket => bucket.type === 'all') ?? []
@@ -91,8 +109,14 @@ function GroupShell({ datasets, data, compare, calendar, dayPlan, section, pathn
                       {section === 'about'
                         ? <GroupAboutPage />
                         : section === 'gallery'
-                          ? <GroupGalleryPage />
-                          : <GroupHomePage dayPlan={dayPlan} />}
+                          ? <GroupGalleryPage today={today ?? ''} todayMonthDay={todayMonthDay ?? ''} />
+                          : (
+                            <GroupHomePage
+                              dayPlan={dayPlan}
+                              monthDay={todayMonthDay ?? ''}
+                              onThisDay={onThisDay ?? []}
+                            />
+                          )}
                     </GroupDataContext.Provider>
                   )
                 : null}
