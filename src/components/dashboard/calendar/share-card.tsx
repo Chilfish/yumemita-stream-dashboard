@@ -1,24 +1,12 @@
-import { Gamepad2, MessageCircle, Music, Sparkles } from "lucide-react";
 import { forwardRef } from "react";
+import { ContentTypeIcon } from "@/components/dashboard/calendar/content-type-icon";
 import { deriveCalendarEventState, monthDayLabel } from "@/lib/calendar";
 import { eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
-import { CONTENT_TYPE_LABELS, type ContentTypeKey } from "@/lib/classify";
+import { CONTENT_TYPE_LABELS } from "@/lib/classify";
 import { assetUrl } from "@/lib/utils";
 import type { CalendarEvent, DayPlan, DayPlanDay } from "@/types/calendar";
 
 const MAX_EVENTS = 7;
-
-function TypeIcon({ kind }: { kind: ContentTypeKey }) {
-  const Icon = kind === "sing"
-    ? Music
-    : kind === "game"
-      ? Gamepad2
-      : kind === "event"
-        ? Sparkles
-        : MessageCircle;
-
-  return <Icon aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.8} />;
-}
 
 function MemberAvatar({ event }: { event: CalendarEvent }) {
   if (event.memberAvatar) {
@@ -48,7 +36,7 @@ function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
 
   return (
     <section>
-      <div className="flex items-baseline justify-between border-b border-stone-700/10 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-700/10 py-3">
         <h3 className="text-xl font-semibold text-stone-700">
           {day.offset === 0 ? "今天" : "明天"} · {monthDayLabel(day.date)}
         </h3>
@@ -57,7 +45,7 @@ function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
 
       <div className="divide-y divide-stone-700/10">
         {events.map(event => (
-          <div className="flex justify-center items-start gap-4 py-4" key={event.key}>
+          <div className="flex items-start gap-4 py-4" key={event.key}>
             <div className="w-20 shrink-0 self-center text-center text-2xl font-semibold leading-none tabular-nums text-stone-800">
               {eventTimeLabel(event)}
             </div>
@@ -67,18 +55,18 @@ function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-2 text-lg text-stone-500">
-                <span className="shrink-0">{event.memberLabel}</span>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-lg text-stone-500">
+                <span className="min-w-0 truncate">{event.memberLabel}</span>
                 {event.kind ? (
                   <>
-                    <TypeIcon kind={event.kind} />
+                    <ContentTypeIcon kind={event.kind} />
                     <span className="shrink-0 text-base text-stone-400">
                       {CONTENT_TYPE_LABELS[event.kind]}
                     </span>
                   </>
                 ) : null}
               </div>
-              <div className="text-3xl font-semibold leading-9 tracking-tight text-stone-800">
+              <div className="line-clamp-3 text-3xl font-semibold leading-9 tracking-tight wrap-anywhere text-stone-800">
                 {eventTitle(event)}
               </div>
             </div>
@@ -125,7 +113,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
 
   return (
     <div
-      className="relative w-[75rem] overflow-hidden bg-pink-200 font-sans text-stone-800"
+      className="relative w-[75rem] overflow-hidden bg-pink-200 font-sans text-stone-800 [text-size-adjust:100%] [-webkit-text-size-adjust:100%]"
       ref={ref}
     >
       <img

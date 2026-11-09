@@ -137,24 +137,32 @@ export function ShareButton({ plan, now }: ShareButtonProps) {
         open={open}
       >
         <DialogPopup>
-          <DialogHeader>
-            <DialogTitle>分享直播日程</DialogTitle>
-            <DialogDescription>
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-lg sm:text-xl">分享直播日程</DialogTitle>
+            <DialogDescription className="text-caption sm:text-sm">
               生成一张夢限大みゅーたいぷ的日程卡片。
             </DialogDescription>
           </DialogHeader>
 
-          <div className="overflow-y-auto overscroll-contain px-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6">
             {preview
               ? (
-                  <img
-                    alt="夢限大みゅーたいぷ 直播日程分享卡片"
-                    className="w-full rounded-xl border border-hairline bg-muted/30"
-                    src={preview}
-                  />
+                  <a
+                    aria-label="在新标签页查看原图"
+                    className="block"
+                    href={preview}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <img
+                      alt="夢限大みゅーたいぷ 直播日程分享卡片"
+                      className="w-full rounded-xl border border-hairline bg-muted/30"
+                      src={preview}
+                    />
+                  </a>
                 )
               : (
-                  <div className="flex h-72 items-center justify-center rounded-xl border border-hairline bg-muted/30 px-6 text-center text-caption text-muted-foreground">
+                  <div className="flex h-48 items-center justify-center rounded-xl border border-hairline bg-muted/30 px-6 text-center text-caption text-muted-foreground sm:h-72">
                     {error
                       ? `生成分享卡片失败：${error}`
                       : generating
@@ -165,14 +173,14 @@ export function ShareButton({ plan, now }: ShareButtonProps) {
             {status ? <p className="mt-2 text-caption text-muted-foreground">{status}</p> : null}
           </div>
 
-          <DialogFooter>
-            <Button disabled={!blob} loading={busy} onClick={copy} size="sm" variant="outline">
-              <Copy aria-hidden="true" />
-              复制图片
-            </Button>
+          <DialogFooter className="shrink-0 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
             <Button disabled={!blob} loading={busy} onClick={download} size="sm">
               <Download aria-hidden="true" />
               下载 PNG
+            </Button>
+            <Button disabled={!blob} loading={busy} onClick={copy} size="sm" variant="outline">
+              <Copy aria-hidden="true" />
+              复制图片
             </Button>
           </DialogFooter>
         </DialogPopup>
