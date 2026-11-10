@@ -7,10 +7,7 @@ import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  SubtitleModeControl,
-  TranscriptAppendixView,
-} from "@/components/dashboard/transcript/transcript-appendix";
+import { TranscriptAppendixView } from "@/components/dashboard/transcript/transcript-appendix";
 import { useTranscript } from "@/hooks/use-transcript";
 import { readSubtitleMode, rememberSubtitleMode } from "@/lib/preferences";
 import { transcriptsPath } from "@/lib/routes";
@@ -46,12 +43,39 @@ function scrollToHeading(id: string): void {
   target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 }
 
+const COLLAPSIBLE_PANEL = '[data-slot="collapsible-panel"]';
+
+/**
+ * 附录展开时面板高度有 200ms 过渡，过渡中途滚动会被浏览器按当时的文档高度截断，
+ * 落点会差一整块面板的高度。这里等过渡开始并结束后再滚，无过渡时 800ms 兜底。
+ */
+function scrollToHeadingWhenSettled(id: string): void {
+  const startedAt = performance.now();
+  let transitionStarted = false;
+
+  const step = (): void => {
+    const panel = document.querySelector<HTMLElement>(COLLAPSIBLE_PANEL);
+    const running =
+      panel?.getAnimations().some(animation => animation.playState === "running") ?? false;
+    if (running) transitionStarted = true;
+    if ((transitionStarted && !running) || performance.now() - startedAt > 800) {
+      scrollToHeading(id);
+      return;
+    }
+    requestAnimationFrame(step);
+  };
+
+  requestAnimationFrame(step);
+}
+
 function TranscriptToc({
   items,
   className,
+  onSelect,
 }: {
   items: TranscriptHeading[];
   className?: string;
+  onSelect: (id: string) => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -60,7 +84,7 @@ function TranscriptToc({
         <li className={cn("min-w-0", item.depth === 3 && "ps-3")} key={item.id}>
           <button
             className="block w-full text-start text-footnote leading-snug text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
-            onClick={() => scrollToHeading(item.id)}
+            onClick={() => onSelect(item.id)}
             type="button"
           >
             {item.text}
@@ -136,7 +160,7 @@ function createMarkdownComponents(idsByLine: Map<number, string>): Components {
         h6: ({ children }: HeadingProps) => (
           <h6 className="mt-4 mb-1 text-body font-semibold text-foreground">{children}</h6>
         ),
-        p: ({ children }: TextProps) => <p className="">{children}</p>,
+        p: ({ children }: TextProps) => <p className="my-2">{children}</p>,
         strong: ({ children }: TextProps) => (
           <strong className="font-semibold text-foreground">{children}</strong>
         ),
@@ -162,10 +186,10 @@ function createMarkdownComponents(idsByLine: Map<number, string>): Components {
           );
         },
         ul: ({ children }: TextProps) => (
-          <ul className="my-3 flex list-disc flex-col gap-1 ps-5">{children}</ul>
+          <ul className="my-2 flex list-disc flex-col gap-1 ps-5">{children}</ul>
         ),
         ol: ({ children }: TextProps) => (
-          <ol className="my-3 flex list-decimal flex-col gap-1 ps-5">{children}</ol>
+          <ol className="my-2 flex list-decimal flex-col gap-1 ps-5">{children}</ol>
         ),
         li: ({ children }: TextProps) => <li className="ps-0.5 [&>p]:my-0">{children}</li>,
         blockquote: ({ children }: TextProps) => (
@@ -300,13 +324,7 @@ function TranscriptError({
   );
 }
 
-function TranscriptHeader({
-  file,
-  subtitleControl,
-}: {
-  file: TranscriptFile;
-  subtitleControl?: ReactNode;
-}) {
+function TranscriptHeader({ file }: { file: TranscriptFile }) {
   const { summary } = file.frontmatter;
   return (
     <header className="flex flex-col gap-3 border-b border-hairline pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -315,7 +333,6 @@ function TranscriptHeader({
           {stripInlineMarkdown(summary)}
         </p>
       ) : null}
-      {subtitleControl}
     </header>
   );
 }
@@ -330,6 +347,8 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
   const { file, status, error, retry } = useTranscript(datasetId, videoId);
 
   const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>(readSubtitleMode);
+  // 附录默认折叠：正文才是主要阅读路径，字幕按需展开。
+  const [appendixOpen, setAppendixOpen] = useState(false);
 
   const toc = file?.toc ?? EMPTY_TOC;
   const appendix = useMemo(
@@ -365,6 +384,16 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
     rememberSubtitleMode(next);
   }
 
+  /** 附录默认折叠，目录里的字幕小节不在 DOM 里：先展开，等面板高度稳定后再滚动。 */
+  function navigateToHeading(id: string): void {
+    if (appendixOpen || !appendixIds.includes(id)) {
+      scrollToHeading(id);
+      return;
+    }
+    setAppendixOpen(true);
+    scrollToHeadingWhenSettled(id);
+  }
+
   if (status === "idle" || status === "loading") return <TranscriptSkeleton />;
   if (status === "empty") return <TranscriptEmpty datasetId={datasetId} videoId={videoId} />;
   if (status === "error" || !file) {
@@ -375,14 +404,7 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
 
   return (
     <div className={cn("flex flex-col gap-5", className)}>
-      <TranscriptHeader
-        file={file}
-        subtitleControl={
-          appendix ? (
-            <SubtitleModeControl mode={subtitleMode} onChange={changeSubtitleMode} />
-          ) : null
-        }
-      />
+      <TranscriptHeader file={file} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_13.5rem] xl:gap-10">
         <div className="min-w-0">
@@ -391,7 +413,7 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
               <summary className="cursor-pointer text-footnote font-medium text-foreground">
                 目录（{toc.length} 节）
               </summary>
-              <TranscriptToc className="mt-2" items={toc} />
+              <TranscriptToc className="mt-2" items={toc} onSelect={navigateToHeading} />
             </details>
           ) : null}
 
@@ -404,6 +426,9 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
                 appendix={appendix}
                 ids={appendixIds}
                 mode={subtitleMode}
+                onModeChange={changeSubtitleMode}
+                onOpenChange={setAppendixOpen}
+                open={appendixOpen}
               />
             ) : null}
           </article>
@@ -423,7 +448,7 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
         <aside className="hidden xl:block">
           <nav aria-label="逐字稿目录" className="sticky top-16 max-h-[calc(100dvh-6rem)] overflow-y-auto">
             <p className="mb-2 text-caption text-ink-3">目录</p>
-            <TranscriptToc items={toc} />
+            <TranscriptToc items={toc} onSelect={navigateToHeading} />
             {toc.length > 0 ? (
               <button
                 className="mt-3 text-caption text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"

@@ -1,5 +1,11 @@
+import { ChevronDown } from "lucide-react";
 import { Fragment, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
   type SubtitleAppendix,
@@ -18,7 +24,7 @@ const MODE_OPTIONS: { value: SubtitleMode; label: string }[] = [
 const EMPTY_KEYS: ReadonlySet<string> = new Set();
 
 /** 附录字幕的全局语言开关；只渲染中文时正文大约少一半。 */
-export function SubtitleModeControl({
+function SubtitleModeControl({
   mode,
   onChange,
 }: {
@@ -170,9 +176,19 @@ export interface TranscriptAppendixViewProps {
   /** 与 `appendix.sections` 一一对应的标题锚点 id。 */
   ids: (string | undefined)[];
   mode: SubtitleMode;
+  open: boolean;
+  onModeChange: (mode: SubtitleMode) => void;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function TranscriptAppendixView({ appendix, ids, mode }: TranscriptAppendixViewProps) {
+export function TranscriptAppendixView({
+  appendix,
+  ids,
+  mode,
+  open,
+  onModeChange,
+  onOpenChange,
+}: TranscriptAppendixViewProps) {
   // 逐条展开的状态只在当前模式内有效：切到双语 / 另一种语言后自动作废。
   const [revealed, setRevealed] = useState<{
     mode: SubtitleMode;
@@ -189,19 +205,38 @@ export function TranscriptAppendixView({ appendix, ids, mode }: TranscriptAppend
     });
   }
 
+  const cueCount = appendix.sections.reduce((total, section) => total + section.cues.length, 0);
+
   return (
-    <>
-      {appendix.sections.map((section, sectionIndex) => (
-        <SubtitleSectionView
-          id={ids[sectionIndex]}
-          key={`${sectionIndex}-${section.heading}`}
-          mode={mode}
-          onToggle={toggle}
-          revealed={activeKeys}
-          section={section}
-          sectionIndex={sectionIndex}
-        />
-      ))}
-    </>
+    <Collapsible
+      className="mt-6 border-t border-hairline pt-3"
+      onOpenChange={(next: boolean) => onOpenChange(next)}
+      open={open}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <CollapsibleTrigger className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm text-footnote font-medium text-foreground outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink data-panel-open:*:data-[slot=appendix-chevron]:rotate-180">
+          {open ? "收起字幕" : `展开字幕（${cueCount} 条）`}
+          <ChevronDown
+            aria-hidden="true"
+            className="size-4 text-ink-3 transition-transform duration-200"
+            data-slot="appendix-chevron"
+          />
+        </CollapsibleTrigger>
+        {open ? <SubtitleModeControl mode={mode} onChange={onModeChange} /> : null}
+      </div>
+      <CollapsiblePanel className="pt-4">
+        {appendix.sections.map((section, sectionIndex) => (
+          <SubtitleSectionView
+            id={ids[sectionIndex]}
+            key={`${sectionIndex}-${section.heading}`}
+            mode={mode}
+            onToggle={toggle}
+            revealed={activeKeys}
+            section={section}
+            sectionIndex={sectionIndex}
+          />
+        ))}
+      </CollapsiblePanel>
+    </Collapsible>
   );
 }
