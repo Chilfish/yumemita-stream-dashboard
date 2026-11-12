@@ -58,6 +58,8 @@ export interface DatasetInsightDto {
 /** 列表 / 岛屿只需要摘要字段；`id`、`content_hash`、`ingest_batch_id` 等不进入读路径。 */
 export type StreamSummaryRow = Pick<
   StreamDbRow,
+  | 'datasetId'
+  | 'participants'
   | 'date'
   | 'videoId'
   | 'title'
@@ -97,6 +99,7 @@ export type StreamSummaryRow = Pick<
 export interface StreamDbRow {
   id: number
   datasetId: string
+  participants: string[]
   videoId: string
   title: string
   url: string

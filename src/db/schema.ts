@@ -69,6 +69,12 @@ export const streams = pgTable(
     scPerHour: numeric('sc_per_hour'),
     paidSharePct: numeric('paid_share_pct'),
     thumbnailKey: text('thumbnail_key'),
+    /**
+     * owner 之外的参与成员。`dataset_id` 是频道主，这里只放其他人，
+     * 两个来源不重叠，所以「某成员的场次」可以直接并集且不用去重。
+     * 顺序即展示顺序；空数组表示单人场。
+     */
+    participants: text('participants').array().notNull().default(sql`'{}'::text[]`),
     sourceGeneratedAt: timestamp('source_generated_at', { withTimezone: true }),
     sourceSchema: text('source_schema'),
     contentHash: text('content_hash'),
@@ -80,6 +86,7 @@ export const streams = pgTable(
     index('streams_dataset_started_idx').on(table.datasetId, table.startedAt.desc()),
     index('streams_dataset_date_idx').on(table.datasetId, table.date.desc()),
     index('streams_dataset_availability_idx').on(table.datasetId, table.availability),
+    index('streams_participants_idx').using('gin', table.participants),
   ],
 )
 
@@ -111,6 +118,8 @@ export const scheduledStreams = pgTable(
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     availability: text('availability'),
     source: text('source').notNull().default('manual'),
+    /** owner 之外的参与成员；空数组表示单人场。 */
+    participants: text('participants').array().notNull().default(sql`'{}'::text[]`),
     note: text('note'),
     /** 最近一次在频道列表里看到的时间，用于清理自动行。 */
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),

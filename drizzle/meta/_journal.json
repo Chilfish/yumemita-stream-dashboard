@@ -71,6 +71,13 @@
       "when": 1794193993364,
       "tag": "0009_drop_superseded_by",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794468134149,
+      "tag": "0010_lame_blizzard",
+      "breakpoints": true
     }
   ]
 }

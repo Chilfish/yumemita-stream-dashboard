@@ -3,6 +3,13 @@ import type { ChatByKind, CurrencyTotals } from "./datapack";
 /** `batch30_manifest.json` 的一行。字段由 collect-batch.mjs 产出。 */
 export interface StreamSummary {
   rank: number;
+  /** 频道主（owner）；联动场不改变它。 */
+  datasetId?: string;
+  /**
+   * owner 之外的参与成员，顺序即展示顺序。
+   * 缺省 / 空数组表示单人场；旧 pack 没有这个字段。
+   */
+  participants?: string[];
   date: string;
   videoId: string;
   title: string;

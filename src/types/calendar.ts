@@ -23,7 +23,10 @@ export type CalendarViewMode = "month" | "agenda";
 export interface CalendarEventInput {
   /** `stream:<videoId>` 或 `schedule:<datasetId>:<eventKey>`；跨成员不重复。 */
   key: string;
+  /** 频道主（owner）。联动场的 URL 与主色仍由它决定。 */
   datasetId: string;
+  /** owner 之外的参与成员；单人场为空数组。 */
+  participantIds: string[];
   videoId: string | null;
   title: string;
   /** ISO 8601；日期待定时为 null。只有日期+时段时是名义时间。 */
@@ -54,6 +57,8 @@ export interface CalendarEvent extends CalendarEventInput {
   state: CalendarEventState;
   memberLabel: string;
   color: string;
+  /** owner 之外的参与成员标签，顺序与 `participantIds` 一致。 */
+  participantLabels: string[];
   /** 成员头像 key（`avatars/...`）；分享卡片使用。 */
   memberAvatar: string | null;
 }
@@ -100,6 +105,8 @@ export interface DayPlan {
 export interface AdminScheduleItem {
   datasetId: string;
   eventKey: string;
+  /** owner 之外的参与成员；空数组表示单人场。 */
+  participants: string[];
   videoId: string | null;
   title: string;
   url: string | null;
