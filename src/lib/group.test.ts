@@ -167,6 +167,12 @@ function summaryOf(data: GroupData, recent = 8): GroupSummaryFile {
   return {
     schema: "test",
     generatedAt: "",
+    totals: {
+      streamCount: data.totals.streamCount,
+      chatTotal: data.totals.chatTotal,
+      superchats: data.totals.superchats,
+      durationSec: data.totals.durationSec,
+    },
     members: data.members.map(item => ({
       datasetId: item.dataset.id,
       streamCount: item.streamCount,
@@ -176,6 +182,11 @@ function summaryOf(data: GroupData, recent = 8): GroupSummaryFile {
       avgConcurrent: item.avgConcurrent,
     })),
     days: [...days.values()],
+    dayTotals: [...days.values()].map(day => ({
+      date: day.date,
+      streams: day.streams,
+      chat: day.chat,
+    })),
     latest: data.members.flatMap(item => (item.latest ? [item.latest] : [])),
     recent: data.rows.slice(0, recent),
   };

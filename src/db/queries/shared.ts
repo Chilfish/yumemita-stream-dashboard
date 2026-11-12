@@ -23,6 +23,8 @@ export function toIso(value: Date | string | null | undefined): string | null {
 export function mapStreamSummary(row: StreamSummaryRow, rank: number): StreamSummary {
   return {
     rank,
+    datasetId: row.datasetId,
+    participants: row.participants ?? [],
     date: row.date ?? '',
     videoId: row.videoId,
     title: row.title,

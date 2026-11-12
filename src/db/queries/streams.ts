@@ -7,8 +7,18 @@ import { mapStreamSummary, maskMemberOnlyMetrics } from './shared'
 
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
 
+/**
+ * 某成员的场次 = 他做频道主的场次 ∪ 他作为参与者的场次。
+ * 两个来源不重叠（`participants` 不含 owner），所以不需要去重。
+ */
+export function involvesMember(datasetId: string) {
+  return sql`(${streams.datasetId} = ${datasetId} or ${datasetId}::text = any(${streams.participants}))`
+}
+
 /** 岛屿摘要用到的列；不要退回 `select()`，否则会多带 content_hash 等写路径字段。 */
 export const SUMMARY_COLUMNS = {
+  datasetId: streams.datasetId,
+  participants: streams.participants,
   date: streams.date,
   videoId: streams.videoId,
   title: streams.title,
@@ -61,7 +71,7 @@ export function buildStreamListQuery(
   const limit = Math.min(options.limit ?? 500, 2000)
   const offset = Math.max(options.offset ?? 0, 0)
   const where = and(
-    eq(streams.datasetId, datasetId),
+    involvesMember(datasetId),
     options.availability ? eq(streams.availability, options.availability) : undefined,
   )
 
@@ -109,7 +119,7 @@ export function buildStreamNavQuery(db: Db, datasetId: string) {
       durationSec: streams.durationSec,
     })
     .from(streams)
-    .where(eq(streams.datasetId, datasetId))
+    .where(involvesMember(datasetId))
     .orderBy(NEWEST_FIRST)
 }
 
@@ -118,7 +128,7 @@ export function buildStreamSummariesQuery(db: Db, datasetId: string, videoIds: s
   return db
     .select(SUMMARY_COLUMNS)
     .from(streams)
-    .where(and(eq(streams.datasetId, datasetId), inArray(streams.videoId, videoIds)))
+    .where(and(involvesMember(datasetId), inArray(streams.videoId, videoIds)))
 }
 
 /** sitemap：一次取回全部成员的定位信息，避免每个成员一次 HTTP 往返。 */
@@ -152,7 +162,8 @@ export function selectStreamQuery(db: Db, datasetId: string, videoId: string) {
   return db
     .select()
     .from(streams)
-    .where(and(eq(streams.datasetId, datasetId), eq(streams.videoId, videoId)))
+    // 联动场从任一参与成员的页面进来都要能打开；URL 里的成员只用于上下文，不再是查找条件。
+    .where(and(eq(streams.videoId, videoId), involvesMember(datasetId)))
 }
 
 export type StreamQueryRow = Awaited<ReturnType<typeof selectStreamQuery>>[number]

@@ -2,9 +2,11 @@ import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/da
 import { isMemberOnly } from "@/lib/visibility";
 import type {
   GroupDayStat,
+  GroupDayTotal,
   GroupMemberStat,
   GroupStreamSummary,
   GroupSummaryFile,
+  GroupTotalsStat,
 } from "@/types/group";
 
 export const DEFAULT_MEMBER_COLOR = "#b8461f";
@@ -16,6 +18,10 @@ export const ATTENDANCE_WINDOW_DAYS = 100;
 export interface GroupStreamRow extends GroupStreamSummary {
   memberLabel: string;
   memberColor: string;
+  /** 频道主；联动场被展示在某位参与者名下时与 `datasetId` 不同。 */
+  ownerDatasetId: string;
+  /** 频道主之外的参与成员标签，顺序与 `participants` 一致。 */
+  participantLabels: string[];
 }
 
 export interface GroupMemberSummary {
@@ -151,7 +157,15 @@ function summarizeMember(
   };
 }
 
-function totalsOf(members: GroupMemberSummary[]): GroupTotals {
+/**
+ * 全组合计。按去重后的场次行算，不累加成员汇总：
+ * 联动场同时属于两位成员，累加会把全组场次数与弹幕算两遍。
+ */
+function totalsOf(
+  rows: GroupStreamSummary[],
+  weekStart: string,
+  monthKey: string,
+): GroupTotals {
   const totals: GroupTotals = {
     streamCount: 0,
     chatTotal: 0,
@@ -161,15 +175,24 @@ function totalsOf(members: GroupMemberSummary[]): GroupTotals {
     weekChat: 0,
     monthStreams: 0,
   };
+  const seen = new Set<string>();
 
-  for (const member of members) {
-    totals.streamCount += member.streamCount;
-    totals.chatTotal += member.chatTotal;
-    totals.superchats += member.superchats;
-    totals.durationSec += member.durationSec;
-    totals.weekStreams += member.weekStreams;
-    totals.weekChat += member.weekChat;
-    totals.monthStreams += member.monthStreams;
+  for (const row of rows) {
+    // 同一个 videoId 只计一次；rows 已经是按 owner 唯一的列表，这里再做一层保护。
+    if (seen.has(row.videoId)) continue;
+    seen.add(row.videoId);
+
+    const memberOnly = isMemberOnly(row.availability);
+    const date = streamDateKey(row);
+    totals.streamCount += 1;
+    if (date && date >= weekStart) totals.weekStreams += 1;
+    if (date && date.slice(0, 7) === monthKey) totals.monthStreams += 1;
+    if (memberOnly) continue;
+
+    totals.chatTotal += row.chatTotal;
+    totals.superchats += row.superchats;
+    totals.durationSec += row.durationSec ?? 0;
+    if (date && date >= weekStart) totals.weekChat += row.chatTotal;
   }
 
   return totals;
@@ -182,11 +205,16 @@ function sortRows<T extends { startedAt: string | null }>(rows: T[]): T[] {
 function attachMember(
   dataset: DatasetIndexEntry,
   row: GroupStreamSummary,
+  datasetById: Map<string, DatasetIndexEntry>,
 ): GroupStreamRow {
   return {
     ...row,
     memberLabel: dataset.label,
     memberColor: dataset.color ?? DEFAULT_MEMBER_COLOR,
+    ownerDatasetId: row.ownerDatasetId ?? row.datasetId,
+    participantLabels: (row.participants ?? [])
+      .filter(id => id !== row.datasetId)
+      .map(id => datasetById.get(id)?.label ?? id),
   };
 }
 
@@ -240,7 +268,7 @@ export function buildGroupDataFromSummary(
     const latestRow = latestById.get(dataset.id);
     members.push({
       dataset,
-      latest: latestRow ? attachMember(dataset, latestRow) : null,
+      latest: latestRow ? attachMember(dataset, latestRow, datasetById) : null,
       streamCount: stat.streamCount,
       chatTotal: stat.chatTotal,
       superchats: stat.superchats,
@@ -255,15 +283,36 @@ export function buildGroupDataFromSummary(
   const rows = summary.recent
     .map(row => {
       const dataset = datasetById.get(row.datasetId);
-      return dataset ? attachMember(dataset, row) : null;
+      return dataset ? attachMember(dataset, row, datasetById) : null;
     })
     .filter((row): row is GroupStreamRow => row !== null);
 
   const { start: attendanceStart, end: attendanceEnd } = attendanceWindow(now);
+  // 组级窗口按去重后的全组日桶算：成员桶里联动场会出现两次。
+  const groupDays = summary.dayTotals ?? summary.days;
+  let weekStreams = 0;
+  let weekChat = 0;
+  let monthStreams = 0;
+  for (const day of groupDays) {
+    if (day.date >= weekStart) {
+      weekStreams += day.streams;
+      weekChat += day.chat;
+    }
+    if (day.date.slice(0, 7) === monthKey) monthStreams += day.streams;
+  }
+
   return {
     members,
     rows: sortRows(rows),
-    totals: totalsOf(members),
+    totals: {
+      streamCount: summary.totals.streamCount,
+      chatTotal: summary.totals.chatTotal,
+      superchats: summary.totals.superchats,
+      durationSec: summary.totals.durationSec,
+      weekStreams,
+      weekChat,
+      monthStreams,
+    },
     days: summary.days.filter(day => day.date >= attendanceStart && day.date <= attendanceEnd),
     attendanceStart,
     attendanceEnd,
@@ -280,13 +329,15 @@ export function buildGroupDataFromStreams(
   const monthKey = jstDateKey(now).slice(0, 7);
   const datasetById = new Map(datasets.map(dataset => [dataset.id, dataset]));
 
-  const byDataset = new Map<string, GroupStreamSummary[]>();
+  // rows 是全组唯一列表（每个 videoId 一条），成员统计另行按 owner ∪ 参与者展开。
+  const byMember = new Map<string, GroupStreamSummary[]>();
   for (const stream of streams) {
-    const dataset = datasetById.get(stream.datasetId);
-    if (!dataset) continue;
-    const bucket = byDataset.get(stream.datasetId);
-    if (bucket) bucket.push(stream);
-    else byDataset.set(stream.datasetId, [stream]);
+    const memberIds = [stream.datasetId, ...(stream.participants ?? [])];
+    for (const memberId of new Set(memberIds)) {
+      const bucket = byMember.get(memberId);
+      if (bucket) bucket.push(stream);
+      else byMember.set(memberId, [stream]);
+    }
   }
 
   const rows: GroupStreamRow[] = [];
@@ -294,8 +345,8 @@ export function buildGroupDataFromStreams(
 
   for (const dataset of datasets) {
     // 没有场次的成员也要留在 members 里：组首页的 idle 列表靠它渲染。
-    const source = byDataset.get(dataset.id) ?? [];
-    const memberRows = sortRows(source).map(row => attachMember(dataset, row));
+    const source = byMember.get(dataset.id) ?? [];
+    const memberRows = sortRows(source).map(row => attachMember(dataset, row, datasetById));
     const stats: RowStat[] = memberRows.map(row => ({
       date: row.date,
       chatTotal: row.chatTotal,
@@ -314,13 +365,18 @@ export function buildGroupDataFromStreams(
         monthKey,
       ),
     );
-    rows.push(...memberRows);
+  }
+
+  // 全组列表按频道主归属铺一次，联动场不会因为参与者多出一行。
+  for (const stream of streams) {
+    const dataset = datasetById.get(stream.datasetId);
+    if (dataset) rows.push(attachMember(dataset, stream, datasetById));
   }
 
   return {
     members,
     rows: sortRows(rows),
-    totals: totalsOf(members),
+    totals: totalsOf(streams, weekStart, monthKey),
     days: [],
     attendanceStart: null,
     attendanceEnd: null,
@@ -356,6 +412,7 @@ export function toGroupStream(datasetId: string, row: StreamSummary): GroupStrea
   const memberOnly = isMemberOnly(row.availability);
   return {
     datasetId,
+    participants: row.participants ?? [],
     date: row.date,
     videoId: row.videoId,
     title: row.title,
@@ -371,6 +428,194 @@ export function toGroupStream(datasetId: string, row: StreamSummary): GroupStrea
     snapshotViews: memberOnly ? null : row.snapshotViews,
     thumbnail: row.thumbnail,
   };
+}
+
+/** 成员统计的字段子集：联动场也要并进来，但只并这一层。 */
+export interface MemberStatLike {
+  datasetId: string;
+  streamCount: number;
+  chatTotal: number;
+  superchats: number;
+  durationSec: number;
+  avgConcurrent: number | null;
+}
+
+export interface DayStatLike {
+  datasetId: string;
+  date: string;
+  streams: number;
+  chat: number;
+}
+
+/**
+ * 把联动场并进每位成员的汇总。
+ * 参与场次对成员而言就是他的一场，指标原样累加；全组去重由调用方按 videoId 负责。
+ */
+export function mergeParticipantStats<T extends MemberStatLike>(
+  stats: T[],
+  participantStreams: GroupStreamSummary[],
+): T[] {
+  if (participantStreams.length === 0) return stats
+  const byMember = new Map(stats.map(stat => [stat.datasetId, stat]))
+  // 平均同接按「同接 × 时长」加权：先把已有的加权和还原出来，累加后再除。
+  const weighted = new Map<string, { sum: number; duration: number }>()
+  for (const stat of stats) {
+    weighted.set(stat.datasetId, stat.avgConcurrent == null
+      ? { sum: 0, duration: 0 }
+      : { sum: stat.avgConcurrent * stat.durationSec, duration: stat.durationSec })
+  }
+
+  for (const stream of participantStreams) {
+    if (isMemberOnly(stream.availability)) continue
+    const durationSec = stream.durationSec ?? 0
+
+    for (const participantId of stream.participants ?? []) {
+      const current = byMember.get(participantId)
+      if (!current) continue
+      current.streamCount += 1
+      current.chatTotal += stream.chatTotal
+      current.superchats += stream.superchats
+      current.durationSec += durationSec
+
+      const bucket = weighted.get(participantId) ?? { sum: 0, duration: 0 }
+      if (stream.avgConcurrent != null && durationSec > 0) {
+        bucket.sum += stream.avgConcurrent * durationSec
+        bucket.duration += durationSec
+      }
+      weighted.set(participantId, bucket)
+    }
+  }
+
+  // 有同接的场次要计入场次数，但会员限定场不计派生指标。
+  for (const stream of participantStreams) {
+    if (!isMemberOnly(stream.availability)) continue
+    for (const participantId of stream.participants ?? []) {
+      const current = byMember.get(participantId)
+      if (current) current.streamCount += 1
+    }
+  }
+
+  for (const stat of stats) {
+    const bucket = weighted.get(stat.datasetId)
+    stat.avgConcurrent = bucket && bucket.duration > 0 ? bucket.sum / bucket.duration : null
+  }
+
+  return stats
+}
+
+/** 把联动场并进成员 × 日桶。 */
+export function mergeParticipantDays<T extends DayStatLike>(
+  days: T[],
+  participantStreams: GroupStreamSummary[],
+): T[] {
+  if (participantStreams.length === 0) return days
+  const byKey = new Map(days.map(day => [`${day.datasetId}|${day.date}`, day]))
+
+  for (const stream of participantStreams) {
+    const chat = isMemberOnly(stream.availability) ? 0 : stream.chatTotal
+    for (const participantId of stream.participants ?? []) {
+      const key = `${participantId}|${stream.date}`
+      const current = byKey.get(key)
+      if (current) {
+        current.streams += 1
+        current.chat += chat
+        continue
+      }
+      const created = {
+        datasetId: participantId,
+        date: stream.date,
+        streams: 1,
+        chat,
+      } as T
+      byKey.set(key, created)
+      days.push(created)
+    }
+  }
+
+  return days
+}
+
+/** 每位成员的最新一场：owner 场次里挑一个，参与场次里挑更好的那个。 */
+export function pickLatestStreams(
+  latest: GroupStreamSummary[],
+  participantStreams: GroupStreamSummary[],
+): GroupStreamSummary[] {
+  if (participantStreams.length === 0) return latest
+  const byMember = new Map(latest.map(row => [row.datasetId, row]))
+
+  for (const stream of participantStreams) {
+    for (const participantId of stream.participants ?? []) {
+      const current = byMember.get(participantId)
+      const candidate: GroupStreamSummary = {
+        ...stream,
+        datasetId: participantId,
+        ownerDatasetId: stream.datasetId,
+      }
+      if (!current || (candidate.startedAt ?? '') > (current.startedAt ?? '')) {
+        byMember.set(participantId, candidate)
+      }
+    }
+  }
+
+  return [...byMember.values()]
+}
+
+/** 全组合计：成员汇总相加后再扣掉联动场重复计入的部分。 */
+export function sumGroupTotals<T extends MemberStatLike>(
+  members: T[],
+  participantStreams: GroupStreamSummary[],
+): GroupTotalsStat {
+  const totals: GroupTotalsStat = { streamCount: 0, chatTotal: 0, superchats: 0, durationSec: 0 }
+  for (const member of members) {
+    totals.streamCount += member.streamCount
+    totals.chatTotal += member.chatTotal
+    totals.superchats += member.superchats
+    totals.durationSec += member.durationSec
+  }
+
+  // 一场联动会被算进 N 位成员，全组只该计 1 次；这里补扣 N-1 份。
+  for (const stream of participantStreams) {
+    const extra = (stream.participants ?? []).length
+    if (extra === 0) continue
+    totals.streamCount -= extra
+    if (isMemberOnly(stream.availability)) continue
+    totals.chatTotal -= stream.chatTotal * extra
+    totals.superchats -= stream.superchats * extra
+    totals.durationSec -= (stream.durationSec ?? 0) * extra
+  }
+
+  return totals
+}
+
+/** 全组按日桶：成员桶相加后扣掉联动场的重复部分。 */
+export function sumGroupDays(
+  days: DayStatLike[],
+  participantStreams: GroupStreamSummary[],
+): GroupDayTotal[] {
+  const byDate = new Map<string, GroupDayTotal>()
+  for (const day of days) {
+    const current = byDate.get(day.date) ?? { date: day.date, streams: 0, chat: 0 }
+    current.streams += day.streams
+    current.chat += day.chat
+    byDate.set(day.date, current)
+  }
+
+  for (const stream of participantStreams) {
+    const extra = (stream.participants ?? []).length
+    if (extra === 0 || !isDateKey(stream.date)) continue
+    const current = byDate.get(stream.date) ?? { date: stream.date, streams: 0, chat: 0 }
+    current.streams -= extra
+    if (!isMemberOnly(stream.availability)) current.chat -= stream.chatTotal * extra
+    byDate.set(stream.date, current)
+  }
+
+  return [...byDate.values()]
+    .filter(day => day.streams > 0 || day.chat > 0)
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+function isDateKey(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
 /** 最近有播的成员排在前面；没播过的按原始顺序垫底。 */

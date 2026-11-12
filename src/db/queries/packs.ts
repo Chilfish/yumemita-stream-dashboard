@@ -33,6 +33,7 @@ import type {
   VstatsInfo,
 } from '@/types/datapack'
 import { toIso, toNumber } from './shared'
+import { involvesMember } from './streams'
 
 type StreamRow = typeof streams.$inferSelect
 type DetailRow = Omit<typeof streamDetails.$inferSelect, 'rawDetail'>
@@ -324,7 +325,7 @@ async function fetchDensityRows(db: Db, datasetId: string, videoIds: string[]): 
     })
     .from(streams)
     .leftJoin(streamDetails, eq(streamDetails.streamId, streams.id))
-    .where(and(eq(streams.datasetId, datasetId), inArray(streams.videoId, videoIds)))
+    .where(and(involvesMember(datasetId), inArray(streams.videoId, videoIds)))
 }
 
 function densityOf(row: DensityRow): number[] {
@@ -394,7 +395,8 @@ export function buildStreamPackQueries(
   videoId: string,
   limits: { words: number, authors: number } | null,
 ) {
-  const where = and(eq(streams.datasetId, datasetId), eq(streams.videoId, videoId))
+  // 联动场从任一参与成员的页面进入都要能取到数据。
+  const where = and(involvesMember(datasetId), eq(streams.videoId, videoId))
   const ids = () => db.select({ id: streams.id }).from(streams).where(where)
 
   const words = db
@@ -453,7 +455,7 @@ export async function getStreamPacks(
 ): Promise<Map<string, StreamDatapack>> {
   if (videoIds.length === 0) return new Map()
 
-  const where = and(eq(streams.datasetId, datasetId), inArray(streams.videoId, videoIds))
+  const where = and(involvesMember(datasetId), inArray(streams.videoId, videoIds))
   const ids = () => db.select({ id: streams.id }).from(streams).where(where)
   const [rows, details, paid, commentRows, words, authorRows] = await runBatch<StreamPackParts>(db, [
     db.select().from(streams).where(where),

@@ -69,11 +69,23 @@ export async function getTranscriptIndex(
   return rows.map(toIndexEntry)
 }
 
+/**
+ * 单场的逐字稿元数据。逐字稿按频道主存目录，联动场从参与者页进入时，
+ * 用 videoId 找到那篇稿，不在参与者目录里另找。
+ */
 export function selectTranscriptMetaQuery(db: Db, datasetId: string, videoId: string) {
   return db
     .select()
     .from(transcripts)
-    .where(and(eq(transcripts.datasetId, datasetId), eq(transcripts.videoId, videoId)))
+    .where(and(
+      eq(transcripts.videoId, videoId),
+      sql`exists (
+        select 1 from ${streams}
+        where ${streams.videoId} = ${videoId}
+          and (${streams.datasetId} = ${datasetId}
+            or ${datasetId}::text = any(${streams.participants}))
+      )`,
+    ))
     .limit(1)
 }
 

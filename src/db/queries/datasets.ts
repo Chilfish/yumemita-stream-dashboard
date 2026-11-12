@@ -4,8 +4,16 @@ import { datasets, streams } from '@/db/schema'
 import type { DatasetSummary } from '@/types/db'
 import { toIso } from './shared'
 
+/**
+ * 成员的场次数按 owner ∪ 参与者统计，与场次列表、成员页呈同一口径。
+ * 全组总数不要用这些数字相加：联动场会同时计入两位成员。
+ */
+const STREAMS_TABLE = sql`(select dataset_id, participants, source_generated_at from streams) s`
+
 export function selectDatasetsQuery(db: Db, datasetId: string | undefined) {
-  const joinCondition = eq(streams.datasetId, datasets.id)
+  const memberWhere = sql`s.dataset_id = ${datasets.id} or ${datasets.id}::text = any(s.participants)`
+  const memberStreams = sql<number>`(select count(*)::int from ${STREAMS_TABLE} where ${memberWhere})`
+  const memberGeneratedAt = sql<Date | null>`(select max(s.source_generated_at) from ${STREAMS_TABLE} where ${memberWhere})`
 
   return db
     .select({
@@ -17,13 +25,11 @@ export function selectDatasetsQuery(db: Db, datasetId: string | undefined) {
       subject: datasets.subject,
       scope: datasets.scope,
       note: datasets.note,
-      streamCount: sql<number>`count(${streams.id})::int`,
-      generatedAt: sql<Date | null>`max(${streams.sourceGeneratedAt})`,
+      streamCount: memberStreams,
+      generatedAt: memberGeneratedAt,
     })
     .from(datasets)
-    .leftJoin(streams, joinCondition)
     .where(datasetId ? eq(datasets.id, datasetId) : undefined)
-    .groupBy(datasets.id)
     .orderBy(datasets.id)
 }
 

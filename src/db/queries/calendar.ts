@@ -19,6 +19,7 @@ import {
   videoIdFromUrl,
 } from "@/lib/schedule";
 import { isMemberOnly } from "@/lib/visibility";
+import { involvesMember } from "./streams";
 import type {
   AdminScheduleItem,
   CalendarEventInput,
@@ -56,6 +57,7 @@ export function buildStreamQueries(db: Db, options: { from: string; to: string; 
   return db
     .select({
       datasetId: streams.datasetId,
+      participants: streams.participants,
       videoId: streams.videoId,
       title: streams.title,
       url: streams.url,
@@ -68,12 +70,12 @@ export function buildStreamQueries(db: Db, options: { from: string; to: string; 
     .from(streams)
     .where(
       and(
-        options.datasetId ? eq(streams.datasetId, options.datasetId) : undefined,
+        options.datasetId ? involvesMember(options.datasetId) : undefined,
         gte(streams.date, options.from),
         lte(streams.date, options.to),
       ),
     )
-    .orderBy(streams.startedAt);
+    .orderBy(streams.startedAt)
 }
 
 export function buildScheduleQueries(
@@ -97,6 +99,7 @@ export function buildScheduleQueries(
       expectedMinutes: scheduledStreams.expectedMinutes,
       cancelledAt: scheduledStreams.cancelledAt,
       availability: scheduledStreams.availability,
+      participants: scheduledStreams.participants,
       source: scheduledStreams.source,
       note: scheduledStreams.note,
       lastLiveAt: scheduledStreams.lastLiveAt,
@@ -140,6 +143,7 @@ function mapStreamEvent(row: StreamQueryRow): CalendarEventInput | null {
   return {
     key: `stream:${row.videoId}`,
     datasetId: row.datasetId,
+    participantIds: row.participants ?? [],
     videoId: row.videoId,
     title: row.title,
     at,
@@ -159,7 +163,7 @@ function mapStreamEvent(row: StreamQueryRow): CalendarEventInput | null {
   };
 }
 
-function mapScheduleEvent(row: ScheduleQueryRow, streamKeys: Set<string>): CalendarEventInput {
+function mapScheduleEvent(row: ScheduleQueryRow, streamOwners: Map<string, string>): CalendarEventInput {
   const scheduledAt = toIso(row.scheduledAt);
   const timing = resolveScheduleTiming({
     date: row.date,
@@ -167,13 +171,15 @@ function mapScheduleEvent(row: ScheduleQueryRow, streamKeys: Set<string>): Calen
     scheduledAt,
   });
   const streamVideoId = row.videoId ?? videoIdFromUrl(row.url);
-  const hasStream = streamVideoId
-    ? streamKeys.has(`${row.datasetId}:${streamVideoId}`)
-    : false;
+  // 同一条视频只存一条记录（跨 dataset 零重复），按 videoId 判断即可，
+  // owner 用来决定链接落在谁的页面上。
+  const streamOwner = streamVideoId ? streamOwners.get(streamVideoId) ?? null : null;
+  const hasStream = streamOwner !== null;
 
   return {
     key: `schedule:${row.datasetId}:${row.eventKey}`,
     datasetId: row.datasetId,
+    participantIds: row.participants ?? [],
     videoId: row.videoId,
     title: row.title,
     at: timing.at,
@@ -190,19 +196,19 @@ function mapScheduleEvent(row: ScheduleQueryRow, streamKeys: Set<string>): Calen
     lastLiveAt: toIso(row.lastLiveAt),
     memberOnly: isMemberOnly(row.availability),
     source: row.source === "youtube" ? "youtube" : "manual",
-    href: hasStream && streamVideoId
-      ? streamPath(row.datasetId, streamVideoId)
+    href: streamOwner && streamVideoId
+      ? streamPath(streamOwner, streamVideoId)
       : null,
     url: row.url,
   };
 }
 
-function streamKeySet(events: CalendarEventInput[]): Set<string> {
-  const keys = new Set<string>();
+function streamOwnerMap(events: CalendarEventInput[]): Map<string, string> {
+  const owners = new Map<string, string>();
   for (const event of events) {
-    if (event.videoId) keys.add(`${event.datasetId}:${event.videoId}`);
+    if (event.videoId) owners.set(event.videoId, event.datasetId);
   }
-  return keys;
+  return owners;
 }
 
 /**
@@ -239,8 +245,8 @@ export async function getCalendarData(
   const streamEvents = streamRows
     .map(mapStreamEvent)
     .filter((event): event is CalendarEventInput => event !== null);
-  const keys = streamKeySet(streamEvents);
-  const scheduleEvents = scheduleRows.map(row => mapScheduleEvent(row, keys));
+  const owners = streamOwnerMap(streamEvents);
+  const scheduleEvents = scheduleRows.map(row => mapScheduleEvent(row, owners));
 
   return {
     members,
@@ -261,8 +267,8 @@ export function buildDayPlanFromRows(
   const streamEvents = streamRows
     .map(mapStreamEvent)
     .filter((event): event is CalendarEventInput => event !== null);
-  const keys = streamKeySet(streamEvents);
-  const scheduleEvents = scheduleRows.map(row => mapScheduleEvent(row, keys));
+  const owners = streamOwnerMap(streamEvents);
+  const scheduleEvents = scheduleRows.map(row => mapScheduleEvent(row, owners));
   const events = buildCalendarEvents({ streams: streamEvents, schedules: scheduleEvents, members, now });
 
   return buildDayPlan(events, now, days, members);
@@ -311,13 +317,13 @@ export async function getAdminScheduleList(
   const streamEvents = streamRows
     .map(mapStreamEvent)
     .filter((event): event is CalendarEventInput => event !== null);
-  const keys = streamKeySet(streamEvents);
-  const scheduleEvents = scheduleRows.map(row => mapScheduleEvent(row, keys));
+  const owners = streamOwnerMap(streamEvents);
+  const scheduleEvents = scheduleRows.map(row => mapScheduleEvent(row, owners));
   const matches = matchSchedulesToStreams(streamEvents, scheduleEvents);
   const now = new Date();
 
   return scheduleRows.map((row, index) => {
-    const event = scheduleEvents[index] ?? mapScheduleEvent(row, keys);
+    const event = scheduleEvents[index] ?? mapScheduleEvent(row, owners);
     const matched = matches.get(event.key) ?? null;
     const state = deriveCalendarEventState(
       { ...event, hasStream: Boolean(matched) || event.hasStream },
@@ -327,6 +333,7 @@ export async function getAdminScheduleList(
     return {
       datasetId: row.datasetId,
       eventKey: row.eventKey,
+      participants: row.participants ?? [],
       videoId: row.videoId,
       title: row.title,
       url: row.url,

@@ -23,6 +23,7 @@ import {
 import type { ChatByKind, CurrencyTotal, EmojiCount } from '@/types/datapack'
 import { isMemberOnly } from '@/lib/visibility'
 import { isV2Pack } from '@/lib/schema-version'
+import { involvesMember } from './streams'
 import { toIso } from './shared'
 
 const TOP_WORDS = 40
@@ -165,7 +166,7 @@ export async function computeDatasetPublicTotals(
       sourceSchema: streams.sourceSchema,
     })
     .from(streams)
-    .where(eq(streams.datasetId, datasetId))
+    .where(involvesMember(datasetId))
 
   const ordered = rows
     .slice()

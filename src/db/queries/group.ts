@@ -1,8 +1,16 @@
-import { sql } from 'drizzle-orm'
+import { and, sql } from 'drizzle-orm'
 import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
 import { streams } from '@/db/schema'
-import { ATTENDANCE_WINDOW_DAYS, shiftDateKey } from '@/lib/group'
+import {
+  ATTENDANCE_WINDOW_DAYS,
+  mergeParticipantDays,
+  mergeParticipantStats,
+  pickLatestStreams,
+  shiftDateKey,
+  sumGroupDays,
+  sumGroupTotals,
+} from '@/lib/group'
 import { isMemberOnly, MEMBER_ONLY_AVAILABILITY } from '@/lib/visibility'
 import {
   GROUP_GALLERY_SCHEMA,
@@ -24,6 +32,7 @@ const PUBLIC_WEIGHT = sql`case when ${streams.availability} is distinct from ${M
 /** 组级列表只渲染这些字段，避免把整行 jsonb 指标拉回来。 */
 const GROUP_STREAM_COLUMNS = {
   datasetId: streams.datasetId,
+  participants: streams.participants,
   date: streams.date,
   videoId: streams.videoId,
   title: streams.title,
@@ -109,6 +118,17 @@ export function buildLatestStreamsQuery(db: Db) {
     .orderBy(streams.datasetId, NEWEST_FIRST)
 }
 
+/**
+ * 联动场对参与者也应算进「他的最新场」。这里只取参与场次（数量很少），
+ * 由 `pickLatest` 与 owner 场次一起挑出每位成员的最新一场。
+ */
+export function buildParticipantStreamsQuery(db: Db) {
+  return db
+    .select(GROUP_STREAM_COLUMNS)
+    .from(streams)
+    .where(and(PUBLIC_ONLY, sql`cardinality(${streams.participants}) > 0`))
+}
+
 export function buildRecentStreamsQuery(db: Db) {
   return db
     .select(GROUP_STREAM_COLUMNS)
@@ -127,6 +147,7 @@ function toGroupStream(row: GroupStreamRow): GroupStreamSummary {
   const memberOnly = isMemberOnly(row.availability)
   return {
     datasetId: row.datasetId,
+    participants: row.participants ?? [],
     date: row.date ?? '',
     videoId: row.videoId,
     title: row.title,
@@ -150,12 +171,14 @@ export function buildGroupSummaryQueries(db: Db) {
     buildDayStatsQuery(db),
     buildLatestStreamsQuery(db),
     buildRecentStreamsQuery(db),
+    buildParticipantStreamsQuery(db),
   ] as const
 }
 
 export type GroupSummaryParts = [
   MemberStatsRow[],
   DayStatsRow[],
+  GroupStreamRow[],
   GroupStreamRow[],
   GroupStreamRow[],
 ]
@@ -165,11 +188,14 @@ export function assembleGroupSummary(
   days: DayStatsRow[],
   latest: GroupStreamRow[],
   recent: GroupStreamRow[],
+  participantRows: GroupStreamRow[] = [],
 ): GroupSummaryFile {
-  const memberStats = mapMemberStats(members)
-  const dayStats = mapDayStats(days)
-  const latestStreams = latest.map(toGroupStream)
+  const participantStreams = mapGroupStreams(participantRows)
+  const memberStats = mergeParticipantStats(mapMemberStats(members), participantStreams)
+  const dayStats = mergeParticipantDays(mapDayStats(days), participantStreams)
+  const latestStreams = pickLatestStreams(latest.map(toGroupStream), participantStreams)
   const recentStreams = recent.map(toGroupStream)
+  const collabStreams = participantStreams
 
   const generatedAt = recentStreams
     .map(row => row.startedAt)
@@ -181,18 +207,20 @@ export function assembleGroupSummary(
     schema: GROUP_SUMMARY_SCHEMA,
     generatedAt: generatedAt ?? new Date().toISOString(),
     members: memberStats.sort((a, b) => a.datasetId.localeCompare(b.datasetId)),
+    totals: sumGroupTotals(memberStats, collabStreams),
     days: dayStats,
+    dayTotals: sumGroupDays(dayStats, collabStreams),
     latest: latestStreams.sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? '')),
     recent: recentStreams,
   }
 }
 
 export async function getGroupSummary(db: Db): Promise<GroupSummaryFile> {
-  const [members, days, latest, recent] = await runBatch<GroupSummaryParts>(
+  const [members, days, latest, recent, participantRows] = await runBatch<GroupSummaryParts>(
     db,
     buildGroupSummaryQueries(db),
   )
-  return assembleGroupSummary(members, days, latest, recent)
+  return assembleGroupSummary(members, days, latest, recent, participantRows)
 }
 
 export function buildGroupGalleryQuery(db: Db) {

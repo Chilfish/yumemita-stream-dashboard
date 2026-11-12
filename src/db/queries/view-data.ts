@@ -207,7 +207,7 @@ export async function getGroupPageData(
   }
 
   if (!options.withToday) {
-    const [datasetRows, members, days, latest, recent] = await runBatch<
+    const [datasetRows, members, days, latest, recent, participantRows] = await runBatch<
       [DatasetQueryRow[], ...GroupSummaryParts]
     >(db, [
       selectDatasetsQuery(db, undefined),
@@ -216,7 +216,10 @@ export async function getGroupPageData(
     const datasets = toIndex(datasetRows.map(mapDataset))
     return {
       datasets,
-      data: buildGroupDataFromSummary(datasets, assembleGroupSummary(members, days, latest, recent)),
+      data: buildGroupDataFromSummary(
+        datasets,
+        assembleGroupSummary(members, days, latest, recent, participantRows),
+      ),
       dayPlan: null,
       today,
       todayMonthDay,
@@ -230,6 +233,7 @@ export async function getGroupPageData(
     days,
     latest,
     recent,
+    participantRows,
     todayStreams,
     todaySchedules,
     onThisDayRows,
@@ -249,7 +253,7 @@ export async function getGroupPageData(
     buildOnThisDayQuery(db, todayMonthDay, today),
   ])
   const datasets = toIndex(datasetRows.map(mapDataset))
-  const summary = assembleGroupSummary(members, days, latest, recent)
+  const summary = assembleGroupSummary(members, days, latest, recent, participantRows)
   const calendarMembers: CalendarMember[] = datasets.map(dataset => ({
     id: dataset.id,
     label: dataset.label,
