@@ -73,6 +73,7 @@
 | `FR-TRANSCRIPT-001` | P1 | 逐字稿发布与渲染 | `AC-TRANSCRIPT-001`：有稿场次出现「逐字稿」分段；索引页按月份列出；行首时间码跳 YouTube；无稿不显示空标签；附录中日对照默认折叠、展开后默认只显示中文，可切双语 / 日文并按条展开，选择记在浏览器本地（手工） | ✅ | archive/product-direction |
 | `FR-TRANSCRIPT-002` | P2 | 逐字稿索引的检索、分面与长列表 | `AC-TRANSCRIPT-002`：搜索匹配标题 / 摘要 / 标签 / 日期 / `videoId`；标签多选同时命中；`q` / `tags` / `sort` / `dense` 写入 URL；标签、排序与密度收进单一筛选入口；月份分组可折叠；移动端筛选面板可用；320px 无横向溢出（手工 + 单测） | ✅ | transcript-index |
 | `FR-DATA-001` | P0 | 由 pack 派生 streams / insights | `AC-DATA-001`：`bun run db:ingest` 重建 `streams` + `dataset_insights`；`db:verify` 0 problems；不手改数据库（手工 / 脚本） | ✅ | data-model |
+| `FR-DATA-005` | P2 | 联动场次归属到多位成员 | `AC-DATA-005`：一场直播有 owner 与参与者；参与者登记在 `content/collaborations.json`，`db:ingest` 写入 `streams.participants`；参与者的场次列表、日历、成员汇总都能看到该场；全组计数按 videoId 去重，不等于各成员之和（单测 + 手工） | ✅ | 2026-11-12 需求 |
 | `FR-DATA-002` | P0 | 资产发布到 R2 | `AC-DATA-002`：`publish:assets` 上传顺序为 thumbs → emoji → archive；逐字稿单独发布；对象可达（手工） | ✅ | deployment |
 | `FR-DATA-003` | P0 | 每日增量抓取与入库 | `AC-DATA-003`：`daily-update.ts` 与 `streams` 做差集；安静日不抓取、不 ingest；失败开 issue（手工 / Actions 日志） | ✅ | deployment |
 | `FR-DATA-004` | P1 | 数据更新后刷新缓存与 SEO 产物 | `AC-DATA-004`：ingest 后调 `POST /api/internal/cache/purge` 按 tag 失效；sitemap 请求期生成；线上 MISS → HIT 与 purge 后回源已实测 | ✅ | astro-ssr-migration |
@@ -114,6 +115,7 @@
 | `FR-COMPARE-002` | `src/pages/compare.astro`、`src/components/pages/group-compare-page.tsx`、`src/lib/compare.ts`、`src/db/queries/group-compare.ts` | 组级全员对比 |
 | `FR-TRANSCRIPT-001` | `content/transcripts/`、`src/components/dashboard/transcript/transcript-view.tsx`、`src/components/dashboard/transcript/transcript-appendix.tsx`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/lib/preferences.ts`、`src/db/queries/transcripts.ts`、`src/pages/[datasetId]/transcripts.astro`、`scripts/publish-transcripts.ts` | 逐字稿与附录语言筛选 |
 | `FR-DATA-*` | `scripts/publish-data.ts`、`scripts/daily-update.ts`、`scripts/lib/` | 数据链路 |
+| `FR-DATA-005` | `content/collaborations.json`、`scripts/lib/collaborations.ts`、`scripts/ingest-db.ts`、`src/db/queries/streams.ts`、`src/db/queries/group.ts`、`src/db/queries/datasets.ts` | 联动场次归属，方案见 [collaboration-streams.md](../planning/collaboration-streams.md) |
 | `FR-SEO-*` | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | SEO |
 | `FR-AGENT-001` / `FR-ARCH-001` | `src/pages/[datasetId]/stream/[videoId].md.ts`、`src/lib/agent-markdown.ts`、`src/db/queries/` | Agent 视图与数据库查询 |
 
@@ -129,3 +131,4 @@
 | 2026-11-07 | 新增「信息密度」非功能约束；组首页删除重复指标、口径脚注与自证式导航 | v1.5 |
 | 2026-11-09 | 新增 `FR-GALLERY-003` 那年今日：`/gallery?day=MM-DD` 按年回看往期同一天，组首页提供预览 | v1.6 |
 | 2026-11-09 | `FR-TRANSCRIPT-001` 补充附录中日对照的语言开关：默认中文、可切双语 / 日文、逐条展开，偏好存本地 | v1.7 |
+| 2026-11-12 | 新增 `FR-DATA-005` 联动场次：一场直播可有 owner 与参与者，参与者可见该场，全组计数按 videoId 去重 | v1.8 |

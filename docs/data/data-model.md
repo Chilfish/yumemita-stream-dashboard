@@ -434,6 +434,7 @@ bun run fetch:live-chat --video <videoId>                       # 已结束时�
 | `slot` | text \| null | `early` / `mid` / `late`；有精确时间时派生 |
 | `kind` | text \| null | `sing` / `event` / `talk` / `game`；空值时按标题推断 |
 | `thumbnail_key` | text \| null | 预留列，当前不写入、不展示；正式封面仍从 `streams.thumbnail_key` 读取 |
+| `participants` | text[] | owner 之外的参与成员；空数组表示单人场。详见 [collaboration-streams.md](../planning/collaboration-streams.md) |
 | `scheduled_at` | timestamptz \| null | 精确开播时间；只有时段时为空 |
 | `expected_minutes` | integer \| null | 预计时长；仅作管理端记录，不参与状态派生 |
 | `cancelled_at` | timestamptz \| null | 非空表示已取消 |
@@ -452,6 +453,20 @@ bun run fetch:live-chat --video <videoId>                       # 已结束时�
 读取时按「成员 + JST 日期 + 时段」把没有 `video_id` 的手工行匹配到 `streams`；
 命中后不再显示手工行，直接显示真实场次。带链接、`video_id` 或自动同步的行按 video id 精确匹配。
 匹配与清理规则见 [schedule-admin.md](../engineering/schedule-admin.md) 第 3 节。
+
+### 联动场次
+
+`streams.participants` 与 `scheduled_streams.participants` 都是 `text[]`，只放 owner 之外的成员 id。
+`dataset_id` 仍是唯一频道主，两个来源不重叠，所以「某成员的场次」直接并集即可：
+
+```sql
+dataset_id = $1 or $1::text = any(participants)
+```
+
+- 已知 videoId 的参与者登记在 `content/collaborations.json`，`db:ingest` 写入 `streams.participants`，重跑按登记全量替换。
+- 成员的场次数与汇总包含他参与的联动场；全组合计按 videoId 去重，因此**全组总数不等于各成员之和**。
+- 站内链接始终指向频道主；参与者 URL 也能打开同一场，但站内不生成。
+- 方案与取舍见 [collaboration-streams.md](../planning/collaboration-streams.md)。
 
 ## 口径与限制
 

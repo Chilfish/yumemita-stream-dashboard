@@ -146,6 +146,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 | `kind` | 否 | `sing` / `event` / `talk` / `game`；省略时按标题推断，标题也为空则留空 |
 | `expectedMinutes` | 否 | 15–720 |
 | `availability` | 否 | `public`（默认）/ `subscriber_only` |
+| `participants` | 否 | owner 之外的参与成员 id 数组；最多 4 个，自动去重并排除 owner |
 | `cancelled` | 否 | 默认 `false` |
 | `source` | 否 | 只允许 `manual`（默认）；管理端不会创建自动同步行 |
 | `note` | 否 | ≤500 字 |
@@ -191,6 +192,15 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 - 改期时自然键跟着改，序号保持不变（`manual:2026-11-08-late-2` 改到 11-09 变成 `manual:2026-11-09-late-2`）；显式 `id` 的行保持原键。
 - 只有时间未知、且没有自然键时才用 `yt:<videoId>`。
 - 链接只填 `url`，不参与主键；已有自动同步行会更新同一行，而不是另建一条。
+
+### 联动场次
+
+- `participants` 只放 owner 之外的成员，自然键仍按 owner 的日期 + 时段生成，参与者不单独占一行。
+- 校验：成员必须存在（否则 `404`）、自动去重、排除 owner 自己、最多 4 个。
+- 自动同步只更新时间类字段，不会清掉手工登记的 `participants`。
+- 两行各自登记了同场成员时，按 video id 合并后取并集。
+- 日历上这一场对每位参与者都可见，成员筛选按「owner 或参与者」判断。
+- 入库后由 `content/collaborations.json` 决定 `streams.participants`，日程上的登记不会自动迁移过去；两者要一起维护。详见 [collaboration-streams.md](../planning/collaboration-streams.md)。
 
 ### 同日同时段的多场
 

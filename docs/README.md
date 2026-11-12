@@ -19,6 +19,7 @@ docs/
 │   ├── architecture.md
 │   ├── backlog.md
 │   ├── live-calendar.md
+│   ├── collaboration-streams.md
 │   └── performance-audit.md
 ├── engineering/                 # 工程规范、开发、部署、性能、排查
 │   ├── README.md
@@ -94,6 +95,7 @@ docs/
 | 长逐字稿卡顿 / 附录中日字幕 | [long-transcript-rendering.md](./research/long-transcript-rendering.md) + [long-document-rendering-practices.md](./research/long-document-rendering-practices.md) | 本站取舍；业界 SSR / 虚拟化 / Canvas / 折叠对照 |
 | 追溯迁移决策 / 数据模型 | [astro-ssr-migration.md](./archive/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 已完成的迁移方案、数据模型、`.md` 路由、缓存与发布 |
 | 继续做直播日历 | [live-calendar.md](./planning/live-calendar.md) + [backlog.md](./planning/backlog.md) | 剩余首页 / 场次页入口与 ICS |
+| 联动场次 / 多人同场 | [collaboration-streams.md](./planning/collaboration-streams.md) | 归属模型、登记文件、计数口径 |
 | 优化数据库读路径 | [performance.md](./engineering/performance.md) + [db-optimization.md](./archive/db-optimization.md) | 当前结论与历史压测 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
 | 不确定该改哪个文件 | [code-map.md](./engineering/code-map.md) | 任务意图 → 关键文件；只放入口 |
