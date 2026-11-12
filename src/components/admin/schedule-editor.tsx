@@ -71,15 +71,6 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
   }
 
   function startEdit(item: AdminScheduleItem): void {
-    if (item.source !== "manual") {
-      toastManager.add({
-        type: "info",
-        title: "自动同步的日程",
-        description: "这里只编辑手工日程。自动行会在下一次同步时刷新。",
-      });
-      return;
-    }
-
     setEditing({ datasetId: item.datasetId, eventKey: item.eventKey });
     setForm({
       datasetId: item.datasetId,
