@@ -16,11 +16,12 @@ import {
   paidEvents,
   streamAuthors,
   streamDetails,
-  streams,
   streamWords,
+  streams,
 } from '../src/db/schema.ts'
 import type { StreamDatapack } from '../src/types/datapack.ts'
 import { buildStreamSummary } from './lib/dataset-manifest.ts'
+import { loadCollaborations, type LoadCollaborationsResult } from './lib/collaborations.ts'
 import { loadEnvFiles, requireEnv } from './lib/env.ts'
 import { syncTranscripts } from './lib/transcripts-db.ts'
 import { pruneMatchedSchedules } from './lib/schedule-match.ts'
@@ -219,6 +220,20 @@ async function main(): Promise<void> {
   const selected = sources.datasets.filter(item => !args.dataset || item.id === args.dataset)
   if (selected.length === 0) throw new Error(`找不到 dataset: ${args.dataset}`)
 
+  const collaborations = loadCollaborations({
+    knownDatasetIds: sources.datasets.map(item => item.id),
+  })
+  const collaborationSkipped = collaborations.skipped.length
+  if (collaborationSkipped > 0) {
+    console.warn(`[ingest] 跳过 ${collaborationSkipped} 条参与者登记`)
+    for (const skip of collaborations.skipped) {
+      console.warn(`[ingest] 跳过 ${skip.videoId}/${skip.datasetId || '-'}：${skip.reason}`)
+    }
+  }
+  if (collaborations.file?.schema && collaborations.file.schema !== 'yumemita.stream-collaborations/v1') {
+    console.warn(`[ingest] 未知的参与者文件 schema：${collaborations.file.schema}`)
+  }
+
   const idsFile = args.idsFile
     ? new Set(readFileSync(args.idsFile, 'utf8').split(/\s+/).filter(Boolean))
     : undefined
@@ -351,7 +366,7 @@ async function main(): Promise<void> {
         else report.forceIds.push(videoId)
 
         try {
-          await ingestPack(db, source, pack, hash, batchId)
+          await ingestPack(db, source, pack, hash, batchId, collaborations)
           report.processed += 1
           changed = true
         }
@@ -477,10 +492,14 @@ async function ingestPack(
   pack: StreamDatapack,
   hash: string,
   batchId: number | null,
+  collaborations: LoadCollaborationsResult,
 ): Promise<void> {
   const video = pack.video
   const chat = pack.chat
   const startedAt = toTimestamp(video.startedAt)
+  // 参与者按登记全量替换：文件里删掉某个成员后重跑也要生效。
+  const participants = (collaborations.byVideo.get(video.id) ?? [])
+    .filter(datasetId => datasetId !== source.id)
 
   await db.transaction(async (tx) => {
     const [row] = await tx.insert(streams).values({
@@ -519,6 +538,7 @@ async function ingestPack(
       scPerHour: numeric(pack.derived?.scPerHour),
       paidSharePct: numeric(pack.chat.paid.paidSharePct),
       thumbnailKey: video.id && video.thumbnail ? `thumbs/${video.id}.jpg` : null,
+      participants,
       sourceGeneratedAt: toTimestamp(pack.generatedAt),
       sourceSchema: pack.schema,
       contentHash: hash,
@@ -560,6 +580,7 @@ async function ingestPack(
         scPerHour: numeric(pack.derived?.scPerHour),
         paidSharePct: numeric(pack.chat.paid.paidSharePct),
         thumbnailKey: video.id && video.thumbnail ? `thumbs/${video.id}.jpg` : null,
+        participants,
         sourceGeneratedAt: toTimestamp(pack.generatedAt),
         sourceSchema: pack.schema,
         contentHash: hash,

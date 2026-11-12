@@ -208,7 +208,7 @@ async function upsertScheduleEntries(
           url: entry.url,
           lastSeenAt: now,
           updatedAt: now,
-          // 频道暂时没给时刻时保留旧值，不把已有排期擦掉。
+          // 频道列表不含共演信息：只动时间类字段，保留手工登记的参与者。
           scheduledAt: sql`coalesce(${entry.scheduledAt}, ${scheduledStreams.scheduledAt})`,
           date: sql`coalesce(${entry.date}, ${scheduledStreams.date})`,
           slot: sql`coalesce(${entry.slot}, ${scheduledStreams.slot})`,

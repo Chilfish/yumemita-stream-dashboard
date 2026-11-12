@@ -5,7 +5,16 @@
  * 全组相册才需要全部精简行。两个文件都在发布时由 manifest 派生，
  * 页面不再为了摘要去拉五份完整 manifest。
  */
-import { ATTENDANCE_WINDOW_DAYS, shiftDateKey, toGroupStream } from "../../src/lib/group.ts";
+import {
+  ATTENDANCE_WINDOW_DAYS,
+  mergeParticipantDays,
+  mergeParticipantStats,
+  pickLatestStreams,
+  shiftDateKey,
+  sumGroupDays,
+  sumGroupTotals,
+  toGroupStream,
+} from "../../src/lib/group.ts";
 import {
   GROUP_GALLERY_SCHEMA,
   GROUP_RECENT_LIMIT,
@@ -112,14 +121,27 @@ export function buildGroupSummary(
   all.sort((a, b) => (b.startedAt ?? "").localeCompare(a.startedAt ?? ""));
   days.sort((a, b) => b.date.localeCompare(a.date) || a.datasetId.localeCompare(b.datasetId));
 
+  // 全组口径按 videoId 去重：联动场会同时进两位成员的统计，但不该算两次。
+  const participantStreams = all.filter(stream => (stream.participants ?? []).length > 0)
+  const stats = mergeParticipantStats(members, participantStreams)
+  const mergedDays = mergeParticipantDays(days, participantStreams)
+  const latestStreams = pickLatestStreams(
+    sortNewestFirst(latest),
+    participantStreams,
+  )
+  const totals = sumGroupTotals(stats, participantStreams)
+  const dayTotals = sumGroupDays(mergedDays, participantStreams)
+
   return {
     schema: GROUP_SUMMARY_SCHEMA,
     generatedAt,
-    members,
-    days,
-    latest: sortNewestFirst(latest),
+    totals,
+    members: stats,
+    days: mergedDays,
+    dayTotals,
+    latest: sortNewestFirst(latestStreams),
     recent: all.slice(0, GROUP_RECENT_LIMIT),
-  };
+  }
 }
 
 export function buildGroupGallery(
