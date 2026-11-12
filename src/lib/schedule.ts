@@ -317,6 +317,11 @@ export const scheduleFieldsSchema = v.object({
   source: v.optional(v.literal("manual")),
   note: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(500)))),
   url: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^https?:\/\//, "url 必须是 http(s) 地址")))),
+  /** owner 之外的参与成员；去重后最多 4 个。 */
+  participants: v.optional(v.nullable(v.pipe(
+    v.array(v.string()),
+    v.maxLength(4, "同场成员最多 4 个"),
+  ))),
 });
 
 export type ScheduleWriteInput = v.InferOutput<typeof scheduleFieldsSchema>;
@@ -353,6 +358,25 @@ export function validateScheduleInput(input: unknown, mode: "create" | "patch"):
   }
 
   return { ok: true, value };
+}
+
+/**
+ * 参与者规整：去掉 owner 自己、空值与重复项，保持提交顺序。
+ * 成员是否存在由调用方查库校验，这里只做纯函数层面的清理。
+ */
+export function normalizeParticipants(
+  participants: string[] | null | undefined,
+  owner: string,
+): string[] {
+  const seen = new Set<string>([owner]);
+  const result: string[] = [];
+  for (const raw of participants ?? []) {
+    const id = raw.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
 }
 
 /** 没指定类型时按标题推断；标题也为空就保持 null。 */

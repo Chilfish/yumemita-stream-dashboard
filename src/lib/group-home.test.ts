@@ -34,6 +34,8 @@ function stream(overrides: Partial<GroupStreamRow> = {}): GroupStreamRow {
     datasetId: "a",
     memberLabel: "A",
     memberColor: "#b8461f",
+    ownerDatasetId: "a",
+    participantLabels: [],
     date: "2026-10-29",
     videoId: "vid",
     title: "配信",

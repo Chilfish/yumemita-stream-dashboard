@@ -426,6 +426,8 @@ function mergeDuplicateSchedules(schedules: CalendarEventInput[]): CalendarEvent
       at: base.at ?? event.at,
       date: base.date ?? event.date,
       slot: base.slot ?? event.slot,
+      // 手工行与自动行各自可能登记了参与者，合并时取并集并保持既有顺序。
+      participantIds: [...new Set([...base.participantIds, ...event.participantIds])],
       timeTentative: base.at ? base.timeTentative : event.timeTentative,
       kind: base.kind ?? event.kind,
       hasStream: base.hasStream || event.hasStream,
@@ -469,6 +471,9 @@ export function buildCalendarEvents(input: BuildCalendarInput): CalendarEvent[] 
         state: deriveCalendarEventState(event, input.now),
         memberLabel: member?.label ?? event.datasetId,
         color: member?.color ?? "var(--member-color)",
+        participantLabels: event.participantIds
+          .map(id => memberById.get(id)?.label ?? id)
+          .filter(Boolean),
         memberAvatar: member?.avatar ?? null,
       } satisfies CalendarEvent;
     })

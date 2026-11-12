@@ -74,6 +74,7 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
     setEditing({ datasetId: item.datasetId, eventKey: item.eventKey });
     setForm({
       datasetId: item.datasetId,
+      participants: item.participants ?? [],
       title: item.title,
       date: item.date ?? today,
       timeMode: item.timeTentative ? "slot" : "time",
@@ -101,6 +102,7 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
 
     const payload: Record<string, unknown> = {
       datasetId: form.datasetId,
+      participants: form.participants.filter(id => id !== form.datasetId),
       title: form.title.trim(),
       date: form.date,
       kind: form.kind === "none" ? null : form.kind,

@@ -30,6 +30,7 @@ function input(overrides: Partial<CalendarEventInput> = {}): CalendarEventInput 
   return {
     key: "schedule:test",
     datasetId: "nonoka",
+    participantIds: [],
     videoId: "abc12345678",
     title: "雑談",
     at,

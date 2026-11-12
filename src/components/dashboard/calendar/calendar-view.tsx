@@ -83,7 +83,11 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
     () =>
       selectedMembers.length === 0
         ? baseEvents
-        : baseEvents.filter(event => selectedMembers.includes(event.datasetId)),
+        : baseEvents.filter(
+            event =>
+              selectedMembers.includes(event.datasetId)
+              || event.participantIds.some(id => selectedMembers.includes(id)),
+          ),
     [baseEvents, selectedMembers],
   );
 

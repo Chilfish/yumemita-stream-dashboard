@@ -69,7 +69,7 @@ export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamPr
         </p>
         <Link
           className="-my-1 flex min-h-9 shrink-0 items-center text-caption text-muted-foreground transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
-          to={streamPath(datasetId, stream.videoId)}
+          to={streamPath(stream.datasetId ?? datasetId, stream.videoId)}
         >
           打开单场详情 →
         </Link>
@@ -78,7 +78,7 @@ export function HomeLatestStream({ datasetId, stream, rows }: HomeLatestStreamPr
       <h2 className="mt-2 text-title text-foreground">
         <Link
           className="line-clamp-3 transition-colors duration-120 ease-out hover:text-member-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink md:line-clamp-2"
-          to={streamPath(datasetId, stream.videoId)}
+          to={streamPath(stream.datasetId ?? datasetId, stream.videoId)}
         >
           {stream.title}
         </Link>

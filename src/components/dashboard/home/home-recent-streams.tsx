@@ -115,7 +115,7 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
             ariaLabel="最近场次"
             columns={columns}
             empty="没有加载到场次"
-            rowHref={row => streamPath(datasetId, row.videoId)}
+            rowHref={row => streamPath(row.datasetId ?? datasetId, row.videoId)}
             rowKey={row => row.videoId}
             rowLabel={row => `打开单场：${row.title}`}
             rows={recent}

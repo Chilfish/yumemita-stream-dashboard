@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { PackStatus } from '@/types/datapack'
 import { TriangleAlert } from 'lucide-react'
+import { memberLabelsOf } from '@/lib/members'
 import { AppHeader } from '@/components/dashboard/shell/app-header'
 import { AppSidebar } from '@/components/dashboard/shell/app-sidebar'
 import { DatasetViewContext } from '@/components/dashboard/contexts/dataset-view-context'
@@ -221,7 +222,7 @@ function DatasetBody(props: DatasetPageProps) {
   }
 }
 
-function StreamBody({ dataset, rows, stream, pack, hasTranscript, locked }: DatasetPageProps) {
+function StreamBody({ datasets, dataset, rows, stream, pack, hasTranscript, locked }: DatasetPageProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const view = parseStreamSubView(searchParams.get('view'))
@@ -242,8 +243,10 @@ function StreamBody({ dataset, rows, stream, pack, hasTranscript, locked }: Data
 
   return (
     <StreamDetailView
-      datasetId={dataset.id}
+      // 联动场从参与者页进来时，封面、表情这些资源仍按频道主取。
+      datasetId={stream.datasetId ?? dataset.id}
       hasTranscript={hasTranscript ?? false}
+      memberLabels={memberLabelsOf(stream, datasets)}
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
       onViewChange={(next) => {
         const params = new URLSearchParams(searchParams)

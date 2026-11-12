@@ -46,11 +46,11 @@ export function GroupOnThisDay({ monthDay, rows }: GroupOnThisDayProps) {
               <li className="min-w-0" key={`${row.datasetId}/${row.videoId}`}>
                 <Link
                   className="press group flex flex-col gap-2 rounded-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
-                  to={streamPath(row.datasetId, row.videoId)}
+                  to={streamPath(row.ownerDatasetId ?? row.datasetId, row.videoId)}
                 >
                   <StreamCover
                     className="transition-[filter] duration-120 ease-out group-hover:brightness-[1.06]"
-                    datasetId={row.datasetId}
+                    datasetId={row.ownerDatasetId ?? row.datasetId}
                     sizes="(min-width: 768px) 22vw, 45vw"
                     thumbnail={row.thumbnail}
                     title={row.title}

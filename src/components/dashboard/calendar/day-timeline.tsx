@@ -8,7 +8,7 @@ import {
   monthDayLabel,
   weekdayLabel,
 } from "@/lib/calendar";
-import { eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
+import { eventMemberLabel, eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
 import { CONTENT_TYPE_LABELS } from "@/lib/classify";
 import { formatDurationLong } from "@/lib/format";
 import { Link } from "@/lib/router-compat";
@@ -56,7 +56,7 @@ function TimelineRow({ event }: { event: CalendarEvent }) {
       <span className="min-w-0 flex-1 pb-3">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="min-w-0 truncate text-caption font-medium text-muted-foreground">
-            {event.memberLabel}
+            {eventMemberLabel(event)}
           </span>
           {event.kind ? (
             <>

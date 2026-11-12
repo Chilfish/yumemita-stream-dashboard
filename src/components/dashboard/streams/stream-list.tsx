@@ -45,12 +45,14 @@ export function StreamList({ datasetId, rows, empty, className }: StreamListProp
       {rows.map(row => {
         const { key, matched } = classifyTitle(row.title);
         const memberOnly = row.masked ?? isMemberOnly(row.availability);
+        // 联动场在参与者页上是「别人的频道播的」，标一行提示避免误以为是自己的场。
+        const hostedElsewhere = Boolean(row.datasetId && row.datasetId !== datasetId);
 
         return (
           <li key={row.videoId}>
             <Link
               className="flex flex-col gap-1.5 px-4 py-3 transition-colors duration-120 ease-out active:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-member-ink"
-              to={streamPath(datasetId, row.videoId)}
+              to={streamPath(row.datasetId ?? datasetId, row.videoId)}
             >
               <div className="flex items-baseline gap-2 text-caption text-ink-3">
                 <span className="tabular-nums">
@@ -59,6 +61,7 @@ export function StreamList({ datasetId, rows, empty, className }: StreamListProp
                 <span className={matched ? "text-muted-foreground" : "text-ink-3"}>
                   {CONTENT_TYPE_LABELS[key]}
                 </span>
+                {hostedElsewhere ? <span>联动</span> : null}
                 {memberOnly ? <span>会员限定</span> : null}
                 <span className="ms-auto tabular-nums">{formatDuration(row.durationSec)}</span>
               </div>

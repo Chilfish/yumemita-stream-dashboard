@@ -138,7 +138,7 @@ export function StreamsView({ rows, datasetId, params, onParamsChange }: Streams
                 className="min-w-[48rem]"
                 columns={columns}
                 onSort={handleSort}
-                rowHref={row => streamPath(datasetId, row.videoId)}
+                rowHref={row => streamPath(row.datasetId ?? datasetId, row.videoId)}
                 rowKey={row => row.videoId}
                 rowLabel={row => `打开 ${row.title}`}
                 rows={rendered}

@@ -9,6 +9,8 @@ export interface DatasetOption {
 
 export interface FormState {
   datasetId: string;
+  /** owner 之外的参与成员，顺序即展示顺序。 */
+  participants: string[];
   title: string;
   date: string;
   timeMode: "slot" | "time";
@@ -32,6 +34,7 @@ const jstTimeFormat = new Intl.DateTimeFormat("en-GB", {
 export function emptyForm(datasets: DatasetOption[], today: string): FormState {
   return {
     datasetId: datasets[0]?.id ?? "",
+    participants: [],
     title: "",
     date: today,
     timeMode: "slot",

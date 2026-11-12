@@ -20,6 +20,7 @@ function scheduleItem(overrides: Partial<AdminScheduleItem> = {}): AdminSchedule
   return {
     datasetId: "nonoka",
     eventKey: "manual:test",
+    participants: [],
     videoId: null,
     title: "雑談",
     url: null,

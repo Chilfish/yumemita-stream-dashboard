@@ -1,5 +1,5 @@
 import type { APIContext, APIRoute } from "astro";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { getAdminScheduleList } from "@/db/queries/calendar";
 import { datasets, scheduledStreams } from "@/db/schema";
@@ -9,6 +9,7 @@ import {
   isDateKey,
   isScheduleSlot,
   manualEventKey,
+  normalizeParticipants,
   parseManualEventKey,
   planScheduleEventKey,
   resolveKind,
@@ -56,6 +57,17 @@ async function datasetExists(datasetId: string): Promise<boolean> {
     .where(eq(datasets.id, datasetId))
     .limit(1);
   return rows.length > 0;
+}
+
+/** 参与者里只要有一个不存在的成员就整体拒绝，避免写入拼写错误。 */
+async function missingDatasets(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ id: datasets.id })
+    .from(datasets)
+    .where(inArray(datasets.id, ids));
+  const known = new Set(rows.map(row => row.id));
+  return ids.filter(id => !known.has(id));
 }
 
 async function findRow(datasetId: string, eventKey: string) {
@@ -133,6 +145,7 @@ function rowToItem(row: typeof scheduledStreams.$inferSelect): AdminScheduleItem
   return {
     datasetId: row.datasetId,
     eventKey: row.eventKey,
+    participants: row.participants ?? [],
     videoId: row.videoId,
     title: row.title,
     url: row.url,
@@ -212,6 +225,12 @@ export const POST: APIRoute = async (context) => {
     return fail("datasetId 不存在", 404, "datasetId");
   }
 
+  const participants = normalizeParticipants(input.participants, input.datasetId);
+  const missing = await missingDatasets(participants);
+  if (missing.length > 0) {
+    return fail(`成员不存在：${missing.join("、")}`, 404, "participants");
+  }
+
   const timing = resolveScheduleTiming(input);
   const eventKey = await resolveCreateKey(input, timing);
   if (!eventKey) return fail("无法确定 eventKey", 400, "eventKey");
@@ -231,6 +250,7 @@ export const POST: APIRoute = async (context) => {
     cancelledAt: input.cancelled ? now : null,
     availability: input.availability ?? "public",
     source: "manual",
+    participants,
     note: input.note ?? null,
     updatedAt: now,
   };
@@ -252,6 +272,7 @@ export const POST: APIRoute = async (context) => {
         expectedMinutes: sql`coalesce(excluded.expected_minutes, ${scheduledStreams.expectedMinutes})`,
         cancelledAt: sql`excluded.cancelled_at`,
         availability: sql`excluded.availability`,
+        participants: sql`excluded.participants`,
         note: sql`excluded.note`,
         updatedAt: sql`excluded.updated_at`,
       },
@@ -302,11 +323,19 @@ export const PATCH: APIRoute = async (context) => {
     cancelled: pick(body, "cancelled", Boolean(existing.cancelledAt)),
     note: pick(body, "note", existing.note),
     url: pick(body, "url", existing.url),
+    // 没传就用原值，传空数组表示清空同场成员。
+    participants: pick(body, "participants", existing.participants ?? []),
   };
 
   const parsed = validateScheduleInput(merged, "create");
   if (!parsed.ok) return fail(parsed.error, 400, parsed.field);
   const input = parsed.value;
+
+  const participants = normalizeParticipants(input.participants, datasetId);
+  const missing = await missingDatasets(participants);
+  if (missing.length > 0) {
+    return fail(`成员不存在：${missing.join("、")}`, 404, "participants");
+  }
 
   const timing = resolveScheduleTiming(input);
   // 自然键行改期时同步改名，序号保持不变；显式 id 行保持原键。
@@ -340,6 +369,8 @@ export const PATCH: APIRoute = async (context) => {
           availability: input.availability ?? target.availability,
           cancelledAt: input.cancelled ? (target.cancelledAt ?? now) : target.cancelledAt,
           note: input.note ?? target.note,
+          // 两行登记的同场成员取并集，不因为合并丢掉任意一边。
+          participants: [...new Set([...(target.participants ?? []), ...participants])],
           updatedAt: now,
         })
         .where(and(
@@ -378,6 +409,7 @@ export const PATCH: APIRoute = async (context) => {
       cancelledAt: input.cancelled ? (existing.cancelledAt ?? now) : null,
       availability: input.availability ?? existing.availability ?? "public",
       source: existing.source,
+      participants,
       note: input.note ?? null,
       updatedAt: now,
     })
@@ -393,6 +425,7 @@ export const PATCH: APIRoute = async (context) => {
         expectedMinutes: sql`excluded.expected_minutes`,
         cancelledAt: sql`excluded.cancelled_at`,
         availability: sql`excluded.availability`,
+        participants: sql`excluded.participants`,
         note: sql`excluded.note`,
         updatedAt: sql`excluded.updated_at`,
       },

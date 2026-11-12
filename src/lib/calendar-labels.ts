@@ -17,6 +17,13 @@ export function eventTimeLabel(event: Pick<CalendarEvent, "at" | "slot" | "timeT
   return formatTime(event.at);
 }
 
+/** 联动场显示「ののか · りつ」；单人场只有 owner。 */
+export function eventMemberLabel(
+  event: Pick<CalendarEvent, "memberLabel" | "participantLabels">,
+): string {
+  return [event.memberLabel, ...event.participantLabels].filter(Boolean).join(" · ");
+}
+
 export const UNTITLED_LABEL = "待定";
 
 export function eventTitle(event: Pick<CalendarEvent, "title">): string {
@@ -26,7 +33,7 @@ export function eventTitle(event: Pick<CalendarEvent, "title">): string {
 export function eventAriaLabel(event: CalendarEvent): string {
   const parts: string[] = [];
   if (event.at) parts.push(eventTimeLabel(event));
-  parts.push(event.memberLabel, eventTitle(event), CALENDAR_STATE_LABELS[event.state]);
+  parts.push(eventMemberLabel(event), eventTitle(event), CALENDAR_STATE_LABELS[event.state]);
   if (event.memberOnly) parts.push("会员限定");
   return parts.join("，");
 }

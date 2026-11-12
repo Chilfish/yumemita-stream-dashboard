@@ -1,6 +1,6 @@
 import { ExternalLink, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { eventAriaLabel, eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
+import { eventAriaLabel, eventMemberLabel, eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
 import { Link } from "@/lib/router-compat";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarEventState } from "@/types/calendar";
@@ -43,7 +43,7 @@ export function CalendarEventRow({ event, className }: CalendarEventRowProps) {
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="min-w-0 truncate text-caption font-medium text-foreground">
-            {event.memberLabel}
+            {eventMemberLabel(event)}
           </span>
           {event.memberOnly ? (
             <>

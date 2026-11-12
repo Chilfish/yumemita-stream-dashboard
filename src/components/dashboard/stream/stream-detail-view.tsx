@@ -35,6 +35,8 @@ const SUBVIEW_LABELS: Record<StreamSubView, string> = {
 
 interface StreamDetailViewProps {
   datasetId: string;
+  /** 联动场的全部成员标签，频道主在前；单人场只有一项。 */
+  memberLabels: string[];
   rows: StreamNavItem[];
   row: StreamRow;
   view: StreamSubView;
@@ -69,6 +71,7 @@ function renderSubview(
 
 export function StreamDetailView({
   datasetId,
+  memberLabels,
   rows,
   row,
   view,
@@ -80,6 +83,8 @@ export function StreamDetailView({
   const memberOnly = pack.video.availability === "subscriber_only";
   const missingVstats = pack.vstats == null;
   const superchatCount = pack.chat.paid.superchats.length;
+  // 联动场把全部成员写在一行；单人场为空，页头不额外占用一行。
+  const memberLine = memberLabels.length > 1 ? memberLabels.join(" × ") : null;
 
   // 逐字稿是可选内容：没有稿的场次不显示这个分段，避免出现永远为空的标签。
   const subviews = STREAM_SUBVIEWS.filter(subview => subview !== "transcript" || hasTranscriptProp);
@@ -147,8 +152,9 @@ export function StreamDetailView({
           title={summary.title}
           titleClassName="text-title line-clamp-2"
         >
-          {memberOnly || missingVstats ? (
+          {memberLine || memberOnly || missingVstats ? (
             <span className="flex flex-wrap items-center gap-1.5">
+              {memberLine ? <span className="text-footnote text-member-ink">{memberLine}</span> : null}
               {memberOnly ? <Badge variant="warning">会员限定</Badge> : null}
               {missingVstats ? (
                 <Badge title="没有同接快照" variant="outline">

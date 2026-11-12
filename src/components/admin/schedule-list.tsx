@@ -47,7 +47,8 @@ function stateTone(state: CalendarEventState): "secondary" | "error" | "outline"
 }
 
 function memberLabel(item: AdminScheduleItem, datasets: DatasetOption[]): string {
-  return datasets.find(dataset => dataset.id === item.datasetId)?.label ?? item.datasetId;
+  const labelOf = (id: string) => datasets.find(dataset => dataset.id === id)?.label ?? id;
+  return [item.datasetId, ...(item.participants ?? [])].map(labelOf).join(" · ");
 }
 
 function KindBadge({ item }: { item: AdminScheduleItem }) {

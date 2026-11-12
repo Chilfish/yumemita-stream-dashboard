@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TimeInput } from "@/components/shared/time-input";
 import { CONTENT_TYPE_LABELS, CONTENT_TYPES, type ContentTypeKey } from "@/lib/classify";
 import { SCHEDULE_SLOTS, SLOT_LABELS } from "@/lib/schedule";
@@ -90,6 +91,29 @@ export function ScheduleForm({
             type="date"
             value={form.date}
           />
+        </Field>
+
+        <Field className="sm:col-span-2">
+          <FieldLabel>同场成员（可选）</FieldLabel>
+          <ToggleGroup
+            aria-label="同场成员"
+            className="flex flex-wrap gap-1"
+            multiple
+            onValueChange={participants => onChange({ participants })}
+            size="sm"
+            value={form.participants}
+          >
+            {datasets
+              .filter(dataset => dataset.id !== form.datasetId)
+              .map(dataset => (
+                <ToggleGroupItem key={dataset.id} value={dataset.id}>
+                  {dataset.label}
+                </ToggleGroupItem>
+              ))}
+          </ToggleGroup>
+          <FieldDescription>
+            联动场只按频道主占一行；这里选中的成员在日历与成员页也会看到这场。
+          </FieldDescription>
         </Field>
 
         <Field className="sm:col-span-2">

@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import { ContentTypeIcon } from "@/components/dashboard/calendar/content-type-icon";
 import { deriveCalendarEventState, monthDayLabel } from "@/lib/calendar";
-import { eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
+import { eventMemberLabel, eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
 import { CONTENT_TYPE_LABELS } from "@/lib/classify";
 import { assetUrl } from "@/lib/utils";
 import type { CalendarEvent, DayPlan, DayPlanDay } from "@/types/calendar";
@@ -56,7 +56,7 @@ function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
 
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-lg text-stone-500">
-                <span className="min-w-0 truncate">{event.memberLabel}</span>
+                <span className="min-w-0 truncate">{eventMemberLabel(event)}</span>
                 {event.kind ? (
                   <>
                     <ContentTypeIcon kind={event.kind} />
