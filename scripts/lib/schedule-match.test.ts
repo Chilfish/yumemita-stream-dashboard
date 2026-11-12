@@ -159,7 +159,7 @@ describe("planScheduleConsolidation", () => {
     });
   });
 
-  it("同一时段有多条自动行时只归一一条，不互相覆盖", () => {
+  it("同一时段有多条自动行时各得一个序号，不互相覆盖", () => {
     const plan = planScheduleConsolidation([
       schedule({
         eventKey: "yt:aaaaaaaaaaa",
@@ -173,8 +173,40 @@ describe("planScheduleConsolidation", () => {
       }),
     ]);
 
+    expect(plan).toHaveLength(2);
+    expect(plan.map(entry => entry.targetEventKey)).toEqual([
+      "manual:2026-11-11-late",
+      "manual:2026-11-11-late-2",
+    ]);
+  });
+
+  it("同日同时段两条手工行时，yt 行合并到时间最近的一条", () => {
+    const plan = planScheduleConsolidation([
+      schedule({
+        eventKey: "manual:2026-11-11-late",
+        scheduledAt: "2026-11-11T22:00:00+09:00",
+        title: "韩国",
+      }),
+      schedule({
+        eventKey: "manual:2026-11-11-late-2",
+        scheduledAt: "2026-11-11T23:00:00+09:00",
+        title: "VG開封",
+      }),
+      schedule({
+        eventKey: "yt:L_WHcvB4dfQ",
+        videoId: "L_WHcvB4dfQ",
+        source: "youtube",
+        scheduledAt: "2026-11-11T23:05:00+09:00",
+        title: "VG開封",
+      }),
+    ]);
+
     expect(plan).toHaveLength(1);
-    expect(plan[0]?.targetEventKey).toBe("manual:2026-11-11-late");
+    expect(plan[0]).toMatchObject({
+      action: "merge",
+      eventKey: "yt:L_WHcvB4dfQ",
+      targetEventKey: "manual:2026-11-11-late-2",
+    });
   });
 
   it("时间未知的 yt 行保持原样", () => {

@@ -7,13 +7,17 @@ import { deriveCalendarEventState, addDays, currentJstDay } from "@/lib/calendar
 import { isContentType } from "@/lib/classify";
 import {
   isDateKey,
-  isNaturalEventKey,
   isScheduleSlot,
-  resolveEventKey,
+  manualEventKey,
+  parseManualEventKey,
+  planScheduleEventKey,
   resolveKind,
   resolveScheduleTiming,
-  scheduleNaturalKey,
+  scheduleEventKey,
   validateScheduleInput,
+  videoIdFromUrl,
+  youtubeEventKey,
+  type ResolvedScheduleTiming,
 } from "@/lib/schedule";
 import type { AdminScheduleItem, CalendarEventState } from "@/types/calendar";
 
@@ -64,6 +68,49 @@ async function findRow(datasetId: string, eventKey: string) {
     ))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/** 同一成员、同一 JST 日期、同一时段下的全部行，用于同场判定与序号分配。 */
+async function listSlotRows(datasetId: string, date: string, slot: string) {
+  return db
+    .select({
+      eventKey: scheduledStreams.eventKey,
+      scheduledAt: scheduledStreams.scheduledAt,
+      title: scheduledStreams.title,
+    })
+    .from(scheduledStreams)
+    .where(and(
+      eq(scheduledStreams.datasetId, datasetId),
+      eq(scheduledStreams.date, date),
+      eq(scheduledStreams.slot, slot),
+    ));
+}
+
+/**
+ * 新增时的主键选择：显式 `eventKey` / `id` 优先；
+ * 否则同一场次复用已有自然键，不同场次顺延到同日同时段的下一个空序号。
+ */
+async function resolveCreateKey(
+  input: { datasetId: string; eventKey?: string | null; id?: string | null; videoId?: string | null; title?: string | null },
+  timing: ResolvedScheduleTiming,
+): Promise<string | null> {
+  if (input.eventKey) return input.eventKey;
+  if (input.id) return manualEventKey(input.id);
+
+  if (timing.date && timing.slot) {
+    const rows = await listSlotRows(input.datasetId, timing.date, timing.slot);
+    return planScheduleEventKey(
+      {
+        date: timing.date,
+        slot: timing.slot,
+        scheduledAt: timing.scheduledAt,
+        title: input.title ?? "",
+      },
+      rows,
+    );
+  }
+
+  return input.videoId ? youtubeEventKey(input.videoId) : null;
 }
 
 function rowToItem(row: typeof scheduledStreams.$inferSelect): AdminScheduleItem {
@@ -166,8 +213,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const timing = resolveScheduleTiming(input);
-  const naturalKey = timing.date && timing.slot ? `${timing.date}-${timing.slot}` : null;
-  const eventKey = resolveEventKey(input, naturalKey);
+  const eventKey = await resolveCreateKey(input, timing);
   if (!eventKey) return fail("无法确定 eventKey", 400, "eventKey");
 
   const now = new Date();
@@ -263,14 +309,23 @@ export const PATCH: APIRoute = async (context) => {
   const input = parsed.value;
 
   const timing = resolveScheduleTiming(input);
-  // 已知日期 + 时段时主键始终是自然键；改期时同步改名，显式 id 行保持原键。
-  const naturalKey = scheduleNaturalKey(timing.date, timing.slot);
-  const nextKey = isNaturalEventKey(eventKey) && naturalKey ? naturalKey : eventKey;
+  // 自然键行改期时同步改名，序号保持不变；显式 id 行保持原键。
+  const parts = parseManualEventKey(eventKey);
+  const nextKey = parts && timing.date && timing.slot
+    ? scheduleEventKey(timing.date, timing.slot, parts.ordinal)
+    : eventKey;
   const now = new Date();
 
   if (nextKey !== eventKey) {
     const target = await findRow(datasetId, nextKey);
     if (target) {
+      // 目标键上是同一场（视频 id 一致）时合并；是另一场就拒绝，不悄悄覆盖。
+      const targetVideoId = target.videoId ?? videoIdFromUrl(target.url);
+      const inputVideoId = input.videoId ?? videoIdFromUrl(input.url);
+      if (!targetVideoId || targetVideoId !== inputVideoId) {
+        return fail("目标日期与时段已有另一场日程", 409, "date");
+      }
+
       // 合并到已有自动行时保留这次编辑的字段，不能只删掉手工行。
       const [updated] = await db
         .update(scheduledStreams)

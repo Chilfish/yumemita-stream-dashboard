@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { CALENDAR_STATE_LABELS } from "@/lib/calendar-labels";
 import { CONTENT_TYPE_LABELS } from "@/lib/classify";
-import { groupSchedulesByDate, SLOT_LABELS } from "@/lib/schedule";
+import { groupSchedulesByDate, parseManualEventKey, SLOT_LABELS } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import type { AdminScheduleItem, CalendarEventState } from "@/types/calendar";
 
@@ -32,9 +32,11 @@ const jstTimeFormat = new Intl.DateTimeFormat("zh-CN", {
 });
 
 function itemTimeLabel(item: AdminScheduleItem): string {
-  if (item.timeTentative && item.slot) return SLOT_LABELS[item.slot];
+  const ordinal = parseManualEventKey(item.eventKey)?.ordinal ?? 1;
+  const suffix = ordinal > 1 ? ` · 第 ${ordinal} 场` : "";
+  if (item.timeTentative && item.slot) return `${SLOT_LABELS[item.slot]}${suffix}`;
   if (!item.scheduledAt) return "—";
-  return jstTimeFormat.format(new Date(item.scheduledAt));
+  return `${jstTimeFormat.format(new Date(item.scheduledAt))}${suffix}`;
 }
 
 function stateTone(state: CalendarEventState): "secondary" | "error" | "outline" | "warning" {

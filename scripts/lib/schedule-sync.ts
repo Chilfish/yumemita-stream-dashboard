@@ -10,6 +10,8 @@ import { and, eq, inArray, lt, sql } from 'drizzle-orm'
 import type { Db } from '../../src/db/connection.ts'
 import { scheduledStreams } from '../../src/db/schema.ts'
 import {
+  freeScheduleEventKey,
+  isScheduleSlot,
   jstDateKeyFrom,
   scheduleNaturalKey,
   slotForJstTime,
@@ -125,11 +127,22 @@ interface ExistingScheduleRow {
   eventKey: string
   videoId: string | null
   url: string | null
+  date: string | null
+  slot: string | null
+  scheduledAt: Date | null
+}
+
+function minutesBetween(left: Date | null, right: Date | null): number | null {
+  if (!left || !right) return null
+  return Math.abs(left.getTime() - right.getTime()) / 60_000
 }
 
 /**
  * 逐条写入未来场。已有行就地更新，主键保持稳定：
  * 手工自然键行不会被自动同步接管成 `yt:`，`yt:` 行拿到日期后再统一归一。
+ *
+ * 同一成员同日同时段有多场时按「未认领 + 开播时间最近」选目标行，
+ * 不会再无条件认领自然键、把另一场的 video id 冲掉。
  */
 async function upsertScheduleEntries(
   db: Db,
@@ -144,6 +157,9 @@ async function upsertScheduleEntries(
       eventKey: scheduledStreams.eventKey,
       videoId: scheduledStreams.videoId,
       url: scheduledStreams.url,
+      date: scheduledStreams.date,
+      slot: scheduledStreams.slot,
+      scheduledAt: scheduledStreams.scheduledAt,
     })
     .from(scheduledStreams)
     .where(eq(scheduledStreams.datasetId, datasetId))
@@ -152,30 +168,38 @@ async function upsertScheduleEntries(
   const byVideo = new Map<string, ExistingScheduleRow>(
     rows.filter(row => row.videoId).map(row => [row.videoId as string, row]),
   )
-  const byUrlId = new Map<string, ExistingScheduleRow>()
+  const claimed = new Set<string>()
+  const bySlot = new Map<string, ExistingScheduleRow[]>()
   for (const row of rows) {
-    if (row.videoId) continue
-    const videoId = videoIdFromUrl(row.url)
-    if (videoId) byUrlId.set(videoId, row)
+    const anchor = row.date && isScheduleSlot(row.slot) ? `${row.date}:${row.slot}` : null
+    if (!anchor) continue
+    const bucket = bySlot.get(anchor)
+    if (bucket) bucket.push(row)
+    else bySlot.set(anchor, [row])
   }
 
   for (const entry of entries) {
-    const target = byKey.get(entry.eventKey)
-      ?? byVideo.get(entry.videoId)
-      ?? byUrlId.get(entry.videoId)
+    const byUrlId = rows.find(row => !row.videoId && videoIdFromUrl(row.url) === entry.videoId)
+    const byVideoTarget = byVideo.get(entry.videoId) ?? byUrlId
+    // 同槽里没被本轮认领、且没有挂着别的视频的行；取开播时间最近的一条。
+    const slotTarget = entry.date && isScheduleSlot(entry.slot)
+      ? (bySlot.get(`${entry.date}:${entry.slot}`) ?? [])
+          .filter(row => !claimed.has(row.eventKey))
+          .filter(row => !row.videoId || row.videoId === entry.videoId)
+          .sort((a, b) => {
+            const left = minutesBetween(entry.scheduledAt, a.scheduledAt)
+            const right = minutesBetween(entry.scheduledAt, b.scheduledAt)
+            if (left != null && right != null && left !== right) return left - right
+            if (left != null && right == null) return -1
+            if (left == null && right != null) return 1
+            return a.eventKey.localeCompare(b.eventKey)
+          })[0]
+      : undefined
+
+    const target = byVideoTarget ?? slotTarget
 
     if (target) {
-      // 同一个视频已经挂在另一行时先删掉，避免 `(dataset_id, video_id)` 唯一索引冲突。
-      const duplicate = byVideo.get(entry.videoId)
-      if (duplicate && duplicate.eventKey !== target.eventKey) {
-        await db.delete(scheduledStreams).where(and(
-          eq(scheduledStreams.datasetId, datasetId),
-          eq(scheduledStreams.eventKey, duplicate.eventKey),
-        ))
-        byVideo.delete(entry.videoId)
-        byKey.delete(duplicate.eventKey)
-      }
-
+      claimed.add(target.eventKey)
       await db
         .update(scheduledStreams)
         .set({
@@ -197,10 +221,10 @@ async function upsertScheduleEntries(
       continue
     }
 
-    // 同一时段已被另一条视频占用时退回 yt，避免覆盖别人的自然键。
-    let eventKey = entry.eventKey
-    const occupant = byKey.get(eventKey)
-    if (occupant && occupant.videoId !== entry.videoId) eventKey = `yt:${entry.videoId}`
+    // 同一时段已有另一条视频时顺延到下一个空序号；没有日期/时段才退回 yt。
+    const eventKey = entry.date && isScheduleSlot(entry.slot)
+      ? freeScheduleEventKey(entry.date, entry.slot, byKey.keys())
+      : `yt:${entry.videoId}`
 
     await db
       .insert(scheduledStreams)
@@ -234,8 +258,21 @@ async function upsertScheduleEntries(
       })
 
     // 同一轮里后续条目要能看到刚写入的键，避免同一时段互相覆盖。
-    byKey.set(eventKey, { eventKey, videoId: entry.videoId, url: entry.url })
-    byVideo.set(entry.videoId, { eventKey, videoId: entry.videoId, url: entry.url })
+    const written: ExistingScheduleRow = {
+      eventKey,
+      videoId: entry.videoId,
+      url: entry.url,
+      date: entry.date,
+      slot: entry.slot,
+      scheduledAt: entry.scheduledAt,
+    }
+    byKey.set(eventKey, written)
+    byVideo.set(entry.videoId, written)
+    if (entry.date && isScheduleSlot(entry.slot)) {
+      const anchor = `${entry.date}:${entry.slot}`
+      bySlot.set(anchor, [...(bySlot.get(anchor) ?? []), written])
+    }
+    claimed.add(eventKey)
   }
 }
 

@@ -16,6 +16,7 @@ import type { Db } from '../../src/db/connection.ts'
 import { scheduledStreams, streams } from '../../src/db/schema.ts'
 import { matchSchedulesToStreams } from '../../src/lib/calendar.ts'
 import {
+  freeScheduleEventKey,
   isScheduleSlot,
   jstDateKeyFrom,
   resolveScheduleTiming,
@@ -196,46 +197,71 @@ export function planSchedulePrune(
   return [...planned.values()]
 }
 
-/** 已知日期 + 时段时的统一主键；与 `manual:<date>-<slot>` 同源。 */
-function naturalEventKey(row: ScheduleRef): string | null {
+/** 日期 + 时段锚点，用于把 `yt:` 行归并到同一场的手工行。 */
+function slotAnchor(row: ScheduleRef): string | null {
   const timing = resolveScheduleTiming({
     date: row.date,
     slot: isScheduleSlot(row.slot) ? row.slot : null,
     scheduledAt: toIso(row.scheduledAt),
-  })
-  return scheduleNaturalKey(timing.date, timing.slot)
+  });
+  return timing.date && timing.slot ? `${timing.date}:${timing.slot}` : null;
+}
+
+function minutesApart(row: ScheduleRef, other: ScheduleRef): number | null {
+  const left = toDate(row.scheduledAt);
+  const right = toDate(other.scheduledAt);
+  if (!left || !right) return null;
+  return Math.abs(left.getTime() - right.getTime()) / 60_000;
 }
 
 /**
  * 纯函数：把 `yt:` 行归一到统一格式。
- * - 已有同日同时段或同 video id 的手工行时，合并到手工行（保留自然键）；
- * - 没有手工行但日期/时段已知时，直接把 `yt:` 改名为自然键；
- * - 时间未知或目标键已被另一条视频占用时不动。
+ * - 同一 video id 的手工行优先，直接合并；
+ * - 否则按日期 + 时段找未被认领的手工行，取开播时间最近的一条；
+ * - 没有可合并的手工行时，把 `yt:` 改名为该时段的下一个空序号（同日多场不互相覆盖）；
+ * - 时间未知时不动。
  */
 export function planScheduleConsolidation(rows: ScheduleRef[]): ScheduleConsolidationEntry[] {
   const byKey = new Map(rows.map(row => [row.eventKey, row]))
-  const naturalTargets = new Map<string, ScheduleRef>()
   const manualByVideo = new Map<string, ScheduleRef>()
+  const manualBySlot = new Map<string, ScheduleRef[]>()
 
   for (const row of rows) {
     if (!row.eventKey.startsWith('manual:')) continue
-    const key = naturalEventKey(row)
-    if (key) naturalTargets.set(key, row)
     const videoId = row.videoId ?? videoIdFromUrl(row.url)
     if (videoId) manualByVideo.set(`${row.datasetId}:${videoId}`, row)
+
+    const anchor = slotAnchor(row)
+    if (!anchor) continue
+    const bucket = manualBySlot.get(anchor)
+    if (bucket) bucket.push(row)
+    else manualBySlot.set(anchor, [row])
   }
 
   const planned: ScheduleConsolidationEntry[] = []
   const reserved = new Set<string>()
+  const claimed = new Set<string>()
+  const ordered = [...rows].sort((a, b) => a.eventKey.localeCompare(b.eventKey))
 
-  for (const row of rows) {
+  for (const row of ordered) {
     if (!row.eventKey.startsWith('yt:')) continue
-    const key = naturalEventKey(row)
-    const target = (row.videoId
-      ? manualByVideo.get(`${row.datasetId}:${row.videoId}`)
-      : undefined) ?? (key ? naturalTargets.get(key) : undefined)
+    const anchor = slotAnchor(row)
+    const target = (row.videoId ? manualByVideo.get(`${row.datasetId}:${row.videoId}`) : undefined)
+      ?? (anchor
+        ? (manualBySlot.get(anchor) ?? [])
+            .filter(candidate => !claimed.has(candidate.eventKey))
+            .sort((a, b) => {
+              const left = minutesApart(row, a);
+              const right = minutesApart(row, b);
+              if (left != null && right != null && left !== right) return left - right;
+              if (left != null && right == null) return -1;
+              if (left == null && right != null) return 1;
+              return a.eventKey.localeCompare(b.eventKey);
+            })[0]
+        : undefined)
 
     if (target && target.eventKey !== row.eventKey) {
+      claimed.add(target.eventKey)
       const patch: ScheduleMergePatch = {}
       if (target.videoId == null && row.videoId) patch.videoId = row.videoId
       if (!target.title.trim() && row.title.trim()) patch.title = row.title
@@ -258,7 +284,19 @@ export function planScheduleConsolidation(rows: ScheduleRef[]): ScheduleConsolid
       continue
     }
 
-    if (!key || byKey.has(key) || reserved.has(key)) continue
+    const timing = resolveScheduleTiming({
+      date: row.date,
+      slot: isScheduleSlot(row.slot) ? row.slot : null,
+      scheduledAt: toIso(row.scheduledAt),
+    })
+    if (!timing.date || !timing.slot) continue
+
+    const key = freeScheduleEventKey(
+      timing.date,
+      timing.slot,
+      [...byKey.keys(), ...reserved],
+    )
+    if (byKey.has(key) || reserved.has(key)) continue
     reserved.add(key)
     planned.push({
       datasetId: row.datasetId,

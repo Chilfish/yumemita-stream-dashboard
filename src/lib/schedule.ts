@@ -154,6 +154,41 @@ export function youtubeEventKey(videoId: string): string {
   return `yt:${videoId}`;
 }
 
+const manualKeyPattern = /^manual:(\d{4}-\d{2}-\d{2})-(early|mid|late)(?:-(\d+))?$/;
+
+export interface ManualEventKeyParts {
+  date: string;
+  slot: ScheduleSlot;
+  /** 同日同时段的第几场，从 1 开始；第 1 场不带后缀。 */
+  ordinal: number;
+}
+
+/** 解析 `manual:<date>-<slot>[-<ordinal>]`；不是自然键时返回 null。 */
+export function parseManualEventKey(eventKey: string): ManualEventKeyParts | null {
+  const match = manualKeyPattern.exec(eventKey);
+  if (!match) return null;
+  const [, date, slot, ordinalText] = match;
+  if (!date || !isDateKey(date) || !isScheduleSlot(slot)) return null;
+  if (!ordinalText) return { date, slot, ordinal: 1 };
+
+  const ordinal = Number(ordinalText);
+  if (!Number.isInteger(ordinal) || ordinal < 2 || String(ordinal) !== ordinalText) return null;
+  return { date, slot, ordinal };
+}
+
+/**
+ * 日期 + 时段已知时的自然键。同日同时段有多场时按序号顺延：
+ * `manual:<date>-<slot>`、`manual:<date>-<slot>-2`、`-3`……
+ */
+export function scheduleEventKey(
+  date: string,
+  slot: ScheduleSlot,
+  ordinal = 1,
+): string {
+  const base = `${date}-${slot}`;
+  return manualEventKey(ordinal > 1 ? `${base}-${ordinal}` : base);
+}
+
 /**
  * 已知日期 + 时段时统一用自然键 `manual:<date>-<slot>`；
  * 只有时间未知时才退回 `yt:<videoId>`。链接不改变主键。
@@ -161,21 +196,97 @@ export function youtubeEventKey(videoId: string): string {
 export function scheduleNaturalKey(
   date: string | null | undefined,
   slot: ScheduleSlot | null | undefined,
+  ordinal = 1,
 ): string | null {
-  return date && slot ? manualEventKey(`${date}-${slot}`) : null;
+  return date && slot ? scheduleEventKey(date, slot, ordinal) : null;
 }
 
 export function isManualEventKey(eventKey: string): boolean {
   return eventKey.startsWith("manual:");
 }
 
-/** `manual:<YYYY-MM-DD>-<slot>`：由日期 + 时段自然键生成的主键。 */
-export function isNaturalEventKey(eventKey: string): boolean {
-  return /^manual:\d{4}-\d{2}-\d{2}-(early|mid|late)$/.test(eventKey);
-}
-
 export function isYoutubeEventKey(eventKey: string): boolean {
   return eventKey.startsWith("yt:");
+}
+
+export interface ScheduleOccurrence {
+  scheduledAt: string | Date | null;
+  title: string;
+}
+
+function occurrenceTime(value: string | Date | null): number | null {
+  if (!value) return null;
+  const time = value instanceof Date ? value.getTime() : Date.parse(value);
+  return Number.isFinite(time) ? time : null;
+}
+
+/**
+ * 同一成员同日同时段的两条记录是否指同一场直播。
+ *
+ * 两侧都有标题时只比标题：改期重提用的是同一个标题，仍是同一场；
+ * 标题有一侧为空时退回比开播时间，两边都给了时间且不同就是两场。
+ */
+export function isSameScheduleOccurrence(a: ScheduleOccurrence, b: ScheduleOccurrence): boolean {
+  const leftTitle = a.title.trim();
+  const rightTitle = b.title.trim();
+  if (leftTitle && rightTitle) return leftTitle === rightTitle;
+
+  const leftAt = occurrenceTime(a.scheduledAt);
+  const rightAt = occurrenceTime(b.scheduledAt);
+  if (leftAt != null && rightAt != null) return leftAt === rightAt;
+  return true;
+}
+
+/** 该成员该时段里第一个没被占用的序号。 */
+export function freeScheduleEventKey(
+  date: string,
+  slot: ScheduleSlot,
+  occupiedKeys: Iterable<string>,
+): string {
+  const used = new Set<number>();
+  for (const eventKey of occupiedKeys) {
+    const parts = parseManualEventKey(eventKey);
+    if (parts && parts.date === date && parts.slot === slot) used.add(parts.ordinal);
+  }
+
+  let ordinal = 1;
+  while (used.has(ordinal)) ordinal += 1;
+  return scheduleEventKey(date, slot, ordinal);
+}
+
+export interface ScheduleOccurrenceRow extends ScheduleOccurrence {
+  eventKey: string;
+}
+
+/** 跨午夜的 `late` 场归到前一晚：00:00–04:59 用前一天做锚点。 */
+export function anchoredSlotDate(
+  date: string | null | undefined,
+  slot: ScheduleSlot | null | undefined,
+  at: string | Date | null | undefined,
+): string | null {
+  if (!date || !slot) return null;
+  const hour = jstHour(at ?? null);
+  if (slot !== "late" || hour == null || hour >= 5) return date;
+
+  const [year, month, day] = date.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day - 1));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+}
+
+/**
+ * 写入时选择主键：同一场次已有自然键行就复用（幂等更新），
+ * 否则在同日同时段顺延一个空序号，不会覆盖另一场。
+ */
+export function planScheduleEventKey(
+  input: { date: string; slot: ScheduleSlot } & ScheduleOccurrence,
+  existing: ScheduleOccurrenceRow[],
+): string {
+  for (const row of existing) {
+    const parts = parseManualEventKey(row.eventKey);
+    if (!parts || parts.date !== input.date || parts.slot !== input.slot) continue;
+    if (isSameScheduleOccurrence(input, row)) return row.eventKey;
+  }
+  return freeScheduleEventKey(input.date, input.slot, existing.map(row => row.eventKey));
 }
 
 const isoWithZone = v.pipe(
@@ -252,19 +363,4 @@ export function resolveKind(
   if (kind) return kind;
   const text = title?.trim();
   return text ? classifyTitle(text).key : null;
-}
-
-/**
- * 主键优先级：显式 `eventKey` / `id` > 日期 + 时段自然键 > `videoId`。
- * 链接只作为外链与匹配线索，不改变主键；已有 `yt:` 行会在同步时归一到自然键。
- */
-export function resolveEventKey(
-  input: Pick<ScheduleWriteInput, "eventKey" | "id" | "videoId">,
-  naturalKey?: string | null,
-): string | null {
-  if (input.eventKey) return input.eventKey;
-  if (input.id) return manualEventKey(input.id);
-  if (naturalKey) return manualEventKey(naturalKey);
-  if (input.videoId) return youtubeEventKey(input.videoId);
-  return null;
 }

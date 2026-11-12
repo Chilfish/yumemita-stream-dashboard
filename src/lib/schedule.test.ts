@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  freeScheduleEventKey,
   groupSchedulesByDate,
   hasTimeZone,
   isDateKey,
   jstDateKeyFrom,
   nominalStart,
-  resolveEventKey,
+  parseManualEventKey,
+  planScheduleEventKey,
   resolveScheduleTiming,
+  scheduleEventKey,
   slotForJstTime,
   validateScheduleInput,
   videoIdFromUrl,
@@ -118,6 +121,99 @@ describe("链接解析", () => {
   });
 });
 
+describe("自然键与序号", () => {
+  it("第 1 场不带后缀，后续按序号顺延", () => {
+    expect(scheduleEventKey("2026-11-10", "late")).toBe("manual:2026-11-10-late");
+    expect(scheduleEventKey("2026-11-10", "late", 2)).toBe("manual:2026-11-10-late-2");
+  });
+
+  it("解析带序号的自然键", () => {
+    expect(parseManualEventKey("manual:2026-11-10-late")).toEqual({
+      date: "2026-11-10",
+      slot: "late",
+      ordinal: 1,
+    });
+    expect(parseManualEventKey("manual:2026-11-10-late-2")).toEqual({
+      date: "2026-11-10",
+      slot: "late",
+      ordinal: 2,
+    });
+  });
+
+  it("非自然键返回 null", () => {
+    expect(parseManualEventKey("manual:my-custom-id")).toBeNull();
+    expect(parseManualEventKey("manual:2026-11-10-late-1")).toBeNull();
+    expect(parseManualEventKey("manual:2026-11-10-late-02")).toBeNull();
+    expect(parseManualEventKey("yt:L_WHcvB4dfQ")).toBeNull();
+    expect(parseManualEventKey("manual:2026-02-30-late")).toBeNull();
+  });
+
+  it("分配该时段第一个空序号", () => {
+    expect(freeScheduleEventKey("2026-11-10", "late", [])).toBe("manual:2026-11-10-late");
+    expect(
+      freeScheduleEventKey("2026-11-10", "late", ["manual:2026-11-10-late"]),
+    ).toBe("manual:2026-11-10-late-2");
+    expect(
+      freeScheduleEventKey("2026-11-10", "late", [
+        "manual:2026-11-10-late",
+        "manual:2026-11-10-late-3",
+        "manual:2026-11-10-mid",
+      ]),
+    ).toBe("manual:2026-11-10-late-2");
+  });
+
+  it("同一标题重提复用原键，不同标题顺延新序号", () => {
+    const existing = [
+      { eventKey: "manual:2026-11-10-late", scheduledAt: "2026-11-10T22:00:00+09:00", title: "韩国" },
+    ];
+
+    expect(
+      planScheduleEventKey(
+        { date: "2026-11-10", slot: "late", scheduledAt: "2026-11-10T23:00:00+09:00", title: "韩国" },
+        existing,
+      ),
+    ).toBe("manual:2026-11-10-late");
+
+    expect(
+      planScheduleEventKey(
+        { date: "2026-11-10", slot: "late", scheduledAt: "2026-11-10T23:00:00+09:00", title: "VG開封" },
+        existing,
+      ),
+    ).toBe("manual:2026-11-10-late-2");
+  });
+
+  it("标题为空时按开播时间区分两场", () => {
+    const existing = [
+      { eventKey: "manual:2026-11-10-late", scheduledAt: "2026-11-10T22:00:00+09:00", title: "" },
+    ];
+
+    expect(
+      planScheduleEventKey(
+        { date: "2026-11-10", slot: "late", scheduledAt: "2026-11-10T22:00:00+09:00", title: "" },
+        existing,
+      ),
+    ).toBe("manual:2026-11-10-late");
+    expect(
+      planScheduleEventKey(
+        { date: "2026-11-10", slot: "late", scheduledAt: "2026-11-10T23:00:00+09:00", title: "" },
+        existing,
+      ),
+    ).toBe("manual:2026-11-10-late-2");
+  });
+
+  it("自己已有的序号行不算重复占用", () => {
+    const existing = [
+      { eventKey: "manual:2026-11-10-late-2", scheduledAt: null, title: "VG開封" },
+    ];
+    expect(
+      planScheduleEventKey(
+        { date: "2026-11-10", slot: "late", scheduledAt: null, title: "VG開封" },
+        existing,
+      ),
+    ).toBe("manual:2026-11-10-late-2");
+  });
+});
+
 describe("输入校验", () => {
   it("带链接的手工行仍用日期 + 时段自然键", () => {
     const result = validateScheduleInput(
@@ -132,14 +228,16 @@ describe("输入校验", () => {
 
     expect(result.ok && result.value.videoId).toBeUndefined();
     expect(
-      resolveEventKey(result.ok ? result.value : {}, "2026-11-11-late"),
+      planScheduleEventKey(
+        {
+          date: "2026-11-11",
+          slot: "late",
+          scheduledAt: null,
+          title: result.ok ? result.value.title ?? "" : "",
+        },
+        [],
+      ),
     ).toBe("manual:2026-11-11-late");
-  });
-
-  it("没有日期时段时才退回 yt 主键", () => {
-    expect(
-      resolveEventKey({ videoId: "L_WHcvB4dfQ" }, null),
-    ).toBe("yt:L_WHcvB4dfQ");
   });
 
   it("url 与显式 videoId 冲突时拒绝", () => {
