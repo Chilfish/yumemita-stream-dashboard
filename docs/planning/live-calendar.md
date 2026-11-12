@@ -114,6 +114,7 @@
 索引与约束：
 
 - 主键 `(dataset_id, event_key)` 是同步脚本的幂等冲突键。
+- 同一成员同日同时段有多场时，`event_key` 用 `manual:<date>-<slot>-N`（N≥2）区分；`date` / `slot` 上不加唯一约束。
 - `(dataset_id, video_id)` 的部分唯一索引防止手工行与自动行同时挂同一个视频。
 - `scheduled_at` 单列索引服务月份范围查询。
 - `date` / `slot` 与 `scheduled_at` 并存：前者给只知道早中晚的预告，后者给精确时刻；写入时统一由 `resolveScheduleTiming` 派生。
@@ -233,7 +234,7 @@ daily-update 频道列表 ───┘         │
 日历读取时由 `matchSchedulesToStreams` 按下列规则匹配：
 
 1. 同一成员、同一 JST 日期、同一时段；
-2. 同日同时段有多场时取开播时间最近的一场；
+2. 同日同时段有多场时取开播时间最近的一场，且已被认领的场次不再复用；
 3. `late` 跨午夜，23:30 与次日 00:30 视为同一晚；
 4. `stream` 优先于 `youtube`，`youtube` 优先于 `manual`；
 5. 已取消的日程不参与匹配；
@@ -251,7 +252,7 @@ await syncScheduleFromChannel(db, datasetId, entries);
 ```
 
 - 输入：`entries` 里的 `id / title / durationSec / liveStatus`，以及能拿到的 `release_timestamp`。
-- `is_upcoming` 且有确定时间 → upsert `manual:<date>-<slot>` 自然键，`source` 保持已有值（新建为 `youtube`），`scheduled_at` 取时间；时间未知时才用 `yt:<videoId>`。
+- `is_upcoming` 且有确定时间 → upsert `manual:<date>-<slot>` 自然键，`source` 保持已有值（新建为 `youtube`），`scheduled_at` 取时间；同槽第 N 场顺延 `-N` 序号；时间未知时才用 `yt:<videoId>`。
 - `is_upcoming` 但没有确定时间 → upsert，`scheduled_at = null`，进「日期待定」。
 - `is_live` → 更新 `last_seen_at` 与 `last_live_at = now()`；不新建行（如果之前没有排期，这场会在结束后由 ingest 进 `streams`）。
 - 每次同步更新 `last_seen_at = now()`。
@@ -653,7 +654,8 @@ chip 标题     text-footnote text-foreground
 | `started_at` 可空 | 已结束场次可能没有时刻 | 用 `date` 当天 00:00 JST 兜底，并在页脚说明 |
 | 预取 10 个月的数据量 | 岛屿 props 变大 | 当前规模约 300–800 行；超过 1500 行时改为按月请求 |
 | 两个「日历」命名冲突 | 用户混淆 | 旧热力图改名「开播热力图」；侧栏只保留一个「日历」 |
-| 手工文件与自动行重复 | 同场出现两条 | 日期 + 时段已知时统一自然键 `manual:<date>-<slot>`；自动行拿到时间后归一到同一键，重复行合并 |
+| 手工文件与自动行重复 | 同场出现两条 | 日期 + 时段已知时统一自然键 `manual:<date>-<slot>`；同日同时段多场按 `-N` 序号分开；自动行拿到时间后归一到同一键，重复行合并 |
+| 同日同时段两场 | 第二场覆盖第一场 | POST 按标题/时间判定同场，不同场顺延空序号；改期撞上另一场返回 409 |
 | 已入库日程残留 | 表里越积越多旧场次 | `ingest` 按 video id / 链接 / 日期+时段删除；`schedule:prune` 可手工对账 |
 | 状态边界（跨午夜、开播窗口） | 显示错误 | 单测覆盖 23:59 JST 与 1 小时窗口 |
 | 会员限定范围 | 误公开指标 | 日历只读元数据；指标字段不进入 DTO |

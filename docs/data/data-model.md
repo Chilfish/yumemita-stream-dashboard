@@ -420,12 +420,13 @@ bun run fetch:live-chat --video <videoId>                       # 已结束时�
 未来场次单独存在 `scheduled_streams`，不写 `streams`。这张表只保留**还没入库**的安排：
 `ingest` 写入 `streams` 后，会按 `video_id`、链接里的 video id、或「成员 + 日期 + 时段」删除对应日程；
 同一条未来场被手工行与自动行同时记录时合并成一行：保留日期 + 时段的自然键，
-自动行补上 `video_id` / 标题 / 链接。
+自动行补上 `video_id` / 标题 / 链接。同一成员同日同时段有多场时，各场占独立序号键，
+按 video id 与开播时间就近配对，不会互相覆盖。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `dataset_id` | text | 成员 id，外键到 `datasets` |
-| `event_key` | text | 已知日期 + 时段时用 `manual:<date>-<slot>`；时间未知时才用 `yt:<videoId>`。与 `dataset_id` 组成主键 |
+| `event_key` | text | 已知日期 + 时段时用 `manual:<date>-<slot>`，同日同时段第 N 场为 `manual:<date>-<slot>-N`（N≥2）；时间未知时才用 `yt:<videoId>`。与 `dataset_id` 组成主键 |
 | `video_id` | text \| null | 已知的 YouTube video id；链接里的 id 只用于匹配，不改变主键 |
 | `title` | text | 日程标题；空字符串表示「待定」 |
 | `url` | text \| null | YouTube 链接 |
