@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planDataset } from '@scripts/lib/update-plan.ts'
+import { planDataset } from './update-plan.ts'
 
 const now = new Date('2026-10-30T05:17:00Z')
 
@@ -74,38 +74,42 @@ describe('planDataset', () => {
     expect(plan.reasons.get('recent')).toContain('24')
   })
 
-  it('不加 --force 时只重试近期缺弹幕的场次', () => {
+  it('不加 --force 时只重试缺 VSTATS / 缺弹幕的近期场次', () => {
     const plan = planDataset({
       channel: [],
-      knownIds: ['no-vstats', 'no-chat', 'ok', 'stale-chat', 'member-only'],
+      knownIds: ['no-vstats', 'no-chat', 'ok', 'stale-vstats', 'member-only'],
       streams: [
         { videoId: 'no-vstats', endedAt: hoursAgo(48), availability: 'public', vstatsViews: null, chatTotal: 10 },
         { videoId: 'no-chat', endedAt: hoursAgo(48), availability: 'public', vstatsViews: 3, chatTotal: 0 },
         { videoId: 'ok', endedAt: hoursAgo(48), availability: 'public', vstatsViews: 3, chatTotal: 10 },
-        { videoId: 'stale-chat', endedAt: hoursAgo(24 * 20), availability: 'public', vstatsViews: 3, chatTotal: 0 },
+        { videoId: 'stale-vstats', endedAt: hoursAgo(24 * 20), availability: 'public', vstatsViews: null, chatTotal: 10 },
         // 会员限定场次 VSTATS 本来就不收录，不重试。
         { videoId: 'member-only', endedAt: hoursAgo(48), availability: 'subscriber_only', vstatsViews: null, chatTotal: 10 },
       ],
       now,
     })
-    expect(plan.forceIds).toEqual(['no-chat'])
+    expect(plan.forceIds).toEqual(['no-vstats', 'no-chat'])
+    expect(plan.reasons.get('no-vstats')).toBe('缺 VSTATS')
     expect(plan.reasons.get('no-chat')).toBe('缺弹幕')
-    expect(plan.expiredIds).toEqual(['stale-chat'])
+    // 超过窗口又没有任何抓取快照：只能记为终态。
+    expect(plan.expiredIds).toEqual(['stale-vstats'])
+    expect(plan.fallbackIds).toEqual([])
   })
 
-  it('缺 VSTATS 不受 14 天窗口影响，不进 forceIds 也不记成已放弃', () => {
+  it('超过窗口且缺 VSTATS 时，用抓取快照兜底，不再重试或报放弃', () => {
     const plan = planDataset({
       channel: [],
-      knownIds: ['recent', 'old'],
+      knownIds: ['old-no-vstats', 'old-no-anything'],
       streams: [
-        { videoId: 'recent', endedAt: hoursAgo(24 * 20), availability: 'public', vstatsViews: null, chatTotal: 10 },
-        { videoId: 'old', endedAt: hoursAgo(24 * 400), availability: 'public', vstatsViews: null, chatTotal: 10 },
+        { videoId: 'old-no-vstats', endedAt: hoursAgo(24 * 40), availability: 'public', vstatsViews: null, snapshotViews: 12345, snapshotLikes: 678, chatTotal: 100 },
+        { videoId: 'old-no-anything', endedAt: hoursAgo(24 * 40), availability: 'public', vstatsViews: null, chatTotal: 100 },
       ],
       now,
     })
     expect(plan.forceIds).toEqual([])
-    expect(plan.expiredIds).toEqual([])
-    expect(plan.reasons.get('old')).toBeUndefined()
+    expect(plan.fallbackIds).toEqual(['old-no-vstats'])
+    expect(plan.reasons.get('old-no-vstats')).toBe('VSTATS 无条目，用抓取快照')
+    expect(plan.expiredIds).toEqual(['old-no-anything'])
   })
 
   it('忽略未来场和正在直播的场次（force 分支）', () => {

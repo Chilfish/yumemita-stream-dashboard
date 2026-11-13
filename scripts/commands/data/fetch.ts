@@ -129,6 +129,14 @@ function withinGrace(info: InfoJson | undefined, hours: number): boolean {
 }
 
 /**
+ * 正常单场页固定带「平均視聴者数」；站点错误页 / bot 检查页同样可能超过 1KB，
+ * 只按长度判断会把垃圾写进快照。识别不出来就按「没有条目」处理。
+ */
+function isVstatsPage(html: string): boolean {
+  return html.length > 1000 && html.includes('平均視聴者数')
+}
+
+/**
  * YouTube 的 bot 检查 / 登录墙。CI 上要么 cookie 过期，要么缺 PO token：
  * 出现这条说明整轮抓取都会失败，不能当成单场的小毛病。
  */
@@ -730,7 +738,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
             signal: AbortSignal.timeout(20000),
           })
           const html = await response.text()
-          if (html.length > 1000) {
+          if (isVstatsPage(html)) {
             writeFileSync(vstatsPath, html, 'utf8')
             media.vstats += 1
           }
@@ -743,7 +751,9 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
           }
         }
         catch (error) {
-          addFailure('vstats', error)
+          // VSTATS 是可选数据源：站点异常 / 网络超时属于预期内，播放与点赞用抓取快照兜底，
+          // 不记为失败项，避免挡住整场的入库与发布。
+          logFile(logPath, `${id} vstats 抓取失败，用抓取快照兜底：${error instanceof Error ? error.message : String(error)}`)
         }
       }
 

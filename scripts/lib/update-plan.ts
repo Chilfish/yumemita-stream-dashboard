@@ -4,10 +4,8 @@
  * 三种候选：
  * - `newIds`：频道里有、清单里没有、且不是未来场/摘要的场次（正常增量）；
  * - `forceIds`：清单里已有、但需要重抓的场次，原因写进 `reasons`；
- * - 其余场次不动。
- *
- * 缺 VSTATS 不在这里重抓：`backfill-vstats.ts` 只请求单场页就能补，成本远低于整套素材重抓，
- * 且不受 14 天窗口限制。这里只负责「缺弹幕」的定点重抓与超窗口记录。
+ * - 其余场次不动：超过重试窗口仍缺 VSTATS 的，有抓取快照就记入 `fallbackIds`
+ *   （站点不收录属于预期，播放 / 点赞用快照），连快照都没有才记入 `expiredIds`。
  *
  * 未来场（`is_upcoming`）和正在直播（`is_live`）不进入候选，等下一轮变成 `was_live`
  * 再处理；同名但明显更短的摘要/切片也不进入候选，避免每天重新判定。
@@ -33,6 +31,9 @@ export interface PlanStream {
   availability?: string | null
   vstatsViews?: number | null
   avgConcurrent?: number | null
+  /** yt-dlp 抓取时的播放 / 点赞快照；VSTATS 没有条目时作为兜底。 */
+  snapshotViews?: number | null
+  snapshotLikes?: number | null
   chatTotal?: number | null
 }
 
@@ -46,6 +47,8 @@ export interface PlanOptions {
   now?: Date
   /** 重抓最近 N 小时内结束的场次；0 = 关闭（不加 --force 时）。 */
   forceRecentHours?: number
+  /** VSTATS 缺失时，多少天内继续重试。 */
+  vstatsGapDays?: number
   /** 弹幕为空时，多少天内继续重试。 */
   chatGapDays?: number
 }
@@ -57,7 +60,9 @@ export interface DatasetPlan {
   deferredIds: string[]
   /** 需要 `--force` 的场次，按清单顺序（最新在前）。 */
   forceIds: string[]
-  /** 超过弹幕重试窗口、本次不再尝试的场次；用于在运行摘要里留下终态。 */
+  /** VSTATS 没有条目、改用抓取快照兜底的场次；属于预期结果，不再重试。 */
+  fallbackIds: string[]
+  /** 超过重试窗口、本次不再尝试补数据的场次；用于在运行摘要里留下终态。 */
   expiredIds: string[]
   /** videoId → 原因，打日志用。 */
   reasons: Map<string, string>
@@ -110,10 +115,12 @@ export function planDataset(options: PlanOptions): DatasetPlan {
   }
 
   const forceRecentHours = options.forceRecentHours ?? 0
+  const vstatsGapDays = options.vstatsGapDays ?? 14
   const chatGapDays = options.chatGapDays ?? 7
   const recentCutoff = nowMs - forceRecentHours * HOUR_MS
 
   const forceIds: string[] = []
+  const fallbackIds: string[] = []
   const expiredIds: string[] = []
   for (const stream of options.streams) {
     if (!known.has(stream.videoId)) continue
@@ -128,17 +135,34 @@ export function planDataset(options: PlanOptions): DatasetPlan {
       reasons.set(stream.videoId, `近 ${forceRecentHours} 小时`)
       continue
     }
+    // VSTATS 不收录会员限定场次；只有公开场次缺条目才值得重试。
+    const missingVstats = stream.vstatsViews == null && stream.avgConcurrent == null
+    if (stream.availability === 'public' && missingVstats && age <= vstatsGapDays * DAY_MS) {
+      forceIds.push(stream.videoId)
+      reasons.set(stream.videoId, '缺 VSTATS')
+      continue
+    }
     if ((stream.chatTotal ?? 0) === 0 && age <= chatGapDays * DAY_MS) {
       forceIds.push(stream.videoId)
       reasons.set(stream.videoId, '缺弹幕')
       continue
     }
-    // 超过重试窗口仍缺弹幕：记录为终态，不再静默消失。
-    if ((stream.chatTotal ?? 0) === 0) {
+    // 超过重试窗口仍缺数据：能兜底的记录为「已兜底」，其余记终态，不再静默消失。
+    if (stream.availability === 'public' && missingVstats) {
+      if (stream.snapshotViews != null || stream.snapshotLikes != null) {
+        fallbackIds.push(stream.videoId)
+        reasons.set(stream.videoId, 'VSTATS 无条目，用抓取快照')
+      }
+      else {
+        expiredIds.push(stream.videoId)
+        reasons.set(stream.videoId, `缺 VSTATS 已超过 ${vstatsGapDays} 天`)
+      }
+    }
+    else if ((stream.chatTotal ?? 0) === 0) {
       expiredIds.push(stream.videoId)
       reasons.set(stream.videoId, `缺弹幕已超过 ${chatGapDays} 天`)
     }
   }
 
-  return { newIds, deferredIds, forceIds, expiredIds, reasons }
+  return { newIds, deferredIds, forceIds, fallbackIds, expiredIds, reasons }
 }
