@@ -513,6 +513,22 @@ bun scripts/backfill-owner-chats.ts --dataset arale --ids ids.txt --concurrency 
 
 补完后重新 `bun run db:ingest --dataset <id>` 让页面读到新字段。
 
+## 把联动登记写入已有库（一次性）
+
+`scripts/apply-collaborations.ts` 把 `content/collaborations.json` 的 participants 写进 `DATABASE_URL` 指向的库，用于已经部署、但没跑过联动回填的环境。不读 pack、不建场次：只更新 `streams.participants`，库里没有的 videoId 会列出来（先跑 `sync:remote` 补场次），写完统一重算 `dataset_insights.public_totals`。幂等，已是目标值的场次跳过。
+
+```bash
+bun scripts/apply-collaborations.ts --dry-run   # 看目标、命中与缺失
+LOCAL=0 bun scripts/apply-collaborations.ts     # 写线上
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dry-run` | 只读：打印目标、需更新数量与缺失场次 |
+| `--skip-migrate` | 跳过 drizzle 迁移（默认先应用） |
+| `--skip-refresh` | 跳过 `public_totals` 重算 |
+| `--verify` | 写完后按 dataset 跑 `db:verify` |
+
 ## 校验 v2 数据
 
 `validate:data` 只检查文件存在与场次数；`verify:data` 检查内容是否自洽、发布是否真的生效。
