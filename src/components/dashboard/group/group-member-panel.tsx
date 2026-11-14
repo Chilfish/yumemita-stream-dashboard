@@ -1,6 +1,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { MemberDot } from "@/components/dashboard/primitives/member-avatar";
-import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/primitives/panel";
+import { Panel } from "@/components/dashboard/primitives/panel";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatDecimal, formatInteger, formatPercent } from "@/lib/format";

@@ -1,12 +1,11 @@
-import { Link } from "@/lib/router-compat";
 import { DataTable, type DataColumn } from "@/components/dashboard/primitives/data-table";
-import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/primitives/panel";
+import { Panel, PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
 import { StreamCover } from "@/components/dashboard/primitives/stream-cover";
 import { StreamList } from "@/components/dashboard/streams/stream-list";
 import { Badge } from "@/components/ui/badge";
 import { CONTENT_TYPE_LABELS, classifyTitle } from "@/lib/classify";
 import { formatDate, formatDuration, formatInteger } from "@/lib/format";
-import { streamsPath, streamPath } from "@/lib/routes";
+import { streamPath } from "@/lib/routes";
 import { isMemberOnly } from "@/lib/visibility";
 import type { StreamSummary } from "@/types/dataset";
 
@@ -102,7 +101,7 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
 
   return (
     <Panel>
-      <PanelHead meta={`最近 ${recent.length} 场，按开播时间倒序`} title="最近场次" />
+      <PanelHead title="最近场次" />
       <PanelBody className="px-0 pb-0 md:px-3">
         <StreamList
           className="md:hidden"
@@ -122,14 +121,6 @@ export function HomeRecentStreams({ datasetId, rows }: HomeRecentStreamsProps) {
           />
         </div>
       </PanelBody>
-      <PanelNote>
-        <Link
-          className="text-muted-foreground transition-colors duration-120 ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
-          to={streamsPath(datasetId)}
-        >
-          完整表格与筛选 →
-        </Link>
-      </PanelNote>
     </Panel>
   );
 }

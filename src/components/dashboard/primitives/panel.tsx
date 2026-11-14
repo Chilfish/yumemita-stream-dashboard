@@ -63,24 +63,6 @@ export function PanelBody({ className, flush, divided, children }: PanelBodyProp
   );
 }
 
-interface PanelNoteProps {
-  className?: string;
-  children: ReactNode;
-}
-
-export function PanelNote({ className, children }: PanelNoteProps) {
-  return (
-    <div
-      className={cn(
-        "border-t border-hairline px-5 py-2.5 text-muted-foreground",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
 interface SplitPanelProps {
   columns?: "main" | "even";
   className?: string;

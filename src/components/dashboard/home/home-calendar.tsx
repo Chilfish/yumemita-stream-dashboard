@@ -1,24 +1,21 @@
 import { useMemo, useState } from "react";
 import { CalendarHeatmap } from "@/components/charts/calendar-heatmap";
-import { Panel, PanelBody, PanelHead, PanelNote } from "@/components/dashboard/primitives/panel";
+import { Panel, PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   buildCalendarDays,
-  calendarMetricValue,
-  type CalendarDay,
   type CalendarMetric,
 } from "@/lib/aggregate";
-import { formatInteger } from "@/lib/format";
 import type { StreamSummary } from "@/types/dataset";
 
 interface HomeCalendarProps {
   rows: StreamSummary[];
 }
 
-const METRIC_OPTIONS: { value: CalendarMetric; label: string; unit: string }[] = [
-  { value: "chat", label: "弹幕", unit: "条" },
-  { value: "streams", label: "场次", unit: "场" },
-  { value: "superchats", label: "SC", unit: "笔" },
+const METRIC_OPTIONS: { value: CalendarMetric; label: string }[] = [
+  { value: "chat", label: "弹幕" },
+  { value: "streams", label: "场次" },
+  { value: "superchats", label: "SC" },
 ];
 
 function isCalendarMetric(value: string | undefined): value is CalendarMetric {
@@ -28,18 +25,8 @@ function isCalendarMetric(value: string | undefined): value is CalendarMetric {
 export function HomeCalendar({ rows }: HomeCalendarProps) {
   const days = useMemo(() => buildCalendarDays(rows), [rows]);
   const [metric, setMetric] = useState<CalendarMetric>("chat");
-  const active =
-    METRIC_OPTIONS.find(option => option.value === metric) ?? {
-      label: "弹幕",
-      unit: "条",
-      value: "chat" as CalendarMetric,
-    };
+  const label = METRIC_OPTIONS.find(option => option.value === metric)?.label ?? "弹幕";
 
-  const total = days.reduce((sum, day) => sum + calendarMetricValue(day, metric), 0);
-  const busiest = days.reduce<CalendarDay | null>((best, day) => {
-    if (!best) return day;
-    return calendarMetricValue(day, metric) > calendarMetricValue(best, metric) ? day : best;
-  }, null);
   const first = days[0]?.date;
   const last = days.at(-1)?.date;
 
@@ -69,25 +56,15 @@ export function HomeCalendar({ rows }: HomeCalendarProps) {
             ))}
           </ToggleGroup>
         }
-        meta="按日本时间"
         title="开播热力图"
       />
       <PanelBody>
         <CalendarHeatmap
-          ariaLabel={`${first ?? ""} 至 ${last ?? ""} 的每日${active.label}热力图`}
+          ariaLabel={`${first ?? ""} 至 ${last ?? ""} 的每日${label}热力图`}
           days={days}
           metric={metric}
         />
       </PanelBody>
-      <PanelNote>
-        {first && last
-          ? `${first} – ${last} · ${formatInteger(days.length)} 个直播日 · 共 ${formatInteger(total)} ${active.unit}${
-              busiest
-                ? ` · 最活跃 ${busiest.date}（${formatInteger(calendarMetricValue(busiest, metric))} ${active.unit}）`
-                : ""
-            }`
-          : "还没有可用的直播日期"}
-      </PanelNote>
     </Panel>
   );
 }
