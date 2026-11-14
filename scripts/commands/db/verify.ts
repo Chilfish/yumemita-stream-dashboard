@@ -68,14 +68,10 @@ function sameTotals(a: CurrencyTotals, b: CurrencyTotals): boolean {
   return true
 }
 
-function readLocal(
-  datasetId: string,
-  idsFile?: Set<string>,
-): { file: string, pack: StreamDatapack }[] {
+function readLocal(datasetId: string): { file: string, pack: StreamDatapack }[] {
   const dir = resolve('data', datasetId)
   return readdirSync(dir)
     .filter(name => name.endsWith('.datapack.json'))
-    .filter(name => !idsFile || idsFile.has(basename(name, '.datapack.json')))
     .sort()
     .map(name => ({
       file: resolve(dir, name),
@@ -109,8 +105,10 @@ export async function runVerify(options: VerifyOptions = {}): Promise<VerifyResu
   let checked = 0
 
   for (const source of selected) {
-    const all = readLocal(source.id, idsFile)
-    const local = options.limit ? all.slice(0, options.limit) : all
+    // `--ids` 只收窄逐场对账；insights 永远是全量重算，不能用子集对比。
+    const every = readLocal(source.id)
+    const scoped = idsFile ? every.filter(item => idsFile.has(item.pack.video.id)) : every
+    const local = options.limit ? scoped.slice(0, options.limit) : scoped
     const videoIds = local.map(item => item.pack.video.id)
     if (videoIds.length === 0) continue
 
@@ -256,7 +254,7 @@ export async function runVerify(options: VerifyOptions = {}): Promise<VerifyResu
         .from(datasetInsights)
         .where(eq(datasetInsights.datasetId, source.id))
       const expected = aggregateDataset(
-        all.map(({ file, pack }) => ({
+        every.map(({ file, pack }) => ({
           summary: buildStreamSummary(pack, `data/${source.id}/${basename(file)}`) as StreamRow['summary'],
           pack,
         })),
