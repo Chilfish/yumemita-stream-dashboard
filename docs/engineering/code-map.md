@@ -23,6 +23,7 @@
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts`、`src/components/dashboard/transcript/transcript-view.tsx`、`transcript-appendix.tsx`、`src/lib/preferences.ts` | 手写 Markdown，发布到 R2；附录默认折叠，展开后中日对照按语言挂载、默认中文，偏好存本地 |
 | 逐字稿索引 / 长列表 | `src/lib/transcript-params.ts`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/components/dashboard/transcript/transcripts-toolbar.tsx`、`docs/archive/transcript-index.md` | 搜索、标签分面、月份折叠；筛选写 URL |
 | 那年今日 / 同一天回看 | `src/lib/gallery-params.ts`、`src/db/queries/group.ts`、`src/components/pages/group-gallery-page.tsx`、`src/components/dashboard/group/group-on-this-day.tsx` | `?day=MM-DD` 按年分组；首页预览只收今天之前；日期选择器写回 URL |
+| 联动场次 / 联动关系视图 | `content/collaborations.json`、`src/lib/collaboration.ts`、`src/components/dashboard/group/group-collaboration-matrix.tsx`、`src/components/dashboard/home/home-co-members.tsx` | 成员页同场成员、组首页同场次数矩阵 |
 | 数据字段 / 口径 | `docs/data/data-model.md`、`src/types/` | 改字段同步文档与类型 |
 | 会员限定公开范围 | `src/lib/visibility.ts`、`src/lib/member-access.ts`、`src/db/queries/shared.ts` | 元数据（封面 / 标题 / 时间）公开；派生指标清零，单场复用详情模板 |
 | 未来日程 / 管理端 | `src/pages/admin/schedule.astro`、`src/pages/api/admin/schedule.ts`、`src/lib/schedule.ts`、`src/lib/admin-auth.ts`、`.agents/skills/schedule-maintenance/SKILL.md` | 手工日程、类型与鉴权；接口见 [schedule-admin.md](./schedule-admin.md) |

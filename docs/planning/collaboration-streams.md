@@ -170,9 +170,9 @@ pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确
 
 联动关系视图的前置条件已满足。
 
-## 9. 联动关系视图（待实现）
+## 9. 联动关系视图
 
-状态：📋 未实现。前置条件已满足（`content/collaborations.json` 已回填）。
+状态：✅ 已落地（2026-11-14）。前置条件已满足（`content/collaborations.json` 已回填）。
 
 ### 9.1 问题
 
@@ -221,6 +221,29 @@ pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确
 - 成员页显示联动面板，按次数降序，0 次显示 `—`，不出现重复行。
 - 组级矩阵只出现有场次的成员对，数字等于按 videoId 去重的同场次数。
 - 三人场在 3 个格子里各计 1 次，点开任一对能看到原始场次并标出人数。
-- 390 / 320px 无横向溢出；矩阵在窄屏可退化为「按成员分组的两行列表」，不压缩到不可读。
+- 390 / 320px 仍保留矩阵：列宽压到约 40px，列头换行、首列吸顶；页面不横向溢出。
 - 只有 1 场登记时页面给出空态说明，不显示误导性的满格矩阵。
+
+### 9.7 实现（2026-11-14）
+
+| 位置 | 内容 |
+| --- | --- |
+| `src/lib/collaboration.ts` | `buildCollaborationPairs` 把每场展开成两两组合；`collaborationPartners` 补 0 次组合、按次数排序 |
+| `src/db/queries/group.ts` | `buildCollaborationStreamsQuery`：只取 `participants` 非空的场次，会员限定场也计入 |
+| `src/components/dashboard/group/group-collaboration-matrix.tsx` | 组首页矩阵：左侧紧凑表格、右侧当前组合的场次；窄屏保留表格，只压列宽与字号 |
+| `src/components/dashboard/home/home-co-members.tsx` | 成员页「同场成员」：对方 · 同场次数 · 最近一次 · 占本人场次比例；0 次写 `—` |
+
+- 成员页直接用已有的 `rows`（已包含参与场次）在客户端聚合，不新增请求；组首页多一条窄查询，只传 `videoId / owner / participants / date / title`。
+- 矩阵颜色只用 `foreground` 透明度做深浅编码（最深 12%），数值始终写出来；行/列十字高亮，点击任一格在右侧（窄屏在下方）显示明细。
+- 桌面左侧矩阵约 440px、右侧明细；窄屏矩阵压到 320px 内，列头换行，首列吸顶，页面不横向溢出。
+- 组首页顺序：今日计划 → 全组主视觉 → 那年今日 → 成员榜与出勤 → 联动关系。
+
+验证（2026-11-14，本地库）：
+
+- `bun run check`：0 errors，487 tests passed（新增 `collaboration.test.ts` 9 条）。
+- `bun run build`：通过。
+- `bun run db:query`：failures 0。
+- 组首页矩阵数字与 SQL 聚合一致：arale×nonoka 26、nonoka×yuno 13、arale×yuno 12、arale×miyako 11、nonoka×ritsu 11、arale×ritsu 7、ritsu×yuno 7、miyako×nonoka 4、miyako×yuno 3。
+- 点击「仲町あられ × 宮永ののか」展开 26 场明细，三人场标「3 人」。
+- 390 / 320px 下矩阵隐藏、分组列表显示，`scrollWidth ≤ clientWidth`，无横向溢出；成员页无溢出。
 
