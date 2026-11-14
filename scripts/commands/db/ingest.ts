@@ -22,7 +22,7 @@ import {
 } from '@/db/schema.ts'
 import type { StreamDatapack } from '@/types/datapack.ts'
 import { buildStreamSummary } from '@scripts/lib/dataset-manifest.ts'
-import { loadCollaborations, type LoadCollaborationsResult } from '@scripts/lib/collaborations.ts'
+import { loadCollaborations, resolveParticipants, type LoadCollaborationsResult } from '@scripts/lib/collaborations.ts'
 import { requireEnv } from '@scripts/lib/env.ts'
 import { syncTranscripts } from '@scripts/lib/transcripts-db.ts'
 import { pruneMatchedSchedules } from '@scripts/lib/schedule-match.ts'
@@ -223,6 +223,7 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
   const collaborations = loadCollaborations({
     knownDatasetIds: sources.datasets.map(item => item.id),
   })
+  const knownDatasetIds = sources.datasets.map(item => item.id)
   const collaborationSkipped = collaborations.skipped.length
   if (collaborationSkipped > 0) {
     console.warn(`[ingest] 跳过 ${collaborationSkipped} 条参与者登记`)
@@ -366,7 +367,7 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
         else report.forceIds.push(videoId)
 
         try {
-          await ingestPack(db, source, pack, hash, batchId, collaborations)
+          await ingestPack(db, source, pack, hash, batchId, collaborations, knownDatasetIds)
           report.processed += 1
           changed = true
         }
@@ -494,13 +495,23 @@ async function ingestPack(
   hash: string,
   batchId: number | null,
   collaborations: LoadCollaborationsResult,
+  knownDatasetIds: string[],
 ): Promise<void> {
   const video = pack.video
   const chat = pack.chat
   const startedAt = toTimestamp(video.startedAt)
-  // 参与者按登记全量替换：文件里删掉某个成员后重跑也要生效。
-  const participants = (collaborations.byVideo.get(video.id) ?? [])
-    .filter(datasetId => datasetId !== source.id)
+  // 登记优先（空数组表示确认无联动），没登记的场次用标题推断。
+  const resolved = resolveParticipants({
+    videoId: video.id,
+    ownerId: source.id,
+    title: video.title,
+    manual: collaborations.byVideo,
+    knownDatasetIds,
+  })
+  const participants = resolved.ids.filter(datasetId => datasetId !== source.id)
+  if (resolved.source === 'title' && participants.length > 0) {
+    console.log(`[ingest] ${source.id}/${video.id}: 标题推断参与者 ${participants.join(', ')}`)
+  }
 
   await db.transaction(async (tx) => {
     const [row] = await tx.insert(streams).values({

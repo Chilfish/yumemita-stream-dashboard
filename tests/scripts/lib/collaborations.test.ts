@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  inferParticipants,
   planCollaborations,
+  resolveParticipants,
   suggestParticipants,
 } from '@scripts/lib/collaborations'
 
@@ -36,12 +38,22 @@ describe('planCollaborations', () => {
     expect(plan.skipped[0]?.reason).toBe('owner 不需要登记为参与者')
   })
 
-  it('全部被拒绝时不写入空数组', () => {
+  it('空数组是显式覆盖，表示确认没有参与者', () => {
     const plan = planCollaborations(
       { streams: { fvSCCUPBzU0: [] } },
       { knownDatasetIds: known },
     )
+    expect(plan.byVideo.get('fvSCCUPBzU0')).toEqual([])
+    expect(plan.byVideo.has('fvSCCUPBzU0')).toBe(true)
+  })
+
+  it('全部是未知成员时不写入，避免拼写错误变成空覆盖', () => {
+    const plan = planCollaborations(
+      { streams: { fvSCCUPBzU0: ['unknown'] } },
+      { knownDatasetIds: known },
+    )
     expect(plan.byVideo.has('fvSCCUPBzU0')).toBe(false)
+    expect(plan.skipped[0]?.reason).toBe('未知成员 id')
   })
 
   it('非法 videoId 与非数组值进入跳过项', () => {
@@ -85,5 +97,81 @@ describe('suggestParticipants', () => {
     expect(
       suggestParticipants('峰月律とぎたーグミで遊ぶ', 'nonoka', known),
     ).toEqual(['ritsu'])
+  })
+})
+
+describe('inferParticipants', () => {
+  it('命中标题里的昵称与组合名', () => {
+    expect(
+      inferParticipants('みゃーちゃんとののちゃんと #ゆめみたのウミガメのスープ', 'arale', known),
+    ).toEqual(['nonoka', 'miyako'])
+    expect(
+      inferParticipants('ののののちゃんとバイトします', 'ritsu', known),
+    ).toEqual(['nonoka'])
+    expect(
+      inferParticipants('💖ユノ＆律こらぼ💙', 'ritsu', known),
+    ).toEqual(['yuno'])
+  })
+
+  it('排除只是在说成员的说法', () => {
+    expect(
+      inferParticipants('お絵描き あられと律を描く会', 'miyako', known),
+    ).toEqual([])
+    expect(
+      inferParticipants('みゃーちゃんデザインどーなつ実食', 'arale', known),
+    ).toEqual([])
+    expect(
+      inferParticipants('【ASMR/シチュボ】ヴァンパイア都子＆ユノ', 'yuno', known),
+    ).toEqual([])
+    expect(
+      inferParticipants('【律いわく】ユノも真面目で素直な優等生になれるらしい', 'yuno', known),
+    ).toEqual([])
+  })
+
+  it('不把旋律 / 法律里的律当成成员', () => {
+    expect(inferParticipants('名曲の旋律を語る', 'yuno', known)).toEqual([])
+    expect(inferParticipants('法律相談の話', 'yuno', known)).toEqual([])
+  })
+
+  it('忽略未知成员与 owner 自己', () => {
+    expect(inferParticipants('宮永ののかと雑談', 'nonoka', known)).toEqual([])
+  })
+})
+
+describe('resolveParticipants', () => {
+  const manual = new Map<string, string[]>([['registered01', ['nonoka']]])
+
+  it('手动登记优先于标题推断', () => {
+    const result = resolveParticipants({
+      videoId: 'registered01',
+      ownerId: 'ritsu',
+      title: 'ユノと律の雑談',
+      manual,
+      knownDatasetIds: known,
+    })
+    expect(result).toEqual({ ids: ['nonoka'], source: 'manual' })
+  })
+
+  it('显式空数组压制标题推断', () => {
+    const empty = new Map<string, string[]>([['registered01', []]])
+    const result = resolveParticipants({
+      videoId: 'registered01',
+      ownerId: 'ritsu',
+      title: 'ユノと律の雑談',
+      manual: empty,
+      knownDatasetIds: known,
+    })
+    expect(result).toEqual({ ids: [], source: 'manual' })
+  })
+
+  it('没有登记时用标题推断', () => {
+    const result = resolveParticipants({
+      videoId: 'unknown0001',
+      ownerId: 'ritsu',
+      title: 'ユノと律の雑談',
+      manual,
+      knownDatasetIds: known,
+    })
+    expect(result).toEqual({ ids: ['yuno'], source: 'title' })
   })
 })

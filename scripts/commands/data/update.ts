@@ -25,12 +25,19 @@ import { fileURLToPath } from 'node:url'
 import { Option } from 'commander'
 import { inArray } from 'drizzle-orm'
 import { runBatch } from '@/db/batch.ts'
-import { createDb } from '@/db/connection.ts'
+import { createDb, createWriteDb } from '@/db/connection.ts'
 import { datasetInsights, streams } from '@/db/schema.ts'
 import { CACHE_TAGS, datasetTag, streamTag } from '@/lib/cache-tags.ts'
 import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
 import type { Logger } from '@scripts/lib/cli/logger.ts'
 import { CliError } from '@scripts/lib/cli/exit.ts'
+import { loadCollaborations } from '@scripts/lib/collaborations.ts'
+import {
+  planCollaborationUpdates,
+  refreshCollaborationTotals,
+  writeCollaborationChanges,
+  type CollaborationRow,
+} from '@scripts/lib/collaboration-sync.ts'
 import { requireEnv } from '@scripts/lib/env.ts'
 import { purgeCache } from '@scripts/lib/purge.ts'
 import { syncScheduleFromChannel } from '@scripts/lib/schedule-sync.ts'
@@ -117,13 +124,20 @@ interface DatabaseStreamRow {
   vstatsViews: number | null
   avgConcurrent: string | number | null
   chatTotal: number | null
+  participants: string[] | null
+}
+
+interface LoadedDatabases {
+  states: Map<string, LoadedState>
+  /** 联动对账用的现状行；与上面的查询共用一次读取。 */
+  collaborationRows: CollaborationRow[]
 }
 
 /** 已入库的场次与 insights 时间：数据库是「哪些场次已经有了」的唯一来源。 */
 async function loadDatabaseStates(
   db: ReturnType<typeof createDb>,
   sources: DatasetSource[],
-): Promise<Map<string, LoadedState>> {
+): Promise<LoadedDatabases> {
   const ids = sources.map(source => source.id)
   const [rows, insights] = await runBatch<[
     DatabaseStreamRow[],
@@ -141,6 +155,7 @@ async function loadDatabaseStates(
         vstatsViews: streams.vstatsViews,
         avgConcurrent: streams.avgConcurrent,
         chatTotal: streams.chatTotal,
+        participants: streams.participants,
       })
       .from(streams)
       .where(inArray(streams.datasetId, ids)),
@@ -151,6 +166,7 @@ async function loadDatabaseStates(
   ])
 
   const byDataset = new Map<string, PlanStream[]>()
+  const collaborationRows: CollaborationRow[] = []
   for (const row of rows) {
     const list = byDataset.get(row.datasetId) ?? []
     list.push({
@@ -165,15 +181,22 @@ async function loadDatabaseStates(
       chatTotal: row.chatTotal ?? null,
     })
     byDataset.set(row.datasetId, list)
+    collaborationRows.push({
+      videoId: row.videoId,
+      datasetId: row.datasetId,
+      title: row.title,
+      participants: row.participants ?? [],
+    })
   }
 
   const generatedAt = new Map(insights.map(row => [row.datasetId, isoOrNull(row.generatedAt)]))
 
-  return new Map(sources.map(source => [source.id, {
+  const states = new Map(sources.map(source => [source.id, {
     streams: byDataset.get(source.id) ?? [],
     generatedAt: generatedAt.get(source.id) ?? null,
     from: 'database' as const,
   }]))
+  return { states, collaborationRows }
 }
 
 /** 本地暂存区的 pack 数量与最新修改时间，用来发现「抓到了但 ingest 没成功」的场次。 */
@@ -398,13 +421,22 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResu
   }
   const vstatsEnabled = !dryRun && !noPublish && !options.noVstats
 
-  const db = createDb(requireEnv('DATABASE_URL'))
-  const states = await loadDatabaseStates(db, selected)
+  const databaseUrl = requireEnv('DATABASE_URL')
+  const db = createDb(databaseUrl)
+  const { states, collaborationRows } = await loadDatabaseStates(db, selected)
+  const knownDatasetIds = sources.map(source => source.id)
+  const collaborations = loadCollaborations({ knownDatasetIds })
+  if (collaborations.skipped.length > 0) {
+    report('warn', `联动登记跳过 ${collaborations.skipped.length} 条`)
+    for (const skip of collaborations.skipped)
+      report('warn', `  跳过 ${skip.videoId}/${skip.datasetId || '-'}：${skip.reason}`)
+  }
 
   let failures = 0
   let newTotal = 0
   let forcedTotal = 0
   let published = 0
+  let collaborationChanges = 0
   let transcriptsPublished = false
   const purgeTags = new Set<string>()
 
@@ -674,6 +706,56 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResu
       failures += 1
   }
 
+  // 联动参与者对账：手动登记优先（含显式空数组），没登记的场次按标题推断。
+  // 放在成员循环之后：安静日也要跑，手动补登 / 删登才会落到已入库场次上。
+  {
+    const diff = planCollaborationUpdates({
+      rows: collaborationRows,
+      manual: collaborations.byVideo,
+      knownDatasetIds,
+      // 只跑单个成员时，其他成员的登记不在本次 rows 里，不该报缺失。
+      reportMissing: !options.dataset,
+    })
+    for (const conflict of diff.conflicts)
+      report('warn', `联动登记 ${conflict.videoId} 把频道主 ${conflict.ownerId} 写成了参与者，已跳过`)
+    for (const videoId of diff.missing)
+      report('warn', `联动登记里的 ${videoId} 库里没有；补 pack 后下一轮自动生效`)
+    if (diff.changes.length > 0) {
+      for (const change of diff.changes.slice(0, 10)) {
+        const source = change.source === 'title' ? '，标题推断' : ''
+        report('info', `联动 ${change.videoId}（${change.ownerId}）：[${change.before.join(', ')}] → [${change.after.join(', ')}${source}]`)
+      }
+      if (diff.changes.length > 10)
+        report('info', `   …其余 ${diff.changes.length - 10} 场略`)
+      if (!dryRun && !noPublish) {
+        const { db: writeDb, pool } = createWriteDb(databaseUrl)
+        try {
+          await writeCollaborationChanges(writeDb, diff.changes)
+          const totals = await refreshCollaborationTotals(db, writeDb, diff.affectedDatasetIds)
+          for (const datasetId of totals.missing)
+            report('warn', `public_totals 缺少 ${datasetId} 的 insights 行；先跑 db ingest`)
+          collaborationChanges = diff.changes.length
+          for (const change of diff.changes) {
+            purgeTags.add(streamTag(change.videoId))
+            purgeTags.add(datasetTag(change.ownerId))
+          }
+          for (const datasetId of diff.affectedDatasetIds)
+            purgeTags.add(datasetTag(datasetId))
+          purgeTags.add(CACHE_TAGS.group)
+          purgeTags.add(CACHE_TAGS.datasets)
+          purgeTags.add(CACHE_TAGS.gallery)
+        }
+        catch (error) {
+          failures += 1
+          report('warn', `联动参与者写入失败：${describe(error)}`)
+        }
+        finally {
+          await pool.end()
+        }
+      }
+    }
+  }
+
   if (purgeTags.size > 0) {
     const result = await purgeCache({ tags: [...purgeTags] })
     if (result.skipped)
@@ -686,8 +768,8 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResu
     }
   }
 
-  const summary = { newStreams: newTotal, refetched: forcedTotal, published, failures }
-  report('info', `完成：新场次 ${newTotal}，重抓 ${forcedTotal}，更新 ${published} 个成员，失败 ${failures} 个`)
+  const summary = { newStreams: newTotal, refetched: forcedTotal, collaborations: collaborationChanges, published, failures }
+  report('info', `完成：新场次 ${newTotal}，重抓 ${forcedTotal}，联动 ${collaborationChanges} 场，更新 ${published} 个成员，失败 ${failures} 个`)
   return { exitCode: failures > 0 ? 1 : 0, data: summary }
 }
 

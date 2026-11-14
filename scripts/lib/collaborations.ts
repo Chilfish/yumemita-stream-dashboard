@@ -1,8 +1,9 @@
 /**
- * 联动场次的参与者登记。
+ * 联动场次的参与者登记与标题推断。
  *
- * pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确认后登记。
- * 这里读 `content/collaborations.json`，交给 `db:ingest` 写 `stream_participants`。
+ * pack 与 YouTube 都不提供结构化的共演信息，权威来源仍是仓库内的
+ * `content/collaborations.json`：登记优先，空数组合义是「确认无联动」，
+ * 用来压制标题推断的误判。没有登记的场次才用标题推断兜底。
  *
  * 校验按「单条失败跳过、不阻塞其余」处理：owner 冲突、未知成员、重复登记
  * 都只记一条日志。文件不存在时返回空表，历史数据行为与单人场完全一致。
@@ -15,7 +16,7 @@ export const COLLABORATIONS_PATH = 'content/collaborations.json'
 
 export interface CollaborationFile {
   schema?: string
-  /** videoId → owner 之外的成员 id。 */
+  /** videoId → owner 之外的成员 id；空数组表示确认这场没有联动。 */
   streams?: Record<string, unknown>
 }
 
@@ -26,7 +27,7 @@ export interface CollaborationSkip {
 }
 
 export interface CollaborationPlan {
-  /** videoId → 去重后的参与者 id，保持登记顺序。 */
+  /** videoId → 去重后的参与者 id，保持登记顺序；空数组是显式覆盖。 */
   byVideo: Map<string, string[]>
   skipped: CollaborationSkip[]
 }
@@ -82,6 +83,8 @@ export function planCollaborations(
     }
 
     if (accepted.length > 0) byVideo.set(videoId, accepted)
+    // 空数组是显式覆盖：确认这场没有联动，用来压制标题推断的误判。
+    else if (value.length === 0) byVideo.set(videoId, [])
   }
 
   return { byVideo, skipped }
@@ -104,13 +107,13 @@ export function loadCollaborations(
   return { file: parsed, ...plan }
 }
 
-/** 标题别名：管理端给候选提示用，绝不自动写入。 */
+/** 标题别名：管理端给候选提示用，也用于未登记场次的参与者推断。 */
 export const MEMBER_TITLE_ALIASES: Record<string, string[]> = {
-  nonoka: ['宮永ののか', '宫永ののか', 'ののか', 'ののちゃん'],
+  nonoka: ['宮永ののか', '宫永ののか', 'ののか', 'ののちゃん', 'のののの', 'のの'],
   arale: ['仲町あられ', 'あられ'],
-  ritsu: ['峰月律', '峰月りつ', 'りっちゃん'],
-  miyako: ['藤都子', 'みやこ'],
-  yuno: ['千石ユノ', 'ユノち', 'ゆの'],
+  ritsu: ['峰月律', '峰月りつ', 'りっちゃん', '律'],
+  miyako: ['藤都子', 'みやこ', 'みゃーちゃん', 'みゃー', '都子'],
+  yuno: ['千石ユノ', 'ユノち', 'ゆの', 'ユノ'],
 }
 
 /**
@@ -122,7 +125,7 @@ export const PAIR_TAGS: Record<string, string[]> = {
   'arale|nonoka': ['ふわキラゆめみ隊', 'ふわキラ'],
   'arale|ritsu': ['りつとあられ'],
   'arale|miyako': ['健全シスターズ'],
-  'arale|yuno': ['甘辛豆腐メンタル', 'あらユノ'],
+  'arale|yuno': ['甘辛豆腐メンタル', 'あらユノ', 'あられユノ'],
   'nonoka|ritsu': ['ぎたーグミ', 'ギターぐみ'],
   'nonoka|miyako': ['ミルミルグッズ化推進委員会', 'ののかみやこ', 'ののみや'],
   'nonoka|yuno': ['ののゆの', 'ののユノ'],
@@ -132,10 +135,15 @@ export const PAIR_TAGS: Record<string, string[]> = {
 }
 
 /**
- * 按标题给出参与者候选。只做提示：
- * 别名可能是普通词汇的一部分（`語りつつ` 含 `りつ`），不能当真相。
+ * 标题里出现成员名但不同场的固定说法。
+ * 已知模式：画成员（繪回）、介绍周边 / 试吃、ASMR シチュボ、转述某人的话（`律いわく`）。
  */
-export function suggestParticipants(
+const NON_COLLAB_TITLE = /描[くきい]|デザイン|実食|ASMR|シチュボ|いわく/i
+
+/** 只用于匹配，不改变原文：`旋律`、`法律` 里的「律」不是峰月律。 */
+const TITLE_NOISE = /旋律|法律|規律|律動|律速/g
+
+function aliasParticipants(
   title: string,
   ownerId: string,
   knownDatasetIds: Iterable<string>,
@@ -152,4 +160,59 @@ export function suggestParticipants(
     .filter(id => id !== ownerId && known.has(id))
 
   return [...new Set([...fromAliases, ...fromPairs])]
+}
+
+/**
+ * 按标题给出参与者候选。用于候选清单，不做误判过滤：
+ * 别名可能是普通词汇的一部分（`語りつつ` 含 `りつ`），不能当真相。
+ */
+export function suggestParticipants(
+  title: string,
+  ownerId: string,
+  knownDatasetIds: Iterable<string>,
+): string[] {
+  return aliasParticipants(title, ownerId, knownDatasetIds)
+}
+
+/**
+ * 未登记场次的自动参与者推断。
+ *
+ * 与 `suggestParticipants` 的差别只在于先剔除已知的非联动说法，
+ * 结果是确定性的：同一标题永远得到同一组 id，可以直接入库。
+ */
+export function inferParticipants(
+  title: string,
+  ownerId: string,
+  knownDatasetIds: Iterable<string>,
+): string[] {
+  if (!title) return []
+  const cleaned = title.replace(TITLE_NOISE, '')
+  if (NON_COLLAB_TITLE.test(cleaned)) return []
+  return aliasParticipants(cleaned, ownerId, knownDatasetIds)
+}
+
+export type ParticipantSource = 'manual' | 'title' | 'none'
+
+export interface ResolvedParticipants {
+  ids: string[]
+  source: ParticipantSource
+}
+
+/**
+ * 参与者取值优先级：手动登记（含显式空数组）> 标题推断 > 空。
+ * ingest 与每日对账共用这一个函数，避免两处口径漂移。
+ */
+export function resolveParticipants(options: {
+  videoId: string
+  ownerId: string
+  title: string | null | undefined
+  manual: Map<string, string[]>
+  knownDatasetIds: Iterable<string>
+}): ResolvedParticipants {
+  const manual = options.manual.get(options.videoId)
+  if (manual !== undefined) {
+    return { ids: manual.filter(id => id !== options.ownerId), source: 'manual' }
+  }
+  const inferred = inferParticipants(options.title ?? '', options.ownerId, options.knownDatasetIds)
+  return { ids: inferred, source: inferred.length > 0 ? 'title' : 'none' }
 }

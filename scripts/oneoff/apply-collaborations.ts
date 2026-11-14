@@ -19,10 +19,11 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
-import { and, eq, inArray } from 'drizzle-orm'
+import { inArray } from 'drizzle-orm'
 import { createDb, createWriteDb } from '@/db/connection.ts'
 import { streams } from '@/db/schema.ts'
 import { loadCollaborations } from '@scripts/lib/collaborations.ts'
+import { planCollaborationUpdates, writeCollaborationChanges, type CollaborationRow } from '@scripts/lib/collaboration-sync.ts'
 import { loadEnvFiles, requireEnv } from '@scripts/lib/env.ts'
 
 const USAGE = `用法：bun scripts/oneoff/apply-collaborations.ts [选项]
@@ -57,13 +58,6 @@ interface DataSource {
   id: string
 }
 
-interface PlannedRow {
-  videoId: string
-  /** 频道主；写入时一起匹配，避免跨 dataset 误改。 */
-  ownerId: string
-  participants: string[]
-}
-
 /** 兄弟步骤走统一 CLI 入口：`bun scripts/cli.ts <group> <command>`。 */
 function run(label: string, command: string[], args: string[] = []): number {
   console.log(`\n[apply] === ${label} ===`)
@@ -82,68 +76,55 @@ const { datasets } = JSON.parse(readFileSync('data-sources.json', 'utf8')) as { 
 const known = datasets.map(dataset => dataset.id)
 const collaboration = loadCollaborations({ knownDatasetIds: known })
 
-const planned: PlannedRow[] = [...collaboration.byVideo].map(([videoId, participants]) => ({
-  videoId,
-  ownerId: '',
-  participants,
-}))
+const planned = [...collaboration.byVideo.keys()]
 if (planned.length === 0) {
   console.warn('[apply] content/collaborations.json 里没有可写入的登记')
   process.exit(0)
 }
 
 const readDb = createDb(url)
-const ids = planned.map(row => row.videoId)
 const remoteRows = await readDb
   .select({
     videoId: streams.videoId,
     datasetId: streams.datasetId,
+    title: streams.title,
     participants: streams.participants,
   })
   .from(streams)
-  .where(inArray(streams.videoId, ids))
+  .where(inArray(streams.videoId, planned))
 
-const remoteById = new Map(remoteRows.map(row => [row.videoId, row]))
-const missing: PlannedRow[] = []
-const conflicts: string[] = []
-const updates: (PlannedRow & { current: string[] })[] = []
-let unchanged = 0
+const diff = planCollaborationUpdates({
+  rows: remoteRows.map<CollaborationRow>(row => ({
+    videoId: row.videoId,
+    datasetId: row.datasetId,
+    title: row.title,
+    participants: row.participants ?? [],
+  })),
+  manual: collaboration.byVideo,
+  knownDatasetIds: known,
+  // 一次性脚本只写登记表里的场次，不对标题推断做全库改动。
+  inferFromTitles: false,
+  reportMissing: true,
+})
+const { changes: updates, unchanged, missing, conflicts } = diff
 
-for (const row of planned) {
-  const remote = remoteById.get(row.videoId)
-  if (!remote) {
-    missing.push(row)
-    continue
-  }
-  row.ownerId = remote.datasetId
-  if (row.participants.includes(remote.datasetId)) {
-    conflicts.push(`${row.videoId}：频道主 ${remote.datasetId} 不能同时是参与者`)
-    continue
-  }
-  const current = remote.participants ?? []
-  if (current.length === row.participants.length && current.every((id, index) => id === row.participants[index])) {
-    unchanged += 1
-    continue
-  }
-  updates.push({ ...row, current })
-}
-
-console.log(`\n[apply] 登记 ${planned.length} 场；库里命中 ${remoteById.size} 场`)
+console.log(`\n[apply] 登记 ${planned.length} 场；库里命中 ${remoteRows.length} 场`)
 console.log(`[apply] 需更新 ${updates.length} 场，已是目标值 ${unchanged} 场，缺失 ${missing.length} 场`)
 for (const row of updates.slice(0, 20)) {
-  console.log(`[apply]   ${row.videoId} ${row.ownerId}: [${row.current.join(', ')}] → [${row.participants.join(', ')}]`)
+  console.log(`[apply]   ${row.videoId} ${row.ownerId}: [${row.before.join(', ')}] → [${row.after.join(', ')}]`)
 }
 if (updates.length > 20)
   console.log(`[apply]   …其余 ${updates.length - 20} 场略`)
 if (missing.length > 0) {
-  console.warn('[apply] 库里没有这些场次；先补 pack（sync:remote）再重跑：')
-  for (const row of missing.slice(0, 30)) console.warn(`[apply]   缺 ${row.videoId}（[${row.participants.join(', ')}]）`)
+  console.warn('[apply] 库里没有这些场次；先补 pack（publish sync）再重跑：')
+  for (const videoId of missing.slice(0, 30)) console.warn(`[apply]   缺 ${videoId}（[${collaboration.byVideo.get(videoId)?.join(', ')}]）`)
   if (missing.length > 30)
     console.warn(`[apply]   …其余 ${missing.length - 30} 场略`)
 }
 if (conflicts.length > 0) {
   console.warn('[apply] 跳过冲突登记：')
-  for (const message of conflicts) console.warn(`[apply]   ${message}`)
+  for (const conflict of conflicts)
+    console.warn(`[apply]   ${conflict.videoId}：频道主 ${conflict.ownerId} 不能同时是参与者`)
 }
 
 if (values['dry-run']) {
@@ -162,14 +143,7 @@ if (!values['skip-migrate']) {
 if (updates.length > 0) {
   const { db, pool } = createWriteDb(url)
   try {
-    await db.transaction(async (tx) => {
-      for (const row of updates) {
-        await tx
-          .update(streams)
-          .set({ participants: row.participants, updatedAt: new Date() })
-          .where(and(eq(streams.videoId, row.videoId), eq(streams.datasetId, row.ownerId)))
-      }
-    })
+    await writeCollaborationChanges(db, updates)
     console.log(`\n[apply] 已写入 ${updates.length} 场`)
   }
   finally {
