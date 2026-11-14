@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["bun", "node"]
+  },
+  "include": [
+    "scripts/cli.ts",
+    "scripts/commands/**/*.ts",
+    "scripts/lib/**/*.ts",
+    "src/**/*.ts"
+  ],
+  "exclude": ["scripts/oneoff/**", "src/components/**", "src/pages/**", "src/**/*.test.ts"]
+}

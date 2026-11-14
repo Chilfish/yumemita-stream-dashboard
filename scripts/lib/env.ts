@@ -50,6 +50,8 @@ export interface LoadEnvOptions {
   cwd?: string
   /** 目标环境那行的前缀，默认 `env`；传脚本名可以沿用 `[publish-data] …` 的日志。 */
   prefix?: string
+  /** 是否打印环境横幅；CLI 层自己用 logger 输出时传 false。 */
+  log?: boolean
 }
 
 /**
@@ -94,7 +96,7 @@ export function loadEnvFiles(options: LoadEnvOptions = {}): void {
     }
   }
 
-  logEnvironment(options.prefix ?? 'env')
+  if (options.log !== false) logEnvironment(options.prefix ?? 'env')
 }
 
 /**
