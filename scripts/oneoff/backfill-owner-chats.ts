@@ -2,9 +2,9 @@
 /**
  * 临时脚本：只补 `chat.ownerChats`，不重抓 meta / 评论 / VSTATS。
  *
- *   bun scripts/backfill-owner-chats.ts --dry-run
- *   bun scripts/backfill-owner-chats.ts --dataset yuno
- *   bun scripts/backfill-owner-chats.ts --dataset arale --ids ids.txt --concurrency 3
+ *   bun scripts/oneoff/backfill-owner-chats.ts --dry-run
+ *   bun scripts/oneoff/backfill-owner-chats.ts --dataset yuno
+ *   bun scripts/oneoff/backfill-owner-chats.ts --dataset arale --ids ids.txt --concurrency 3
  *
  * 流程：从对象存储读 pack（读不到回退本地）→ 只下载 live_chat → 归一化 →
  * 提取 Owner 徽章记录 → 合并进 pack → 上传回对象存储 + 同步本地 data/。
@@ -16,11 +16,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { normalizeLiveChat, type ChatRecord } from './lib/live-chat.ts'
-import { archiveKey, createObjectStore, datapackKey, readCredentials } from './lib/object-storage.ts'
-import { loadEnvFiles } from './lib/env.ts'
-import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
-import type { OwnerChat, StreamDatapack } from '../src/types/datapack.ts'
+import { normalizeLiveChat, type ChatRecord } from '@scripts/lib/live-chat.ts'
+import { archiveKey, createObjectStore, datapackKey, readCredentials } from '@scripts/lib/object-storage.ts'
+import { loadEnvFiles } from '@scripts/lib/env.ts'
+import { resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
+import type { OwnerChat, StreamDatapack } from '@/types/datapack.ts'
 
 interface DatasetSource {
   id: string
@@ -28,7 +28,7 @@ interface DatasetSource {
   datapackDir: string
 }
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
 const JST_OFFSET_MIN = 540
 const OWNER_KINDS = new Set<OwnerChat['kind']>(['text', 'superchat', 'sticker', 'membership', 'gift'])
@@ -53,7 +53,7 @@ const { values } = parseArgs({
   allowPositionals: false,
 })
 
-const USAGE = `用法：bun scripts/backfill-owner-chats.ts [选项]
+const USAGE = `用法：bun scripts/oneoff/backfill-owner-chats.ts [选项]
 
 只抓 live_chat，把主播本人发言明细（chat.ownerChats）补进 pack，并上传回对象存储。
 默认处理「有 Owner 发言、但还没有 ownerChats」的场次。

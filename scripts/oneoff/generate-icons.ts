@@ -7,7 +7,7 @@
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const publicRoot = join(appRoot, "public");
 const sourcePath = join(publicRoot, "favicon.jpg");
 

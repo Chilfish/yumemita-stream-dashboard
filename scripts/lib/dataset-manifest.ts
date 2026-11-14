@@ -1,57 +1,17 @@
 /**
- * manifest 摘要的单一来源：`add-datapack.mjs` 与 `stream-datapack.ts` 共用。
+ * manifest 摘要的单一来源：`data datapack` 与 `oneoff add-datapack` 共用。
  *
- * 摘要字段与 `src/types/dataset.ts` 的 `StreamSummary`、`docs/data/data-model.md` 对齐；
- * 新增字段时只改这里，避免两个入口各写一份后漂移。
+ * 摘要字段定义在 `src/types/dataset.ts` 的 `StreamSummary`，这里只负责生成，
+ * 不复制字段表，避免两处漂移。
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import type { ChatByKind, CurrencyTotals } from '../../src/types/datapack.ts'
+import type { ChatByKind, CurrencyTotals } from '@/types/datapack.ts'
+import type { StreamSummary } from '@/types/dataset.ts'
 
 export const MANIFEST_SCHEMA = 'yumemita.stream-datapack.batch/v1'
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000
 
-export interface StreamSummary {
-  rank: number
-  date: string
-  videoId: string
-  title: string
-  url: string
-  durationHms: string | null
-  durationSec: number | null
-  startedAt: string | null
-  endedAt: string | null
-  availability: string | null
-  avgConcurrent: number | null
-  maxConcurrent: number | null
-  maxConcurrentAt: string | null
-  watchTimeHours: number | null
-  vstatsViews: number | null
-  vstatsLikes: number | null
-  snapshotViews: number | null
-  snapshotLikes: number | null
-  snapshotComments: number | null
-  chatTotal: number
-  chatByKind: ChatByKind
-  pureEmojiOnly: number
-  uniqueAuthors: number
-  superchats: number
-  scTotalsByCurrency: CurrencyTotals
-  stickers: number
-  memberships: number
-  /** 赠送会员公告数；v2 之前的 pack 没有，缺失时记 0。 */
-  gifts: number
-  /** 赠送会员总数（把每次公告的 `count` 相加）。 */
-  giftedMemberships: number
-  commentsCaptured: number | null
-  chatPer1000AvgViewers: number | null
-  likesPer1000Views: number | null
-  scPerHour: number | null
-  /** 对象存储里的封面相对 key；没有封面时为 null。 */
-  thumbnail: string | null
-  sessionDir: string
-  datapack: string
-  generatedAt: string
-}
+export type { StreamSummary }
 
 export interface ManifestFile {
   schema?: string

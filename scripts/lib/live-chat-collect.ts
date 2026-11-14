@@ -319,7 +319,7 @@ export async function collectReplay(options: ReplayCollectOptions): Promise<Repl
     log(`${videoId} 回放已翻完（${result.total} 条），跳过；加 --force 可重抓`)
     return result
   }
-  let continuation = prior?.continuation ?? watchToken
+  let continuation: string | null = prior?.continuation ?? watchToken
   let pages = prior?.continuation ? (prior.pages ?? 0) : 0
   let startedPages = pages
   let duplicates = prior?.duplicates ?? 0

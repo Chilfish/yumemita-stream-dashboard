@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { eq } from 'drizzle-orm'
-import type { WriteDb } from '../../src/db/connection.ts'
-import { transcripts } from '../../src/db/schema.ts'
+import type { WriteDb } from '@/db/connection.ts'
+import { transcripts } from '@/db/schema.ts'
 
 /**
  * 把 `content/transcripts/<datasetId>/*.md` 的 frontmatter 同步到 `transcripts` 表。

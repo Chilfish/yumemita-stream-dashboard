@@ -12,9 +12,9 @@
  * 标题不参与删除，避免「ゲーム」「朝活」这类占位标题误伤。
  */
 import { and, eq, gte, inArray } from 'drizzle-orm'
-import type { Db } from '../../src/db/connection.ts'
-import { scheduledStreams, streams } from '../../src/db/schema.ts'
-import { matchSchedulesToStreams } from '../../src/lib/calendar.ts'
+import type { Db } from '@/db/connection.ts'
+import { scheduledStreams, streams } from '@/db/schema.ts'
+import { matchSchedulesToStreams } from '@/lib/calendar.ts'
 import {
   freeScheduleEventKey,
   isScheduleSlot,
@@ -23,10 +23,10 @@ import {
   scheduleNaturalKey,
   slotForJstTime,
   videoIdFromUrl,
-} from '../../src/lib/schedule.ts'
-import { isMemberOnly } from '../../src/lib/visibility.ts'
-import type { CalendarEventInput } from '../../src/types/calendar.ts'
-import { toIso } from '../../src/db/queries/shared.ts'
+} from '@/lib/schedule.ts'
+import { isMemberOnly } from '@/lib/visibility.ts'
+import type { CalendarEventInput } from '@/types/calendar.ts'
+import { toIso } from '@/db/queries/shared.ts'
 
 const MATCH_WINDOW_DAYS = 120
 const DAY_MS = 86_400_000
@@ -40,6 +40,8 @@ export interface StreamRef {
   startedAt: Date | string | null
   endedAt: Date | string | null
   availability: string | null
+  /** 联动场次的参与成员（owner 之外）；单人场缺省。 */
+  participantIds?: string[]
 }
 
 export interface ScheduleRef {
@@ -100,6 +102,7 @@ function streamEvent(row: StreamRef): CalendarEventInput | null {
   return {
     key: `stream:${row.videoId}`,
     datasetId: row.datasetId,
+    participantIds: row.participantIds ?? [],
     videoId: row.videoId,
     title: row.title,
     at,
@@ -129,6 +132,7 @@ function scheduleEvent(row: ScheduleRef): CalendarEventInput | null {
   return {
     key: `schedule:${row.datasetId}:${row.eventKey}`,
     datasetId: row.datasetId,
+    participantIds: [],
     videoId: row.videoId,
     title: row.title,
     at: timing.at,

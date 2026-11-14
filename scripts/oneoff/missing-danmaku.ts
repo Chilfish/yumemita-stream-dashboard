@@ -2,7 +2,7 @@
 /**
  * 列出「有弹幕但本机没有原始弹幕」的场次，供 fetch:danmaku 使用。
  *
- *   bun scripts/missing-danmaku.ts --root "D:/projects/claude-messages/temp/youtube-live"
+ *   bun scripts/oneoff/missing-danmaku.ts --root "D:/projects/claude-messages/temp/youtube-live"
  *
  * 输出 `data/missing-danmaku/<dataset>.txt` 与 `index.json`。
  * 判定：datapack 仍是 v1、chat.total > 0，且归档里找不到 `danmaku_<videoId>.jsonl`。
@@ -11,9 +11,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { sentinelIsFresh } from './lib/sentinel.ts'
+import { sentinelIsFresh } from '@scripts/lib/sentinel.ts'
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const DATA = join(APP_ROOT, 'data')
 
 const { values } = parseArgs({
@@ -26,7 +26,7 @@ const { values } = parseArgs({
   allowPositionals: false,
 })
 
-const USAGE = `用法：bun scripts/missing-danmaku.ts --root <会话根目录> [选项]
+const USAGE = `用法：bun scripts/oneoff/missing-danmaku.ts --root <会话根目录> [选项]
 
 列出有弹幕、但本机没有原始弹幕的场次。
 

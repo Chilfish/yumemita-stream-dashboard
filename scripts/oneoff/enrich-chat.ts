@@ -2,8 +2,8 @@
 /**
  * 用补抓到的 danmaku jsonl 把现有 v1 datapack 的 chat 聚合升级成 v2。
  *
- *   bun scripts/enrich-chat.ts
- *   bun scripts/enrich-chat.ts --dataset arale --dry-run
+ *   bun scripts/oneoff/enrich-chat.ts
+ *   bun scripts/oneoff/enrich-chat.ts --dataset arale --dry-run
  *
  * 只重算弹幕相关的聚合字段（作者、词频、徽章、构成等），保留 pack 里的
  * video / vstats / comments / density / paid 等原有数据，不重新抓任何素材。
@@ -14,9 +14,9 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { isStopword } from '../src/lib/stopwords.ts'
+import { isStopword } from '@/lib/stopwords.ts'
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
 
 const { values } = parseArgs({
@@ -31,7 +31,7 @@ const { values } = parseArgs({
   allowPositionals: false,
 })
 
-const USAGE = `用法：bun scripts/enrich-chat.ts [选项]
+const USAGE = `用法：bun scripts/oneoff/enrich-chat.ts [选项]
 
 把已有 v1 datapack 的 chat 聚合升级为 v2（作者 / 词频全量）。
 

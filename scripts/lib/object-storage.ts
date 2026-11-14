@@ -5,7 +5,7 @@
  * manifest / insights，与 pack 一起上传到同一个桶，避免两份数据漂移。
  */
 import { S3Client } from 'bun'
-import { thumbVariantName } from '../../src/lib/thumb-variants.ts'
+import { thumbVariantName } from '@/lib/thumb-variants.ts'
 import {
   DEFAULT_LOCAL_ACCESS_KEY,
   DEFAULT_LOCAL_SECRET_KEY,
@@ -90,7 +90,7 @@ export function emojiKey(datasetId: string, fileName: string): string {
   return `emojis/${datasetId}/${fileName}`
 }
 
-interface Credentials {
+export interface Credentials {
   accountId: string
   accessKeyId: string
   secretAccessKey: string
@@ -172,7 +172,7 @@ function isTransientUploadError(error: unknown): boolean {
   return /internal error|please try again|timed? ?out|econnreset|etimedout|socket hang up|fetch failed/i.test(error.message)
 }
 
-async function withUploadRetry(objectKey: string, upload: () => Promise<void>): Promise<void> {
+async function withUploadRetry(objectKey: string, upload: () => Promise<unknown>): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       await upload()

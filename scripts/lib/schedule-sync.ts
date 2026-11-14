@@ -7,8 +7,8 @@
  * - 已在 `streams` 里的场次跳过，避免留下过期日程。
  */
 import { and, eq, inArray, lt, sql } from 'drizzle-orm'
-import type { Db } from '../../src/db/connection.ts'
-import { scheduledStreams } from '../../src/db/schema.ts'
+import type { Db } from '@/db/connection.ts'
+import { scheduledStreams } from '@/db/schema.ts'
 import {
   freeScheduleEventKey,
   isScheduleSlot,
@@ -16,7 +16,7 @@ import {
   scheduleNaturalKey,
   slotForJstTime,
   videoIdFromUrl,
-} from '../../src/lib/schedule.ts'
+} from '@/lib/schedule.ts'
 import type { ChannelEntry } from './update-plan.ts'
 import { normalizeScheduleKeys } from './schedule-match.ts'
 
@@ -111,6 +111,7 @@ export async function pruneStaleSchedules(
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - days * DAY_MS)
   const today = jstDateKeyFrom(now.toISOString())
+  if (!today) return 0
   const deleted = await db
     .delete(scheduledStreams)
     .where(and(

@@ -2,7 +2,7 @@
 /**
  * 给旧版 `danmaku_<videoId>.jsonl` 回填 `authorId`。
  *
- *   bun scripts/backfill-author-id.ts --root "D:/projects/claude-messages/temp/youtube-live"
+ *   bun scripts/oneoff/backfill-author-id.ts --root "D:/projects/claude-messages/temp/youtube-live"
  *
  * 旧 jsonl 是归档工程早期归一化的，没有 `msg.authorId`；原始 `live_chat.json`
  * 还在，重新归一化一遍即可补上。已有 authorId 的文件默认跳过，可反复执行。
@@ -24,9 +24,9 @@ import {
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { normalizeLiveChat } from './lib/live-chat.ts'
+import { normalizeLiveChat } from '@scripts/lib/live-chat.ts'
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 const { values } = parseArgs({
   options: {
@@ -40,7 +40,7 @@ const { values } = parseArgs({
   allowPositionals: false,
 })
 
-const USAGE = `用法：bun scripts/backfill-author-id.ts --root <会话根目录> [选项]
+const USAGE = `用法：bun scripts/oneoff/backfill-author-id.ts --root <会话根目录> [选项]
 
 用原始 live_chat.json 重新归一化旧 jsonl，补上 msg.authorId。
 

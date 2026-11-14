@@ -7,16 +7,16 @@
  * 写入 `content/collaborations.json`。只读：不改数据、不连数据库。
  *
  * 用法：
- *   bun scripts/suggest-collaborations.ts                       # 控制台表格
- *   bun scripts/suggest-collaborations.ts --markdown > temp/x.md # Markdown 表格
- *   bun scripts/suggest-collaborations.ts --json                # 机器可读
- *   bun scripts/suggest-collaborations.ts --dataset ritsu       # 只看一位成员
- *   bun scripts/suggest-collaborations.ts --include-registered  # 含已登记场次
+ *   bun scripts/oneoff/suggest-collaborations.ts                       # 控制台表格
+ *   bun scripts/oneoff/suggest-collaborations.ts --markdown > temp/x.md # Markdown 表格
+ *   bun scripts/oneoff/suggest-collaborations.ts --json                # 机器可读
+ *   bun scripts/oneoff/suggest-collaborations.ts --dataset ritsu       # 只看一位成员
+ *   bun scripts/oneoff/suggest-collaborations.ts --include-registered  # 含已登记场次
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import process from 'node:process'
-import { loadCollaborations, suggestParticipants } from './lib/collaborations.ts'
+import { loadCollaborations, suggestParticipants } from '@scripts/lib/collaborations.ts'
 
 interface ManifestStream {
   videoId: string
@@ -55,7 +55,7 @@ interface Args {
   help: boolean
 }
 
-const USAGE = `用法：bun scripts/suggest-collaborations.ts [选项]
+const USAGE = `用法：bun scripts/oneoff/suggest-collaborations.ts [选项]
 
 按本地 manifest 标题扫成员别名，输出联动场候选；只读，不写登记文件。
 

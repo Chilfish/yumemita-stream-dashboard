@@ -7,10 +7,10 @@
  * 写完统一重算 `dataset_insights.public_totals`，成员页数字才会跟上。
  *
  * 用法：
- *   bun scripts/apply-collaborations.ts --dry-run             # 看目标、命中与缺失
- *   LOCAL=0 bun scripts/apply-collaborations.ts               # 写线上
- *   bun scripts/apply-collaborations.ts --skip-migrate        # 已手动迁移过
- *   bun scripts/apply-collaborations.ts --verify              # 写完后对账
+ *   bun scripts/oneoff/apply-collaborations.ts --dry-run             # 看目标、命中与缺失
+ *   LOCAL=0 bun scripts/oneoff/apply-collaborations.ts               # 写线上
+ *   bun scripts/oneoff/apply-collaborations.ts --skip-migrate        # 已手动迁移过
+ *   bun scripts/oneoff/apply-collaborations.ts --verify              # 写完后对账
  *
  * 幂等：已经是目标值的场次跳过；重复运行不会产生额外写入。
  */
@@ -20,12 +20,12 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { and, eq, inArray } from 'drizzle-orm'
-import { createDb, createWriteDb } from '../src/db/connection.ts'
-import { streams } from '../src/db/schema.ts'
-import { loadCollaborations } from './lib/collaborations.ts'
-import { loadEnvFiles, requireEnv } from './lib/env.ts'
+import { createDb, createWriteDb } from '@/db/connection.ts'
+import { streams } from '@/db/schema.ts'
+import { loadCollaborations } from '@scripts/lib/collaborations.ts'
+import { loadEnvFiles, requireEnv } from '@scripts/lib/env.ts'
 
-const USAGE = `用法：bun scripts/apply-collaborations.ts [选项]
+const USAGE = `用法：bun scripts/oneoff/apply-collaborations.ts [选项]
 
 把 content/collaborations.json 的 participants 写进 DATABASE_URL 指向的库。
 不读 pack、不建场次；写完刷新 dataset_insights.public_totals。
@@ -64,11 +64,10 @@ interface PlannedRow {
   participants: string[]
 }
 
-const script = (name: string) => resolve('scripts', name)
-
-function run(label: string, file: string, args: string[] = []): number {
+/** 兄弟步骤走统一 CLI 入口：`bun scripts/cli.ts <group> <command>`。 */
+function run(label: string, command: string[], args: string[] = []): number {
   console.log(`\n[apply] === ${label} ===`)
-  const result = spawnSync(process.execPath, [script(file), ...args], {
+  const result = spawnSync(process.execPath, [resolve('scripts', 'cli.ts'), ...command, ...args], {
     cwd: process.cwd(),
     env: process.env,
     stdio: 'inherit',
@@ -153,7 +152,7 @@ if (values['dry-run']) {
 }
 
 if (!values['skip-migrate']) {
-  const code = run('数据库迁移', 'db-migrate.ts')
+  const code = run('数据库迁移', ['db', 'migrate'])
   if (code !== 0) {
     console.error('[apply] 迁移失败；可先手动 bun run db:migrate 后加 --skip-migrate 重跑')
     process.exit(code)
@@ -179,16 +178,16 @@ if (updates.length > 0) {
 }
 
 if (!values['skip-refresh']) {
-  const code = run('刷新公开汇总', 'refresh-public-totals.ts')
+  const code = run('刷新公开汇总', ['db', 'totals'])
   if (code !== 0) {
-    console.warn('[apply] public_totals 刷新失败；可手动重跑 bun scripts/refresh-public-totals.ts')
+    console.warn('[apply] public_totals 刷新失败；可手动重跑 bun run ymmt db totals')
     process.exitCode = code
   }
 }
 
 if (values.verify) {
   for (const dataset of datasets) {
-    const code = run(`verify ${dataset.id}`, 'verify-db.ts', ['--dataset', dataset.id])
+    const code = run(`verify ${dataset.id}`, ['db', 'verify'], ['--dataset', dataset.id])
     if (code !== 0) {
       console.warn(`[apply] verify ${dataset.id} 有差异（exit ${code}）；先确认是否为既有差异`)
       process.exitCode = code

@@ -14,7 +14,7 @@ import {
   sumGroupDays,
   sumGroupTotals,
   toGroupStream,
-} from "../../src/lib/group.ts";
+} from "@/lib/group.ts";
 import {
   GROUP_GALLERY_SCHEMA,
   GROUP_RECENT_LIMIT,
@@ -24,7 +24,7 @@ import {
   type GroupMemberStat,
   type GroupStreamSummary,
   type GroupSummaryFile,
-} from "../../src/types/group.ts";
+} from "@/types/group.ts";
 import type { StreamSummary } from "./dataset-manifest.ts";
 
 /** 与首页出勤条共用窗口；再早的日期不会进入近 7 天 / 本月 / 出勤视图。 */

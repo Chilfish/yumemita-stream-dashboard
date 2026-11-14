@@ -1,11 +1,10 @@
-#!/usr/bin/env bun
 /**
  * 导入已经写好的逐字稿。
  *
- *   bun scripts/transcript-import.ts <path> --dataset nonoka
- *   bun scripts/transcript-import.ts <path> --dataset nonoka --video-id W0bKqP-Eyj4
- *   bun scripts/transcript-import.ts <dir>  --dataset nonoka
- *   bun scripts/transcript-import.ts <dir>  --dataset nonoka --force
+ *   bun run ymmt transcript import <path> --dataset nonoka
+ *   bun run ymmt transcript import <path> --dataset nonoka --video-id W0bKqP-Eyj4
+ *   bun run ymmt transcript import <dir>  --dataset nonoka
+ *   bun run ymmt transcript import <dir>  --dataset nonoka --force
  *
  * 1. videoId 来源顺序：frontmatter → `--video-id` → 文件名日期在 manifest 里的唯一匹配；
  * 2. 去掉只供归档的段落（`<!-- archive-only:start/end -->` 之间，或整节「与既有档案的互证」）；
@@ -21,14 +20,17 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
+import { Option } from 'commander'
 import {
   normalizeFrontmatter,
   parseFrontmatter,
   parseTranscriptFile,
   stripArchiveBlock,
-} from '../src/lib/transcripts.ts'
-import type { BatchManifest } from '../src/types/dataset.ts'
+} from '@/lib/transcripts.ts'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { CliError, UsageError } from '@scripts/lib/cli/exit.ts'
+import { createLogger, type Logger } from '@scripts/lib/cli/logger.ts'
+import type { BatchManifest } from '@/types/dataset.ts'
 
 interface DatasetSource {
   id: string
@@ -37,108 +39,42 @@ interface DatasetSource {
   manifest?: string
 }
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+// 文件在 scripts/commands/transcript/，仓库根在上三级。
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const CONTENT_ROOT = join(APP_ROOT, 'content', 'transcripts')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
 
-const USAGE = `用法：bun scripts/transcript-import.ts <path> --dataset <id> [选项]
-
-把写好的 Markdown 复制进 content/transcripts/<datasetId>/<videoId>.md。
-<path> 可以是单个文件，也可以是目录（批量导入其中的 *.md，跳过不合规的稿件）。
-
-选项：
-  --dataset <id>        目标成员（必须是 data-sources.json 里的 id）
-  --video-id <id>       frontmatter 没有 videoId 时用它兜底（只对单篇生效）
-  --allow-member-only   会员限定场次默认拒绝导入，加此项才放行
-  --force               目标文件已存在时覆盖
-  -h, --help            显示本帮助`
-
-const { values, positionals } = parseArgs({
-  options: {
-    dataset: { type: 'string' },
-    'video-id': { type: 'string' },
-    'allow-member-only': { type: 'boolean' },
-    force: { type: 'boolean' },
-    help: { type: 'boolean', short: 'h' },
-  },
-  allowPositionals: true,
-})
-
-function log(message: string): void {
-  console.log(`[transcripts] ${message}`)
+export interface TranscriptImportOptions {
+  /** 位置参数 `<path>`：单个文件或目录。 */
+  path?: string
+  dataset?: string
+  videoId?: string
+  allowMemberOnly?: boolean
+  force?: boolean
+  dryRun?: boolean
+  log?: Logger
 }
 
-function warn(message: string): void {
-  console.warn(`[transcripts]   ! ${message}`)
+export interface TranscriptImportOutcomeData {
+  batch: boolean
+  datasetId: string
+  written: { file: string, target: string, videoId: string, origin: string, notes: string[] }[]
+  skipped: string[]
+  failed: string[]
 }
 
-function fail(message: string): never {
-  console.error(`[transcripts] ${message}`)
-  process.exit(1)
+export interface TranscriptImportResult {
+  exitCode: number
+  data: TranscriptImportOutcomeData
 }
 
-if (values.help) {
-  console.log(USAGE)
-  process.exit(0)
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
-
-const sourcePath = positionals[0]
-if (!sourcePath)
-  fail(`缺少源文件路径\n\n${USAGE}`)
-if (!values.dataset)
-  fail(`缺少 --dataset\n\n${USAGE}`)
-
-const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as { datasets?: DatasetSource[] }
-const dataset = (config.datasets ?? []).find(item => item.id === values.dataset)
-if (!dataset)
-  fail(`data-sources.json 里没有 dataset：${values.dataset}`)
-
-const absoluteSource = resolve(sourcePath)
-if (!existsSync(absoluteSource))
-  fail(`源文件不存在：${absoluteSource}`)
-
-const batch = statSync(absoluteSource).isDirectory()
-if (batch && values['video-id'])
-  fail('--video-id 只对单篇生效；批量导入时 videoId 必须写在各篇 frontmatter 里')
 
 /** 以 `_` / `.` 开头的文件是草稿或模板，不参与导入。 */
 function isSkipped(name: string): boolean {
   return name.startsWith('_') || name.startsWith('.')
-}
-
-const sources = batch
-  ? readdirSync(absoluteSource, { withFileTypes: true })
-      .filter(entry => entry.isFile() && entry.name.endsWith('.md') && !isSkipped(entry.name))
-      .map(entry => join(absoluteSource, entry.name))
-      .sort((a, b) => a.localeCompare(b))
-  : [absoluteSource]
-
-if (sources.length === 0) {
-  log(`${absoluteSource} 里没有可导入的 .md`)
-  process.exit(0)
-}
-if (batch)
-  log(`批量导入 ${sources.length} 个文件 → ${dataset.id}`)
-
-let manifestCache: BatchManifest | null | undefined
-
-function readManifest(): BatchManifest | null {
-  if (manifestCache !== undefined)
-    return manifestCache
-  const rel = dataset?.manifest ?? join(dataset?.datapackDir ?? `data/${dataset?.id}`, 'manifest.json')
-  const path = resolve(APP_ROOT, rel)
-  if (!existsSync(path)) {
-    manifestCache = null
-    return null
-  }
-  try {
-    manifestCache = JSON.parse(readFileSync(path, 'utf8')) as BatchManifest
-  }
-  catch (error) {
-    warn(`读取 ${relative(APP_ROOT, path)} 失败：${error instanceof Error ? error.message : String(error)}`)
-    manifestCache = null
-  }
-  return manifestCache
 }
 
 /** 从文件名里抠日期：`2026-10-13_标题.md` 或 `20261013_标题.md`。 */
@@ -194,8 +130,6 @@ function ensureFrontmatter(
   }
 }
 
-const datasetId = dataset.id
-
 type VideoIdOrigin = 'frontmatter' | 'flag' | 'manifest'
 
 const ORIGIN_LABEL: Record<VideoIdOrigin, string> = {
@@ -215,12 +149,20 @@ type Outcome =
   | { kind: 'skipped', reason: string }
   | { kind: 'failed', reason: string }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+/** 一次导入的上下文：dataset / 批量标志 / 选项 / manifest 缓存。 */
+interface ImportContext {
+  datasetId: string
+  batch: boolean
+  videoIdFlag?: string
+  allowMemberOnly: boolean
+  force: boolean
+  /** 全局 --dry-run：只校验，不写目标文件。 */
+  dryRun: boolean
+  readManifest: () => BatchManifest | null
 }
 
 /** 处理一篇稿。不合规的只返回跳过原因，由调用方决定是否致命。 */
-function importOne(filePath: string, seen: Map<string, string>): Outcome {
+function importOne(filePath: string, seen: Map<string, string>, context: ImportContext): Outcome {
   let text: string
   try {
     text = readFileSync(filePath, 'utf8')
@@ -236,8 +178,8 @@ function importOne(filePath: string, seen: Map<string, string>): Outcome {
   let resolvedTitle = frontmatter.title
   let origin: VideoIdOrigin = 'frontmatter'
 
-  if (!videoId && !batch && values['video-id']) {
-    videoId = values['video-id']
+  if (!videoId && !context.batch && context.videoIdFlag) {
+    videoId = context.videoIdFlag
     origin = 'flag'
   }
 
@@ -246,9 +188,9 @@ function importOne(filePath: string, seen: Map<string, string>): Outcome {
     if (!date)
       return { kind: 'skipped', reason: 'frontmatter 没有 videoId，文件名里也没有日期' }
 
-    const manifest = readManifest()
+    const manifest = context.readManifest()
     if (!manifest || !Array.isArray(manifest.streams))
-      return { kind: 'skipped', reason: `frontmatter 没有 videoId，又读不到 ${datasetId} 的 manifest` }
+      return { kind: 'skipped', reason: `frontmatter 没有 videoId，又读不到 ${context.datasetId} 的 manifest` }
 
     const candidates = manifest.streams.filter(
       stream => stream.date === date || (stream.startedAt ?? '').slice(0, 10) === date,
@@ -277,9 +219,9 @@ function importOne(filePath: string, seen: Map<string, string>): Outcome {
   if (!/^[\w-]{6,}$/.test(videoId))
     notes.push(`videoId 看起来不像 YouTube id：${videoId}`)
 
-  const stream = readManifest()?.streams?.find(item => item.videoId === videoId) ?? null
+  const stream = context.readManifest()?.streams?.find(item => item.videoId === videoId) ?? null
   if (stream) {
-    if (stream.availability === 'subscriber_only' && !values['allow-member-only']) {
+    if (stream.availability === 'subscriber_only' && !context.allowMemberOnly) {
       return {
         kind: 'skipped',
         reason: `${videoId} 是会员限定场次：逐字稿只留在 archives，确需导入请加 --allow-member-only`,
@@ -296,9 +238,9 @@ function importOne(filePath: string, seen: Map<string, string>): Outcome {
     notes.push(`manifest 里没有 ${videoId}，确认 id 没写错（发布时不会拦，索引页会多一条）`)
   }
 
-  const targetDir = join(CONTENT_ROOT, datasetId)
+  const targetDir = join(CONTENT_ROOT, context.datasetId)
   const targetPath = join(targetDir, `${videoId}.md`)
-  if (existsSync(targetPath) && !values.force)
+  if (existsSync(targetPath) && !context.force)
     return { kind: 'skipped', reason: `${relative(APP_ROOT, targetPath)} 已存在（加 --force 覆盖）` }
 
   const body = stripArchiveBlock(text)
@@ -317,9 +259,11 @@ function importOne(filePath: string, seen: Map<string, string>): Outcome {
   }
 
   try {
-    mkdirSync(targetDir, { recursive: true })
+    if (!context.dryRun)
+      mkdirSync(targetDir, { recursive: true })
     const output = supplemented.text.endsWith('\n') ? supplemented.text : `${supplemented.text}\n`
-    writeFileSync(targetPath, output, 'utf8')
+    if (!context.dryRun)
+      writeFileSync(targetPath, output, 'utf8')
   }
   catch (error) {
     return { kind: 'failed', reason: `写入失败：${errorMessage(error)}` }
@@ -337,43 +281,193 @@ function importOne(filePath: string, seen: Map<string, string>): Outcome {
   return { kind: 'written', targetPath, videoId, origin, notes }
 }
 
-const seen = new Map<string, string>()
-const skipped: string[] = []
-const failed: string[] = []
-let written = 0
+/**
+ * 业务主体：解析源路径（文件或目录）后逐篇导入。
+ *
+ * 批量模式下不合规的稿件记为跳过并继续，只有读写失败才让退出码变 1；
+ * 单篇模式仍然失败即退出，避免静默什么都不做。`dryRun` 时不写目标文件。
+ */
+export async function runTranscriptImport(
+  options: TranscriptImportOptions,
+): Promise<TranscriptImportResult> {
+  const log = options.log ?? createLogger({ name: 'transcript.import' })
+  const sourcePath = options.path?.trim()
+  if (!sourcePath) {
+    throw new UsageError('缺少源文件路径', {
+      hint: 'bun run ymmt transcript import <path> --dataset nonoka',
+      context: { argument: 'path' },
+    })
+  }
+  const datasetIdFlag = options.dataset?.trim()
+  if (!datasetIdFlag) {
+    throw new UsageError('缺少 --dataset', {
+      hint: 'bun run ymmt transcript import <path> --dataset nonoka',
+      context: { option: 'dataset' },
+    })
+  }
 
-for (const filePath of sources) {
-  const label = basename(filePath)
-  const outcome = importOne(filePath, seen)
+  const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as { datasets?: DatasetSource[] }
+  const dataset = (config.datasets ?? []).find(item => item.id === datasetIdFlag)
+  if (!dataset) {
+    const available = (config.datasets ?? []).map(item => item.id).join(', ')
+    throw new CliError(`data-sources.json 里没有 dataset：${datasetIdFlag}`, {
+      code: 'UNKNOWN_DATASET',
+      hint: `可用：${available || '(data-sources.json 为空)'}`,
+      context: { dataset: datasetIdFlag },
+    })
+  }
 
-  if (outcome.kind === 'written') {
-    written += 1
-    log(
-      `已写入 ${relative(APP_ROOT, outcome.targetPath)}`
-      + `（videoId ${outcome.videoId}，来源：${ORIGIN_LABEL[outcome.origin]}）`,
+  const absoluteSource = resolve(sourcePath)
+  if (!existsSync(absoluteSource)) {
+    throw new CliError(`源文件不存在：${absoluteSource}`, {
+      code: 'MISSING_SOURCE',
+      hint: '检查 <path>；目录会批量导入其中的 *.md（不递归）',
+      context: { path: absoluteSource },
+    })
+  }
+
+  const batch = statSync(absoluteSource).isDirectory()
+  if (batch && options.videoId) {
+    throw new UsageError('--video-id 只对单篇生效；批量导入时 videoId 必须写在各篇 frontmatter 里', {
+      context: { option: 'videoId' },
+    })
+  }
+
+  const sources = batch
+    ? readdirSync(absoluteSource, { withFileTypes: true })
+      .filter(entry => entry.isFile() && entry.name.endsWith('.md') && !isSkipped(entry.name))
+      .map(entry => join(absoluteSource, entry.name))
+      .sort((a, b) => a.localeCompare(b))
+    : [absoluteSource]
+
+  const empty: TranscriptImportOutcomeData = { batch, datasetId: dataset.id, written: [], skipped: [], failed: [] }
+  if (sources.length === 0) {
+    log.info(`${absoluteSource} 里没有可导入的 .md`)
+    return { exitCode: 0, data: empty }
+  }
+  if (batch)
+    log.info(`批量导入 ${sources.length} 个文件 → ${dataset.id}`)
+
+  let manifestCache: BatchManifest | null | undefined
+  const readManifest = (): BatchManifest | null => {
+    if (manifestCache !== undefined)
+      return manifestCache
+    const rel = dataset.manifest ?? join(dataset.datapackDir ?? `data/${dataset.id}`, 'manifest.json')
+    const path = resolve(APP_ROOT, rel)
+    if (!existsSync(path)) {
+      manifestCache = null
+      return null
+    }
+    try {
+      manifestCache = JSON.parse(readFileSync(path, 'utf8')) as BatchManifest
+    }
+    catch (error) {
+      log.warn(`读取 ${relative(APP_ROOT, path)} 失败：${errorMessage(error)}`)
+      manifestCache = null
+    }
+    return manifestCache
+  }
+
+  const context: ImportContext = {
+    datasetId: dataset.id,
+    batch,
+    videoIdFlag: options.videoId,
+    allowMemberOnly: options.allowMemberOnly === true,
+    force: options.force === true,
+    dryRun: options.dryRun === true,
+    readManifest,
+  }
+
+  const seen = new Map<string, string>()
+  const data: TranscriptImportOutcomeData = { ...empty }
+  let written = 0
+
+  for (const filePath of sources) {
+    const label = basename(filePath)
+    const outcome = importOne(filePath, seen, context)
+
+    if (outcome.kind === 'written') {
+      written += 1
+      const target = relative(APP_ROOT, outcome.targetPath)
+      log.info(
+        `${context.dryRun ? '将写入（dry-run）' : '已写入'} ${target}`
+        + `（videoId ${outcome.videoId}，来源：${ORIGIN_LABEL[outcome.origin]}）`,
+      )
+      for (const note of outcome.notes) log.info(`  ${note}`)
+      data.written.push({
+        file: label,
+        target,
+        videoId: outcome.videoId,
+        origin: ORIGIN_LABEL[outcome.origin],
+        notes: outcome.notes,
+      })
+      continue
+    }
+
+    if (outcome.kind === 'skipped') {
+      if (!batch) {
+        throw new CliError(`${label}：${outcome.reason}`, {
+          code: 'SKIPPED_SOURCE',
+          hint: '单篇导入失败即退出；批量导入（传目录）会跳过不合规的稿件继续',
+          context: { file: label },
+        })
+      }
+      data.skipped.push(`${label}：${outcome.reason}`)
+      log.warn(`${label}：${outcome.reason}`)
+      continue
+    }
+
+    data.failed.push(`${label}：${outcome.reason}`)
+    log.error(`${label}：${outcome.reason}`)
+  }
+
+  if (batch) {
+    log.info(
+      `批量导入完成：写入 ${written} 篇，跳过 ${data.skipped.length} 篇`
+      + `${data.failed.length > 0 ? `，失败 ${data.failed.length} 篇` : ''}`,
     )
-    for (const note of outcome.notes) log(`  ${note}`)
-    continue
   }
+  if (written > 0)
+    log.info('下一步：检查正文，然后运行 bun run ymmt publish transcripts')
 
-  if (outcome.kind === 'skipped') {
-    if (!batch)
-      fail(`${label}：${outcome.reason}`)
-    skipped.push(`${label}：${outcome.reason}`)
-    warn(`${label}：${outcome.reason}`)
-    continue
-  }
-
-  failed.push(`${label}：${outcome.reason}`)
-  console.error(`[transcripts]   x ${label}：${outcome.reason}`)
+  return { exitCode: data.failed.length > 0 ? 1 : 0, data }
 }
 
-if (batch) {
-  log(
-    `批量导入完成：写入 ${written} 篇，跳过 ${skipped.length} 篇`
-    + `${failed.length > 0 ? `，失败 ${failed.length} 篇` : ''}`,
-  )
+export const transcriptImportSpec: CommandSpec = {
+  id: 'transcript.import',
+  description: '导入写好的 Markdown 逐字稿到 content/transcripts',
+  details: [
+    'videoId 来源顺序：frontmatter → `--video-id` → 文件名日期在 manifest 里的唯一匹配。',
+    '会去掉只供归档的段落（`<!-- archive-only:start/end -->` 之间，或整节「与既有档案的互证」），',
+    '并按 manifest 补上缺的 videoId / date / title（只补缺的字段）。',
+    '',
+    '路径是目录时批量导入其中的 `*.md`（不递归，`_` / `.` 开头的不算）；',
+    '批量模式下不合规的稿件记为跳过并继续，只有读写失败才让退出码变 1。',
+    '单篇模式仍然失败即退出，避免静默什么都不做。',
+  ].join('\n'),
+  examples: [
+    'bun run ymmt transcript import content/transcripts/draft.md --dataset nonoka',
+    'bun run ymmt transcript import content/transcripts/draft.md --dataset nonoka --video-id W0bKqP-Eyj4',
+    'bun run ymmt transcript import temp/drafts --dataset nonoka',
+    'bun run ymmt transcript import temp/drafts --dataset nonoka --force',
+  ],
+  options: [
+    new Option('--dataset <id>', '目标成员（必须是 data-sources.json 里的 id）'),
+    new Option('--video-id <id>', 'frontmatter 没有 videoId 时用它兜底（只对单篇生效）'),
+    new Option('--allow-member-only', '会员限定场次默认拒绝导入，加此项才放行'),
+    new Option('--force', '目标文件已存在时覆盖'),
+  ],
+  arguments: [{ name: 'path', description: '源 Markdown 文件，或包含 *.md 的目录' }],
+  async run(ctx) {
+    const result = await runTranscriptImport({
+      path: ctx.args[0],
+      dataset: typeof ctx.options.dataset === 'string' ? ctx.options.dataset : undefined,
+      videoId: typeof ctx.options.videoId === 'string' ? ctx.options.videoId : undefined,
+      allowMemberOnly: ctx.flag('allowMemberOnly'),
+      force: ctx.flag('force'),
+      dryRun: ctx.dryRun,
+      log: ctx.log,
+    })
+    return { exitCode: result.exitCode, data: result.data }
+  },
 }
-if (written > 0)
-  log('下一步：检查正文，然后运行 bun run publish:transcripts')
-process.exit(failed.length > 0 ? 1 : 0)

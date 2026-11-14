@@ -1,9 +1,9 @@
 import { Option } from 'commander'
-import type { CommandSpec } from '../../lib/cli/runtime.ts'
-import { CliError, requireEnvVar } from '../../lib/cli/exit.ts'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { CliError, requireEnvVar } from '@scripts/lib/cli/exit.ts'
 import { desc, eq } from 'drizzle-orm'
-import { createDb } from '../../../src/db/connection.ts'
-import { streams } from '../../../src/db/schema.ts'
+import { createDb } from '@/db/connection.ts'
+import { streams } from '@/db/schema.ts'
 
 /** 数据库里最新一场的 videoId；数据工作流的 yt-dlp 探针。 */
 export const dbLatestSpec: CommandSpec = {

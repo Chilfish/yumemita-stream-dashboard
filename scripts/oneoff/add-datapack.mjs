@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 把一份 datapack 加入某个 dataset：
- *   bun scripts/add-datapack.mjs <datasetId> <path/to/datapack.json>
+ *   bun scripts/oneoff/add-datapack.mjs <datasetId> <path/to/datapack.json>
  *
  * - 校验 schema 与 video.id
  * - 复制到 data/<datasetId>/<videoId>.datapack.json（上传前的本地暂存区，不进 git）
@@ -11,9 +11,9 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { upsertManifestStream } from "./lib/dataset-manifest.ts";
+import { upsertManifestStream } from "../lib/dataset-manifest.ts";
 
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const datasourcesPath = join(appRoot, "data-sources.json");
 
 function fail(message) {
@@ -27,7 +27,7 @@ function readJson(path) {
 
 const [datasetId, inputPath] = process.argv.slice(2);
 if (!datasetId || !inputPath) {
-  fail("用法：bun scripts/add-datapack.mjs <datasetId> <path/to/datapack.json>");
+  fail("用法：bun scripts/oneoff/add-datapack.mjs <datasetId> <path/to/datapack.json>");
 }
 
 const sources = readJson(datasourcesPath);

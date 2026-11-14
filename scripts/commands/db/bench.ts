@@ -1,29 +1,26 @@
-#!/usr/bin/env bun
 /**
  * 数据库读路径压测：经本地 Neon HTTP 代理走与 workerd 相同的驱动，
  * 测量每个页面查询组合的 SQL 条数、/sql 往返数与 p50/p95。
  *
- *   bun run db:bench
- *   bun run db:bench -- --rounds 20 --label after
- *   bun run db:bench -- --label baseline --out temp/bench-db-baseline.json
- *
- * 依赖本地库与代理：`bun run dev:db` 之后由 ensureDevServices() 拉起。
+ * 依赖本地库与代理：`bun run ymmt dev db` 之后由 ensureDevServices() 拉起。
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import process from 'node:process'
-import { parseArgs } from 'node:util'
-import { runBatch } from '../src/db/batch.ts'
-import { createDb, type Db } from '../src/db/connection.ts'
-import { getCalendarData } from '../src/db/queries/calendar.ts'
-import { selectDatasetsQuery } from '../src/db/queries/datasets.ts'
-import { getGroupCompareData } from '../src/db/queries/group-compare.ts'
+import { Option } from 'commander'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { CliError } from '@scripts/lib/cli/exit.ts'
+import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { runBatch } from '@/db/batch.ts'
+import { createDb, type Db } from '@/db/connection.ts'
+import { getCalendarData } from '@/db/queries/calendar.ts'
+import { selectDatasetsQuery } from '@/db/queries/datasets.ts'
+import { getGroupCompareData } from '@/db/queries/group-compare.ts'
 import {
   assembleStreamPack,
   buildStreamPackQueries,
   getStreamPack,
   type StreamPackParts,
-} from '../src/db/queries/packs.ts'
+} from '@/db/queries/packs.ts'
 import {
   buildAllStreamHeadsQuery,
   buildAllStreamRefsQuery,
@@ -31,11 +28,11 @@ import {
   listStreams,
   selectStreamQuery,
   type StreamQueryRow,
-} from '../src/db/queries/streams.ts'
+} from '@/db/queries/streams.ts'
 import {
   getTranscriptIndex,
   selectTranscriptMetaQuery,
-} from '../src/db/queries/transcripts.ts'
+} from '@/db/queries/transcripts.ts'
 import {
   getCompareDensityMap,
   getComparePacks,
@@ -43,34 +40,58 @@ import {
   getGroupPageData,
   getStreamPageData,
   getStreamPageExtras,
-} from '../src/db/queries/view-data.ts'
-import { calendarWindow, currentJstMonth, monthRange } from '../src/lib/calendar.ts'
-import { ensureDevServices } from './lib/dev-services.ts'
-import { loadEnvFiles } from './lib/env.ts'
+} from '@/db/queries/view-data.ts'
+import { calendarWindow, currentJstMonth, monthRange } from '@/lib/calendar.ts'
+import { ensureDevServices } from '@scripts/lib/dev-services.ts'
 
-const { values } = parseArgs({
-  options: {
-    rounds: { type: 'string', default: '10' },
-    label: { type: 'string', default: 'current' },
-    out: { type: 'string' },
-    url: { type: 'string' },
-    endpoint: { type: 'string' },
-    help: { type: 'boolean', short: 'h' },
-  },
-  allowPositionals: false,
-})
+/** 只取命令需要的日志通道；默认空操作。 */
+export type BenchLog = Pick<Logger, 'info' | 'warn' | 'error' | 'line'>
 
-if (values.help) {
-  console.log(`用法：bun scripts/bench-db.ts [选项]
+const NOOP_LOG: BenchLog = { info: () => {}, warn: () => {}, error: () => {}, line: () => {} }
 
-选项：
-  --rounds <n>      每个场景执行次数（默认 10）
-  --label <name>    结果标签，例如 baseline / after
-  --out <path>      写入 JSON（默认 temp/bench-db-<label>.json）
-  --url <url>       覆盖 DATABASE_URL
-  --endpoint <url>  覆盖 NEON_HTTP_ENDPOINT
-  -h, --help        显示本帮助`)
-  process.exit(0)
+export interface BenchOptions {
+  /** 每个场景执行次数，默认 10。 */
+  rounds?: number
+  /** 结果标签，用于默认文件名与结果里的一行；默认 current。 */
+  label?: string
+  /** 写入 JSON 的路径，默认 temp/bench-db-<label>.json。 */
+  out?: string
+  /** 覆盖 DATABASE_URL。 */
+  url?: string
+  /** 覆盖 NEON_HTTP_ENDPOINT。 */
+  endpoint?: string
+  /** 只测不落盘（全局 --dry-run）。 */
+  dryRun?: boolean
+  log?: BenchLog
+}
+
+interface Measurement {
+  name: string
+  queries: number
+  requests: number
+  p50Ms: number
+  p95Ms: number
+  runs: number
+}
+
+export interface BenchPayload {
+  label: string
+  datasetId: string
+  videoId: string
+  rounds: number
+  measuredAt: string
+  node: string
+  results: Measurement[]
+}
+
+/** 返回值在落盘 payload 之上补一个 `out`：dry-run 时为 null，不落盘。 */
+export interface BenchData extends BenchPayload {
+  out: string | null
+}
+
+export interface BenchResult {
+  exitCode: number
+  data: BenchData
 }
 
 interface Health {
@@ -91,14 +112,8 @@ interface Scenario {
   run: (ctx: ScenarioContext) => Promise<unknown>
 }
 
-interface Measurement {
-  name: string
-  queries: number
-  requests: number
-  p50Ms: number
-  p95Ms: number
-  runs: number
-}
+const BENCH_DATASET = 'nonoka'
+const DEFAULT_ROUNDS = 10
 
 function percentile(values: number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b)
@@ -214,28 +229,45 @@ const scenarios: Scenario[] = [
   },
 ]
 
-async function main(): Promise<void> {
-  loadEnvFiles()
+/**
+ * 逐个场景压测，返回每个场景的平均 SQL 条数 / HTTP 往返数与 p50 / p95。
+ *
+ * `dryRun` 时不写 `--out` 文件，测量本身照旧（压测就是只读查询）。
+ */
+export async function runBench(options: BenchOptions = {}): Promise<BenchResult> {
+  const log = options.log ?? NOOP_LOG
+  const label = options.label ?? 'current'
+  const rounds = Math.max(1, options.rounds ?? DEFAULT_ROUNDS)
+
   const services = await ensureDevServices({
-    url: values.url,
-    endpoint: values.endpoint,
+    url: options.url,
+    endpoint: options.endpoint,
   })
   if (!services.local) {
-    throw new Error('db:bench 只接受本地数据库；请把 DATABASE_URL 指向 localhost')
+    throw new CliError('db bench 只接受本地数据库', {
+      code: 'NOT_LOCAL_DATABASE',
+      hint: '把 .dev.vars 的 DATABASE_URL 指回 localhost（或设 LOCAL=1），再运行 bun run ymmt dev db',
+      context: { databaseUrl: services.databaseUrl },
+    })
   }
 
   const db = createDb(services.databaseUrl, services.endpoint)
 
-  const datasetId = 'nonoka'
+  const datasetId = BENCH_DATASET
   const latest = await getLatestStream(db, datasetId)
-  if (!latest) throw new Error('本地库缺少 nonoka 场次，先运行 bun run dev:seed')
+  if (!latest) {
+    throw new CliError('本地库缺少 nonoka 场次', {
+      code: 'EMPTY_DATABASE',
+      hint: '先运行 bun run ymmt db ingest --dataset nonoka 写入本地 pack',
+      context: { datasetId },
+    })
+  }
   const videoId = latest.videoId
 
   const listed = await listStreams(db, datasetId, { limit: 3, withTotal: false })
   const compareIds = listed.streams.map(stream => stream.videoId)
   const ctx: ScenarioContext = { db, datasetId, videoId, compareIds }
 
-  const rounds = Math.max(1, Number(values.rounds) || 10)
   const results: Measurement[] = []
 
   for (const scenario of scenarios) {
@@ -264,8 +296,9 @@ async function main(): Promise<void> {
     })
   }
 
-  const payload = {
-    label: values.label,
+  const out = options.dryRun ? null : resolve(options.out ?? `temp/bench-db-${label}.json`)
+  const payload: BenchPayload = {
+    label,
     datasetId,
     videoId,
     rounds,
@@ -274,18 +307,59 @@ async function main(): Promise<void> {
     results,
   }
 
-  const out = resolve(values.out ?? `temp/bench-db-${values.label}.json`)
-  mkdirSync(dirname(out), { recursive: true })
-  writeFileSync(out, `${JSON.stringify(payload, null, 2)}\n`)
+  if (out) {
+    mkdirSync(dirname(out), { recursive: true })
+    writeFileSync(out, `${JSON.stringify(payload, null, 2)}\n`)
+  }
+  else {
+    log.info('dry-run：不写结果文件')
+  }
 
-  console.table(results.map(item => ({
-    scenario: item.name,
-    SQL: item.queries,
-    HTTP: item.requests,
-    p50: `${item.p50Ms} ms`,
-    p95: `${item.p95Ms} ms`,
-  })))
-  console.log(`[db:bench] ${values.label} → ${out}`)
+  for (const item of results) {
+    log.line(
+      `${item.name}: SQL ${item.queries} / HTTP ${item.requests} / p50 ${item.p50Ms} ms / p95 ${item.p95Ms} ms`,
+    )
+  }
+  log.info(`[db:bench] ${label} → ${out ?? '（dry-run，未落盘）'}`)
+
+  // 落盘内容与旧脚本一致；`out` 只进返回值，方便 CI 直接取路径。
+  return { exitCode: 0, data: { ...payload, out } }
 }
 
-await main()
+/** 读路径压测：每个页面查询组合的 SQL 条数、HTTP 往返数与 p50 / p95。 */
+export const dbBenchSpec: CommandSpec = {
+  id: 'db.bench',
+  description: '读路径压测（SQL 条数 / HTTP 往返 / p50 / p95）',
+  details: '经本地 Neon HTTP 代理走与 workerd 相同的驱动，逐场景测量。\n'
+    + '只接受本地库：先运行 bun run ymmt dev db。结果默认写入 temp/bench-db-<label>.json。',
+  examples: [
+    'bun run ymmt db bench',
+    'bun run ymmt db bench --rounds 20 --label after',
+    'bun run ymmt db bench --label baseline --out temp/bench-db-baseline.json',
+    'bun run ymmt db bench --json',
+  ],
+  options: [
+    new Option('--rounds <n>', `每个场景执行次数（默认 ${DEFAULT_ROUNDS}）`),
+    new Option('--label <name>', '结果标签，例如 baseline / after（默认 current）'),
+    new Option('--out <path>', '写入 JSON（默认 temp/bench-db-<label>.json）'),
+    new Option('--url <url>', '覆盖 DATABASE_URL'),
+    new Option('--endpoint <url>', '覆盖 NEON_HTTP_ENDPOINT'),
+  ],
+  async run(ctx) {
+    const result = await runBench({
+      ...(ctx.options.rounds === undefined ? {} : { rounds: ctx.integer('rounds', DEFAULT_ROUNDS, 1) }),
+      ...(typeof ctx.options.label === 'string' ? { label: ctx.options.label } : {}),
+      ...(typeof ctx.options.out === 'string' ? { out: ctx.options.out } : {}),
+      ...(typeof ctx.options.url === 'string' ? { url: ctx.options.url } : {}),
+      ...(typeof ctx.options.endpoint === 'string' ? { endpoint: ctx.options.endpoint } : {}),
+      dryRun: ctx.dryRun,
+      log: ctx.log,
+    })
+    const { data } = result
+    return {
+      exitCode: result.exitCode,
+      data,
+      summary: `压测完成：${data.results.length} 个场景 × ${data.rounds} 轮（${data.label}）${data.out ? ` → ${data.out}` : '，dry-run 未落盘'}`,
+    }
+  },
+}

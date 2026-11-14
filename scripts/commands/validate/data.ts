@@ -1,119 +1,153 @@
-#!/usr/bin/env bun
 /**
- * 校验本地 datapack（唯一真源）。
+ * 校验本地 datapack（唯一真源）：schema、文件名与 video.id 一致、可选 HEAD 远端 archive。
  *
- *   bun run validate:data
- *   bun run validate:data -- --remote   # 额外 HEAD R2 archive 对象
- *
- * 整站对账以 `db:verify` 为准；这里只保证 pack 能被 ingest 正常消费。
+ * 整站对账以 `db verify` 为准；这里只保证 pack 能被 ingest 正常消费。
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
-import { safeParse } from "valibot";
-import { DatapackSchema, formatIssues } from "./validate-schema.ts";
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { basename, join, relative, resolve, sep } from 'node:path'
+import { safeParse } from 'valibot'
+import { Option } from 'commander'
+import type { CommandSpec } from '../../lib/cli/runtime.ts'
+import { CliError } from '../../lib/cli/exit.ts'
+import { DatapackSchema, formatIssues } from '../../lib/validate-schema.ts'
 
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const remoteBase = (process.env.DATAPACK_BASE ?? "").replace(/\/+$/, "");
-const checkRemote = process.argv.includes("--remote");
-const errors = [];
+const APP_ROOT = resolve(import.meta.dir, '..', '..', '..')
 
-function rel(path) {
-  return relative(appRoot, path).split(sep).join("/");
+interface DatasetConfig {
+  datasets?: { id: string }[]
 }
 
-function readJson(path) {
-  try {
-    return JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    errors.push(`${rel(path)}: ${error instanceof Error ? error.message : String(error)}`);
-    return null;
-  }
+interface Target {
+  datasetId: string
+  videoId: string
 }
 
-const config = readJson(join(appRoot, "data-sources.json"));
-if (!config || !Array.isArray(config.datasets) || config.datasets.length === 0) {
-  console.error("[validate-data] data-sources.json 里没有 datasets");
-  process.exit(1);
+function rel(path: string): string {
+  return relative(APP_ROOT, path).split(sep).join('/')
 }
 
-const targets = [];
-
-for (const dataset of config.datasets) {
-  const dir = join(appRoot, "data", dataset.id);
-  if (!existsSync(dir)) {
-    errors.push(`缺少 ${rel(dir)}`);
-    continue;
-  }
-
-  const files = readdirSync(dir).filter((name) => name.endsWith(".datapack.json"));
-  if (files.length === 0) {
-    errors.push(`${dataset.id}: 目录里没有 datapack`);
-    continue;
-  }
-
-  for (const name of files) {
-    const path = join(dir, name);
-    const videoId = basename(name, ".datapack.json");
-    const pack = readJson(path);
-    if (pack === null) continue;
-
-    const result = safeParse(DatapackSchema, pack);
-    if (!result.success) {
-      errors.push(...formatIssues(result).map((issue) => `${rel(path)}: ${issue}`));
-      continue;
-    }
-    if (result.output.video?.id !== videoId) {
-      errors.push(
-        `${rel(path)}: video.id (${result.output.video?.id ?? "缺失"}) 与文件名 ${videoId} 不一致`,
-      );
-      continue;
-    }
-    targets.push({ datasetId: dataset.id, videoId });
-  }
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
-async function verifyRemote() {
+/** 并发 HEAD 远端 archive 对象，返回不可达数量。 */
+async function checkRemoteObjects(
+  remoteBase: string,
+  targets: Target[],
+  errors: string[],
+): Promise<number> {
   if (!remoteBase) {
-    console.error("[validate-data] --remote 需要设置 DATAPACK_BASE（对象存储公开根地址）");
-    process.exit(1);
+    throw new CliError('--remote 需要设置 DATAPACK_BASE（对象存储公开根地址）', {
+      code: 'MISSING_ENV',
+      exitCode: 3,
+      hint: '在 .dev.vars 里配置 DATAPACK_BASE；只查本地就去掉 --remote',
+    })
   }
 
-  const urls = targets.map(
-    ({ datasetId, videoId }) => `${remoteBase}/archive/${datasetId}/${videoId}.datapack.json`,
-  );
-  const failures = [];
-  let cursor = 0;
+  const urls = targets.map(({ datasetId, videoId }) => `${remoteBase}/archive/${datasetId}/${videoId}.datapack.json`)
+  const failures: string[] = []
+  let cursor = 0
 
   const workers = Array.from({ length: Math.min(8, urls.length) }, async () => {
     for (;;) {
-      const url = urls[cursor];
-      cursor += 1;
-      if (!url) return;
+      const url = urls[cursor]
+      cursor += 1
+      if (!url) return
       try {
-        const response = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(15_000) });
-        if (!response.ok) failures.push(`${url} -> HTTP ${response.status}`);
-      } catch (error) {
-        failures.push(`${url} -> ${error instanceof Error ? error.message : String(error)}`);
+        const response = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(15_000) })
+        if (!response.ok) failures.push(`${url} -> HTTP ${response.status}`)
+      }
+      catch (error) {
+        failures.push(`${url} -> ${errorMessage(error)}`)
       }
     }
-  });
-  await Promise.all(workers);
+  })
+  await Promise.all(workers)
 
   if (failures.length > 0) {
-    errors.push(`${failures.length}/${urls.length} 个 archive 对象不可达`);
-    errors.push(...failures.slice(0, 20));
+    errors.push(`${failures.length}/${urls.length} 个 archive 对象不可达`)
+    errors.push(...failures.slice(0, 20))
   }
-  return urls.length;
+  return urls.length
 }
 
-const remoteCount = checkRemote ? await verifyRemote() : 0;
+export const validateDataSpec: CommandSpec = {
+  id: 'validate.data',
+  description: '校验本地 datapack：schema、文件名与 video.id 一致',
+  examples: [
+    'bun run ymmt validate data',
+    'bun run ymmt validate data --remote',
+    'bun run ymmt validate data --json',
+  ],
+  options: [new Option('--remote', '额外 HEAD 对象存储上的 archive 对象')],
+  async run(ctx) {
+    const errors: string[] = []
 
-if (errors.length > 0) {
-  console.error(`[validate-data] ${errors.length} 个问题`);
-  for (const error of errors) console.error(`  - ${error}`);
-  process.exit(1);
+    const readJson = (path: string): unknown | null => {
+      try {
+        return JSON.parse(readFileSync(path, 'utf8')) as unknown
+      }
+      catch (error) {
+        errors.push(`${rel(path)}: ${errorMessage(error)}`)
+        return null
+      }
+    }
+
+    const config = readJson(join(APP_ROOT, 'data-sources.json')) as DatasetConfig | null
+    if (!config || !Array.isArray(config.datasets) || config.datasets.length === 0) {
+      throw new CliError('data-sources.json 里没有 datasets', {
+        code: 'EMPTY_CONFIG',
+        hint: '检查 data-sources.json 的 datasets 数组',
+      })
+    }
+
+    const targets: Target[] = []
+    for (const dataset of config.datasets) {
+      const dir = join(APP_ROOT, 'data', dataset.id)
+      if (!existsSync(dir)) {
+        errors.push(`缺少 ${rel(dir)}`)
+        continue
+      }
+
+      const files = readdirSync(dir).filter(name => name.endsWith('.datapack.json'))
+      if (files.length === 0) {
+        errors.push(`${dataset.id}: 目录里没有 datapack`)
+        continue
+      }
+
+      for (const name of files) {
+        const path = join(dir, name)
+        const videoId = basename(name, '.datapack.json')
+        const pack = readJson(path)
+        if (pack === null) continue
+
+        const result = safeParse(DatapackSchema, pack)
+        if (!result.success) {
+          errors.push(...formatIssues(result).map(issue => `${rel(path)}: ${issue}`))
+          continue
+        }
+        if (result.output.video?.id !== videoId) {
+          errors.push(`${rel(path)}: video.id (${result.output.video?.id ?? '缺失'}) 与文件名 ${videoId} 不一致`)
+          continue
+        }
+        targets.push({ datasetId: dataset.id, videoId })
+      }
+    }
+
+    const remoteCount = ctx.flag('remote')
+      ? await checkRemoteObjects((process.env.DATAPACK_BASE ?? '').replace(/\/+$/, ''), targets, errors)
+      : 0
+
+    if (errors.length > 0) {
+      for (const error of errors) ctx.log.error(error)
+      return {
+        exitCode: 1,
+        data: { checked: targets.length, problems: errors.length, errors },
+      }
+    }
+
+    const remoteNote = ctx.flag('remote') ? `，archive ${remoteCount} 个对象可达` : ''
+    ctx.log.info(`OK：${targets.length} 场${remoteNote}`)
+    return { data: { checked: targets.length, problems: 0, remoteObjects: remoteCount } }
+  },
 }
-
-const remoteNote = checkRemote ? `，archive ${remoteCount} 个对象可达` : "";
-console.log(`[validate-data] OK：${targets.length} 场${remoteNote}`);

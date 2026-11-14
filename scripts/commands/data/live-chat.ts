@@ -1,16 +1,15 @@
-#!/usr/bin/env bun
 /**
  * 开播前 / 直播中的弹幕采集（InnerTube live chat）。
  *
- *   bun run fetch:live-chat --video fmjJNbzcr3g
- *   bun run fetch:live-chat --dataset yuno --ids ids.txt --once
+ *   bun run ymmt data live-chat --video fmjJNbzcr3g
+ *   bun run ymmt data live-chat --dataset yuno --ids ids.txt --once
  *
  * yt-dlp 的 `live_chat` 字幕只在直播结束后才有，等待室与直播中的弹幕它拿不到。
- * 本脚本从 watch 页取 `liveChatRenderer` 的 continuation（等待室只有 reload），
+ * 本命令从 watch 页取 `liveChatRenderer` 的 continuation（等待室只有 reload），
  * 轮询 `youtubei/v1/live_chat/get_live_chat`，按与回放完全相同的口径归一化：
  * text / SC / 贴纸 / 会员 / 赠送会员 / 领取赠礼、徽章、authorId、频道表情、主播发言。
  *
- * 输出（与 `fetch-streams` / `fetch-danmaku` 共用会话目录）：
+ * 输出（与 `data fetch` / `data danmaku` 共用会话目录）：
  *   danmaku/danmaku_live_<videoId>.jsonl   实时采集，记录带 `rendererId` 供合并去重
  *   danmaku/emoji_<videoId>.json           本场出现过的频道表情
  *   work/live-chat-state.json              continuation / 计数 / 停止原因，可续跑
@@ -24,13 +23,14 @@
  * 适合定时任务或开播前先把等待室历史落盘。
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
-import { danmakuKey, loadDanmakuFile, writeDanmakuFile } from './lib/danmaku-merge.ts'
-import { loadEnvFiles } from './lib/env.ts'
-import { collectReplay, chatHeaders, datasetForVideo } from './lib/live-chat-collect.ts'
-import { resolveCookies } from './lib/yt-cookies.ts'
+import { join, resolve, sep } from 'node:path'
+import { Option } from 'commander'
+import type { Logger } from '@scripts/lib/cli/logger.ts'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { CliError, UsageError } from '@scripts/lib/cli/exit.ts'
+import { danmakuKey, loadDanmakuFile, writeDanmakuFile } from '@scripts/lib/danmaku-merge.ts'
+import { collectReplay, chatHeaders, datasetForVideo } from '@scripts/lib/live-chat-collect.ts'
+import { resolveCookies } from '@scripts/lib/yt-cookies.ts'
 import {
   classifyChatError,
   classifyWatchStatus,
@@ -45,13 +45,17 @@ import {
   type WatchDisposition,
   type WatchPage,
   type WatchStatus,
-} from './lib/innertube-live.ts'
-import { writeEmojiSidecar, type ChatEmoji, type ChatRecord } from './lib/live-chat.ts'
-import { chatEventKey, extractChatEvents, type ChatEventRecord } from './lib/live-chat-events.ts'
+} from '@scripts/lib/innertube-live.ts'
+import { writeEmojiSidecar, type ChatEmoji, type ChatRecord } from '@scripts/lib/live-chat.ts'
+import { chatEventKey, extractChatEvents, type ChatEventRecord } from '@scripts/lib/live-chat-events.ts'
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(import.meta.dir, '../../..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
 const STATE_VERSION = 1
+const DEFAULT_MIN_INTERVAL_MS = 1000
+const DEFAULT_MAX_INTERVAL_MS = 15_000
+const DEFAULT_PAGE_DELAY_MS = 150
+const DEFAULT_COOKIE_BROWSER = 'firefox'
 
 interface DatasetSource {
   id: string
@@ -80,54 +84,70 @@ interface CollectorState {
   stopReason: string | null
 }
 
-const OPTIONS = {
-  video: { type: 'string' },
-  ids: { type: 'string' },
-  dataset: { type: 'string' },
-  root: { type: 'string' },
-  cookie: { type: 'string' },
-  cookies: { type: 'string' },
-  'max-hours': { type: 'string', default: '0' },
-  'min-interval': { type: 'string', default: '1000' },
-  'max-interval': { type: 'string', default: '15000' },
-  'page-delay': { type: 'string', default: '150' },
-  'max-pages': { type: 'string', default: '0' },
-  once: { type: 'boolean' },
-  'no-replay': { type: 'boolean' },
-  'cookies-from-browser': { type: 'string', default: 'firefox' },
-  'cookie-cache': { type: 'string' },
-  'no-cookies': { type: 'boolean' },
-  'dry-run': { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const
+/** 注入的日志器；默认静默，方便测试与进程内调用。 */
+export type CommandLog = Pick<Logger, 'info' | 'warn' | 'error'>
 
-const USAGE = `用法：bun scripts/fetch-live-chat.ts --video <id> [选项]
+const SILENT_LOG: CommandLog = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+}
 
-开播前 / 直播中通过 InnerTube 采集弹幕，写 danmaku_live_<videoId>.jsonl。
-直播已结束时自动改走 InnerTube 回放，写 danmaku_<videoId>.jsonl + events_<videoId>.jsonl。
+export interface CollectVideoSummary {
+  videoId: string
+  label: string
+  session: string | null
+  stopReason: string | null
+  stored: number
+  events: number
+  duplicates: number
+  polls: number
+  error: string | null
+}
 
-选项：
-  --video <id>          单个视频 ID
-  --ids <文件>          视频 ID 列表（每行一个）
-  --dataset <id>        强制指定 dataset；默认按 watch 页的 channelId 匹配
-  --root <目录>         会话根目录（默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live）
-  --cookie <字符串>     Cookie 请求头（会员限定需要）；也可用环境变量 YT_COOKIE
-  --cookies <文件>      Netscape cookie jar（yt-dlp 导出的 cookies.txt）
-  --cookies-from-browser <b> 导出 cookie 时用哪个浏览器，默认 firefox
-  --cookie-cache <文件> cookie 缓存路径，默认 ~/yt-cookies.txt
-  --no-cookies          不使用 cookie，以匿名状态抓取
-  --max-hours <n>       最长跟随小时数，0 = 不限（默认 0）
-  --min-interval <ms>   轮询间隔下限，默认 1000
-  --max-interval <ms>   轮询间隔上限，默认 15000
-  --page-delay <ms>     回放每页间隔，默认 150
-  --max-pages <n>       回放最多翻多少页，0 = 不限
-  --once                只取一页（等待室历史 / 定时任务），不触发完整回放
-  --no-replay           已结束时只报告，不自动抓回放
-  --dry-run             只打印统计，不写文件
-  -h, --help            显示本帮助
+export interface RunLiveChatOptions {
+  /** 单个视频 ID。 */
+  video?: string
+  /** 视频 ID 列表文件（每行一个）。 */
+  ids?: string
+  /** 强制指定 dataset；默认按 watch 页的 channelId 匹配。 */
+  dataset?: string
+  /** 会话根目录（默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live）。 */
+  root?: string
+  /** Cookie 请求头（会员限定需要）；也可用环境变量 YT_COOKIE。 */
+  cookie?: string
+  /** Netscape cookie jar（yt-dlp 导出的 cookies.txt）。 */
+  cookies?: string
+  /** 最长跟随小时数，0 = 不限（默认 0）。 */
+  maxHours?: number
+  /** 轮询间隔下限，默认 1000。 */
+  minInterval?: number
+  /** 轮询间隔上限，默认 15000。 */
+  maxInterval?: number
+  /** 回放每页间隔，默认 150。 */
+  pageDelay?: number
+  /** 回放最多翻多少页，0 = 不限。 */
+  maxPages?: number
+  /** 只取一页（等待室历史 / 定时任务），不触发完整回放。 */
+  once?: boolean
+  /** 已结束时只报告，不自动抓回放。 */
+  noReplay?: boolean
+  /** 导出 cookie 时用哪个浏览器，默认 firefox。 */
+  cookiesFromBrowser?: string
+  /** cookie 缓存路径，默认 ~/yt-cookies.txt。 */
+  cookieCache?: string
+  /** 不使用 cookie，以匿名状态抓取。 */
+  noCookies?: boolean
+  /** 只打印统计，不写文件。 */
+  dryRun?: boolean
+  /** 注入的日志器；默认静默。 */
+  log?: CommandLog
+}
 
-停止条件：直播结束、聊天被禁用、播放器受限且没有弹幕 token、--max-hours 到点或 Ctrl-C。
-等待室（LIVE_STREAM_OFFLINE）不是终态，会继续轮询。`
+export interface LiveChatRunResult {
+  videos: CollectVideoSummary[]
+  failures: number
+}
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf8')) as T
@@ -265,10 +285,7 @@ interface CollectOptions {
   replay: boolean
   pageDelayMs: number
   maxPages: number
-}
-
-function log(line: string): void {
-  console.log(`[live-chat] ${line}`)
+  log: CommandLog
 }
 
 /** 每次运行重新导出到 `~/yt-cookies.txt`，导出失败才用旧缓存。 */
@@ -281,6 +298,7 @@ async function resolveChatCookie(
     cachePath?: string
     disable?: boolean
   },
+  log: CommandLog,
 ): Promise<string | null> {
   const resolved = await resolveCookies({
     cookie: cli.cookie,
@@ -291,16 +309,32 @@ async function resolveChatCookie(
     disable: cli.disable,
     url: `https://www.youtube.com/watch?v=${videoId}`,
     appRoot: APP_ROOT,
-    log,
+    log: line => log.info(line),
   })
   if (resolved.source === 'cache' && resolved.jarPath)
-    log(`cookie：复用缓存 ${resolved.jarPath}`)
+    log.info(`cookie：复用缓存 ${resolved.jarPath}`)
   else if (resolved.source === 'none' && resolved.note)
-    log(resolved.note)
+    log.info(resolved.note)
   return resolved.header
 }
 
-async function collectVideo(videoId: string, options: CollectOptions, sources: DatasetSource[]): Promise<void> {
+async function collectVideo(
+  videoId: string,
+  options: CollectOptions,
+  sources: DatasetSource[],
+): Promise<CollectVideoSummary> {
+  const log = options.log
+  const summary: CollectVideoSummary = {
+    videoId,
+    label: 'unknown',
+    session: null,
+    stopReason: null,
+    stored: 0,
+    events: 0,
+    duplicates: 0,
+    polls: 0,
+    error: null,
+  }
   const headers = chatHeaders(options.cookie)
 
   let watch: WatchPage | null = null
@@ -323,15 +357,18 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
       }
     }
   }
+  summary.label = resolved.label
   if (options.datasetId && !resolved.dataset) {
-    console.error(`[live-chat] data-sources.json 里没有 dataset：${options.datasetId}`)
-    process.exitCode = 1
-    return
+    log.error(`data-sources.json 里没有 dataset：${options.datasetId}`)
+    summary.error = `data-sources.json 里没有 dataset：${options.datasetId}`
+    summary.stopReason = 'unknown_dataset'
+    return summary
   }
 
   const date = jstDate(watch?.scheduledStart ?? null)
   const session = existingSession(options.root, videoId)
     ?? join(options.root, `${date}_${resolved.label}_${videoId}`)
+  summary.session = session
   const danmakuDir = join(session, 'danmaku')
   const livePath = join(danmakuDir, `danmaku_live_${videoId}.jsonl`)
   const eventsPath = join(danmakuDir, `events_${videoId}.jsonl`)
@@ -411,11 +448,11 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
   }
   if (loaded.invalid > 0 && !options.dryRun) {
     writeDanmakuFile(livePath, loaded.records)
-    log(`${videoId} 清理 ${loaded.invalid} 行损坏记录`)
+    log.info(`${videoId} 清理 ${loaded.invalid} 行损坏记录`)
   }
   if (loadedEvents.invalid > 0 && !options.dryRun) {
     writeDanmakuFile(eventsPath, loadedEvents.records)
-    log(`${videoId} 清理 ${loadedEvents.invalid} 行损坏事件`)
+    log.info(`${videoId} 清理 ${loadedEvents.invalid} 行损坏事件`)
   }
   const emojis = readEmojiSidecar(emojiPath)
 
@@ -460,16 +497,16 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
       saveState(statePath, state)
   }
 
-  log(`${videoId} ${resolved.label} 会话 ${session.split(/[\\/]/).at(-1)}`)
+  log.info(`${videoId} ${resolved.label} 会话 ${session.split(/[\\/]/).at(-1)}`)
   if (watch?.title)
-    log(`${videoId} 标题：${watch.title}`)
+    log.info(`${videoId} 标题：${watch.title}`)
   if (status) {
-    log(`${videoId} 状态：${disposition}${status.isReplay ? '（已是回放）' : ''}${status.availability === 'subscriber_only' ? '（会员限定）' : ''}`)
+    log.info(`${videoId} 状态：${disposition}${status.isReplay ? '（已是回放）' : ''}${status.availability === 'subscriber_only' ? '（会员限定）' : ''}`)
   }
 
   if (disposition === 'ended') {
     if (options.replay && !options.once) {
-      log(`${videoId} 直播已结束，改走 InnerTube 回放`)
+      log.info(`${videoId} 直播已结束，改走 InnerTube 回放`)
       state.stopReason = 'replay'
       persist()
       const replay = await collectReplay({
@@ -479,7 +516,7 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
         pageDelayMs: options.pageDelayMs,
         maxPages: options.maxPages,
         dryRun: options.dryRun,
-        log,
+        log: line => log.info(line),
       })
       state.stopReason = replay.status === 'done' ? 'replay' : `replay:${replay.status}`
       state.lastError = replay.error ?? null
@@ -487,42 +524,68 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
       state.eventsStored = replay.events
       state.duplicates = replay.duplicates
       persist()
+      summary.stopReason = state.stopReason
+      summary.stored = replay.total
+      summary.events = replay.events
+      summary.duplicates = replay.duplicates
+      summary.polls = state.polls
       if (replay.status === 'done') {
-        log(`${videoId} 回放完成：${replay.total} 条消息、${replay.events} 个事件、${replay.emojis} 个表情 → ${replay.output}`)
+        log.info(`${videoId} 回放完成：${replay.total} 条消息、${replay.events} 个事件、${replay.emojis} 个表情 → ${replay.output}`)
       }
       else {
-        log(`${videoId} 回放未完成（${replay.status}）${replay.error ? `：${replay.error}` : ''}；重跑会从断点续翻`)
+        log.info(`${videoId} 回放未完成（${replay.status}）${replay.error ? `：${replay.error}` : ''}；重跑会从断点续翻`)
       }
-      return
+      return summary
     }
-    log(`${videoId} 直播已结束，实时采集跳过${options.once ? '（--once 不抓回放；去掉 --once 或先跑 fetch:danmaku）' : '（--no-replay）'}`)
+    log.info(`${videoId} 直播已结束，实时采集跳过${options.once ? '（--once 不抓回放；去掉 --once 或先跑 fetch:danmaku）' : '（--no-replay）'}`)
     state.stopReason = 'ended'
     persist()
-    return
+    summary.stopReason = state.stopReason
+    summary.stored = seen.size
+    summary.events = seenEvents.size
+    summary.duplicates = duplicates
+    summary.polls = state.polls
+    return summary
   }
   if (disposition === 'chat_disabled') {
-    log(`${videoId} 聊天已被禁用，无法采集`)
+    log.info(`${videoId} 聊天已被禁用，无法采集`)
     state.stopReason = 'chat_disabled'
     persist()
-    return
+    summary.stopReason = state.stopReason
+    summary.stored = seen.size
+    summary.events = seenEvents.size
+    summary.duplicates = duplicates
+    summary.polls = state.polls
+    return summary
   }
   if (disposition === 'unplayable' && !continuation) {
-    log(`${videoId} 播放器受限且没有弹幕 token（会员限定 / 需要登录 cookie）`)
+    log.info(`${videoId} 播放器受限且没有弹幕 token（会员限定 / 需要登录 cookie）`)
     state.stopReason = 'unplayable'
     persist()
-    return
+    summary.stopReason = state.stopReason
+    summary.stored = seen.size
+    summary.events = seenEvents.size
+    summary.duplicates = duplicates
+    summary.polls = state.polls
+    return summary
   }
   if (!continuation && watchError) {
-    log(`${videoId} 取不到 continuation：${watchError}`)
+    log.info(`${videoId} 取不到 continuation：${watchError}`)
     state.stopReason = 'no_continuation'
     persist()
-    return
+    summary.stopReason = state.stopReason
+    summary.error = watchError
+    summary.stored = seen.size
+    summary.events = seenEvents.size
+    summary.duplicates = duplicates
+    summary.polls = state.polls
+    return summary
   }
 
   let running = true
   const onSignal = (): void => {
     running = false
-    log(`${videoId} 收到中断，保存状态后退出`)
+    log.info(`${videoId} 收到中断，保存状态后退出`)
   }
   process.once('SIGINT', onSignal)
 
@@ -545,7 +608,7 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
         status = page.status
         const nextDisposition = classifyWatchStatus(status)
         if (nextDisposition !== disposition)
-          log(`${videoId} 状态变化：${disposition} → ${nextDisposition}`)
+          log.info(`${videoId} 状态变化：${disposition} → ${nextDisposition}`)
         disposition = nextDisposition
         if (disposition === 'ended' || disposition === 'chat_disabled') {
           stopReason = disposition
@@ -555,7 +618,7 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
       }
       catch (error) {
         lastError = describe(error)
-        log(`${videoId} 定期检查 watch 页失败：${lastError}`)
+        log.info(`${videoId} 定期检查 watch 页失败：${lastError}`)
       }
       persist()
     }
@@ -576,7 +639,7 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
         continuation = watch.continuation?.token ?? null
         continuationKind = watch.continuation?.kind ?? null
         lastError = null
-        log(`${videoId} 重新取 token：${disposition} ${continuation ? `(${continuationKind})` : '（无）'}`)
+        log.info(`${videoId} 重新取 token：${disposition} ${continuation ? `(${continuationKind})` : '（无）'}`)
         if (!continuation && (disposition === 'ended' || disposition === 'chat_disabled' || disposition === 'unplayable')) {
           stopReason = disposition
           break
@@ -584,7 +647,7 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
       }
       catch (error) {
         lastError = describe(error)
-        log(`${videoId} watch 页失败：${lastError}`)
+        log.info(`${videoId} watch 页失败：${lastError}`)
       }
       persist()
       continue
@@ -601,7 +664,7 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
       const body = error instanceof ChatHttpError ? error.body : ''
       const kind = classifyChatError(`${message} ${body}`, httpStatus)
       lastError = message
-      log(`${videoId} 轮询失败（${kind}）：${message}`)
+      log.info(`${videoId} 轮询失败（${kind}）：${message}`)
       if (kind === 'members_only' || kind === 'chat_disabled' || kind === 'ended') {
         stopReason = kind
         break
@@ -618,7 +681,7 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
       const message = JSON.stringify(payload)
       const kind = classifyChatError(message)
       lastError = message
-      log(`${videoId} 上游错误（${kind}）：${message.slice(0, 200)}`)
+      log.info(`${videoId} 上游错误（${kind}）：${message.slice(0, 200)}`)
       if (kind === 'members_only' || kind === 'chat_disabled' || kind === 'ended') {
         stopReason = kind
         break
@@ -682,7 +745,7 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
     const skippedDetail = Object.entries(skipped)
       .map(([kind, count]) => `${kind.replace(/^liveChat|Renderer$/g, '')} ${count}`)
       .join(' / ')
-    log(`${videoId} ${disposition} +${added}（重复 ${duplicatesThisPoll} / 合计 ${seen.size} / 事件 +${eventsAdded}（合计 ${seenEvents.size}） / 轮询 ${state.polls}）${skippedDetail ? ` 跳过 ${skippedDetail}` : ''}`)
+    log.info(`${videoId} ${disposition} +${added}（重复 ${duplicatesThisPoll} / 合计 ${seen.size} / 事件 +${eventsAdded}（合计 ${seenEvents.size}） / 轮询 ${state.polls}）${skippedDetail ? ` 跳过 ${skippedDetail}` : ''}`)
     persist()
 
     if (options.once) {
@@ -705,96 +768,206 @@ async function collectVideo(videoId: string, options: CollectOptions, sources: D
   process.removeListener('SIGINT', onSignal)
   state.stopReason = stopReason ?? (running ? 'done' : 'interrupted')
   persist()
-  log(`${videoId} 结束（${state.stopReason}）：合计 ${seen.size} 条，事件 ${seenEvents.size} 条，重复 ${duplicates}，轮询 ${state.polls}；${options.dryRun ? 'dry-run 未写入' : `输出 ${livePath}`}`)
+  log.info(`${videoId} 结束（${state.stopReason}）：合计 ${seen.size} 条，事件 ${seenEvents.size} 条，重复 ${duplicates}，轮询 ${state.polls}；${options.dryRun ? 'dry-run 未写入' : `输出 ${livePath}`}`)
+
+  summary.stopReason = state.stopReason
+  summary.stored = seen.size
+  summary.events = seenEvents.size
+  summary.duplicates = duplicates
+  summary.polls = state.polls
+  summary.error = lastError
+  return summary
 }
 
-async function main(): Promise<void> {
-  loadEnvFiles()
-  const { values } = parseArgs({ options: OPTIONS, args: process.argv.slice(2), allowPositionals: false })
-  if (values.help) {
-    console.log(USAGE)
-    return
-  }
+/**
+ * InnerTube 实时弹幕采集：等待室历史 / 直播中跟随 / 结束后转完整回放。
+ *
+ * 进程内可调用：不读 process.argv、不调用 process.exit（失败从 `exitCode` 反映），
+ * 进度与上游错误走注入的 `log`；单场失败只记录，不阻塞其余场次。
+ */
+export async function runLiveChat(
+  options: RunLiveChatOptions = {},
+): Promise<{ exitCode: number, data?: LiveChatRunResult }> {
+  const log = options.log ?? SILENT_LOG
 
   const rawIds: string[] = []
-  if (values.video)
-    rawIds.push(values.video)
-  if (values.ids) {
-    const path = resolve(values.ids)
+  if (options.video)
+    rawIds.push(options.video)
+  if (options.ids) {
+    const path = resolve(options.ids)
     if (!existsSync(path)) {
-      console.error(`[live-chat] 找不到 ID 列表：${path}`)
-      process.exit(1)
+      throw new CliError(`找不到 ID 列表：${path}`, {
+        code: 'MISSING_IDS_FILE',
+        hint: '确认 --ids 的路径，或用 --video 单个指定',
+        context: { path },
+      })
     }
     rawIds.push(...readFileSync(path, 'utf8').split(/\r?\n/))
   }
   const ids = [...new Set(rawIds.map(videoIdOf).filter((id): id is string => id !== null))]
   if (ids.length === 0) {
-    console.error('[live-chat] 请用 --video <id> 或 --ids <文件> 指定视频')
-    console.error(USAGE)
-    process.exit(1)
+    throw new UsageError('请用 --video <id> 或 --ids <文件> 指定视频', {
+      hint: '例如 bun run ymmt data live-chat --video fmjJNbzcr3g',
+    })
   }
 
   const sources = existsSync(CONFIG_PATH)
     ? readJson<{ datasets?: DatasetSource[] }>(CONFIG_PATH).datasets ?? []
     : []
 
-  const root = resolve(values.root ?? process.env.STREAM_SESSION_ROOT ?? join(APP_ROOT, 'temp', 'youtube-live'))
+  const dryRun = options.dryRun === true
+  const root = resolve(options.root ?? process.env.STREAM_SESSION_ROOT ?? join(APP_ROOT, 'temp', 'youtube-live'))
   const dataRoot = join(APP_ROOT, 'data')
   if (root === dataRoot || root.startsWith(`${dataRoot}${sep}`)) {
-    console.error('[live-chat] --root 是原始素材目录，不能指向 data/')
-    process.exit(1)
+    throw new UsageError('--root 是原始素材目录，不能指向 data/', {
+      hint: '用归档工程的会话根目录，例如 --root "D:/projects/claude-messages/temp/youtube-live"',
+      context: { root },
+    })
   }
-  if (!values['dry-run']) {
+  if (!dryRun) {
     mkdirSync(root, { recursive: true })
     if ((root.startsWith(`${APP_ROOT}/`) || root.startsWith(`${APP_ROOT}\\`)) && !existsSync(join(root, '.gitignore')))
       writeFileSync(join(root, '.gitignore'), '*\n', 'utf8')
   }
 
   const cookie = await resolveChatCookie(ids[0]!, {
-    cookie: values.cookie,
-    cookies: values.cookies,
-    browser: values['cookies-from-browser'],
-    cachePath: values['cookie-cache'],
-    disable: values['no-cookies'],
-  })
+    cookie: options.cookie,
+    cookies: options.cookies,
+    browser: options.cookiesFromBrowser ?? DEFAULT_COOKIE_BROWSER,
+    cachePath: options.cookieCache,
+    disable: options.noCookies,
+  }, log)
 
-  const options: CollectOptions = {
+  const minInterval = Math.max(1000, options.minInterval ?? DEFAULT_MIN_INTERVAL_MS)
+  const maxInterval = Math.max(1000, options.maxInterval ?? DEFAULT_MAX_INTERVAL_MS)
+  if (maxInterval < minInterval) {
+    throw new UsageError('--max-interval 不能小于 --min-interval', {
+      hint: '例如 --min-interval 1000 --max-interval 15000',
+      context: { minInterval, maxInterval },
+    })
+  }
+
+  const collect: CollectOptions = {
     root,
     cookie,
-    minInterval: Math.max(1000, Number(values['min-interval']) || 1000),
-    maxInterval: Math.max(1000, Number(values['max-interval']) || 15_000),
-    once: Boolean(values.once),
-    dryRun: Boolean(values['dry-run']),
-    maxHours: Math.max(0, Number(values['max-hours']) || 0),
-    datasetId: values.dataset,
-    replay: !values['no-replay'],
-    pageDelayMs: Math.max(0, Number(values['page-delay']) || 0),
-    maxPages: Math.max(0, Number(values['max-pages']) || 0),
-  }
-  if (options.maxInterval < options.minInterval) {
-    console.error('[live-chat] --max-interval 不能小于 --min-interval')
-    process.exit(1)
+    minInterval,
+    maxInterval,
+    once: options.once === true,
+    dryRun,
+    maxHours: Math.max(0, options.maxHours ?? 0),
+    datasetId: options.dataset,
+    replay: options.noReplay !== true,
+    pageDelayMs: Math.max(0, options.pageDelay ?? DEFAULT_PAGE_DELAY_MS),
+    maxPages: Math.max(0, options.maxPages ?? 0),
+    log,
   }
   if (!cookie)
-    log('未提供 cookie：公开场次可采集；会员限定场次会停在 unplayable')
+    log.info('未提供 cookie：公开场次可采集；会员限定场次会停在 unplayable')
 
   // 多视频时 Ctrl-C 一次就整体停下，不要继续下一个场次。
   let interrupted = false
-  process.once('SIGINT', () => {
+  const onInterrupt = (): void => {
     interrupted = true
-  })
+  }
+  process.once('SIGINT', onInterrupt)
 
-  for (const videoId of ids) {
-    if (interrupted)
-      break
-    try {
-      await collectVideo(videoId, options, sources)
-    }
-    catch (error) {
-      console.error(`[live-chat] ${videoId} 失败：${describe(error)}`)
-      process.exitCode = 1
+  const videos: CollectVideoSummary[] = []
+  let failures = 0
+  try {
+    for (const videoId of ids) {
+      if (interrupted)
+        break
+      try {
+        const summary = await collectVideo(videoId, collect, sources)
+        videos.push(summary)
+        if (summary.error && !summary.session)
+          failures += 1
+      }
+      catch (error) {
+        failures += 1
+        log.error(`${videoId} 失败：${describe(error)}`)
+        videos.push({
+          videoId,
+          label: 'unknown',
+          session: null,
+          stopReason: 'error',
+          stored: 0,
+          events: 0,
+          duplicates: 0,
+          polls: 0,
+          error: describe(error),
+        })
+      }
     }
   }
+  finally {
+    process.removeListener('SIGINT', onInterrupt)
+  }
+
+  return { exitCode: failures > 0 ? 1 : 0, data: { videos, failures } }
 }
 
-await main()
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+/** `--no-x` 形式的开关在 commander 里是 `<x>: false`；true/false 都表示没传。 */
+function negated(ctx: { options: Record<string, unknown> }, name: string): boolean {
+  return ctx.options[name] === false
+}
+
+/** `data live-chat`：InnerTube 实时聊天采集。 */
+export const dataLiveChatSpec: CommandSpec<LiveChatRunResult> = {
+  id: 'data.live-chat',
+  description: 'InnerTube 实时聊天采集（等待室 / 直播中 / 结束后转回放）',
+  details: '开播前 / 直播中通过 InnerTube 采集弹幕，写 danmaku_live_<videoId>.jsonl。\n'
+    + '直播已结束时自动改走 InnerTube 回放，写 danmaku_<videoId>.jsonl + events_<videoId>.jsonl。\n\n'
+    + '停止条件：直播结束、聊天被禁用、播放器受限且没有弹幕 token、--max-hours 到点或 Ctrl-C。\n'
+    + '等待室（LIVE_STREAM_OFFLINE）不是终态，会继续轮询。',
+  examples: [
+    'bun run ymmt data live-chat --video fmjJNbzcr3g',
+    'bun run ymmt data live-chat --dataset yuno --ids temp/live-ids.txt --once',
+    'bun run ymmt data live-chat --video fmjJNbzcr3g --max-hours 3 --json',
+  ],
+  options: [
+    new Option('--video <id>', '单个视频 ID'),
+    new Option('--ids <文件>', '视频 ID 列表（每行一个）'),
+    new Option('--dataset <id>', '强制指定 dataset；默认按 watch 页的 channelId 匹配'),
+    new Option('--root <目录>', '会话根目录（默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live）'),
+    new Option('--cookie <字符串>', 'Cookie 请求头（会员限定需要）；也可用环境变量 YT_COOKIE'),
+    new Option('--cookies <文件>', 'Netscape cookie jar（yt-dlp 导出的 cookies.txt）'),
+    new Option('--cookies-from-browser <b>', `导出 cookie 时用哪个浏览器，默认 ${DEFAULT_COOKIE_BROWSER}`).default(DEFAULT_COOKIE_BROWSER),
+    new Option('--cookie-cache <文件>', 'cookie 缓存路径，默认 ~/yt-cookies.txt'),
+    new Option('--no-cookies', '不使用 cookie，以匿名状态抓取'),
+    new Option('--max-hours <n>', '最长跟随小时数，0 = 不限').default(0),
+    new Option('--min-interval <ms>', `轮询间隔下限，默认 ${DEFAULT_MIN_INTERVAL_MS}`).default(DEFAULT_MIN_INTERVAL_MS),
+    new Option('--max-interval <ms>', `轮询间隔上限，默认 ${DEFAULT_MAX_INTERVAL_MS}`).default(DEFAULT_MAX_INTERVAL_MS),
+    new Option('--page-delay <ms>', `回放每页间隔，默认 ${DEFAULT_PAGE_DELAY_MS}`).default(DEFAULT_PAGE_DELAY_MS),
+    new Option('--max-pages <n>', '回放最多翻多少页，0 = 不限').default(0),
+    new Option('--once', '只取一页（等待室历史 / 定时任务），不触发完整回放'),
+    new Option('--no-replay', '已结束时只报告，不自动抓回放'),
+  ],
+  async run(ctx) {
+    const result = await runLiveChat({
+      video: optionalString(ctx.options.video),
+      ids: optionalString(ctx.options.ids),
+      dataset: optionalString(ctx.options.dataset),
+      root: optionalString(ctx.options.root),
+      cookie: optionalString(ctx.options.cookie),
+      cookies: optionalString(ctx.options.cookies),
+      maxHours: ctx.integer('maxHours', 0, 0),
+      minInterval: ctx.integer('minInterval', DEFAULT_MIN_INTERVAL_MS, 1000),
+      maxInterval: ctx.integer('maxInterval', DEFAULT_MAX_INTERVAL_MS, 1000),
+      pageDelay: ctx.integer('pageDelay', DEFAULT_PAGE_DELAY_MS, 0),
+      maxPages: ctx.integer('maxPages', 0, 0),
+      once: ctx.flag('once'),
+      noReplay: negated(ctx, 'replay'),
+      cookiesFromBrowser: optionalString(ctx.options.cookiesFromBrowser) ?? DEFAULT_COOKIE_BROWSER,
+      cookieCache: optionalString(ctx.options.cookieCache),
+      noCookies: negated(ctx, 'cookies'),
+      dryRun: ctx.dryRun,
+      log: ctx.log,
+    })
+    return { exitCode: result.exitCode, data: result.data }
+  },
+}

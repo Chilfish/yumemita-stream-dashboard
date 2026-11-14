@@ -2,11 +2,12 @@ import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { eq, sql } from 'drizzle-orm'
 import { basename, resolve } from 'node:path'
-import process from 'node:process'
-import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
-import { isStopword } from '../src/lib/stopwords.ts'
-import { createDb, createWriteDb } from '../src/db/connection.ts'
-import { computeDatasetPublicTotals } from '../src/db/queries/dataset-totals.ts'
+import { Option } from 'commander'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { aggregateDataset, type StreamRow } from '@/lib/aggregate.ts'
+import { isStopword } from '@/lib/stopwords.ts'
+import { createDb, createWriteDb } from '@/db/connection.ts'
+import { computeDatasetPublicTotals } from '@/db/queries/dataset-totals.ts'
 import {
   authors,
   comments,
@@ -18,13 +19,13 @@ import {
   streamDetails,
   streamWords,
   streams,
-} from '../src/db/schema.ts'
-import type { StreamDatapack } from '../src/types/datapack.ts'
-import { buildStreamSummary } from './lib/dataset-manifest.ts'
-import { loadCollaborations, type LoadCollaborationsResult } from './lib/collaborations.ts'
-import { loadEnvFiles, requireEnv } from './lib/env.ts'
-import { syncTranscripts } from './lib/transcripts-db.ts'
-import { pruneMatchedSchedules } from './lib/schedule-match.ts'
+} from '@/db/schema.ts'
+import type { StreamDatapack } from '@/types/datapack.ts'
+import { buildStreamSummary } from '@scripts/lib/dataset-manifest.ts'
+import { loadCollaborations, type LoadCollaborationsResult } from '@scripts/lib/collaborations.ts'
+import { requireEnv } from '@scripts/lib/env.ts'
+import { syncTranscripts } from '@scripts/lib/transcripts-db.ts'
+import { pruneMatchedSchedules } from '@scripts/lib/schedule-match.ts'
 
 interface DataSource {
   id: string
@@ -209,12 +210,11 @@ function buildInsights(packs: { pack: StreamDatapack, rel: string }[]) {
   return aggregateDataset(rows)
 }
 
-async function main(): Promise<void> {
-  loadEnvFiles()
-  const args = parseArgs(process.argv.slice(2))
+async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }> {
+  const args = parseArgs(argv)
   if (args.help) {
     console.log(USAGE)
-    return
+    return { exitCode: 0, data: null }
   }
   const sources = JSON.parse(readFileSync('data-sources.json', 'utf8')) as { datasets: DataSource[] }
   const selected = sources.datasets.filter(item => !args.dataset || item.id === args.dataset)
@@ -432,7 +432,7 @@ async function main(): Promise<void> {
         console.log(`[ingest] ${source.id}: 逐字稿元数据 ${transcriptCount} 篇`)
       }
 
-      const prunedSchedules = await pruneMatchedSchedules(db, source.id)
+      const prunedSchedules = await pruneMatchedSchedules(readDb!, source.id)
       if (prunedSchedules.length > 0) {
         console.log(`[ingest] ${source.id}: 清理已入库日程 ${prunedSchedules.length} 条`)
       }
@@ -453,7 +453,7 @@ async function main(): Promise<void> {
       }).where(eq(ingestReports.id, batchId))
     }
 
-    console.log(JSON.stringify({
+    const summary = {
       status,
       dryRun: args.dryRun,
       processed,
@@ -465,9 +465,10 @@ async function main(): Promise<void> {
         skipped: report.skipped,
         failed: report.failed,
       })),
-    }, null, 2))
+    }
+    console.log(JSON.stringify(summary, null, 2))
 
-    if (failures > 0) process.exitCode = 1
+    return { exitCode: failures > 0 ? 1 : 0, data: summary }
   }
   catch (error) {
     // 异常中断也要关闭报告，避免永远停留在 running。
@@ -736,4 +737,39 @@ async function ingestPack(
   })
 }
 
-await main()
+/**
+ * 同进程入口：按旧命令行参数运行 ingest。
+ *
+ * `data update` / `publish sync` 之类需要串联一步 ingest，但不想再起一个
+ * bun 子进程时用它；CLI 的 `db.ingest` 也走同一条路径。
+ */
+export async function runIngest(argv: string[] = []): Promise<{ exitCode: number, data: unknown }> {
+  return main(argv.filter(arg => arg !== '--help'))
+}
+
+/** 把本地 pack 投影到 PostgreSQL；一场一个事务，按 content_hash 增量。 */
+export const dbIngestSpec: CommandSpec = {
+  id: 'db.ingest',
+  description: '把本地 datapack 写入 PostgreSQL（事务 upsert + insights）',
+  details: '未识别的参数会被忽略；补数据时务必带 --dataset / --ids，避免误跑全量。',
+  examples: [
+    'bun run ymmt db ingest --dataset nonoka --limit 30',
+    'bun run ymmt db ingest --dataset arale --ids ids.txt --limit 5',
+    'bun run ymmt db ingest --all',
+    'bun run ymmt db ingest --dry-run --json',
+  ],
+  options: [
+    new Option('--dataset <id>', '只处理指定 dataset；省略会处理全部成员'),
+    new Option('--ids <文件>', '只处理文件里列出的 videoId（每行一个）'),
+    new Option('--limit <n>', '每个 dataset 最多处理前 n 份 pack；跳过 insights 重算'),
+    new Option('--force', '内容 hash 不变也重写'),
+    new Option('--new-only', '只插入数据库里还没有的场次，不改写已有行'),
+    new Option('--all', '等同上 --force（历史参数）'),
+    new Option('--batch-size <n>', '每处理 n 份打印进度，默认 50'),
+  ],
+  async run(ctx) {
+    const result = await runIngest(ctx.toArgv({ includeDryRun: true }))
+    return { exitCode: result.exitCode, data: result.data }
+  },
+}
+

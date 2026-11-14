@@ -22,29 +22,34 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
+import { Option } from 'commander'
 import { inArray } from 'drizzle-orm'
-import { runBatch } from '../src/db/batch.ts'
-import { createDb } from '../src/db/connection.ts'
-import { datasetInsights, streams } from '../src/db/schema.ts'
-import { CACHE_TAGS, datasetTag, streamTag } from '../src/lib/cache-tags.ts'
-import { loadEnvFiles, requireEnv } from './lib/env.ts'
-import { purgeCache } from './lib/purge.ts'
-import { syncScheduleFromChannel } from './lib/schedule-sync.ts'
-import { planDataset, type ChannelEntry, type PlanStream } from './lib/update-plan.ts'
-import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
+import { runBatch } from '@/db/batch.ts'
+import { createDb } from '@/db/connection.ts'
+import { datasetInsights, streams } from '@/db/schema.ts'
+import { CACHE_TAGS, datasetTag, streamTag } from '@/lib/cache-tags.ts'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { CliError } from '@scripts/lib/cli/exit.ts'
+import { requireEnv } from '@scripts/lib/env.ts'
+import { purgeCache } from '@scripts/lib/purge.ts'
+import { syncScheduleFromChannel } from '@scripts/lib/schedule-sync.ts'
+import { planDataset, type ChannelEntry, type PlanStream } from '@scripts/lib/update-plan.ts'
+import { resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
+import { runFetch } from './fetch.ts'
+import { runVstats } from './vstats.ts'
+import { runThumbnails } from './thumbnails.ts'
+import { runIngest } from '../db/ingest.ts'
+import { runPublishData } from '../publish/data.ts'
+import { runPublishTranscripts } from '../publish/transcripts.ts'
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
-const FETCH_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-streams.ts')
-const THUMB_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-thumbnails.ts')
-const INGEST_SCRIPT = join(APP_ROOT, 'scripts', 'ingest-db.ts')
-const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
-const TRANSCRIPT_SCRIPT = join(APP_ROOT, 'scripts', 'publish-transcripts.ts')
-const VSTATS_SCRIPT = join(APP_ROOT, 'scripts', 'backfill-vstats.ts')
 
 const FORCE_RECENT_HOURS = 24
 const PACK_SUFFIX = '.datapack.json'
+
+type Report = (level: 'info' | 'warn' | 'error', message: string) => void
 
 interface DatasetSource {
   id: string
@@ -60,48 +65,6 @@ interface LoadedState {
   generatedAt: string | null
   from: 'database'
 }
-
-const OPTIONS = {
-  dataset: { type: 'string' },
-  root: { type: 'string' },
-  'state-dir': { type: 'string' },
-  concurrency: { type: 'string', default: '3' },
-  cookies: { type: 'string' },
-  'cookies-from-browser': { type: 'string', default: 'firefox' },
-  'cookie-cache': { type: 'string' },
-  'no-cookies': { type: 'boolean' },
-  'vstats-limit': { type: 'string', default: '20' },
-  'no-vstats': { type: 'boolean' },
-  force: { type: 'boolean' },
-  'dry-run': { type: 'boolean' },
-  'no-publish': { type: 'boolean' },
-  bootstrap: { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const
-
-const USAGE = `用法：bun scripts/daily-update.ts [选项]
-
-按频道 /streams 列表和数据库里的 streams 求差集，只抓有变化的场次。
-抓取后依次运行 ingest、资产发布、逐字稿发布与缓存失效。
-
-选项：
-  --dataset <id>              只处理一个 dataset；默认全部
-  --root <目录>               原始会话目录（默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live）
-  --state-dir <目录>          进度/频道缓存（默认 <root>/.fetch-state）
-  --concurrency <n>           抓取并发，默认 3
-  --cookies <文件>            Netscape cookie jar；CI 用这个
-  --cookies-from-browser <b>  导出 cookie 时用哪个浏览器，默认 firefox
-  --cookie-cache <文件>       cookie 缓存路径，默认 ~/yt-cookies.txt
-  --no-cookies                不使用 cookie，以匿名状态抓取
-  --vstats-limit <n>          每个成员本轮最多补抓 n 场 VSTATS，默认 20
-  --no-vstats                 跳过 VSTATS 补抓
-  --force                     额外重抓最近 ${FORCE_RECENT_HOURS} 小时结束的场次
-  --dry-run                   只列候选，不抓取、不写库、不发布
-  --no-publish                只写本地，不写库、不上传对象存储
-  --bootstrap                 数据库为空时也允许按全量新场次处理
-  -h, --help                  显示本帮助
-
-写入数据库需要 DATABASE_URL；发布资产需要 R2_* 凭据；缓存失效需要 SITE_URL + PURGE_TOKEN。`
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf8')) as T
@@ -134,14 +97,6 @@ function runCapture(command: string, args: string[], env?: Record<string, string
       const stderr = Buffer.concat(err).toString('utf8').trim().split('\n').slice(-3).join(' | ')
       rejectPromise(new Error(`${command} exit ${code}${stderr ? `：${stderr}` : ''}`))
     })
-  })
-}
-
-function runScript(script: string, args: string[]): Promise<number> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, [script, ...args], { stdio: 'inherit' })
-    child.on('error', rejectPromise)
-    child.on('close', code => resolvePromise(code ?? 1))
   })
 }
 
@@ -264,10 +219,14 @@ interface ChannelList {
  * 频道 `/streams` 列表。用 `-J` 而不是 `--print`：标题里可能有制表符/换行，
  * 按行切分会错位；同时强制 UTF-8，避免 Windows 控制台编码把日文标题弄坏。
  */
-async function readChannelEntries(source: DatasetSource, stateDir: string): Promise<ChannelList> {
+async function readChannelEntries(
+  source: DatasetSource,
+  stateDir: string,
+  report: Report,
+): Promise<ChannelList> {
   const cachePath = join(stateDir, `channel-${source.id}.json`)
   if (!source.channelId) {
-    console.warn(`[update] ${source.id} 缺少 channelId，跳过频道列表`)
+    report('warn', `${source.id} 缺少 channelId，跳过频道列表`)
     return { entries: existsSync(cachePath) ? readChannelCache(cachePath) : [], failed: true }
   }
 
@@ -317,18 +276,18 @@ async function readChannelEntries(source: DatasetSource, stateDir: string): Prom
       writeFileSync(cachePath, `${JSON.stringify({ updatedAt: new Date().toISOString(), entries })}\n`, 'utf8')
       return { entries, failed: false }
     }
-    console.warn(`[update] ${source.id} 频道列表为空`)
+    report('warn', `${source.id} 频道列表为空`)
   }
   catch (error) {
-    console.warn(`[update] ${source.id} 频道列表抓取失败：${describe(error)}`)
+    report('warn', `${source.id} 频道列表抓取失败：${describe(error)}`)
   }
 
   if (existsSync(cachePath)) {
     const cached = readChannelCache(cachePath)
-    console.warn(`[update] ${source.id} 使用频道列表缓存（${cached.length} 条），本次可能漏掉新场次`)
+    report('warn', `${source.id} 使用频道列表缓存（${cached.length} 条），本次可能漏掉新场次`)
     return { entries: cached, failed: true }
   }
-  console.warn(`[update] ${source.id} 没有频道列表缓存，本次只能处理待补数据的场次`)
+  report('warn', `${source.id} 没有频道列表缓存，本次只能处理待补数据的场次`)
   return { entries: [], failed: true }
 }
 
@@ -342,58 +301,102 @@ function readChannelCache(path: string): ChannelEntry[] {
   }
 }
 
-async function main(): Promise<void> {
-  loadEnvFiles()
-  const { values } = parseArgs({ options: OPTIONS, args: process.argv.slice(2), allowPositionals: false })
-  if (values.help) {
-    console.log(USAGE)
-    return
+/** `data update` 的选项。 */
+export interface UpdateOptions {
+  dataset?: string
+  root?: string
+  stateDir?: string
+  concurrency?: number
+  cookies?: string
+  cookiesFromBrowser?: string
+  cookieCache?: string
+  noCookies?: boolean
+  vstatsLimit?: number
+  noVstats?: boolean
+  force?: boolean
+  dryRun?: boolean
+  noPublish?: boolean
+  bootstrap?: boolean
+  /** 运行期日志；CLI 传 ctx.log，测试可省略。 */
+  log?: Logger
+}
+
+export interface UpdateResult {
+  exitCode: number
+  data?: Record<string, unknown>
+}
+
+/**
+ * 每日增量：频道差集 → 定点抓取 → 补 VSTATS / 封面 → ingest → 发布 → purge。
+ *
+ * 本地和 GitHub Actions 共用同一个入口；安静日（无新场次且本地 pack 不比数据库新）
+ * 不抓取、不 ingest、不发布。
+ */
+export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResult> {
+  const report: Report = (level, message) => {
+    if (options.log) options.log[level](message)
+    else if (level === 'error') console.error(message)
+    else if (level === 'warn') console.warn(message)
+    else console.log(message)
   }
+  // 兄弟命令收 Logger，CLI 传进来的就是；没有时给个只落 stderr 的占位实现。
+  const fallbackLog: Logger = {
+    name: 'data.update',
+    info: (message: string) => report('info', message),
+    warn: (message: string) => report('warn', message),
+    error: (message: string) => report('error', message),
+    debug: () => {},
+    line: (message: string) => report('info', message),
+    output: () => {},
+    child: () => fallbackLog,
+  }
+  const log: Logger = options.log ?? fallbackLog
 
   const sources = readJson<{ datasets?: DatasetSource[] }>(CONFIG_PATH).datasets ?? []
-  const selected = values.dataset ? sources.filter(item => item.id === values.dataset) : sources
+  const selected = options.dataset ? sources.filter(item => item.id === options.dataset) : sources
   if (selected.length === 0) {
-    console.error(`[update] 找不到 dataset：${values.dataset ?? '(data-sources.json 为空)'}`)
-    console.error(`[update] 可用：${sources.map(item => item.id).join(', ') || '(空)'}`)
-    process.exit(1)
+    report('error', `找不到 dataset：${options.dataset ?? '(data-sources.json 为空)'}`)
+    report('error', `可用：${sources.map(item => item.id).join(', ') || '(空)'}`)
+    return { exitCode: 1 }
   }
 
-  const root = resolve(values.root ?? process.env.STREAM_SESSION_ROOT ?? join(APP_ROOT, 'temp', 'youtube-live'))
+  const root = resolve(options.root ?? process.env.STREAM_SESSION_ROOT ?? join(APP_ROOT, 'temp', 'youtube-live'))
   const dataRoot = join(APP_ROOT, 'data')
   if (root === dataRoot || root.startsWith(`${dataRoot}${sep}`)) {
-    console.error('[update] --root 是原始素材目录，不能指向 data/')
-    process.exit(1)
+    report('error', '--root 是原始素材目录，不能指向 data/')
+    return { exitCode: 1 }
   }
-  const stateDir = resolve(values['state-dir'] ?? join(root, '.fetch-state'))
+  const stateDir = resolve(options.stateDir ?? join(root, '.fetch-state'))
   mkdirSync(root, { recursive: true })
   mkdirSync(stateDir, { recursive: true })
   // 安静日不会走到 publish，但 CI 的 data/ 缓存需要一个真实存在的目录。
   mkdirSync(dataRoot, { recursive: true })
 
-  const concurrency = Number(values.concurrency)
+  const concurrency = options.concurrency ?? 3
   if (!Number.isInteger(concurrency) || concurrency < 1) {
-    console.error('[update] --concurrency 需要是 >= 1 的整数')
-    process.exit(1)
+    report('error', '--concurrency 需要是 >= 1 的整数')
+    return { exitCode: 1 }
   }
   // cookie 默认每次运行重新导出到 ~/yt-cookies.txt；CI 走显式 --cookies 文件。
+  const cookiesFromBrowser = options.cookiesFromBrowser ?? 'firefox'
   const resolvedCookies = await resolveCookies({
-    cookies: values.cookies,
+    cookies: options.cookies,
     envCookie: process.env.YT_COOKIE,
-    browser: values['cookies-from-browser'],
-    cachePath: values['cookie-cache'],
-    disable: values['no-cookies'],
+    browser: cookiesFromBrowser,
+    cachePath: options.cookieCache,
+    disable: options.noCookies,
     appRoot: APP_ROOT,
-    log: line => console.log(`[update] ${line}`),
+    log: line => report('info', line),
   })
-  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: values['cookies-from-browser'] })
-  const dryRun = Boolean(values['dry-run'])
-  const noPublish = Boolean(values['no-publish'])
-  const vstatsLimit = Number(values['vstats-limit'])
+  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: cookiesFromBrowser })
+  const dryRun = options.dryRun === true
+  const noPublish = options.noPublish === true
+  const vstatsLimit = options.vstatsLimit ?? 20
   if (!Number.isInteger(vstatsLimit) || vstatsLimit < 0) {
-    console.error('[update] --vstats-limit 需要是 >= 0 的整数')
-    process.exit(1)
+    report('error', '--vstats-limit 需要是 >= 0 的整数')
+    return { exitCode: 1 }
   }
-  const vstatsEnabled = !dryRun && !noPublish && !values['no-vstats']
+  const vstatsEnabled = !dryRun && !noPublish && !options.noVstats
 
   const db = createDb(requireEnv('DATABASE_URL'))
   const states = await loadDatabaseStates(db, selected)
@@ -406,21 +409,21 @@ async function main(): Promise<void> {
   const purgeTags = new Set<string>()
 
   for (const source of selected) {
-    console.log(`\n[update] === ${source.label} (${source.id}) ===`)
+    report('info', `=== ${source.label} (${source.id}) ===`)
     const state = states.get(source.id) ?? { streams: [], generatedAt: null, from: 'database' as const }
     const knownIds = state.streams.map(stream => stream.videoId)
-    console.log(`[update] 数据库：${knownIds.length} 场（${state.from}）`)
+    report('info', `数据库：${knownIds.length} 场（${state.from}）`)
 
-    const channelList = await readChannelEntries(source, stateDir)
+    const channelList = await readChannelEntries(source, stateDir, report)
     const channel = channelList.entries
     if (channel.length === 0 && knownIds.length === 0) {
-      console.warn(`[update] ${source.id} 既没有频道列表也没有已入库场次，跳过`)
+      report('warn', `${source.id} 既没有频道列表也没有已入库场次，跳过`)
       failures += 1
       continue
     }
-    if (knownIds.length === 0 && channel.length > 20 && !values.bootstrap) {
-      console.error(`[update] ${source.id} 数据库里还没有场次，但频道有 ${channel.length} 条；`)
-      console.error('[update] 拒绝把整个频道当成新场次。确认要首次建档时加 --bootstrap。')
+    if (knownIds.length === 0 && channel.length > 20 && !options.bootstrap) {
+      report('error', `${source.id} 数据库里还没有场次，但频道有 ${channel.length} 条；`)
+      report('error', '拒绝把整个频道当成新场次。确认要首次建档时加 --bootstrap。')
       failures += 1
       continue
     }
@@ -436,12 +439,12 @@ async function main(): Promise<void> {
           purgeTags.add(CACHE_TAGS.schedule)
           const normalized = schedule.normalized > 0 ? `，归一重复 ${schedule.normalized}` : ''
           const pruned = schedule.pruned > 0 ? `，清理过期 ${schedule.pruned}` : ''
-          console.log(`[update] ${source.id} 日程：预定 ${schedule.upserted}，直播中 ${schedule.live}${normalized}${pruned}`)
+          report('info', `${source.id} 日程：预定 ${schedule.upserted}，直播中 ${schedule.live}${normalized}${pruned}`)
         }
       }
       catch (error) {
         failures += 1
-        console.warn(`[update] ${source.id} 日程同步失败：${describe(error)}`)
+        report('warn', `${source.id} 日程同步失败：${describe(error)}`)
       }
     }
 
@@ -449,19 +452,19 @@ async function main(): Promise<void> {
       channel,
       knownIds,
       streams: state.streams,
-      forceRecentHours: values.force ? FORCE_RECENT_HOURS : 0,
+      forceRecentHours: options.force ? FORCE_RECENT_HOURS : 0,
     })
 
-    console.log(`[update] 计划：新场次 ${plan.newIds.length}，重抓 ${plan.forceIds.length}，暂缓 ${plan.deferredIds.length}`)
+    report('info', `计划：新场次 ${plan.newIds.length}，重抓 ${plan.forceIds.length}，暂缓 ${plan.deferredIds.length}`)
     if (plan.newIds.length > 0)
-      console.log(`[update]   新：${plan.newIds.slice(0, 10).join(', ')}${plan.newIds.length > 10 ? ` 等 ${plan.newIds.length} 场` : ''}`)
+      report('info', `  新：${plan.newIds.slice(0, 10).join(', ')}${plan.newIds.length > 10 ? ` 等 ${plan.newIds.length} 场` : ''}`)
     if (plan.forceIds.length > 0) {
       const detail = plan.forceIds.slice(0, 10).map(id => `${id}(${plan.reasons.get(id) ?? '重抓'})`).join(', ')
-      console.log(`[update]   重抓：${detail}${plan.forceIds.length > 10 ? ` 等 ${plan.forceIds.length} 场` : ''}`)
+      report('info', `  重抓：${detail}${plan.forceIds.length > 10 ? ` 等 ${plan.forceIds.length} 场` : ''}`)
     }
     if (plan.expiredIds.length > 0) {
       const detail = plan.expiredIds.slice(0, 10).map(id => `${id}(${plan.reasons.get(id) ?? '已过期'})`).join(', ')
-      console.log(`[update]   已放弃：${detail}${plan.expiredIds.length > 10 ? ` 等 ${plan.expiredIds.length} 场` : ''}`)
+      report('info', `  已放弃：${detail}${plan.expiredIds.length > 10 ? ` 等 ${plan.expiredIds.length} 场` : ''}`)
     }
 
     // 上次抓取成功但 ingest 失败（或本地用了 --no-publish）时，本地 pack 会比数据库新；
@@ -472,21 +475,21 @@ async function main(): Promise<void> {
         ? local.count > 0
         : local.newest != null && local.newest > Date.parse(state.generatedAt))
     if (localAhead)
-      console.log('[update] 本地 pack 还没入库，本次补 ingest')
+      report('info', '本地 pack 还没入库，本次补 ingest')
 
     const hasFetchWork = plan.newIds.length > 0 || plan.forceIds.length > 0
     if (!hasFetchWork && !localAhead && !vstatsEnabled) {
       if (channelList.failed) {
-        console.warn(`[update] ${source.id} 没有可处理的变化，但频道列表不可用；记一次失败`)
+        report('warn', `${source.id} 没有可处理的变化，但频道列表不可用；记一次失败`)
         failures += 1
       }
       else {
-        console.log(`[update] ${source.id} 没有变化，跳过`)
+        report('info', `${source.id} 没有变化，跳过`)
       }
       continue
     }
     if (dryRun) {
-      console.log(`[update] ${source.id} dry-run，不抓取也不发布`)
+      report('info', `${source.id} dry-run，不抓取也不发布`)
       continue
     }
 
@@ -496,42 +499,49 @@ async function main(): Promise<void> {
     // 频道列表失败时本次可能漏掉新场次；继续处理待补数据的场次，但结果记为失败。
     let datasetFailed = channelList.failed
 
-    // 正常增量：只把这次判定要抓的场次交给 fetch-streams，
-    // 未来场/摘要不会被重新拉一遍元信息。
+    // 正常增量：只把这次判定要抓的场次交给 fetch，未来场/摘要不会被重新拉一遍元信息。
     if (plan.newIds.length > 0) {
       const idsFile = join(stateDir, `daily-ids-${source.id}.txt`)
       writeFileSync(idsFile, `${plan.newIds.join('\n')}\n`, 'utf8')
-      console.log(`[update] ${source.id} 抓取新场次…`)
-      const code = await runScript(FETCH_SCRIPT, [
-        '--dataset', source.id,
-        '--root', root,
-        '--ids', idsFile,
-        '--restore',
-        '--no-publish',
-        '--concurrency', String(concurrency),
-        ...cookieArgs,
-      ])
-      if (code !== 0) {
+      report('info', `${source.id} 抓取新场次…`)
+      const fetched = await runFetch({
+        dataset: source.id,
+        root,
+        ids: idsFile,
+        restore: true,
+        noPublish: true,
+        concurrency: String(concurrency),
+        cookies: options.cookies,
+        cookiesFromBrowser: cookiesFromBrowser,
+        cookieCache: options.cookieCache,
+        noCookies: options.noCookies,
+        log,
+      })
+      if (fetched.exitCode !== 0) {
         datasetFailed = true
-        console.warn(`[update] ${source.id} 新场次抓取有失败项（exit ${code}）`)
+        report('warn', `${source.id} 新场次抓取有失败项（exit ${fetched.exitCode}）`)
       }
     }
 
     // 定点重抓：最近 24 小时 + 缺弹幕；VSTATS 由下面的补抓步骤单独处理。
     if (plan.forceIds.length > 0) {
-      console.log(`[update] ${source.id} 重抓 ${plan.forceIds.length} 场…`)
-      const code = await runScript(FETCH_SCRIPT, [
-        '--dataset', source.id,
-        '--root', root,
-        '--force', plan.forceIds.join(','),
-        '--restore',
-        '--no-publish',
-        '--concurrency', String(concurrency),
-        ...cookieArgs,
-      ])
-      if (code !== 0) {
+      report('info', `${source.id} 重抓 ${plan.forceIds.length} 场…`)
+      const fetched = await runFetch({
+        dataset: source.id,
+        root,
+        force: plan.forceIds,
+        restore: true,
+        noPublish: true,
+        concurrency: String(concurrency),
+        cookies: options.cookies,
+        cookiesFromBrowser: cookiesFromBrowser,
+        cookieCache: options.cookieCache,
+        noCookies: options.noCookies,
+        log,
+      })
+      if (fetched.exitCode !== 0) {
         datasetFailed = true
-        console.warn(`[update] ${source.id} 重抓有失败项（exit ${code}）`)
+        report('warn', `${source.id} 重抓有失败项（exit ${fetched.exitCode}）`)
       }
     }
 
@@ -540,16 +550,17 @@ async function main(): Promise<void> {
     if (vstatsEnabled) {
       const idsOut = join(stateDir, `vstats-updated-${source.id}.txt`)
       writeFileSync(idsOut, '', 'utf8')
-      console.log(`[update] ${source.id} 补抓 VSTATS…`)
-      const code = await runScript(VSTATS_SCRIPT, [
-        '--dataset', source.id,
-        '--limit', String(vstatsLimit),
-        '--ids-out', idsOut,
-        '--quiet',
-      ])
-      if (code !== 0) {
+      report('info', `${source.id} 补抓 VSTATS…`)
+      const stats = await runVstats({
+        dataset: source.id,
+        limit: vstatsLimit,
+        idsOut,
+        quiet: true,
+        log,
+      })
+      if (stats.exitCode !== 0) {
         datasetFailed = true
-        console.warn(`[update] ${source.id} VSTATS 补抓有失败项（exit ${code}）`)
+        report('warn', `${source.id} VSTATS 补抓有失败项（exit ${stats.exitCode}）`)
       }
       else if (existsSync(idsOut)) {
         vstatsIds = readFileSync(idsOut, 'utf8')
@@ -558,21 +569,21 @@ async function main(): Promise<void> {
           .filter(Boolean)
       }
       if (vstatsIds.length > 0)
-        console.log(`[update] ${source.id} 补到 VSTATS ${vstatsIds.length} 场`)
+        report('info', `${source.id} 补到 VSTATS ${vstatsIds.length} 场`)
     }
 
     if (noPublish) {
-      console.log(`[update] ${source.id} --no-publish，跳过封面与发布`)
+      report('info', `${source.id} --no-publish，跳过封面与发布`)
       continue
     }
 
     if (!hasFetchWork && !localAhead && vstatsIds.length === 0) {
       if (channelList.failed) {
-        console.warn(`[update] ${source.id} 没有可处理的变化，但频道列表不可用；记一次失败`)
+        report('warn', `${source.id} 没有可处理的变化，但频道列表不可用；记一次失败`)
         failures += 1
       }
       else {
-        console.log(`[update] ${source.id} 没有变化，跳过`)
+        report('info', `${source.id} 没有变化，跳过`)
       }
       continue
     }
@@ -582,13 +593,14 @@ async function main(): Promise<void> {
     if (thumbIds.length > 0) {
       const thumbFile = join(stateDir, `daily-thumbs-${source.id}.txt`)
       writeFileSync(thumbFile, `${thumbIds.join('\n')}\n`, 'utf8')
-      const thumbCode = await runScript(THUMB_SCRIPT, [
-        '--dataset', source.id,
-        '--ids', thumbFile,
-      ])
-      if (thumbCode !== 0) {
+      const thumbs = await runThumbnails({
+        dataset: source.id,
+        ids: thumbFile,
+        log,
+      })
+      if (thumbs.exitCode !== 0) {
         datasetFailed = true
-        console.warn(`[update] ${source.id} 封面补抓有失败项（exit ${thumbCode}）`)
+        report('warn', `${source.id} 封面补抓有失败项（exit ${thumbs.exitCode}）`)
       }
     }
 
@@ -605,11 +617,15 @@ async function main(): Promise<void> {
 
     // 逐字稿先上传正文，随后 ingest 才会把新稿的元数据同步进数据库。
     if (!transcriptsPublished) {
-      console.log('[update] 发布逐字稿…')
-      const transcriptCode = await runScript(TRANSCRIPT_SCRIPT, [])
-      if (transcriptCode !== 0) {
+      report('info', '发布逐字稿…')
+      const transcripts = await runPublishTranscripts({
+        noUpload: false,
+        force: false,
+        log,
+      })
+      if (transcripts.exitCode !== 0) {
         datasetFailed = true
-        console.warn(`[update] 逐字稿发布有失败项（exit ${transcriptCode}）`)
+        report('warn', `逐字稿发布有失败项（exit ${transcripts.exitCode}）`)
       }
       else {
         transcriptsPublished = true
@@ -617,26 +633,27 @@ async function main(): Promise<void> {
       }
     }
 
-    console.log(`[update] ${source.id} 写入数据库…`)
-    const ingestCode = await runScript(INGEST_SCRIPT, [
+    report('info', `${source.id} 写入数据库…`)
+    const ingest = await runIngest([
       '--dataset', source.id,
       ...(changedFile ? ['--ids', changedFile] : []),
     ])
-    const ingestOk = ingestCode === 0
+    const ingestOk = ingest.exitCode === 0
     if (!ingestOk) {
       datasetFailed = true
-      console.warn(`[update] ${source.id} ingest 失败（exit ${ingestCode}）`)
+      report('warn', `${source.id} ingest 失败（exit ${ingest.exitCode}）`)
     }
 
-    console.log(`[update] ${source.id} 发布资产…`)
-    const publishCode = await runScript(PUBLISH_SCRIPT, [
-      '--dataset', source.id,
-      '--assets-only',
-      ...(changedFile ? ['--ids', changedFile] : []),
-    ])
-    if (publishCode !== 0) {
+    report('info', `${source.id} 发布资产…`)
+    const publish = await runPublishData({
+      dataset: source.id,
+      assetsOnly: true,
+      ids: changedFile ?? undefined,
+      log,
+    })
+    if (publish.exitCode !== 0) {
       datasetFailed = true
-      console.warn(`[update] ${source.id} 资产发布失败（exit ${publishCode}）`)
+      report('warn', `${source.id} 资产发布失败（exit ${publish.exitCode}）`)
     }
 
     // 数据库已提交即可失效页面缓存；资产失败只影响封面，不该挡住数据更新。
@@ -660,18 +677,79 @@ async function main(): Promise<void> {
   if (purgeTags.size > 0) {
     const result = await purgeCache({ tags: [...purgeTags] })
     if (result.skipped)
-      console.log(`[update] 缓存失效跳过：${result.reason}`)
+      report('info', `缓存失效跳过：${result.reason}`)
     else if (result.success)
-      console.log(`[update] 缓存失效：${[...purgeTags].join(', ')}`)
+      report('info', `缓存失效：${[...purgeTags].join(', ')}`)
     else {
       failures += 1
-      console.warn(`[update] 缓存失效失败：${result.reason ?? `HTTP ${result.status ?? '?'}`}`)
+      report('warn', `缓存失效失败：${result.reason ?? `HTTP ${result.status ?? '?'}`}`)
     }
   }
 
-  console.log(`\n[update] 完成：新场次 ${newTotal}，重抓 ${forcedTotal}，更新 ${published} 个成员，失败 ${failures} 个`)
-  if (failures > 0)
-    process.exitCode = 1
+  const summary = { newStreams: newTotal, refetched: forcedTotal, published, failures }
+  report('info', `完成：新场次 ${newTotal}，重抓 ${forcedTotal}，更新 ${published} 个成员，失败 ${failures} 个`)
+  return { exitCode: failures > 0 ? 1 : 0, data: summary }
 }
 
-await main()
+/** 每日增量更新：本地与 GitHub Actions 共用。 */
+export const dataUpdateSpec: CommandSpec = {
+  id: 'data.update',
+  description: '每日增量：频道差集 → 定点抓取 → 补 VSTATS / 封面 → ingest → 发布 → purge',
+  details: '本地和 GitHub Actions 共用。安静日（无新场次且本地 pack 不比数据库新）不抓取、不发布。',
+  examples: [
+    'bun run ymmt data update',
+    'bun run ymmt data update --force',
+    'bun run ymmt data update --dataset nonoka --dry-run',
+    'bun run ymmt data update --no-publish',
+  ],
+  options: [
+    new Option('--dataset <id>', '只处理一个成员；默认全部'),
+    new Option('--root <目录>', '原始会话目录，默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live'),
+    new Option('--state-dir <目录>', '进度 / 频道缓存，默认 <root>/.fetch-state'),
+    new Option('--concurrency <n>', '抓取并发，默认 3'),
+    new Option('--cookies <文件>', 'Netscape cookie jar；CI 用这个'),
+    new Option('--cookies-from-browser <b>', '导出 cookie 的浏览器，默认 firefox'),
+    new Option('--cookie-cache <文件>', 'cookie 缓存路径，默认 ~/yt-cookies.txt'),
+    new Option('--no-cookies', '匿名抓取'),
+    new Option('--vstats-limit <n>', '每个成员本轮最多补 n 场 VSTATS，默认 20'),
+    new Option('--no-vstats', '跳过 VSTATS 补抓'),
+    new Option('--force', '额外重抓最近 24 小时结束的场次'),
+    new Option('--no-publish', '只写本地，不写库、不上传'),
+    new Option('--bootstrap', '数据库为空时也允许按全量新场次处理'),
+  ],
+  async run(ctx) {
+    const dataset = typeof ctx.options.dataset === 'string' ? ctx.options.dataset : undefined
+    if (!dataset && sourcesHaveNoDatasets()) {
+      throw new CliError('data-sources.json 里没有 datasets', {
+        code: 'EMPTY_CONFIG',
+        hint: '检查 data-sources.json 的 datasets 数组',
+      })
+    }
+    const result = await runUpdate({
+      dataset,
+      root: typeof ctx.options.root === 'string' ? ctx.options.root : undefined,
+      stateDir: typeof ctx.options.stateDir === 'string' ? ctx.options.stateDir : undefined,
+      concurrency: ctx.integer('concurrency', 3, 1),
+      cookies: typeof ctx.options.cookies === 'string' ? ctx.options.cookies : undefined,
+      cookiesFromBrowser: typeof ctx.options.cookiesFromBrowser === 'string'
+        ? ctx.options.cookiesFromBrowser
+        : 'firefox',
+      cookieCache: typeof ctx.options.cookieCache === 'string' ? ctx.options.cookieCache : undefined,
+      noCookies: ctx.flag('noCookies'),
+      vstatsLimit: ctx.integer('vstatsLimit', 20, 0),
+      noVstats: ctx.flag('noVstats'),
+      force: ctx.flag('force'),
+      dryRun: ctx.dryRun,
+      noPublish: ctx.flag('noPublish'),
+      bootstrap: ctx.flag('bootstrap'),
+      log: ctx.log,
+    })
+    return { exitCode: result.exitCode, data: result.data }
+  },
+}
+
+/** data-sources.json 是否为空；只有真正空配置才提前报错。 */
+function sourcesHaveNoDatasets(): boolean {
+  const sources = readJson<{ datasets?: DatasetSource[] }>(CONFIG_PATH).datasets ?? []
+  return sources.length === 0
+}

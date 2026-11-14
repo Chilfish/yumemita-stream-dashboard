@@ -1,11 +1,20 @@
+/**
+ * 数据库与本地 pack 字段级对账：场次、付费事件、评论、词表、作者与 insights。
+ *
+ * 读本地 `data/<dataset>/*.datapack.json`，与数据库逐项比对；有差异时退出码 1。
+ * `--limit` 走小批量模式，跳过 `dataset_insights` 对比。
+ */
 import { readdirSync, readFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
-import process from 'node:process'
+import { Option } from 'commander'
 import { eq, inArray, sql } from 'drizzle-orm'
-import { aggregateDataset, type StreamRow } from '../src/lib/aggregate.ts'
-import { runBatch } from '../src/db/batch.ts'
-import { createDb } from '../src/db/connection.ts'
-import { computeDatasetPublicTotals } from '../src/db/queries/dataset-totals.ts'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { requireEnvVar, UsageError } from '@scripts/lib/cli/exit.ts'
+import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { aggregateDataset, type StreamRow } from '@/lib/aggregate.ts'
+import { runBatch } from '@/db/batch.ts'
+import { createDb } from '@/db/connection.ts'
+import { computeDatasetPublicTotals } from '@/db/queries/dataset-totals.ts'
 import {
   comments,
   datasetInsights,
@@ -13,16 +22,32 @@ import {
   streamAuthors,
   streams,
   streamWords,
-} from '../src/db/schema.ts'
-import type { CurrencyTotals, StreamDatapack } from '../src/types/datapack.ts'
-import { buildStreamSummary } from './lib/dataset-manifest.ts'
-import { loadEnvFiles, requireEnv } from './lib/env.ts'
-import { jsonEqual } from './lib/json-equal.ts'
+} from '@/db/schema.ts'
+import type { CurrencyTotals, StreamDatapack } from '@/types/datapack.ts'
+import { buildStreamSummary } from '@scripts/lib/dataset-manifest.ts'
+import { jsonEqual } from '@scripts/lib/json-equal.ts'
 
-interface Args {
+/** 只取命令需要的日志通道；默认是空操作，测试与被其它脚本调用时都不产生输出。 */
+export type VerifyLog = Pick<Logger, 'info' | 'warn' | 'error' | 'line'>
+
+const NOOP_LOG: VerifyLog = { info: () => {}, warn: () => {}, error: () => {}, line: () => {} }
+
+export interface VerifyOptions {
+  /** 只处理指定 dataset；省略会处理 data-sources.json 里的全部成员。 */
   dataset?: string
+  /** 只处理文件里列出的 videoId（每行一个）。 */
   idsFile?: string
+  /** 每个 dataset 最多处理前 n 场；有值时跳过 dataset_insights 对比。 */
   limit?: number
+  log?: VerifyLog
+}
+
+export interface VerifyResult {
+  exitCode: number
+  data: {
+    checked: number
+    problems: number
+  }
 }
 
 interface Problem {
@@ -30,15 +55,7 @@ interface Problem {
   message: string
 }
 
-function parseArgs(argv: string[]): Args {
-  const args: Args = {}
-  for (let index = 0; index < argv.length; index += 1) {
-    if (argv[index] === '--dataset') args.dataset = argv[++index]
-    else if (argv[index] === '--ids') args.idsFile = argv[++index]
-    else if (argv[index] === '--limit') args.limit = Number(argv[++index])
-  }
-  return args
-}
+const DATABASE_HINT = '在 .dev.vars 配置 DATABASE_URL；本地可先运行 bun run ymmt dev db'
 
 function sameTotals(a: CurrencyTotals, b: CurrencyTotals): boolean {
   const keys = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])
@@ -66,23 +83,34 @@ function readLocal(
     }))
 }
 
-async function main(): Promise<void> {
-  loadEnvFiles()
-  const args = parseArgs(process.argv.slice(2))
+/**
+ * 逐场对账；差异明细写日志，返回值只有计数。
+ *
+ * 单条差异只记录、不中断，剩余场次照旧比对。
+ */
+export async function runVerify(options: VerifyOptions = {}): Promise<VerifyResult> {
+  const log = options.log ?? NOOP_LOG
   const sources = JSON.parse(readFileSync('data-sources.json', 'utf8')) as {
     datasets: { id: string }[]
   }
-  const selected = sources.datasets.filter(item => !args.dataset || item.id === args.dataset)
-  const idsFile = args.idsFile
-    ? new Set(readFileSync(args.idsFile, 'utf8').split(/\s+/).filter(Boolean))
+  const selected = sources.datasets.filter(item => !options.dataset || item.id === options.dataset)
+  if (selected.length === 0) {
+    throw new UsageError(`找不到 dataset：${options.dataset}`, {
+      code: 'UNKNOWN_DATASET',
+      hint: '查可用成员：jq -r ".datasets[].id" data-sources.json，再去掉拼错的 --dataset',
+      context: { dataset: options.dataset },
+    })
+  }
+  const idsFile = options.idsFile
+    ? new Set(readFileSync(options.idsFile, 'utf8').split(/\s+/).filter(Boolean))
     : undefined
-  const db = createDb(requireEnv('DATABASE_URL'))
+  const db = createDb(requireEnvVar('DATABASE_URL', DATABASE_HINT))
   const problems: Problem[] = []
   let checked = 0
 
   for (const source of selected) {
     const all = readLocal(source.id, idsFile)
-    const local = args.limit ? all.slice(0, args.limit) : all
+    const local = options.limit ? all.slice(0, options.limit) : all
     const videoIds = local.map(item => item.pack.video.id)
     if (videoIds.length === 0) continue
 
@@ -222,7 +250,7 @@ async function main(): Promise<void> {
       }
     }
 
-    if (!args.limit) {
+    if (!options.limit) {
       const [insight] = await db
         .select()
         .from(datasetInsights)
@@ -250,15 +278,42 @@ async function main(): Promise<void> {
       }
     }
     else {
-      console.log(`[verify] ${source.id}: 小批量模式，跳过 dataset_insights 对比`)
+      log.info(`[verify] ${source.id}: 小批量模式，跳过 dataset_insights 对比`)
     }
   }
 
-  console.log(JSON.stringify({ checked, problems: problems.length }, null, 2))
   for (const problem of problems.slice(0, 20)) {
-    console.error(`✗ ${problem.scope}: ${problem.message}`)
+    log.error(`✗ ${problem.scope}: ${problem.message}`)
   }
-  if (problems.length > 0) process.exitCode = 1
+
+  return { exitCode: problems.length > 0 ? 1 : 0, data: { checked, problems: problems.length } }
 }
 
-await main()
+/** 数据库与本地 pack 字段级对账；有差异时退出码 1。 */
+export const dbVerifySpec: CommandSpec = {
+  id: 'db.verify',
+  description: '数据库与本地 pack 字段级对账',
+  details: '逐场比对 chat_total / 付费事件 / 评论 / 词表 / 作者，并重算 dataset_insights。\n'
+    + '有差异时退出码 1，前 20 条明细写 stderr。`--limit` 走小批量模式，跳过 insights 对比。',
+  examples: [
+    'bun run ymmt db verify',
+    'bun run ymmt db verify --dataset nonoka',
+    'bun run ymmt db verify --dataset nonoka --ids ids.txt',
+    'bun run ymmt db verify --limit 20 --json',
+  ],
+  options: [
+    new Option('--dataset <id>', '只处理指定 dataset'),
+    new Option('--ids <文件>', '只处理文件里列出的 videoId（每行一个）'),
+    new Option('--limit <n>', '每个 dataset 最多处理前 n 场；跳过 insights 对比'),
+  ],
+  async run(ctx) {
+    const result = await runVerify({
+      ...(typeof ctx.options.dataset === 'string' ? { dataset: ctx.options.dataset } : {}),
+      ...(typeof ctx.options.ids === 'string' ? { idsFile: ctx.options.ids } : {}),
+      ...(ctx.options.limit === undefined ? {} : { limit: ctx.integer('limit', 1, 1) }),
+      log: ctx.log,
+    })
+    ctx.log.line(`对账完成：检查 ${result.data.checked} 场，问题 ${result.data.problems} 个`)
+    return { exitCode: result.exitCode, data: result.data }
+  },
+}

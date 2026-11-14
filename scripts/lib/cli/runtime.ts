@@ -91,6 +91,13 @@ export interface CommandContext {
   integer(name: string, fallback: number, min?: number): number
   /** 读取一个布尔选项。 */
   flag(name: string): boolean
+  /**
+   * 把已解析的选项还原成命令行参数，交给迁移中的 `main(argv)` 复用。
+   *
+   * 只输出非 undefined / 非 false 的项；布尔选项输出 `--flag`，其它输出 `--flag value`。
+   * `--dry-run` 是全局选项、不在这里面，命令自己支持时传 `{ includeDryRun: true }` 显式补上。
+   */
+  toArgv(options?: { includeDryRun?: boolean }): string[]
 }
 
 type RuntimeFlag = 'json' | 'quiet' | 'dryRun' | 'logLevel' | 'logFile'
@@ -188,6 +195,20 @@ function createContext(spec: CommandSpec, command: Command, globals: GlobalValue
     flag(name) {
       return options[name] === true
     },
+    toArgv(argvOptions) {
+      const argv: string[] = [...this.args]
+      for (const [key, value] of Object.entries(options)) {
+        if (value === undefined || value === false || value === null) continue
+        const flag = `--${kebab(key)}`
+        if (value === true) argv.push(flag)
+        else if (Array.isArray(value)) {
+          for (const item of value) argv.push(flag, String(item))
+        }
+        else argv.push(flag, String(value))
+      }
+      if (argvOptions?.includeDryRun && globals.dryRun) argv.push('--dry-run')
+      return argv
+    },
   }
 }
 
@@ -221,6 +242,50 @@ function buildMeta(globals: GlobalValues, startTime: number): {
   }
 }
 
+/**
+ * `--json` 模式下 stdout 只能有一行信封。
+ *
+ * 迁移中的命令主体仍用 `console.log` 输出进度，这里在运行期间把 console 的
+ * 日志通道改道 stderr，保证 `| jq` 一定解析得到唯一一行 JSON。
+ */
+function redirectConsoleToStderr(): () => void {
+  const saved = { log: console.log, info: console.info, debug: console.debug, table: console.table }
+  const toErr = (...args: unknown[]): void => {
+    process.stderr.write(`${args.map(item => (typeof item === 'string' ? item : JSON.stringify(item))).join(' ')}\n`)
+  }
+  console.log = toErr
+  console.info = toErr
+  console.debug = toErr
+  console.table = toErr
+  return () => Object.assign(console, saved)
+}
+
+/** 命令主体调用 `process.exit(code)` 时抛这个，runtime 转成退出码而不是立刻杀进程。 */
+class CommandExit extends Error {
+  readonly code: number
+  constructor(code: number) {
+    super(`命令以退出码 ${code} 结束`)
+    this.name = 'CommandExit'
+    this.code = code
+  }
+}
+
+/**
+ * 运行期间接管 `process.exit`。
+ *
+ * 迁移进来的命令主体仍会 `process.exit(1)`，直接杀掉进程就没法输出 JSON 信封、
+ * 也没法恢复被改道的 console。这里把它变成异常，由 runtime 统一收口。
+ */
+function interceptProcessExit(): () => void {
+  const original = process.exit.bind(process)
+  process.exit = ((code?: number) => {
+    throw new CommandExit(typeof code === 'number' ? code : EXIT_CODES.ok)
+  }) as typeof process.exit
+  return () => {
+    process.exit = original
+  }
+}
+
 /** 给一条命令挂上统一的执行包装：环境横幅、信封、退出码。 */
 function attachRunner(command: Command, spec: CommandSpec, startTime: number): Command {
   command.action(async (...actionArgs: unknown[]) => {
@@ -244,6 +309,8 @@ function attachRunner(command: Command, spec: CommandSpec, startTime: number): C
     loadEnvFiles({ log: false })
     if (!globals.json) ctx.log.info(describeEnvironment(process.env))
 
+    const restoreConsole = globals.json ? redirectConsoleToStderr() : null
+    const restoreExit = interceptProcessExit()
     try {
       const result = (await spec.run(ctx)) ?? {}
       const ok = (result.exitCode ?? EXIT_CODES.ok) === 0
@@ -261,6 +328,21 @@ function attachRunner(command: Command, spec: CommandSpec, startTime: number): C
       process.exitCode = result.exitCode ?? EXIT_CODES.ok
     }
     catch (error) {
+      // 命令主体自己 process.exit 的情况；退出码原样沿用。
+      if (error instanceof CommandExit) {
+        const meta = buildMeta(globals, startTime)
+        if (globals.json) {
+          process.stdout.write(`${serializeEnvelope(buildEnvelope({
+            command: spec.id,
+            ok: error.code === 0,
+            ...(error.code === 0 ? {} : { error: { code: 'EXITED', message: '命令以非零退出码结束' } }),
+            meta,
+          }))}\n`)
+        }
+        process.exitCode = error.code
+        return
+      }
+
       const { payload, exitCode } = toEnvelopeError(error)
       if (globals.json) {
         process.stdout.write(`${serializeEnvelope(buildEnvelope({
@@ -278,6 +360,10 @@ function attachRunner(command: Command, spec: CommandSpec, startTime: number): C
         }
       }
       process.exitCode = exitCode
+    }
+    finally {
+      restoreExit()
+      restoreConsole?.()
     }
   })
   return command
@@ -326,13 +412,36 @@ export interface DescribeCommand {
 }
 
 /** 命令树的结构化描述，`describe` 子命令与文档生成共用。 */
-export function describeCli(groups: CliGroup[], version: string): {
+export function describeCli(
+  groups: CliGroup[],
+  version: string,
+  rootCommands: CommandSpec[] = [],
+): {
   name: string
   version: string
   exitCodes: { code: number, meaning: string }[]
   globalOptions: { flags: string, description: string }[]
+  commands: DescribeCommand[]
   groups: { name: string, description: string, commands: DescribeCommand[] }[]
 } {
+  const toDescribed = (spec: CommandSpec): DescribeCommand => ({
+    id: spec.id,
+    description: spec.description,
+    ...(spec.details ? { details: spec.details } : {}),
+    ...(spec.examples ? { examples: spec.examples } : {}),
+    options: (spec.options ?? []).map(option => ({
+      flags: option.flags,
+      description: option.description,
+      ...(option.defaultValue !== undefined ? { default: option.defaultValue } : {}),
+      ...(option.argChoices ? { choices: option.argChoices } : {}),
+    })),
+    arguments: (spec.arguments ?? []).map(argument => ({
+      name: argument.name,
+      description: argument.description,
+      required: argument.required !== false,
+    })),
+  })
+
   return {
     name: 'ymmt',
     version,
@@ -351,32 +460,21 @@ export function describeCli(groups: CliGroup[], version: string): {
       { flags: '-h, --help', description: '显示帮助' },
       { flags: '-V, --version', description: '显示版本' },
     ],
+    commands: rootCommands.map(toDescribed),
     groups: groups.map(group => ({
       name: group.name,
       description: group.description,
-      commands: group.commands.map(spec => ({
-        id: spec.id,
-        description: spec.description,
-        ...(spec.details ? { details: spec.details } : {}),
-        ...(spec.examples ? { examples: spec.examples } : {}),
-        options: (spec.options ?? []).map(option => ({
-          flags: option.flags,
-          description: option.description,
-          ...(option.defaultValue !== undefined ? { default: option.defaultValue } : {}),
-          ...(option.argChoices ? { choices: option.argChoices } : {}),
-        })),
-        arguments: (spec.arguments ?? []).map(argument => ({
-          name: argument.name,
-          description: argument.description,
-          required: argument.required !== false,
-        })),
-      })),
+      commands: group.commands.map(toDescribed),
     })),
   }
 }
 
 /** 构建整个 CLI 树。 */
-export function buildCli(groups: CliGroup[], version: string): Command {
+export function buildCli(
+  groups: CliGroup[],
+  version: string,
+  rootCommands: CommandSpec[] = [],
+): Command {
   setVersion(version)
   const program = new Command()
   program
@@ -392,7 +490,7 @@ export function buildCli(groups: CliGroup[], version: string): Command {
     .description('输出完整命令树（JSON），供 agent 自举，不用读源码')
   applySharedSettings(describeCommand)
   describeCommand.action(() => {
-    process.stdout.write(`${JSON.stringify(describeCli(groups, version), null, 2)}\n`)
+    process.stdout.write(`${JSON.stringify(describeCli(groups, version, rootCommands), null, 2)}\n`)
   })
 
   for (const group of groups) {
@@ -400,6 +498,9 @@ export function buildCli(groups: CliGroup[], version: string): Command {
     applySharedSettings(groupCommand)
     for (const spec of group.commands) registerCommand(groupCommand, spec)
   }
+
+  // 顶层命令（如 deploy）：不带分组，直接挂在根上。
+  for (const spec of rootCommands) registerCommand(program, spec)
 
   return program
 }

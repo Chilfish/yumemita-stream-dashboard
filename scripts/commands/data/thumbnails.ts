@@ -1,13 +1,12 @@
-#!/usr/bin/env bun
 /**
  * 补齐封面图：把 YouTube 的 16:9 封面镜像到本地暂存区 `data/<datasetId>/thumbs/<videoId>.jpg`。
  *
- *   bun run fetch:thumbs --dataset nonoka            # 只补缺失
- *   bun run fetch:thumbs --dataset nonoka --force    # 重抓全部
- *   bun run fetch:thumbs --dataset nonoka --limit 20 --dry-run
+ *   bun run ymmt data thumbnails --dataset nonoka            # 只补缺失
+ *   bun run ymmt data thumbnails --dataset nonoka --force    # 重抓全部
+ *   bun run ymmt data thumbnails --dataset nonoka --limit 20 --dry-run
  *
  * 页面运行时只读对象存储（`<base>/<datasetId>/thumbs/<videoId>.jpg`），不直连 YouTube：
- * 避免热链、CORS 与慢请求拖慢首屏。抓完由 `bun run publish:assets` 上传。
+ * 避免热链、CORS 与慢请求拖慢首屏。抓完由 `bun run ymmt publish data --assets-only` 上传。
  *
  * 特性：
  *   - 可重入：已存在的 jpg 默认跳过，`--force` 才重抓
@@ -20,16 +19,19 @@
  *     key 见 `src/lib/thumb-variants.ts`；只有原图时自动补齐，不重新下载
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
-import { THUMB_VARIANTS, thumbVariantName } from '../src/lib/thumb-variants.ts'
-import { runPool } from './lib/object-storage.ts'
+import { join, resolve } from 'node:path'
+import { Option } from 'commander'
+import type { Logger } from '@scripts/lib/cli/logger.ts'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { CliError, UsageError } from '@scripts/lib/cli/exit.ts'
+import { THUMB_VARIANTS, thumbVariantName } from '@/lib/thumb-variants.ts'
+import { runPool } from '@scripts/lib/object-storage.ts'
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(import.meta.dir, '../../..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
 const THUMB_HOST = 'https://i.ytimg.com/vi'
 const PACK_SUFFIX = '.datapack.json'
+const DEFAULT_CONCURRENCY = 4
 
 /** 顺序即优先级：先大后小，两个都是真 16:9。 */
 const VARIANTS = ['maxresdefault.jpg', 'mqdefault.jpg']
@@ -54,7 +56,7 @@ interface Downloaded {
   variant: string
 }
 
-interface Counts {
+export interface ThumbCounts {
   ok: number
   skipped: number
   failed: number
@@ -62,34 +64,36 @@ interface Counts {
   variants: number
 }
 
-const OPTIONS = {
-  dataset: { type: 'string' },
-  ids: { type: 'string' },
-  limit: { type: 'string' },
-  force: { type: 'boolean' },
-  'dry-run': { type: 'boolean' },
-  concurrency: { type: 'string', default: '4' },
-  help: { type: 'boolean', short: 'h' },
-} as const
+/** 注入的日志器；默认静默，方便测试与进程内调用。 */
+export type CommandLog = Pick<Logger, 'info' | 'warn' | 'error'>
 
-const USAGE = `用法：bun scripts/fetch-thumbnails.ts [选项]
+const SILENT_LOG: CommandLog = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+}
 
-把每场直播的 YouTube 封面镜像到 data/<datasetId>/thumbs/<videoId>.jpg，
-并编码 480 / 960 / 1280w 的 WebP 变体（<videoId>.<width>.webp），
-发布时由 bun run publish:assets 一起上传。已存在的原图默认跳过，只有原图时补变体；
-单张失败只记日志，不阻塞其余场次。
+export interface RunThumbnailsOptions {
+  /** 只处理指定 dataset；不传则处理 data-sources.json 里的全部。 */
+  dataset?: string
+  /** 只处理文件里列出的 videoId（每行一个）；用于增量更新。 */
+  ids?: string
+  /** 本次最多抓 n 张（按 manifest 顺序，最新的优先）；0 = 全部。 */
+  limit?: number
+  /** 已存在的封面也重新下载。 */
+  force?: boolean
+  /** 只列出候选，不发请求、不写文件。 */
+  dryRun?: boolean
+  /** 并发数，默认 4。 */
+  concurrency?: number
+  /** 注入的日志器；默认静默。 */
+  log?: CommandLog
+}
 
-选项：
-  --dataset <id>     只处理指定 dataset；不传则处理 data-sources.json 里的全部
-  --ids <文件>       只处理文件里列出的 videoId（每行一个）；用于增量更新
-  --limit <n>        本次最多抓 n 张（按 manifest 顺序，最新的优先）；0 = 全部
-  --force            已存在的封面也重新下载
-  --dry-run          只列出候选，不发请求、不写文件
-  --concurrency <n>  并发数，默认 4（太高会被 YouTube 限流）
-  -h, --help         显示本帮助
-
-选图顺序：maxresdefault.jpg（1280×720）→ mqdefault.jpg（320×180），都是真 16:9。
-校验：content-type 为 image/*、字节数 > 1500；15 秒超时、失败重试 2 次。`
+export interface ThumbnailsRunResult {
+  datasets: ({ id: string } & ThumbCounts)[]
+  totals: ThumbCounts
+}
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf8')) as T
@@ -195,7 +199,7 @@ async function encodeVariants(jpgPath: string, thumbsDir: string, videoId: strin
 }
 
 /** manifest 的顺序就是「最新在前」，--limit 优先补最近的场次。 */
-function videoIdsFor(source: DatasetSource, dir: string): string[] {
+function videoIdsFor(source: DatasetSource, dir: string, log: CommandLog): string[] {
   const manifestPath = resolve(APP_ROOT, source.manifest ?? join(source.datapackDir, 'manifest.json'))
   if (existsSync(manifestPath)) {
     try {
@@ -207,7 +211,7 @@ function videoIdsFor(source: DatasetSource, dir: string): string[] {
         return ids
     }
     catch (error) {
-      console.warn(`[fetch-thumbs] ${source.id} manifest 读取失败，改用 datapack 文件名：${describe(error)}`)
+      log.warn(`${source.id} manifest 读取失败，改用 datapack 文件名：${describe(error)}`)
     }
   }
   if (!existsSync(dir))
@@ -218,6 +222,7 @@ function videoIdsFor(source: DatasetSource, dir: string): string[] {
     .sort()
 }
 
+/** 单个 dataset：先给老原图补变体，再抓缺的封面。单项失败只记日志。 */
 async function fetchDataset(
   source: DatasetSource,
   limit: number,
@@ -225,10 +230,12 @@ async function fetchDataset(
   force: boolean,
   dryRun: boolean,
   filter: Set<string> | null,
-): Promise<Counts> {
+  log: CommandLog,
+): Promise<{ counts: ThumbCounts, missing: boolean }> {
+  const empty = (): ThumbCounts => ({ ok: 0, skipped: 0, failed: 0, variants: 0 })
   const dir = resolve(APP_ROOT, source.datapackDir)
   const thumbsDir = join(dir, 'thumbs')
-  const allIds = videoIdsFor(source, dir)
+  const allIds = videoIdsFor(source, dir, log)
   // --ids：只处理点名场次；点名了但 manifest 里还没有（刚入库）也补进来。
   // 空文件表示「本次没有要补的」，不能退化成处理全部。
   const ids = filter
@@ -236,12 +243,11 @@ async function fetchDataset(
     : allIds
   if (ids.length === 0) {
     if (filter) {
-      console.log(`[fetch-thumbs] ${source.id}：--ids 里的场次都不在清单中，跳过`)
-      return { ok: 0, skipped: 0, failed: 0, variants: 0 }
+      log.info(`${source.id}：--ids 里的场次都不在清单中，跳过`)
+      return { counts: empty(), missing: false }
     }
-    console.error(`[fetch-thumbs] ${source.id} 没有可用场次：${source.datapackDir}/ 里既没有 manifest.json，也没有 *${PACK_SUFFIX}`)
-    process.exitCode = 1
-    return { ok: 0, skipped: 0, failed: 0, variants: 0 }
+    log.error(`${source.id} 没有可用场次：${source.datapackDir}/ 里既没有 manifest.json，也没有 *${PACK_SUFFIX}`)
+    return { counts: empty(), missing: true }
   }
 
   const existing = force ? [] : ids.filter(id => existsSync(join(thumbsDir, `${id}.jpg`)))
@@ -249,33 +255,33 @@ async function fetchDataset(
   const pendingAll = ids.filter(id => !known.has(id))
   const pending = limit > 0 ? pendingAll.slice(0, limit) : pendingAll
 
-  console.log(`[fetch-thumbs] ${source.id}：${ids.length} 场，已有 ${existing.length} 张，本次处理 ${pending.length} 张（并发 ${concurrency}）`)
+  log.info(`${source.id}：${ids.length} 场，已有 ${existing.length} 张，本次处理 ${pending.length} 张（并发 ${concurrency}）`)
   if (pendingAll.length > pending.length)
-    console.log(`[fetch-thumbs] ${source.id}：--limit ${limit} 只抓 ${pending.length} 张，其余 ${pendingAll.length - pending.length} 张留到下次`)
+    log.info(`${source.id}：--limit ${limit} 只抓 ${pending.length} 张，其余 ${pendingAll.length - pending.length} 张留到下次`)
 
   if (dryRun) {
-    console.log(`[fetch-thumbs] ${source.id}：dry-run 只列候选，不发请求`)
+    log.info(`${source.id}：dry-run 只列候选，不发请求`)
     for (const id of pending)
-      console.log(`  ${source.id}/thumbs/${id}.jpg  ←  ${THUMB_HOST}/${id}/maxresdefault.jpg`)
-    console.log(`[fetch-thumbs] ${source.id}：成功 0 / 跳过 ${existing.length} / 失败 0`)
-    return { ok: 0, skipped: existing.length, failed: 0, variants: 0 }
+      log.info(`  ${source.id}/thumbs/${id}.jpg  ←  ${THUMB_HOST}/${id}/maxresdefault.jpg`)
+    log.info(`${source.id}：成功 0 / 跳过 ${existing.length} / 失败 0`)
+    return { counts: { ok: 0, skipped: existing.length, failed: 0, variants: 0 }, missing: false }
   }
 
-  const counts: Counts = { ok: 0, skipped: existing.length, failed: 0, variants: 0 }
+  const counts: ThumbCounts = { ok: 0, skipped: existing.length, failed: 0, variants: 0 }
 
   // 老数据只有原图：就地补 WebP 变体，不重新下载。
   const backfill = force
     ? []
     : existing.filter(id => THUMB_VARIANTS.some(width => !existsSync(variantPath(thumbsDir, id, width))))
   if (backfill.length > 0) {
-    console.log(`[fetch-thumbs] ${source.id}：${backfill.length} 张原图缺 WebP 变体，开始补齐...`)
+    log.info(`${source.id}：${backfill.length} 张原图缺 WebP 变体，开始补齐...`)
     await runPool(backfill, concurrency, async (id) => {
       try {
         counts.variants += await encodeVariants(join(thumbsDir, `${id}.jpg`), thumbsDir, id, false)
       }
       catch (error) {
         counts.failed += 1
-        console.warn(`[fetch-thumbs] ${source.id}/${id} 变体生成失败：${describe(error)}`)
+        log.warn(`${source.id}/${id} 变体生成失败：${describe(error)}`)
       }
     })
   }
@@ -291,60 +297,120 @@ async function fetchDataset(
       const written = await encodeVariants(jpgPath, thumbsDir, id, force)
       counts.ok += 1
       counts.variants += written
-      console.log(`[fetch-thumbs] ${source.id}/${id} 成功：${variant}，${formatBytes(bytes.byteLength)}，变体 ${written} 个`)
+      log.info(`${source.id}/${id} 成功：${variant}，${formatBytes(bytes.byteLength)}，变体 ${written} 个`)
     }
     catch (error) {
       counts.failed += 1
-      console.warn(`[fetch-thumbs] ${source.id}/${id} 失败：${describe(error)}`)
+      log.warn(`${source.id}/${id} 失败：${describe(error)}`)
     }
   })
 
-  console.log(`[fetch-thumbs] ${source.id}：成功 ${counts.ok} / 跳过 ${counts.skipped} / 失败 ${counts.failed} / 变体 ${counts.variants}`)
-  return counts
+  log.info(`${source.id}：成功 ${counts.ok} / 跳过 ${counts.skipped} / 失败 ${counts.failed} / 变体 ${counts.variants}`)
+  return { counts, missing: false }
 }
 
-async function main(): Promise<void> {
-  const { values } = parseArgs({ options: OPTIONS, args: process.argv.slice(2), allowPositionals: false })
-  if (values.help) {
-    console.log(USAGE)
-    return
+/**
+ * 把封面镜像到 `data/<datasetId>/thumbs/` 并补 WebP 变体。
+ *
+ * 进程内可调用（`data update` 用它替代 spawn）：不读 process.argv、不调用 process.exit。
+ * 进度走注入的 `log`；某个 dataset 没有候选时记一次失败后继续处理其余 dataset。
+ */
+export async function runThumbnails(
+  options: RunThumbnailsOptions = {},
+): Promise<{ exitCode: number, data?: ThumbnailsRunResult }> {
+  const log = options.log ?? SILENT_LOG
+  const limit = options.limit ?? 0
+  const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY
+  if (!Number.isInteger(limit) || limit < 0) {
+    throw new UsageError('--limit 需要是 >= 0 的整数', {
+      hint: '例如 --limit 20，0 表示不限',
+      context: { option: 'limit', value: limit },
+    })
+  }
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new UsageError('--concurrency 需要是 >= 1 的整数', {
+      hint: '例如 --concurrency 4（太高会被 YouTube 限流）',
+      context: { option: 'concurrency', value: concurrency },
+    })
   }
 
   const sources = readJson<{ datasets?: DatasetSource[] }>(CONFIG_PATH).datasets ?? []
-  const selected = values.dataset ? sources.filter(item => item.id === values.dataset) : sources
+  const selected = options.dataset ? sources.filter(item => item.id === options.dataset) : sources
   if (selected.length === 0) {
-    console.error(`[fetch-thumbs] 找不到 dataset：${values.dataset ?? '(请用 --dataset 指定)'}`)
-    console.error(`[fetch-thumbs] 可用：${sources.map(item => item.id).join(', ') || '(data-sources.json 为空)'}`)
-    process.exit(1)
+    throw new CliError(`找不到 dataset：${options.dataset ?? '(请用 --dataset 指定)'}`, {
+      code: 'UNKNOWN_DATASET',
+      hint: `可用：${sources.map(item => item.id).join(', ') || '(data-sources.json 为空)'}`,
+      context: { dataset: options.dataset ?? null },
+    })
   }
 
-  const limit = Number(values.limit ?? 0)
-  const concurrency = Number(values.concurrency ?? 4)
-  if (!Number.isInteger(limit) || limit < 0) {
-    console.error('[fetch-thumbs] --limit 需要是 >= 0 的整数')
-    process.exit(1)
-  }
-  if (!Number.isInteger(concurrency) || concurrency < 1) {
-    console.error('[fetch-thumbs] --concurrency 需要是 >= 1 的整数')
-    process.exit(1)
-  }
-
-  const total: Counts = { ok: 0, skipped: 0, failed: 0, variants: 0 }
-  const filter = values.ids
-    ? new Set(readFileSync(resolve(values.ids), 'utf8').split(/\r?\n/).map(line => line.trim()).filter(Boolean))
+  const force = options.force === true
+  const dryRun = options.dryRun === true
+  const filter = options.ids
+    ? new Set(readFileSync(resolve(options.ids), 'utf8').split(/\r?\n/).map(line => line.trim()).filter(Boolean))
     : null
+
+  const totals: ThumbCounts = { ok: 0, skipped: 0, failed: 0, variants: 0 }
+  const datasets: ThumbnailsRunResult['datasets'] = []
+  let missingDatasets = 0
   for (const source of selected) {
-    const counts = await fetchDataset(source, limit, concurrency, Boolean(values.force), Boolean(values['dry-run']), filter)
-    total.ok += counts.ok
-    total.skipped += counts.skipped
-    total.failed += counts.failed
-    total.variants += counts.variants
+    const { counts, missing } = await fetchDataset(source, limit, concurrency, force, dryRun, filter, log)
+    if (missing)
+      missingDatasets += 1
+    datasets.push({ id: source.id, ...counts })
+    totals.ok += counts.ok
+    totals.skipped += counts.skipped
+    totals.failed += counts.failed
+    totals.variants += counts.variants
   }
 
-  if (selected.length > 1 || total.failed > 0)
-    console.log(`[fetch-thumbs] 合计：成功 ${total.ok} / 跳过 ${total.skipped} / 失败 ${total.failed} / 变体 ${total.variants}`)
-  if (total.ok > 0 || total.variants > 0)
-    console.log('[fetch-thumbs] 下一步：bun run publish:assets 上传封面与变体（thumbs 先于 archive 上传）')
+  if (selected.length > 1 || totals.failed > 0)
+    log.info(`合计：成功 ${totals.ok} / 跳过 ${totals.skipped} / 失败 ${totals.failed} / 变体 ${totals.variants}`)
+  if (totals.ok > 0 || totals.variants > 0)
+    log.info('下一步：bun run ymmt publish data --assets-only 上传封面与变体（thumbs 先于 archive 上传）')
+
+  return {
+    exitCode: missingDatasets > 0 || totals.failed > 0 ? 1 : 0,
+    data: { datasets, totals },
+  }
 }
 
-await main()
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+/** `data thumbnails`：镜像封面并生成 480 / 960 / 1280w WebP。 */
+export const dataThumbnailsSpec: CommandSpec<ThumbnailsRunResult> = {
+  id: 'data.thumbnails',
+  description: '镜像 YouTube 封面并生成 480 / 960 / 1280w WebP 变体',
+  details: '把每场直播的 YouTube 封面镜像到 data/<datasetId>/thumbs/<videoId>.jpg，'
+    + '并编码 480 / 960 / 1280w 的 WebP 变体（<videoId>.<width>.webp）。\n'
+    + '已存在的原图默认跳过，只有原图时补变体；单张失败只记日志，不阻塞其余场次。\n\n'
+    + '选图顺序：maxresdefault.jpg（1280×720）→ mqdefault.jpg（320×180），都是真 16:9。\n'
+    + '校验：content-type 为 image/*、字节数 > 1500；15 秒超时、失败重试 2 次。',
+  examples: [
+    'bun run ymmt data thumbnails --dataset nonoka',
+    'bun run ymmt data thumbnails --dataset nonoka --force',
+    'bun run ymmt data thumbnails --dataset nonoka --limit 20 --dry-run',
+    'bun run ymmt data thumbnails --dataset nonoka --ids temp/daily-thumbs-nonoka.txt',
+  ],
+  options: [
+    new Option('--dataset <id>', '只处理指定 dataset；不传则处理 data-sources.json 里的全部'),
+    new Option('--ids <文件>', '只处理文件里列出的 videoId（每行一个）；用于增量更新'),
+    new Option('--limit <n>', '本次最多抓 n 张（按 manifest 顺序，最新的优先）；0 = 全部').default(0),
+    new Option('--force', '已存在的封面也重新下载'),
+    new Option('--concurrency <n>', `并发数，默认 ${DEFAULT_CONCURRENCY}（太高会被 YouTube 限流）`).default(DEFAULT_CONCURRENCY),
+  ],
+  async run(ctx) {
+    const result = await runThumbnails({
+      dataset: optionalString(ctx.options.dataset),
+      ids: optionalString(ctx.options.ids),
+      limit: ctx.integer('limit', 0, 0),
+      concurrency: ctx.integer('concurrency', DEFAULT_CONCURRENCY, 1),
+      force: ctx.flag('force'),
+      dryRun: ctx.dryRun,
+      log: ctx.log,
+    })
+    return { exitCode: result.exitCode, data: result.data }
+  },
+}

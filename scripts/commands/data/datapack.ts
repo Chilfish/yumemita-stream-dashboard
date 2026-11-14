@@ -3,7 +3,7 @@
  * 一场直播的「数据包」：把 yt-dlp 的元信息・弹幕・评论区，与 VSTATS 的统计快照
  * 合并成一份归一化 JSON，供后续统计/画图/复用。
  *
- *   bun scripts/stream-datapack.ts <会话目录...>
+ *   bun run ymmt data datapack <会话目录...>
  *
  * 会话目录（抓取侧产物，缺哪个就跳过哪块）：
  *   meta/info.json                      yt-dlp -J 原始输出
@@ -20,32 +20,60 @@
 import type { Dirent } from 'node:fs'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
-import { parseAmount } from './lib/amount.ts'
-import { upsertManifestStream } from './lib/dataset-manifest.ts'
-import { deriveVstats, parseVstats } from './lib/vstats.ts'
-import { isStopword } from '../src/lib/stopwords.ts'
+import { Option } from 'commander'
+import type { Logger } from '@scripts/lib/cli/logger.ts'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { UsageError } from '@scripts/lib/cli/exit.ts'
+import { parseAmount } from '@scripts/lib/amount.ts'
+import { upsertManifestStream } from '@scripts/lib/dataset-manifest.ts'
+import { deriveVstats, parseVstats } from '@scripts/lib/vstats.ts'
+import { isStopword } from '@/lib/stopwords.ts'
+import type { ChatRecord } from '@scripts/lib/live-chat.ts'
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(import.meta.dir, '../../..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
 
 const SCHEMA = 'yumemita.stream-datapack/v2'
 const JST_OFFSET_MIN = 540
 const ANY_DANMAKU_RE = /^danmaku_.*\.jsonl$/
 
-interface ChatMsg {
-  author?: string
-  /** 稳定的频道 ID；旧 jsonl 没有这个字段。 */
-  authorId?: string
-  text?: string
-  sc?: string | null
-  kind?: string
-  badges?: string[]
-  emoji?: { id: string }[]
-  timestampUs?: string | number
-  header?: string
-  giftCount?: number
+/** 注入的日志器；默认静默，方便测试与进程内调用。 */
+export type CommandLog = Pick<Logger, 'info' | 'warn' | 'error'>
+
+const SILENT_LOG: CommandLog = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+}
+
+export interface RunDatapackOptions {
+  /** 会话目录（位置参数），可传多个。 */
+  sessions: string[]
+  /** 强制指定 dataset（默认按 channelId 匹配）。 */
+  dataset?: string
+  /** 输出到指定文件（仅单个会话；不更新 manifest）。 */
+  out?: string
+  /** VSTATS 单场页 HTML（仅单个会话，默认自动找 web/vstats_video_<id>.html）。 */
+  vstats?: string
+  /** 只写 datapack，不更新 manifest。 */
+  skipIndex?: boolean
+  /** 注入的日志器；默认静默。 */
+  log?: CommandLog
+}
+
+export interface DatapackSessionResult {
+  session: string
+  videoId: string
+  datasetId: string | null
+  outPath: string
+  rel: string
+  manifestCount: number | null
+  stats: { chat: number, authors: number, sc: number, comments: number }
+}
+
+export interface DatapackRunResult {
+  written: DatapackSessionResult[]
+  failures: { session: string, error: string }[]
 }
 
 interface EmojiAsset {
@@ -54,11 +82,8 @@ interface EmojiAsset {
   url: string
 }
 
-interface ChatRecord {
-  seq?: number
-  ts?: number
-  msg: ChatMsg
-}
+/** 弹幕 jsonl 的一行；归一化口径与 `scripts/lib/live-chat.ts` 一致。 */
+type ChatMsg = ChatRecord['msg']
 
 interface InfoJson {
   id?: string
@@ -130,28 +155,6 @@ interface DatasetSource {
   manifest: string
   datapackDir: string
 }
-
-const OPTIONS = {
-  out: { type: 'string' },
-  vstats: { type: 'string' },
-  dataset: { type: 'string' },
-  'skip-index': { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const
-
-const USAGE = `用法：bun scripts/stream-datapack.ts <会话目录...> [选项]
-
-把一场或多场直播的元信息・弹幕・评论区・VSTATS 快照归一化成 datapack。
-
-按 info.channel_id 匹配 data-sources.json 的 dataset，写到
-data/<datasetId>/<videoId>.datapack.json，并 upsert manifest 摘要。
-
-选项：
-  --dataset <id>    强制指定 dataset（默认按 channelId 匹配）
-  --out <路径>      输出到指定文件（仅单个会话；不更新 manifest）
-  --vstats <路径>   VSTATS 单场页 HTML（仅单个会话，默认自动找 web/vstats_video_<id>.html）
-  --skip-index      只写 datapack，不更新 manifest
-  -h, --help        显示本帮助`
 
 function readDatasources(): DatasetSource[] {
   if (!existsSync(DATASOURCES_PATH))
@@ -694,32 +697,43 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
   }
 }
 
-function main(): void {
-  const { values, positionals } = parseArgs({ options: OPTIONS, args: process.argv.slice(2), allowPositionals: true })
-  if (values.help || positionals.length === 0) {
-    console.log(USAGE)
-    process.exit(values.help ? 0 : 1)
+/**
+ * 把一个或多个会话目录归一化成 datapack。
+ *
+ * 进程内可调用（`data fetch` 用它替代 spawn）：位置参数从 `sessions` 传，
+ * 不读 process.argv、不调用 process.exit；单个会话失败只记录，其余继续。
+ */
+export function runDatapack(options: RunDatapackOptions): { exitCode: number, data?: DatapackRunResult } {
+  const log = options.log ?? SILENT_LOG
+  const sessions = options.sessions ?? []
+  if (sessions.length === 0) {
+    throw new UsageError('至少需要一个会话目录', {
+      hint: '例如 bun run ymmt data datapack temp/youtube-live/2024-01-01_nonoka_abcdefghijk',
+    })
   }
-  if (positionals.length > 1 && (values.out || values.vstats)) {
-    console.error('[stream-datapack] --out / --vstats 只能用于单个会话')
-    process.exit(1)
+  if (sessions.length > 1 && (options.out || options.vstats)) {
+    throw new UsageError('--out / --vstats 只能用于单个会话', {
+      hint: '一次只处理一个会话目录，或去掉 --out / --vstats',
+      context: { sessions: sessions.length },
+    })
   }
 
   const sources = readDatasources()
-  const vstatsOverride = values.vstats ? resolve(values.vstats) : null
-  let failed = 0
+  const vstatsOverride = options.vstats ? resolve(options.vstats) : null
+  const written: DatapackSessionResult[] = []
+  const failures: { session: string, error: string }[] = []
 
-  for (const positional of positionals) {
+  for (const positional of sessions) {
     const sessionDir = resolve(positional)
     try {
       const { pack, channelId, stats } = buildPack(sessionDir, vstatsOverride)
-      const dataset = resolveDataset(sources, channelId, values.dataset)
-      if (values.dataset && !dataset)
-        throw new Error(`data-sources.json 里没有 dataset：${values.dataset}`)
+      const dataset = resolveDataset(sources, channelId, options.dataset)
+      if (options.dataset && !dataset)
+        throw new Error(`data-sources.json 里没有 dataset：${options.dataset}`)
 
-      const usingExplicitOut = Boolean(values.out)
-      const outPath = values.out
-        ? resolve(values.out)
+      const usingExplicitOut = Boolean(options.out)
+      const outPath = options.out
+        ? resolve(options.out)
         : dataset
           ? join(APP_ROOT, dataset.datapackDir, `${pack.video.id}.datapack.json`)
           : join(sessionDir, 'work', 'stream-datapack.json')
@@ -728,26 +742,76 @@ function main(): void {
       writeFileSync(outPath, `${JSON.stringify(pack, null, 2)}\n`, 'utf8')
 
       const datapackRel = relative(APP_ROOT, outPath).replaceAll('\\', '/')
-      console.log(`[stream-datapack] ${datapackRel}`)
-      console.log(`[stream-datapack] 弹幕 ${stats.chat} 条 / 作者 ${stats.authors} 人 / SC ${stats.sc} 笔 / 评论 ${stats.comments} 条`)
+      log.info(datapackRel)
+      log.info(`弹幕 ${stats.chat} 条 / 作者 ${stats.authors} 人 / SC ${stats.sc} 笔 / 评论 ${stats.comments} 条`)
 
+      let manifestCount: number | null = null
       if (!dataset) {
-        console.warn('[stream-datapack] 未匹配 data-sources.json 的 dataset，只写到会话目录')
+        log.warn('未匹配 data-sources.json 的 dataset，只写到会话目录')
       }
-      else if (!usingExplicitOut && !values['skip-index']) {
+      else if (!usingExplicitOut && !options.skipIndex) {
         const manifestPath = resolve(APP_ROOT, dataset.manifest)
         const { count } = upsertManifestStream(manifestPath, pack, datapackRel)
-        console.log(`[stream-datapack] manifest ${dataset.id}: ${count} 场`)
+        manifestCount = count
+        log.info(`manifest ${dataset.id}: ${count} 场`)
       }
+
+      written.push({
+        session: sessionDir,
+        videoId: pack.video.id,
+        datasetId: dataset?.id ?? null,
+        outPath,
+        rel: datapackRel,
+        manifestCount,
+        stats,
+      })
     }
     catch (error) {
-      failed += 1
-      console.error(`[stream-datapack] 失败 ${sessionDir}：${error instanceof Error ? error.message : String(error)}`)
+      const message = error instanceof Error ? error.message : String(error)
+      failures.push({ session: sessionDir, error: message })
+      log.error(`失败 ${sessionDir}：${message}`)
     }
   }
 
-  if (failed > 0)
-    process.exit(1)
+  return { exitCode: failures.length > 0 ? 1 : 0, data: { written, failures } }
 }
 
-main()
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+/** `data datapack`：把一场素材合并成 datapack。 */
+export const dataDatapackSpec: CommandSpec<DatapackRunResult> = {
+  id: 'data.datapack',
+  description: '把会话目录的元信息・弹幕・评论・VSTATS 合并成 datapack',
+  details: '把一场或多场直播的元信息・弹幕・评论区・VSTATS 快照归一化成 datapack。\n'
+    + '按 info.channel_id 匹配 data-sources.json 的 dataset，写到 '
+    + 'data/<datasetId>/<videoId>.datapack.json，并 upsert manifest 摘要。\n'
+    + '匹配不到 dataset 时只写到 <会话目录>/work/stream-datapack.json。',
+  examples: [
+    'bun run ymmt data datapack temp/youtube-live/2024-01-01_nonoka_abcdefghijk',
+    'bun run ymmt data datapack temp/youtube-live/session-a temp/youtube-live/session-b --dataset nonoka',
+    'bun run ymmt data datapack temp/youtube-live/session-a --out temp/pack.json --json',
+  ],
+  arguments: [
+    // 名字带 `...` 才会注册成 commander 的可变长位置参数（`<sessions...>`）。
+    { name: 'sessions...', description: '会话目录（可多个）', required: true },
+  ],
+  options: [
+    new Option('--dataset <id>', '强制指定 dataset（默认按 channelId 匹配）'),
+    new Option('--out <路径>', '输出到指定文件（仅单个会话；不更新 manifest）'),
+    new Option('--vstats <路径>', 'VSTATS 单场页 HTML（仅单个会话，默认自动找 web/vstats_video_<id>.html）'),
+    new Option('--skip-index', '只写 datapack，不更新 manifest'),
+  ],
+  run(ctx) {
+    const result = runDatapack({
+      sessions: ctx.args,
+      dataset: optionalString(ctx.options.dataset),
+      out: optionalString(ctx.options.out),
+      vstats: optionalString(ctx.options.vstats),
+      skipIndex: ctx.flag('skipIndex'),
+      log: ctx.log,
+    })
+    return Promise.resolve({ exitCode: result.exitCode, data: result.data })
+  },
+}

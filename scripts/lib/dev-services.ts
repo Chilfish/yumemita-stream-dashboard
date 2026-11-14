@@ -7,6 +7,7 @@ import { Client, Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { ensureSiloRunning } from './dev-silo.ts'
+import { parseEnvContent } from './env.ts'
 import {
   DEFAULT_LOCAL_DATABASE_URL,
   DEFAULT_LOCAL_PROXY_ENDPOINT,
@@ -274,14 +275,15 @@ export function ensureDevVars(databaseUrl: string, endpoint: string): void {
     return
   }
 
-  const missing = Object.entries(values).filter(([key]) => readEnvValue(content, key) === undefined)
+  const parsed = parseEnvContent(content)
+  const missing = Object.entries(values).filter(([key]) => parsed[key] === undefined)
   if (missing.length) {
     const prefix = content.endsWith('\n') ? content : `${content}\n`
     writeFileSync(path, `${prefix}${missing.map(([key, value]) => `${key}=${value}`).join('\n')}\n`)
     console.log(`[dev] .dev.vars 已补充：${missing.map(([key]) => key).join(' / ')}`)
   }
 
-  const configured = readEnvValue(content, 'DATABASE_URL')
+  const configured = parsed.DATABASE_URL
   if (configured && !isLocalUrl(configured)) {
     console.warn(`[dev] 注意：.dev.vars 的 DATABASE_URL 不是本机地址（${new URL(configured).host}），astro dev 仍会连远程库`)
   }

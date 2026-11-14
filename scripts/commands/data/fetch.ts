@@ -26,26 +26,26 @@ import {
 } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
-import { normalizeLiveChat } from './lib/live-chat.ts'
-import { sentinelIsFresh } from './lib/sentinel.ts'
-import { loadEnvFiles } from './lib/env.ts'
-import { mergeDanmakuFiles } from './lib/danmaku-merge.ts'
-import { readCredentials } from './lib/object-storage.ts'
-import { restoreDataset } from './lib/restore-datapacks.ts'
-import { resolveCookies, ytdlpCookieArgs } from './lib/yt-cookies.ts'
+import { Option } from 'commander'
+import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { normalizeLiveChat } from '@scripts/lib/live-chat.ts'
+import { sentinelIsFresh } from '@scripts/lib/sentinel.ts'
+import { mergeDanmakuFiles } from '@scripts/lib/danmaku-merge.ts'
+import { readCredentials } from '@scripts/lib/object-storage.ts'
+import { restoreDataset } from '@scripts/lib/restore-datapacks.ts'
+import { resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
 
-const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
+const CLI_SCRIPT = join(APP_ROOT, 'scripts', 'cli.ts')
 
 /** 回放/评论/VSTATS 可能滞后：这段时间内抓不到不写「不可用」，留给下次重试。 */
 const CHAT_GRACE_HOURS = 24
 /** VSTATS 对新场次的收录更慢；这段时间内缺页面按「还没生成」处理。 */
 const VSTATS_GRACE_HOURS = 24 * 14
-const DATAPACK_SCRIPT = join(APP_ROOT, 'scripts', 'stream-datapack.ts')
-const INGEST_SCRIPT = join(APP_ROOT, 'scripts', 'ingest-db.ts')
-const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
-const PURGE_SCRIPT = join(APP_ROOT, 'scripts', 'purge-cache.ts')
+/** 兄弟步骤统一走 `bun scripts/cli.ts <group> <command>`，只保留一个入口。 */
+const cli = (...command: string[]): string[] => [CLI_SCRIPT, ...command]
 
 interface DatasetSource {
   id: string
@@ -89,60 +89,6 @@ interface Failure {
   error: string
 }
 
-const OPTIONS = {
-  dataset: { type: 'string' },
-  root: { type: 'string' },
-  'state-dir': { type: 'string' },
-  concurrency: { type: 'string', default: '3' },
-  'meta-concurrency': { type: 'string', default: '6' },
-  'build-every': { type: 'string', default: '5' },
-  limit: { type: 'string', default: '0' },
-  cookies: { type: 'string' },
-  'cookies-from-browser': { type: 'string', default: 'firefox' },
-  'cookie-cache': { type: 'string' },
-  'no-cookies': { type: 'boolean' },
-  'dry-run': { type: 'boolean' },
-  'no-build': { type: 'boolean' },
-  restore: { type: 'boolean' },
-  'no-restore': { type: 'boolean' },
-  ids: { type: 'string' },
-  force: { type: 'string', multiple: true },
-  publish: { type: 'boolean' },
-  'no-publish': { type: 'boolean' },
-  help: { type: 'boolean', short: 'h' },
-} as const
-
-const USAGE = `用法：bun scripts/fetch-streams.ts --dataset <id> --root <会话根目录> [选项]
-
-按频道 /streams 列表补齐历史直播：yt-dlp 元信息 + live_chat 回放 + 评论 + VSTATS，
-每 N 场生成 datapack 并 upsert manifest。已处理的场次会自动跳过。
-
-选项：
-  --dataset <id>             data-sources.json 里的 dataset；只有一个时可以省略
-  --root <目录>              原始会话根目录（默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live）
-  --state-dir <目录>         进度/日志/频道缓存（默认 <root>/.fetch-state）
-  --concurrency <n>          媒体并发，默认 3
-  --meta-concurrency <n>     元信息并发，默认 6
-  --build-every <n>          每 n 场构建一次，默认 5；0 = 全部抓完再构建
-  --limit <n>                本次最多处理 n 场（含元信息阶段），0 = 全部
-  --cookies <文件>           Netscape cookie jar；不传则每次运行从浏览器导出到 ~/yt-cookies.txt
-  --cookies-from-browser <b> 导出 cookie 时用哪个浏览器，默认 firefox
-  --cookie-cache <文件>      cookie 缓存路径，默认 ~/yt-cookies.txt
-  --no-cookies               不使用 cookie，以匿名状态抓取
-  --dry-run                  只列出候选，不抓取
-  --no-build                 只抓素材，不生成 datapack
-  --restore                  从对象存储恢复 manifest 与缺失的 datapack 后再规划
-  --no-restore               不自动恢复（本地没有 manifest 时也不拉远端）
-  --ids <文件>               直接读视频 ID 列表（每行一个），跳过频道列表抓取
-  --force <id[,id...]>       定点重抓：只处理点名的场次（meta/弹幕/评论/VSTATS 全覆盖），
-                             不补跑频道里的其他待抓场次，也不拉频道列表；可重复传。
-                             all = 忽略已入库，把本次全频道候选都重抓
-  --publish                  抓完写入数据库、发布资产并 purge；有 --force 时默认开启
-  --no-publish               即使有 --force 也不写库 / 不发布
-  -h, --help                 显示本帮助
-
-恢复：本地没有 manifest 时默认自动执行，已存在的 pack 不会重复下载。
-远端来源按顺序尝试 DATAPACK_BASE 公开地址，再试 R2_*。`
 
 function logFile(path: string, message: string): void {
   const line = `[${new Date().toISOString()}] ${message}`
@@ -271,31 +217,88 @@ function readLocalPackMeta(path: string): { title: string, durationSec: number |
   }
 }
 
-async function main(): Promise<void> {
-  const { values } = parseArgs({ options: OPTIONS, args: process.argv.slice(2), allowPositionals: true })
-  if (values.help) {
-    console.log(USAGE)
-    process.exit(0)
+/** `data fetch` 的选项；所有字段都可省略，省略时沿用脚本默认值。 */
+export interface FetchOptions {
+  dataset?: string
+  root?: string
+  stateDir?: string
+  concurrency?: string
+  metaConcurrency?: string
+  buildEvery?: string
+  limit?: string
+  cookies?: string
+  cookiesFromBrowser?: string
+  cookieCache?: string
+  noCookies?: boolean
+  dryRun?: boolean
+  noBuild?: boolean
+  restore?: boolean
+  noRestore?: boolean
+  ids?: string
+  force?: string[]
+  publish?: boolean
+  noPublish?: boolean
+  /** 运行期日志；CLI 传 ctx.log，测试可省略。 */
+  log?: Logger
+}
+
+export interface FetchResult {
+  exitCode: number
+  data?: Record<string, unknown>
+}
+
+/**
+ * 频道补齐：拉频道 /streams → 抓 meta / 弹幕 / 评论 / VSTATS → 每 N 场生成 datapack。
+ *
+ * 可被 `data update` 同进程调用，也可由 `data fetch` 命令直接触发。
+ */
+export async function runFetch(options: FetchOptions = {}): Promise<FetchResult> {
+  const report = (level: 'info' | 'warn' | 'error', message: string): void => {
+    if (options.log) options.log[level](message)
+    else if (level === 'error') console.error(message)
+    else if (level === 'warn') console.warn(message)
+    else console.log(message)
   }
 
-  loadEnvFiles({ prefix: 'fetch:streams' })
+  const values: Record<string, unknown> = {
+    dataset: options.dataset,
+    root: options.root,
+    'state-dir': options.stateDir,
+    concurrency: options.concurrency,
+    'meta-concurrency': options.metaConcurrency,
+    'build-every': options.buildEvery,
+    limit: options.limit,
+    cookies: options.cookies,
+    'cookies-from-browser': options.cookiesFromBrowser,
+    'cookie-cache': options.cookieCache,
+    'no-cookies': options.noCookies,
+    'dry-run': options.dryRun,
+    'no-build': options.noBuild,
+    restore: options.restore,
+    'no-restore': options.noRestore,
+    ids: options.ids,
+    force: options.force,
+    publish: options.publish,
+    'no-publish': options.noPublish,
+  }
 
   const sources = readJson<{ datasets?: DatasetSource[] }>(DATASOURCES_PATH).datasets ?? []
-  const dataset = values.dataset
+  const dataset = typeof values.dataset === 'string'
     ? sources.find(item => item.id === values.dataset)
     : sources.length === 1
       ? sources[0]
       : undefined
   if (!dataset) {
-    console.error(`找不到 dataset：${values.dataset ?? '(请用 --dataset 指定)'}`)
-    console.error(`可用：${sources.map(item => item.id).join(', ') || '(data-sources.json 为空)'}`)
-    process.exit(1)
+    report('error', `找不到 dataset：${typeof values.dataset === 'string' ? values.dataset : '(请用 --dataset 指定)'}`)
+    report('error', `可用：${sources.map(item => item.id).join(', ') || '(data-sources.json 为空)'}`)
+    return { exitCode: 1 }
   }
 
   // --force 可以重复传、逗号分隔；all 表示本次所有候选。
   const forcedIds = new Set<string>()
   let forceAll = false
-  for (const raw of values.force ?? []) {
+  const forceRaw = Array.isArray(values.force) ? values.force as string[] : []
+  for (const raw of forceRaw) {
     for (const token of raw.split(',')) {
       const id = token.trim()
       if (!id)
@@ -305,32 +308,39 @@ async function main(): Promise<void> {
         continue
       }
       if (!/^[A-Za-z0-9_-]{11}$/.test(id)) {
-        console.error(`--force 里的视频 ID 不合法：${id}`)
-        process.exit(1)
+        report('error', `--force 里的视频 ID 不合法：${id}`)
+        return { exitCode: 1 }
       }
       forcedIds.add(id)
     }
   }
   const forced = forceAll || forcedIds.size > 0
-  const shouldPublish = !values['no-publish'] && (values.publish || forced)
+  const shouldPublish = !values['no-publish'] && (values.publish === true || forced)
 
   if (!dataset.channelId) {
-    console.error(`dataset ${dataset.id} 缺少 channelId`)
-    process.exit(1)
+    report('error', `dataset ${dataset.id} 缺少 channelId`)
+    return { exitCode: 1 }
   }
 
   const manifestPath = resolve(APP_ROOT, dataset.manifest)
   const datapackDir = resolve(APP_ROOT, dataset.datapackDir)
 
-  const root = resolve(values.root ?? process.env.STREAM_SESSION_ROOT ?? join(APP_ROOT, 'temp', 'youtube-live'))
+  const root = resolve(
+    (typeof values.root === 'string' ? values.root : undefined)
+    ?? process.env.STREAM_SESSION_ROOT
+    ?? join(APP_ROOT, 'temp', 'youtube-live'),
+  )
   const dataRoot = join(APP_ROOT, 'data')
   if (root === dataRoot || root.startsWith(`${dataRoot}${sep}`)) {
-    console.error('--root 是原始素材目录，不能指向 data/（datapack 输出目录）。')
-    console.error('用归档工程的会话根目录，例如 --root "D:/projects/claude-messages/temp/youtube-live"；')
-    console.error('或使用默认的 ./temp/youtube-live（已自动忽略，不会提交）。')
-    process.exit(1)
+    report('error', '--root 是原始素材目录，不能指向 data/（datapack 输出目录）。')
+    report('error', '用归档工程的会话根目录，例如 --root "D:/projects/claude-messages/temp/youtube-live"；')
+    report('error', '或使用默认的 ./temp/youtube-live（已自动忽略，不会提交）。')
+    return { exitCode: 1 }
   }
-  const stateDir = resolve(values['state-dir'] ?? join(root, '.fetch-state'))
+  const stateDir = resolve(
+    (typeof values['state-dir'] === 'string' ? values['state-dir'] as string : undefined)
+    ?? join(root, '.fetch-state'),
+  )
   mkdirSync(root, { recursive: true })
   mkdirSync(stateDir, { recursive: true })
   // 默认 root 在仓库内时，避免原始素材/状态被 git 看到。
@@ -343,21 +353,24 @@ async function main(): Promise<void> {
   const progressPath = join(stateDir, 'fetch-progress.json')
   const channelCache = join(stateDir, 'channel-ids.txt')
 
-  const limit = Number(values.limit)
-  const concurrency = Number(values.concurrency)
-  const metaConcurrency = Number(values['meta-concurrency'])
-  const buildEvery = Number(values['build-every'])
+  const limit = Number(values.limit ?? 0)
+  const concurrency = Number(values.concurrency ?? 3)
+  const metaConcurrency = Number(values['meta-concurrency'] ?? 6)
+  const buildEvery = Number(values['build-every'] ?? 5)
+  const cookiesFromBrowser = typeof values['cookies-from-browser'] === 'string'
+    ? values['cookies-from-browser'] as string
+    : 'firefox'
   // cookie 默认每次运行重新导出到 ~/yt-cookies.txt，整轮 yt-dlp 调用共用。
   const resolvedCookies = await resolveCookies({
-    cookies: values.cookies,
+    cookies: typeof values.cookies === 'string' ? values.cookies as string : undefined,
     envCookie: process.env.YT_COOKIE,
-    browser: values['cookies-from-browser'],
-    cachePath: values['cookie-cache'],
-    disable: values['no-cookies'],
+    browser: cookiesFromBrowser,
+    cachePath: typeof values['cookie-cache'] === 'string' ? values['cookie-cache'] as string : undefined,
+    disable: values['no-cookies'] === true,
     appRoot: APP_ROOT,
-    log: line => console.log(`[fetch:streams] ${line}`),
+    log: line => report('info', `[fetch] ${line}`),
   })
-  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: values['cookies-from-browser'] })
+  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: cookiesFromBrowser })
   // CI 里 GitHub runner 的出口 IP 更容易被 YouTube 的 bot 检查拦；
   // 配了 YTDLP_PROXY（mihomo）就让所有 yt-dlp 请求走代理，没配就直连。
   const proxy = process.env.YTDLP_PROXY
@@ -369,7 +382,8 @@ async function main(): Promise<void> {
 
   // 换设备 / 丢缓存时先拉回远端的 manifest 与 pack；本地已有 manifest 时不自动跑，
   // 避免每次抓取都多一次网络请求（要强制刷新用 --restore）。
-  const shouldRestore = Boolean(values.restore) || (!values['no-restore'] && !existsSync(manifestPath))
+  const shouldRestore = values.restore === true
+    || (values['no-restore'] !== true && !existsSync(manifestPath))
   const restoreFailed = new Set<string>()
   if (shouldRestore) {
     try {
@@ -390,7 +404,7 @@ async function main(): Promise<void> {
     }
   }
   if (!existsSync(manifestPath))
-    console.warn(`[fetch-streams] 还没有 manifest（${dataset.manifest}），按空索引开始`)
+    report('warn', `还没有 manifest（${dataset.manifest}），按空索引开始`)
 
   const manifest: { streams?: StreamSummary[] } = existsSync(manifestPath)
     ? readJson<{ streams?: StreamSummary[] }>(manifestPath)
@@ -437,7 +451,7 @@ async function main(): Promise<void> {
   saveProgress()
   logFile(logPath, `=== start dataset=${dataset.id} root=${root} known=${knownIds.size} limit=${limit}`)
 
-  void (async () => {
+  return await (async (): Promise<FetchResult> => {
     // --force <id> 是单场返工：只处理点名的场次，不顺手补跑频道里其他待抓场次，
     // 也不值得为它去拉一遍频道列表。
     const onlyForced = forcedIds.size > 0 && !forceAll
@@ -445,7 +459,7 @@ async function main(): Promise<void> {
     if (onlyForced) {
       logFile(logPath, `定点重抓：${[...forcedIds].join(', ')}（跳过频道列表）`)
     }
-    else if (values.ids) {
+    else if (typeof values.ids === 'string') {
       const idsPath = resolve(values.ids)
       channelIds = [...new Set(readFileSync(idsPath, 'utf8').split(/\r?\n/).map(line => line.trim()).filter(Boolean))]
       writeFileSync(channelCache, `${channelIds.join('\n')}\n`, 'utf8')
@@ -461,8 +475,8 @@ async function main(): Promise<void> {
       catch (error) {
         logFile(logPath, `频道列表抓取失败，尝试缓存：${error instanceof Error ? error.message : String(error)}`)
         if (!existsSync(channelCache)) {
-          console.error('没有可用的频道列表缓存。可以先用 --ids <文件> 提供视频 ID 列表（每行一个）。')
-          process.exit(1)
+          report('error', '没有可用的频道列表缓存。可以先用 --ids <文件> 提供视频 ID 列表（每行一个）。')
+          return { exitCode: 1 }
         }
         channelIds = [...new Set(readFileSync(channelCache, 'utf8').split('\n').map(line => line.trim()).filter(Boolean))]
       }
@@ -485,13 +499,19 @@ async function main(): Promise<void> {
     else
       logFile(logPath, `频道 ${channelIds.length} 条 / 已入库 ${knownIds.size} / 候选 ${candidates.length}${forcedCount > 0 ? `（强制 ${forcedCount}）` : ''}`)
 
-    if (values['dry-run']) {
-      for (const candidate of candidates)
-        console.log(candidate.id)
+    if (values['dry-run'] === true) {
       progress.phase = 'done'
       saveProgress()
       logFile(logPath, `dry-run：${candidates.length} 条候选`)
-      return
+      // 候选名单是 dry-run 的数据输出：人读逐行打印，--json 放进信封。
+      if (options.log) {
+        for (const candidate of candidates)
+          report('info', candidate.id)
+      }
+      return {
+        exitCode: 0,
+        data: { dryRun: true, candidates: candidates.map(candidate => candidate.id) },
+      }
     }
 
     const metaFailures: Failure[] = []
@@ -615,10 +635,10 @@ async function main(): Promise<void> {
     progress.failures = failures
 
     const buildSessions = async (dirs: string[]): Promise<void> => {
-      if (values['no-build'] || dirs.length === 0)
+      if (values['no-build'] === true || dirs.length === 0)
         return
       try {
-        await run('bun', [DATAPACK_SCRIPT, '--dataset', dataset.id, ...dirs], false, 1)
+        await run('bun', [...cli('data', 'datapack', '--dataset', dataset.id), ...dirs], false, 1)
         progress.build = { chunks: Number((progress.build as { chunks?: number } | undefined)?.chunks ?? 0) + 1, sessions: dirs.length }
         logFile(logPath, `build ok：${dirs.length} 场`)
       }
@@ -828,7 +848,7 @@ async function main(): Promise<void> {
     // 强制重抓只有一两场，本地 datapack 一更新就顺手入库 + 发资产 + 失效缓存。
     // ingest 与 publish 都是增量的：未变化的场次会跳过。
     if (shouldPublish) {
-      if (values['no-build']) {
+      if (values['no-build'] === true) {
         progress.publish = 'skipped: --no-build'
         logFile(logPath, 'publish 跳过：--no-build 没有重新生成 datapack')
       }
@@ -842,18 +862,18 @@ async function main(): Promise<void> {
       }
       else {
         try {
-          logFile(logPath, `ingest：bun scripts/ingest-db.ts --dataset ${dataset.id}`)
-          const ingestOutput = await run('bun', [INGEST_SCRIPT, '--dataset', dataset.id], true, 0)
+          logFile(logPath, `ingest：bun run ymmt db ingest --dataset ${dataset.id}`)
+          const ingestOutput = await run('bun', cli('db', 'ingest', '--dataset', dataset.id), true, 0)
           for (const line of ingestOutput.split('\n').map(item => item.trim()).filter(Boolean))
             logFile(logPath, `ingest | ${line}`)
 
-          logFile(logPath, `publish：bun scripts/publish-data.ts --dataset ${dataset.id} --assets-only`)
-          const output = await run('bun', [PUBLISH_SCRIPT, '--dataset', dataset.id, '--assets-only'], true, 0)
+          logFile(logPath, `publish：bun run ymmt publish data --dataset ${dataset.id} --assets-only`)
+          const output = await run('bun', cli('publish', 'data', '--dataset', dataset.id, '--assets-only'), true, 0)
           for (const line of output.split('\n').map(item => item.trim()).filter(Boolean))
             logFile(logPath, `publish | ${line}`)
 
-          logFile(logPath, `purge：bun scripts/purge-cache.ts --dataset ${dataset.id}`)
-          const purgeOutput = await run('bun', [PURGE_SCRIPT, '--dataset', dataset.id], true, 0)
+          logFile(logPath, `purge：bun run ymmt publish purge --dataset ${dataset.id}`)
+          const purgeOutput = await run('bun', cli('publish', 'purge', '--dataset', dataset.id), true, 0)
           for (const line of purgeOutput.split('\n').map(item => item.trim()).filter(Boolean))
             logFile(logPath, `purge | ${line}`)
           progress.publish = 'ok'
@@ -872,21 +892,99 @@ async function main(): Promise<void> {
     progress.media = media
     saveProgress()
     logFile(logPath, `=== done：media ${media.done}/${media.total}，chat ${media.chat}，comments ${media.comments}，vstats ${media.vstats}，元信息失败 ${metaFailures.length}，失败 ${failures.length}`)
-    console.log(`\n进度文件：${progressPath}`)
-    console.log(`日志文件：${logPath}`)
+    report('info', `进度文件：${progressPath}`)
+    report('info', `日志文件：${logPath}`)
     // 元信息失败以前只进进度文件，上层看不到：新场次全被 bot 检查拦下时
     // 工作流照样报成功，数据就静默断更了。
     const allFailures = [...metaFailures, ...failures]
     if (allFailures.length > 0) {
-      console.log(`\n仍有 ${allFailures.length} 项失败（可重跑同一命令重试）：`)
+      report('warn', `仍有 ${allFailures.length} 项失败（可重跑同一命令重试）：`)
       for (const failure of allFailures.slice(0, 20))
-        console.log(`  - ${failure.id} [${failure.step}] ${failure.error}`)
-      process.exitCode = 1
+        report('warn', `  - ${failure.id} [${failure.step}] ${failure.error}`)
+      return {
+        exitCode: 1,
+        data: {
+          media,
+          failures: allFailures.length,
+          metaFailures: metaFailures.length,
+          progressPath,
+          logPath,
+        },
+      }
+    }
+
+    return {
+      exitCode: 0,
+      data: {
+        media,
+        failures: 0,
+        metaFailures: 0,
+        progressPath,
+        logPath,
+      },
     }
   })().catch((error) => {
     logFile(logPath, `fatal：${error instanceof Error ? error.stack ?? error.message : String(error)}`)
-    process.exit(1)
+    return { exitCode: 1 }
   })
 }
 
-await main()
+/** 按频道列表补齐历史场次，每 N 场生成 datapack。 */
+export const dataFetchSpec: CommandSpec = {
+  id: 'data.fetch',
+  description: '按频道列表补齐历史场次：元信息 + 弹幕 + 评论 + VSTATS，每 N 场生成 datapack',
+  details: '已处理的场次会自动跳过；本地没有 manifest 时默认先从对象存储恢复。',
+  examples: [
+    'bun run ymmt data fetch --dataset nonoka --root ./temp/youtube-live',
+    'bun run ymmt data fetch --dataset nonoka --force abcdEFGH123',
+    'bun run ymmt data fetch --dataset nonoka --dry-run',
+  ],
+  options: [
+    new Option('--dataset <id>', 'dataset；只有一个时可以省略'),
+    new Option('--root <目录>', '原始会话根目录，默认 $STREAM_SESSION_ROOT 或 ./temp/youtube-live'),
+    new Option('--state-dir <目录>', '进度 / 日志 / 频道缓存，默认 <root>/.fetch-state'),
+    new Option('--concurrency <n>', '媒体并发，默认 3'),
+    new Option('--meta-concurrency <n>', '元信息并发，默认 6'),
+    new Option('--build-every <n>', '每 n 场构建一次，默认 5；0 = 全部抓完再构建'),
+    new Option('--limit <n>', '本次最多处理 n 场，0 = 全部'),
+    new Option('--ids <文件>', '直接读视频 ID 列表（每行一个），跳过频道列表抓取'),
+    new Option('--force <ids>', '定点重抓这些场次（逗号分隔，可重复）；all = 全频道候选重抓'),
+    new Option('--cookies <文件>', 'Netscape cookie jar；CI 用这个'),
+    new Option('--cookies-from-browser <b>', '导出 cookie 的浏览器，默认 firefox'),
+    new Option('--cookie-cache <文件>', 'cookie 缓存路径，默认 ~/yt-cookies.txt'),
+    new Option('--no-cookies', '匿名抓取'),
+    new Option('--restore', '先从对象存储恢复 manifest 与缺失的 datapack'),
+    new Option('--no-restore', '不自动恢复'),
+    new Option('--no-build', '只抓素材，不生成 datapack'),
+    new Option('--publish', '抓完写入数据库、发布资产并 purge；有 --force 时默认开启'),
+    new Option('--no-publish', '即使有 --force 也不写库、不发布'),
+  ],
+  async run(ctx) {
+    // commander 把重复传入的 --force 收集成数组，单次传入则是字符串。
+    const forceRaw = ctx.options.force
+    const force = forceRaw === undefined ? [] : Array.isArray(forceRaw) ? forceRaw.map(String) : [String(forceRaw)]
+    const result = await runFetch({
+      dataset: typeof ctx.options.dataset === 'string' ? ctx.options.dataset : undefined,
+      root: typeof ctx.options.root === 'string' ? ctx.options.root : undefined,
+      stateDir: typeof ctx.options.stateDir === 'string' ? ctx.options.stateDir : undefined,
+      concurrency: ctx.options.concurrency === undefined ? undefined : String(ctx.options.concurrency),
+      metaConcurrency: ctx.options.metaConcurrency === undefined ? undefined : String(ctx.options.metaConcurrency),
+      buildEvery: ctx.options.buildEvery === undefined ? undefined : String(ctx.options.buildEvery),
+      limit: ctx.options.limit === undefined ? undefined : String(ctx.options.limit),
+      cookies: typeof ctx.options.cookies === 'string' ? ctx.options.cookies : undefined,
+      cookiesFromBrowser: typeof ctx.options.cookiesFromBrowser === 'string' ? ctx.options.cookiesFromBrowser : undefined,
+      cookieCache: typeof ctx.options.cookieCache === 'string' ? ctx.options.cookieCache : undefined,
+      noCookies: ctx.flag('noCookies'),
+      dryRun: ctx.dryRun,
+      noBuild: ctx.flag('noBuild'),
+      restore: ctx.flag('restore'),
+      noRestore: ctx.flag('noRestore'),
+      ids: typeof ctx.options.ids === 'string' ? ctx.options.ids : undefined,
+      force,
+      publish: ctx.flag('publish'),
+      noPublish: ctx.flag('noPublish'),
+      log: ctx.log,
+    })
+    return { exitCode: result.exitCode, data: result.data }
+  },
+}
