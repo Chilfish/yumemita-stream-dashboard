@@ -90,6 +90,22 @@ bun run sync:remote -- --recent-days 30 --update-existing
 
 `verify` 默认只警告并继续发布（`--strict-verify` 才中止）：如果本地 pack 在 ingest 之后又被更新，线上库会暂时落后，但不该因此挡住封面 / archive 上传；补完 ingest 后重跑一次 verify 即可。
 
+### 联动参与者补到已部署环境
+
+`sync:remote` 默认只新增场次，不会改写已有行的 `participants`。登记 `content/collaborations.json` 后，用一次性脚本定向更新目标库：
+
+```bash
+LOCAL=0 bun scripts/apply-collaborations.ts --dry-run   # 看目标、需更新与缺失场次
+LOCAL=0 bun scripts/apply-collaborations.ts             # 写线上并刷新 public_totals
+LOCAL=0 bun scripts/apply-collaborations.ts --verify    # 写完对账
+```
+
+- 先应用 `drizzle/` 迁移（`0010` 的 `participants` 列与索引），再按 `videoId + datasetId` 更新，不读 pack、不建场次。
+- 脚本幂等：已是目标值的场次跳过；重复运行只报告、不写入。
+- 库里没有的场次会列出来，先 `bun run sync:remote -- --recent-days 0` 补 pack，再重跑本脚本。
+- 写完统一跑 `refresh-public-totals`；跳过时成员页汇总会落后于场次列表。
+- 本地忘记跑回填时，也可以用同一脚本（`LOCAL=1`）修本地库。
+
 ## 加一位成员 / 新 dataset
 
 1. 新建目录 `data/<id>/`，放入所有 `<videoId>.datapack.json`。

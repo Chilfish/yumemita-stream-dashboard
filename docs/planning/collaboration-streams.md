@@ -168,6 +168,7 @@ pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确
 - 标题与 tag 都没写的场次用 X 确认，例如 [ritsu 2023-11-30](https://x.com/ritsu_yumemita/status/1730214221089300875) 的 `#りつみやコラボ` 对应本地 `atfD1eiEa_o`（おえかきの森）。
 - 标题漏掉参与的场次按描述里的「コラボ相手」补齐；画あられ/律的绘回、同时视听、只是提到成员名字的场次不计入。「同時視聴」是两人各自看同一场录播，不共用直播间。
 - 写入后按成员跑 `db:ingest --dataset <id> --ids <文件> --force`，再用 `scripts/refresh-public-totals.ts` 统一重算 `public_totals`。分批 ingest 时先跑的成员看不到后写入的参与者，必须最后统一 refresh。
+- 已部署环境不重跑 ingest：`bun scripts/apply-collaborations.ts` 先补迁移，再按 videoId 定向写 `streams.participants` 并刷新 `public_totals`；`--dry-run` 会列出库里缺失的场次。见 [adding-data.md](../data/adding-data.md#联动参与者补到已部署环境)。
 - 新发现的联动场继续走同一流程；同名同日两段配信（如 2026-07-12 两场「コラボ歌枠」）按两个 videoId 各算一场。
 
 | 成员对 | 组合名 / tag |
