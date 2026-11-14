@@ -3,8 +3,8 @@
  * 联动场次候选清单。
  *
  * pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确认后登记。
- * 这里按本地 manifest 的标题扫成员别名，列出候选，供人工剔除假阳性后写入
- * `content/collaborations.json`。只读：不改数据、不连数据库。
+ * 这里按本地 manifest 的标题扫成员别名与组合名 tag，列出候选，供人工剔除假阳性后
+ * 写入 `content/collaborations.json`。只读：不改数据、不连数据库。
  *
  * 用法：
  *   bun scripts/suggest-collaborations.ts                       # 控制台表格

@@ -108,9 +108,27 @@ export function loadCollaborations(
 export const MEMBER_TITLE_ALIASES: Record<string, string[]> = {
   nonoka: ['宮永ののか', '宫永ののか', 'ののか', 'ののちゃん'],
   arale: ['仲町あられ', 'あられ'],
-  ritsu: ['峰月律', 'りっちゃん'],
+  ritsu: ['峰月律', '峰月りつ', 'りっちゃん'],
   miyako: ['藤都子', 'みやこ'],
   yuno: ['千石ユノ', 'ユノち', 'ゆの'],
+}
+
+/**
+ * 组合名 / 联动 tag：命中即视为这两人同场。
+ * 只收专有名词，不收 `納期`、`みやみや` 这类会出现在单人内容里的泛词。
+ * 出处见 `docs/planning/collaboration-streams.md` §8 与组合名对照档。
+ */
+export const PAIR_TAGS: Record<string, string[]> = {
+  'arale|nonoka': ['ふわキラゆめみ隊', 'ふわキラ'],
+  'arale|ritsu': ['りつとあられ'],
+  'arale|miyako': ['健全シスターズ'],
+  'arale|yuno': ['甘辛豆腐メンタル', 'あらユノ'],
+  'nonoka|ritsu': ['ぎたーグミ', 'ギターぐみ'],
+  'nonoka|miyako': ['ミルミルグッズ化推進委員会', 'ののかみやこ', 'ののみや'],
+  'nonoka|yuno': ['ののゆの', 'ののユノ'],
+  'ritsu|miyako': ['りつみやコラボ'],
+  'ritsu|yuno': ['ユノ食べろ律食べるな', 'ユノりつ'],
+  'miyako|yuno': ['納期シスターズ'],
 }
 
 /**
@@ -123,8 +141,15 @@ export function suggestParticipants(
   knownDatasetIds: Iterable<string>,
 ): string[] {
   const known = new Set(knownDatasetIds)
-  return Object.entries(MEMBER_TITLE_ALIASES)
+  const fromAliases = Object.entries(MEMBER_TITLE_ALIASES)
     .filter(([id]) => id !== ownerId && known.has(id))
     .filter(([, aliases]) => aliases.some(alias => title.includes(alias)))
     .map(([id]) => id)
+
+  const fromPairs = Object.entries(PAIR_TAGS)
+    .filter(([, tags]) => tags.some(tag => title.includes(tag)))
+    .flatMap(([pair]) => pair.split('|'))
+    .filter(id => id !== ownerId && known.has(id))
+
+  return [...new Set([...fromAliases, ...fromPairs])]
 }

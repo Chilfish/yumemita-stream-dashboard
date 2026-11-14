@@ -157,16 +157,31 @@ pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确
 | `/nonoka/streams`、`/yuno/streams` | 联动标记按预期出现 |
 | `/calendar?month=2024-06&day=2024-06-11` | 显示「宮永ののか · 峰月律 · 千石ユノ」 |
 | 单场页 `/arale/stream/It1RXfOPVYU` | 页头「仲町あられ × 宮永ののか × 峰月律」 |
-| 成员页场次数（owner ∪ 参与者） | arale 533 / nonoka 320 / miyako 333 / ritsu 352 / yuno 460 |
+| 成员页场次数（owner ∪ 参与者） | 2026-11-14 回填后：arale 533 / nonoka 322 / miyako 337 / ritsu 355 / yuno 468（随后仍会随新场次变化） |
 
 ## 8. 回填与后续
 
-`content/collaborations.json` 已回填（2026-11-14，73 场）：
+`content/collaborations.json` 已回填（2026-11-14，80 场）：
 
-- 候选来自 `scripts/suggest-collaborations.ts`：扫本地 manifest 标题里的成员别名，输出候选表，不改数据。
-- 标题漏掉参与的场次按描述里的「コラボ相手」补齐；画あられ/律的绘回、同时视听、只是提到成员名字的场次不计入。
+- 候选来自 `scripts/suggest-collaborations.ts`：扫本地 manifest 标题里的成员别名与组合名 tag，输出候选表，不改数据。
+- 第二轮回填补了组合名 tag：标题只写「ユノりつ」「ののユノ」这类组合名的场次，成员全名别名命中不到。10 对 tag 同时写进 `scripts/lib/collaborations.ts` 的 `PAIR_TAGS`，以后再扫会自动带上。
+- 标题与 tag 都没写的场次用 X 确认，例如 [ritsu 2023-11-30](https://x.com/ritsu_yumemita/status/1730214221089300875) 的 `#りつみやコラボ` 对应本地 `atfD1eiEa_o`（おえかきの森）。
+- 标题漏掉参与的场次按描述里的「コラボ相手」补齐；画あられ/律的绘回、同时视听、只是提到成员名字的场次不计入。「同時視聴」是两人各自看同一场录播，不共用直播间。
 - 写入后按成员跑 `db:ingest --dataset <id> --ids <文件> --force`，再用 `scripts/refresh-public-totals.ts` 统一重算 `public_totals`。分批 ingest 时先跑的成员看不到后写入的参与者，必须最后统一 refresh。
 - 新发现的联动场继续走同一流程；同名同日两段配信（如 2026-07-12 两场「コラボ歌枠」）按两个 videoId 各算一场。
+
+| 成员对 | 组合名 / tag |
+| --- | --- |
+| 仲町あられ × 宮永ののか | ふわキラゆめみ隊、ふわキラ |
+| 仲町あられ × 峰月律 | りつとあられ |
+| 仲町あられ × 藤都子 | 健全シスターズ |
+| 仲町あられ × 千石ユノ | 甘辛豆腐メンタル、あらユノ |
+| 宮永ののか × 峰月律 | ぎたーグミ、ギターぐみ |
+| 宮永ののか × 藤都子 | ミルミルグッズ化推進委員会、ののかみやこ、ののみや |
+| 宮永ののか × 千石ユノ | ののゆの、ののユノ |
+| 峰月律 × 藤都子 | りつみやコラボ |
+| 峰月律 × 千石ユノ | ユノ食べろ律食べるな、ユノりつ |
+| 藤都子 × 千石ユノ | 納期シスターズ |
 
 联动关系视图的前置条件已满足。
 
@@ -243,7 +258,7 @@ pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确
 - `bun run check`：0 errors，487 tests passed（新增 `collaboration.test.ts` 9 条）。
 - `bun run build`：通过。
 - `bun run db:query`：failures 0。
-- 组首页矩阵数字与 SQL 聚合一致：arale×nonoka 26、nonoka×yuno 13、arale×yuno 12、arale×miyako 11、nonoka×ritsu 11、arale×ritsu 7、ritsu×yuno 7、miyako×nonoka 4、miyako×yuno 3。
-- 点击「仲町あられ × 宮永ののか」展开 26 场明细，三人场标「3 人」。
-- 390 / 320px 下矩阵隐藏、分组列表显示，`scrollWidth ≤ clientWidth`，无横向溢出；成员页无溢出。
+- 组首页矩阵数字与 SQL 聚合一致：arale×nonoka 27、nonoka×yuno 14、arale×yuno 12、nonoka×ritsu 12、arale×miyako 11、ritsu×yuno 10、arale×ritsu 7、miyako×nonoka 4、miyako×yuno 3、miyako×ritsu 1，10 对全部有数据。
+- 点击「仲町あられ × 宮永ののか」展开 27 场明细，三人场标「3 人」。
+- 390 / 320px 保留表格：320px 下表格收进 320px，无横向溢出；成员页无溢出。
 

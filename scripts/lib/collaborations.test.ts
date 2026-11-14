@@ -71,4 +71,19 @@ describe('suggestParticipants', () => {
   it('不把自己的别名算成参与者', () => {
     expect(suggestParticipants('峰月律の雑談', 'ritsu', known)).toEqual([])
   })
+
+  it('组合名 tag 命中整对成员', () => {
+    expect(
+      suggestParticipants('#りつみやコラボ おえかきの森', 'ritsu', known),
+    ).toEqual(['miyako'])
+    expect(
+      suggestParticipants('【It Takes Two】ユノりつ', 'ritsu', known),
+    ).toEqual(['yuno'])
+  })
+
+  it('组合名与成员别名合并去重', () => {
+    expect(
+      suggestParticipants('峰月律とぎたーグミで遊ぶ', 'nonoka', known),
+    ).toEqual(['ritsu'])
+  })
 })
