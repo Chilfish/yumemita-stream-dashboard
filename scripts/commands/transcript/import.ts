@@ -438,7 +438,8 @@ export async function runTranscriptImport(
     const label = basename(filePath)
     let text: string
     try {
-      text = readFileSync(filePath, 'utf8')
+      // 归档侧稿件可能是 CRLF；统一成 LF，避免 frontmatter 解析与写回出现双份。
+      text = readFileSync(filePath, 'utf8').replace(/\r\n?/g, '\n')
     }
     catch (error) {
       data.failed.push(`${label}：读取失败：${errorMessage(error)}`)

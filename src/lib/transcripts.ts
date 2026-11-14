@@ -147,7 +147,8 @@ export interface ParsedFrontmatter {
  */
 export function parseFrontmatter(text: string): ParsedFrontmatter {
   const source = text.replace(/^\uFEFF/, "");
-  const lines = source.split("\n");
+  // 归档侧稿件常是 CRLF；按 \r?\n 切行，否则 `---\r` 匹配不上围栏。
+  const lines = source.split(/\r?\n/);
   if (!FRONTMATTER_FENCE.test(lines[0] ?? "")) {
     return { data: {}, body: source };
   }

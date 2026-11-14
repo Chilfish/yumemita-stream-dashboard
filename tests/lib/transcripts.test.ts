@@ -73,6 +73,15 @@ describe("parseFrontmatter", () => {
     const { data } = parseFrontmatter("---\n# 备注\nvideoId: abc\n---\n");
     expect(data).toEqual({ videoId: "abc" });
   });
+
+  it("parses CRLF frontmatter instead of treating it as body", () => {
+    const { data, body } = parseFrontmatter(
+      "---\r\nvideoId: abc\r\ntitle: 标题\r\n---\r\n\r\n## 开场\r\n",
+    );
+    expect(data.videoId).toBe("abc");
+    expect(data.title).toBe("标题");
+    expect(body.trimStart().startsWith("## 开场")).toBe(true);
+  });
 });
 
 describe("parseTranscriptFile", () => {
