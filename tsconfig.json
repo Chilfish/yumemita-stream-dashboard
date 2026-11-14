@@ -4,7 +4,8 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@scripts/*": ["./scripts/*"]
     }
   },
   "include": [".astro/types.d.ts", "**/*"],
