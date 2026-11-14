@@ -22,8 +22,7 @@
 | B33 | 峰值解释：把峰值分钟与人工标注的事件对齐 | P3 | 事件标注数据 | 2026-11-03 roadmap | 📋 |
 | B34 | 推文联动：先用手动 pin 验证价值，外部服务只做增强 | P3 | 无 | roadmap | 📋 |
 | B35 | 空数据 / 部分数据的更明确提示（已有基础版） | P3 | 无 | roadmap | 📋 |
-| B36 | 联动场次批量回填：用标题候选出清单，人工确认后写入 `content/collaborations.json`，再按成员重跑 `db:ingest` | P2 | 归属模型已落地 | 2026-11-12 需求 | 🚧 模型与查询已落地；本地 pack 命中约 66 场候选，仅登记了示例场。方案见 [collaboration-streams.md](collaboration-streams.md) |
-| B37 | 联动关系视图（`FR-DATA-006`）：成员页「同场成员」面板 + 组级同场次数矩阵 | P3 | B36 回填完成 | 2026-11-12 需求 | 📋 已定不用节点连线图（5 人 10 对全连通，无结构可读）；口径为「同场次数」，三人场每对各计 1 次。设计见 [collaboration-streams.md](collaboration-streams.md) §9 |
+| B37 | 联动关系视图（`FR-DATA-006`）：成员页「同场成员」面板 + 组级同场次数矩阵 | P3 | 无（B36 已回填 73 场） | 2026-11-12 需求 | 📋 设计已定：不用节点连线图（5 人 10 对全连通，无结构可读）；口径为「同场次数」，三人场每对各计 1 次。见 [collaboration-streams.md](collaboration-streams.md) §9 |
 
 > 2026-11-08 隐式状态机审查的 Z / R / E / U 问题已全部关闭，记录见 [review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md) 与 [archive/state-machine-remediation.md](../archive/state-machine-remediation.md)。
 

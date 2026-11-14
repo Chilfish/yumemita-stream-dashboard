@@ -43,6 +43,7 @@ Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整�
 | `bun run db:migrate` | 应用 `drizzle/` 迁移（按 `.dev.vars` 与 `LOCAL` 选库） |
 | `bun run db:ingest` | 本地 pack → PostgreSQL；支持 `--dataset` / `--ids` / `--limit` / `--all` / `--dry-run` |
 | `bun run db:verify` | 数据库与本地 pack 字段级对账 |
+| `bun scripts/suggest-collaborations.ts` | 扫 manifest 标题别名出联动场候选（只读；`--markdown` / `--json`） |
 | `bun run db:query` | 查询层冒烟：列表 / insights / 组首页 / 相册 + 本地延迟 |
 | `bun run perf:smoke` | 页面级性能冒烟：响应体大小 / 耗时中位数 / cache tag（先启动 preview 或 wrangler dev） |
 | `bun run publish:assets` | 上传封面 / 表情 / archive（不写 JSON 索引） |

@@ -147,15 +147,32 @@ pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确
 
 `db:verify` 在 `arale` / `miyako` 上仍报「数据库缺少该场」，是仓库已有 pack 尚未入库的既有差异，与本次改造无关。
 
-## 8. 后续
+### 回填验证（2026-11-14，本地库）
 
-- `content/collaborations.json` 目前只登记了示例场。批量补齐需要先用 `suggestParticipants` 出候选，人工确认后写入，再按成员重跑 `db:ingest --dataset <id>`。见 backlog B36。
-- 全量回填参与者后，各成员的 `dataset_insights` 需要重算，否则成员页汇总会落后于列表。
-- 联动关系视图见下一节，前置条件是 B36 已回填。
+| 检查 | 结果 |
+| --- | --- |
+| `bun run db:query` | failures 0 |
+| `bun run db:verify --dataset <成员>`（5 人） | 0 problems |
+| `bun run check` / `bun run build` / `bun run validate:data` | 通过 |
+| `/nonoka/streams`、`/yuno/streams` | 联动标记按预期出现 |
+| `/calendar?month=2024-06&day=2024-06-11` | 显示「宮永ののか · 峰月律 · 千石ユノ」 |
+| 单场页 `/arale/stream/It1RXfOPVYU` | 页头「仲町あられ × 宮永ののか × 峰月律」 |
+| 成员页场次数（owner ∪ 参与者） | arale 533 / nonoka 320 / miyako 333 / ritsu 352 / yuno 460 |
+
+## 8. 回填与后续
+
+`content/collaborations.json` 已回填（2026-11-14，73 场）：
+
+- 候选来自 `scripts/suggest-collaborations.ts`：扫本地 manifest 标题里的成员别名，输出候选表，不改数据。
+- 标题漏掉参与的场次按描述里的「コラボ相手」补齐；画あられ/律的绘回、同时视听、只是提到成员名字的场次不计入。
+- 写入后按成员跑 `db:ingest --dataset <id> --ids <文件> --force`，再用 `scripts/refresh-public-totals.ts` 统一重算 `public_totals`。分批 ingest 时先跑的成员看不到后写入的参与者，必须最后统一 refresh。
+- 新发现的联动场继续走同一流程；同名同日两段配信（如 2026-07-12 两场「コラボ歌枠」）按两个 videoId 各算一场。
+
+联动关系视图的前置条件已满足。
 
 ## 9. 联动关系视图（待实现）
 
-状态：📋 未实现。前置条件：`content/collaborations.json` 已回填。
+状态：📋 未实现。前置条件已满足（`content/collaborations.json` 已回填）。
 
 ### 9.1 问题
 
