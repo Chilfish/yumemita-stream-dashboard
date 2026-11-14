@@ -76,7 +76,7 @@ const SORT_LABELS: Record<TableSortKey, string> = {
   duration: "时长",
   avg: "平均同接",
   max: "峰值同接",
-  watch: "视聴时间",
+  watch: "视听时间",
   views: "播放",
   likes: "点赞",
   chat: "弹幕",

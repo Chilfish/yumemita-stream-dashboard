@@ -137,7 +137,7 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
       {ownerChats.length > 0 ? (
         <section className="border-t border-hairline pt-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-headline text-foreground">主播本人发言与操作</h2>
+            <h2 className="text-headline text-foreground">主播本人发言</h2>
             <p className="text-caption text-ink-3">
               共 {formatInteger(ownerChats.length)} 条
             </p>

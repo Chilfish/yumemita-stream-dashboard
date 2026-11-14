@@ -69,7 +69,7 @@
 | `availability` | string | `public` / `subscriber_only` 等 |
 | `avgConcurrent` / `maxConcurrent` | number \| null | VSTATS 同接 |
 | `maxConcurrentAt` | string \| null | 最大值时刻（`MM/DD HH:mm`） |
-| `watchTimeHours` | number \| null | VSTATS 视聴时间（人·时） |
+| `watchTimeHours` | number \| null | VSTATS 视听时间（人·时） |
 | `vstatsViews` / `vstatsLikes` | number \| null | VSTATS 快照 |
 | `snapshotViews` / `snapshotLikes` / `snapshotComments` | number \| null | yt-dlp 抓取时点 |
 | `chatTotal` | number | 弹幕全部条目 |
@@ -246,7 +246,7 @@
 | `startedAt` / `endedAt` / `durationText` | 站点口径的开始/结束/时长 |
 | `avgConcurrent` / `maxConcurrent` | 平均/最大同接 |
 | `maxConcurrentAt` | 最大值时刻 |
-| `watchTimeHours` | 视聴时间（人·时，站点口径） |
+| `watchTimeHours` | 视听时间（人·时，站点口径） |
 | `views` / `likes` | 站点快照 |
 
 `vstats: null` 的常见原因：会员限定（站点不收录）、早于站点开始收录的日期（本频道约 2026-08-31 以前）。
@@ -279,7 +279,7 @@
 | `wordCounts` | **v2**：全量分词词频 `{ 词: 次数 }`，不截断；同样已剔除英文虚词与寒暄词 |
 | `hashtags` | `#` / `＃` 标签计数 |
 | `emojiKinds` | 表情种类数 + Top 15 |
-| `ownerChats` | 主播本人发言与操作，按时间顺序全量：`at` / `kind` / `text` / `emojis`；`kind: "event"` 表示置顶 / 投票 / Q&A 等主播操作。旧 pack 缺失 |
+| `ownerChats` | 主播本人发言，按时间顺序全量：`at` / `kind` / `text` / `emojis`；`kind: "event"` 表示置顶 / 投票 / Q&A 等主播操作。旧 pack 缺失 |
 | `emojis` | 本场出现过的频道专属表情：`id`（`<channelId>/<hash>`）/ `name` / `url`（InnerTube 原图）；旧 pack 缺失 |
 | `events` | 非消息事件：`at` / `type` / `owner` / `author` / `text` / `data`。`type` 取 `banner` / `bannerRemoved` / `poll` / `pollUpdate` / `qna` / `product` / `system` / `modeChange` / `deleted` / `deletedAuthor` / `replaced` / `panel` / `other`；投票的 `data.choices` 是最后一次快照。没有实时采集时缺失 |
 

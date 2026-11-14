@@ -49,7 +49,7 @@ const METRICS: Metric[] = [
   { key: "max", label: "最大同接", value: row => row.maxConcurrent, format: formatInteger },
   {
     key: "watch",
-    label: "视聴时间",
+    label: "视听时间",
     unit: "人·时",
     value: row => row.watchTimeHours,
     format: formatInteger,

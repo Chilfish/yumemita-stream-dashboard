@@ -7,7 +7,7 @@
 | yt-dlp 元信息            | 开播时刻・时长・标题・简介与简介外链・字幕/弹幕回放有无                       |
 | 弹幕（`live_chat` 全量） | 条数・构成・时间分布・词频・SC / 贴纸 / 会员里程碑 / 赠送会员・参与人数        |
 | 评论区                   | 顶层评论・赞数・置顶・上传者发言                                              |
-| VSTATS 快照              | 平均/最大同接・最大值时刻・视聴时间・播放・点赞（YouTube 自身不提供同接历史） |
+| VSTATS 快照              | 平均/最大同接・最大值时刻・视听时间・播放・点赞（YouTube 自身不提供同接历史） |
 
 产物写到本地暂存区 `data/<datasetId>/<videoId>.datapack.json`（已 gitignore），并更新该 dataset 的
 本地 `manifest.json` 摘要。正式入库用 `bun run db:ingest`，资产发布用 `bun run publish:assets`。

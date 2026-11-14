@@ -26,7 +26,7 @@ export function StreamOverviewPanel({ row }: StreamOverviewPanelProps) {
         : "无同接快照",
     },
     {
-      label: "视聴时间",
+      label: "视听时间",
       unit: "人·时",
       value: formatInteger(vstats?.watchTimeHours ?? null),
     },

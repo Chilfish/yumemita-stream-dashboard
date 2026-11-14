@@ -32,7 +32,7 @@
 
 ## 图表是空的
 
-- **该场没有 VSTATS**：`vstats: null`，同接/视聴时间相关图表会跳过。会员限定场常见。
+- **该场没有 VSTATS**：`vstats: null`，同接/视听时间相关图表会跳过。会员限定场常见。
 - **没有 SC**：币种环图显示“本 dataset 没有 SC 记录”。
 - **没有评论**：评论区显示空状态；`comments` 可能为 `null`。
 - **词频/发言者为空**：datapack 的 `topWords` / `topAuthors` 是 Top 截断列表，场次太短可能不足阈值。

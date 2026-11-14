@@ -317,7 +317,7 @@ index (title gin_trgm_ops)          -- 可选，用于标题搜索
 | `badges` | `jsonb` | 徽章分布 |
 | `hashtags` | `jsonb` | 标签计数 |
 | `emoji_kinds` | `jsonb` | 表情种类与 Top |
-| `owner_chats` | `jsonb` | 主播本人发言与操作（`kind: "event"` 为置顶 / 投票等） |
+| `owner_chats` | `jsonb` | 主播本人发言（`kind: "event"` 为置顶 / 投票等） |
 | `emojis` | `jsonb` | 本场频道表情 |
 | `events` | `jsonb` | 实时采集的非消息事件（置顶 / 投票 / 系统 / 删除等） |
 | `video_extra` | `jsonb` | 简介、外链、章节、字幕/回放标记 |
@@ -1315,4 +1315,3 @@ Worker 的 `r2_buckets` 绑定同名桶，读取 `transcripts.r2_key`（形如 `
 - [deployment.md](../engineering/deployment.md) — 现有构建、R2 发布、定时任务
 - [ssg-research.md](./ssg-research.md) — 旧 SSG 调研；本文替代其结论
 - `starter-astro-react` 的 `docs/engineering/astro-experiments.md` — 模板已落地的 Astro 实验记录（本地路径 `D:\git\starter-astro-react\docs\engineering\astro-experiments.md`）
-
