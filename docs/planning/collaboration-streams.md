@@ -29,8 +29,7 @@
 
 ### 非目标
 
-- 不做自动识别入库。标题别名有假阳性：`語りつつ` 命中 `りつ`，食物「あられ」命中 仲町あられ。匹配只作为候选提示。
-- 不引入成员维表或多人主键。参与者是 owner 之外的附加关系，不做「无主多成员」的场次。
+- 不做成员维表或多人主键。参与者是 owner 之外的附加关系，不做「无主多成员」的场次。
 - 不改指标口径：一场的弹幕、SC、同接仍是一份，不按人数拆分或摊薄。
 
 ## 3. 数据模型
@@ -56,25 +55,38 @@
 dataset_id = $1 or $1::text = any(participants)
 ```
 
-### 3.2 登记来源
+### 3.2 登记来源与推断
 
-pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确认后登记。权威来源是仓库内的 `content/collaborations.json`：
+pack 与 YouTube 都不提供结构化的共演信息。参与者来源有两层，按优先级取值：
+
+1. **手动登记**：仓库内的 `content/collaborations.json` 是权威来源。
+2. **标题推断**：没登记的场次，用 `scripts/lib/collaborations.ts` 的 `inferParticipants` 从标题推断。
 
 ```json
 {
   "schema": "yumemita.stream-collaborations/v1",
   "streams": {
-    "fvSCCUPBzU0": ["nonoka"]
+    "fvSCCUPBzU0": ["nonoka"],
+    "5O7QhNqosps": []
   }
 }
 ```
 
 - key 是 videoId，value 是 owner 之外的成员 id 数组。
-- `ingest` 读取后写入 `streams.participants`，按登记全量替换，所以删掉成员后重跑也会生效。
+- **空数组是显式覆盖**：表示「确认这场没有联动」，用来压制标题推断的误判。所有成员都非法（未知 id、owner 冲突、重复）时不会写成空数组，避免拼写错误被当成覆盖。
+- `ingest` 读取后写入 `streams.participants`，按目标值全量替换，所以删掉成员后重跑也会生效。
 - 校验按「单条失败跳过、不阻塞其余」：非法 videoId、非数组、未知成员、owner 冲突、重复登记都只记日志。
-- 文件不存在时 participant 全为空，行为与改造前一致。
+- 文件不存在时全部走标题推断；行为与改造前一致。
 
-标题候选匹配在 `scripts/lib/collaborations.ts` 的 `suggestParticipants`，只做提示，不自动写入。
+标题推断只读标题，结果是确定性的，同一标题永远得到同一组 id：
+
+- 别名表 `MEMBER_TITLE_ALIASES` 覆盖全名、昵称与常见写法（`みゃーちゃん`、`のののの`、`都子`、`律`、裸 `ユノ`）。
+- 组合名 tag `PAIR_TAGS` 命中整对成员（`ふわキラ`、`ユノりつ` 等）。
+- 已知非联动说法直接排除：`描く会` / `デザイン` / `実食` / `ASMR` / `シチュボ` / `いわく`（转述某人）；`旋律`、`法律` 里的「律」不参与匹配。
+
+`data update` 在每天 ingest 之后跑一次对账（`scripts/lib/collaboration-sync.ts`）：用数据库里的 `title` 重新算目标值，只写真正变化的行，然后重算受影响成员的 `public_totals` 并失效对应缓存 tag。所以手动补登、改登、删登在下一轮日更自动生效，不需要重跑 ingest。
+
+`suggestParticipants` 仍只做候选提示（不过滤假阳性），用于人工审查；不写库。
 
 ## 4. 读取
 
@@ -161,15 +173,15 @@ pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确
 
 ## 8. 回填与后续
 
-`content/collaborations.json` 已回填（2026-11-14，80 场）：
+`content/collaborations.json` 已回填（2026-11-14，82 场）：
 
 - 候选来自 `scripts/suggest-collaborations.ts`：扫本地 manifest 标题里的成员别名与组合名 tag，输出候选表，不改数据。
 - 第二轮回填补了组合名 tag：标题只写「ユノりつ」「ののユノ」这类组合名的场次，成员全名别名命中不到。10 对 tag 同时写进 `scripts/lib/collaborations.ts` 的 `PAIR_TAGS`，以后再扫会自动带上。
 - 标题与 tag 都没写的场次用 X 确认，例如 [ritsu 2023-11-30](https://x.com/ritsu_yumemita/status/1730214221089300875) 的 `#りつみやコラボ` 对应本地 `atfD1eiEa_o`（おえかきの森）。
 - 标题漏掉参与的场次按描述里的「コラボ相手」补齐；画あられ/律的绘回、同时视听、只是提到成员名字的场次不计入。「同時視聴」是两人各自看同一场录播，不共用直播间。
 - 写入后按成员跑 `db:ingest --dataset <id> --ids <文件> --force`，再用 `scripts/refresh-public-totals.ts` 统一重算 `public_totals`。分批 ingest 时先跑的成员看不到后写入的参与者，必须最后统一 refresh。
-- 已部署环境不重跑 ingest：`bun scripts/apply-collaborations.ts` 先补迁移，再按 videoId 定向写 `streams.participants` 并刷新 `public_totals`；`--dry-run` 会列出库里缺失的场次。见 [adding-data.md](../data/adding-data.md#联动参与者补到已部署环境)。
-- 新发现的联动场继续走同一流程；同名同日两段配信（如 2026-07-12 两场「コラボ歌枠」）按两个 videoId 各算一场。
+- 已部署环境不重跑 ingest：`bun scripts/oneoff/apply-collaborations.ts` 先补迁移，再按 videoId 定向写 `streams.participants` 并刷新 `public_totals`；`--dry-run` 会列出库里缺失的场次。见 [adding-data.md](../data/adding-data.md#联动参与者)。
+- 新发现的联动场不再依赖一次性回填：首次 ingest 与每轮 `data update` 对账都会自动写入标题推断结果；只有标题完全没写人名的场次需要人工补登记。同名同日两段配信（如 2026-07-12 两场「コラボ歌枠」）按两个 videoId 各算一场。
 
 | 成员对 | 组合名 / tag |
 | --- | --- |
@@ -262,4 +274,19 @@ pack 与 YouTube 都不提供结构化的共演信息，参与者只能人工确
 - 组首页矩阵数字与 SQL 聚合一致：arale×nonoka 27、nonoka×yuno 14、arale×yuno 12、nonoka×ritsu 12、arale×miyako 11、ritsu×yuno 10、arale×ritsu 7、miyako×nonoka 4、miyako×yuno 3、miyako×ritsu 1，10 对全部有数据。
 - 点击「仲町あられ × 宮永ののか」展开 27 场明细，三人场标「3 人」。
 - 390 / 320px 保留表格：320px 下表格收进 320px，无横向溢出；成员页无溢出。
+
+## 10. 标题推断的覆盖率（2026-11-14 实测）
+
+用本地 1,925 场 pack 对照已登记的 82 场：
+
+| 规则 | 覆盖 | 全库未登记命中 |
+| --- | --- | --- |
+| 扩展前的别名 + 组合名 | 67/80（84%） | 1（`描く会` 假阳性） |
+| 扩展后的别名 + 组合名 + 排除词 | 73/82（89%） | 0（推断曾捞出 2 场漏登记的 yuno × ritsu，已补登） |
+
+扩展别名补的是 `みゃーちゃん / みゃー`、`のののの / のの`、`都子`、`律`、裸 `ユノ`。排除词只针对实测到的假阳性：画成员、周边 / 试吃、ASMR シチュボ、`いわく` 这类转述。
+
+标题推不出来的 9 场（`VIRTUAL GIRL @ WORLD'S END` ×3、`Overcooked! 2` ×2、`It Takes Two`、`8番出口`、两场实写吃播）：标题和描述都没有其他成员的名字，只能人工登记。描述不能整段扫：每位成员的模板都带全员名单与链接，整段匹配会在 1,762/1,925 场里误命中，只取 `コラボ相手` 段或「名字 + @handle 同行」才可用，维护成本高于收益，暂不做。
+
+因此推断只负责大部分场次，漏掉的少量仍走手动登记；`suggest-collaborations.ts` 用来出候选与复查。
 

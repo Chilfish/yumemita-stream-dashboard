@@ -20,7 +20,7 @@ bun run ymmt describe --json               # 完整命令树，供 agent 自举
 
 | 命令 | 作用 |
 | --- | --- |
-| `data update` | 每日增量：频道差集 → 定点抓取 → 补 VSTATS / 封面 → ingest → 发布 → purge |
+| `data update` | 每日增量：频道差集 → 定点抓取 → 补 VSTATS / 封面 → ingest → 联动参与者对账 → 发布 → purge |
 | `data fetch` | 按频道补齐历史场次，每 N 场生成 datapack |
 | `data vstats` | 只补 VSTATS 单场页数据 |
 | `data thumbnails` | 镜像封面并生成 480 / 960 / 1280w WebP |

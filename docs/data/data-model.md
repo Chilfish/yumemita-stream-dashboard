@@ -463,7 +463,8 @@ bun run ymmt data live-chat --video <videoId>                       # 已结束�
 dataset_id = $1 or $1::text = any(participants)
 ```
 
-- 已知 videoId 的参与者登记在 `content/collaborations.json`，`db:ingest` 写入 `streams.participants`，重跑按登记全量替换。
+- 参与者来源：手动登记 `content/collaborations.json` 优先（空数组合义是确认无联动），未登记场次用标题推断；`db:ingest` 与 `data update` 的对账共用同一套取值口径，按目标值全量替换。
+- `data update` 每天 ingest 后会重新对账一次，手动补登 / 改登 / 删登在下一轮自动生效，并重算受影响成员的 `public_totals`。
 - 成员的场次数与汇总包含他参与的联动场；全组合计按 videoId 去重，因此**全组总数不等于各成员之和**。
 - 站内链接始终指向频道主；参与者 URL 也能打开同一场，但站内不生成。
 - 方案与取舍见 [collaboration-streams.md](../planning/collaboration-streams.md)。
