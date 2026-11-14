@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { parseAmount } from './lib/amount.ts'
 import { upsertManifestStream } from './lib/dataset-manifest.ts'
+import { deriveVstats, parseVstats } from './lib/vstats.ts'
 import { isStopword } from '../src/lib/stopwords.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -122,19 +123,6 @@ interface PackChatEvent {
   data?: Record<string, unknown>
 }
 
-interface VstatsVideo {
-  updatedAt: string | null
-  startedAt: string | null
-  endedAt: string | null
-  durationText: string | null
-  maxConcurrent: number | null
-  maxConcurrentAt: string | null
-  avgConcurrent: number | null
-  watchTimeHours: number | null
-  views: number | null
-  likes: number | null
-}
-
 interface DatasetSource {
   id: string
   label: string
@@ -192,13 +180,6 @@ function hms(seconds: number): string {
   return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
-function num(text: string | undefined): number | null {
-  if (!text)
-    return null
-  const n = Number(text.replace(/,/g, ''))
-  return Number.isFinite(n) ? n : null
-}
-
 function round(n: number, digits = 2): number {
   const p = 10 ** digits
   return Math.round(n * p) / p
@@ -219,53 +200,6 @@ function readJson<T>(path: string): T | null {
   }
   catch {
     return null
-  }
-}
-
-/** VSTATS 单场页是服务端渲染的固定版式：按标签取其后的一小段再抠值。 */
-function vstatsBlock(html: string, label: string, length = 700): string | null {
-  const i = html.indexOf(label)
-  return i < 0 ? null : html.slice(i, i + length)
-}
-
-const UPDATED_AT_RE = /最終更新:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/
-const DATE_RE = /(\d{4}-\d{2}-\d{2})/
-const TIME_RE = /(\d{2}:\d{2}:\d{2})/
-const STAT_DURATION_RE = /(\d+:\d{2}:\d{2})/
-const STAT_NUMBER_RE = /<span class="fs-5[^"]*">\s*([\d,]+)/
-const MAX_CONCURRENT_AT_RE = /\((\d{1,2}\/\d{1,2} \d{2}:\d{2})\)/
-
-function parseVstats(html: string): VstatsVideo {
-  // 「最大視聴者数ランキング」「高評価数ランキング」这类导航词在页首，先跳到统计块再取标签。
-  const detail = html.slice(Math.max(0, html.indexOf('最終更新')))
-  const started = vstatsBlock(detail, '開始時刻')
-  const ended = vstatsBlock(detail, '終了時刻')
-  const duration = vstatsBlock(detail, '配信時間', 300)
-  const maxBlock = vstatsBlock(detail, '最大視聴者数')
-  const avgBlock = vstatsBlock(detail, '平均視聴者数', 400)
-  const watchBlock = vstatsBlock(detail, '視聴時間', 400)
-  const viewBlock = vstatsBlock(detail, '再生数', 400)
-  const likeBlock = vstatsBlock(detail, '高評価数', 400)
-
-  const stamp = (block: string | null): string | null => {
-    if (!block)
-      return null
-    const date = DATE_RE.exec(block)?.[1]
-    const time = TIME_RE.exec(block)?.[1]
-    return date && time ? `${date}T${time}+09:00` : null
-  }
-
-  return {
-    updatedAt: UPDATED_AT_RE.exec(html)?.[1] ?? null,
-    startedAt: stamp(started),
-    endedAt: stamp(ended),
-    durationText: STAT_DURATION_RE.exec(duration ?? '')?.[1] ?? null,
-    maxConcurrent: num(STAT_NUMBER_RE.exec(maxBlock ?? '')?.[1]),
-    maxConcurrentAt: MAX_CONCURRENT_AT_RE.exec(maxBlock ?? '')?.[1] ?? null,
-    avgConcurrent: num(STAT_NUMBER_RE.exec(avgBlock ?? '')?.[1]),
-    watchTimeHours: num(STAT_NUMBER_RE.exec(watchBlock ?? '')?.[1]),
-    views: num(STAT_NUMBER_RE.exec(viewBlock ?? '')?.[1]),
-    likes: num(STAT_NUMBER_RE.exec(likeBlock ?? '')?.[1]),
   }
 }
 
@@ -745,18 +679,11 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
         }
       : null,
     derived: {
-      /** 每 1000 名平均同接对应的弹幕条数——跨场次比较「弹幕热不热」的量。 */
-      chatPer1000AvgViewers: vstats?.avgConcurrent && timed.length
-        ? round((timed.length / vstats.avgConcurrent) * 1000, 1)
-        : null,
-      likesPer1000Views: vstats?.views && vstats.likes
-        ? round((vstats.likes / vstats.views) * 1000, 1)
-        : null,
+      // 每 1000 名平均同接对应的弹幕条数 / 点赞率 / 两边播放数差，口径见 scripts/lib/vstats.ts。
+      ...deriveVstats(vstats, timed.length, info.view_count ?? null),
       scPerHour: startedSec && lastAt != null && scList.length
         ? round(scList.length / ((lastAt - startedSec) / 3600), 2)
         : null,
-      /** 同一时间点两边的播放数差（VSTATS 快照 vs 抓取时）。 */
-      vstatsVsYtdlpViews: vstats?.views != null && info.view_count != null ? info.view_count - vstats.views : null,
     },
   }
 
