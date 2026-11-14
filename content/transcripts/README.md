@@ -45,17 +45,27 @@ bun run ymmt transcript new W0bKqP-Eyj4 --dataset nonoka
 # 导入已经写好的 Markdown（frontmatter 缺 videoId 时可用 --video-id 指定）
 bun run ymmt transcript import "D:/messages/.../2026-10-13_ライブ振り返り.md" --dataset nonoka
 
-# 批量导入一个目录（不递归，跳过不合规的稿）
-bun run ymmt transcript import "D:/messages/archives/.../配信" --dataset nonoka
+# 只传归档根目录：自动识别成员目录的 配信/*.md 与 団体配信/*.md
+bun run ymmt transcript import "D:/messages/archives/夢限大みゅーたいぷ/members"
+
+# 也可以只传某个成员目录或团体目录
+bun run ymmt transcript import "D:/messages/archives/.../members/宮永ののか"
+bun run ymmt transcript import "D:/messages/archives/.../members/団体配信"
 
 # 校验 + 发布到对象存储；加 --no-upload 只校验
 bun run ymmt publish transcripts
 ```
 
+dataset 推断顺序：`--dataset` → 路径里的成员目录名（`宮永ののか` → `nonoka`）→
+用 videoId 查数据库 `streams.dataset_id` 取真正的投稿者（团体配信）。所以通常不用再写 `--dataset`。
+
+目录发现规则：成员目录只取 `配信/*.md`（顶层是档案与专题文档），`団体配信/` 取顶层 `*.md`；
+`raw/` 与 `_` / `.` / `00_` / `01_` 开头的索引文件跳过。
+
 导入会按 manifest 补 `date` / `title`，去掉 `archive-only` 段落，并拒绝会员限定场次（逐字稿只留在归档侧；确需例外加 `--allow-member-only`）。
 
 目录模式下一篇出问题不影响其余：缺 `videoId`、文件名里也没有日期、对不上 manifest、会员限定、
-目标已存在（`--force` 才覆盖）都记为跳过并打印原因；只有读写失败才让退出码变 1。
+目标已存在（`--force` 才覆盖）、团体场次在库里查不到归属，都记为跳过并打印原因；只有读写失败才让退出码变 1。
 
 发布产物：
 

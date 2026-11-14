@@ -90,20 +90,26 @@ bun run ymmt publish sync -- --recent-days 30 --update-existing
 
 `verify` 默认只警告并继续发布（`--strict-verify` 才中止）：如果本地 pack 在 ingest 之后又被更新，线上库会暂时落后，但不该因此挡住封面 / archive 上传；补完 ingest 后重跑一次 verify 即可。
 
-### 联动参与者补到已部署环境
+### 联动参与者
 
-`sync:remote` 默认只新增场次，不会改写已有行的 `participants`。登记 `content/collaborations.json` 后，用一次性脚本定向更新目标库：
+参与者有两层来源，按优先级取值：`content/collaborations.json` 的手动登记优先，没登记的场次用标题推断（`scripts/lib/collaborations.ts`）。
+
+- 新场次在 `db ingest` 时直接写入；已入库场次由 `data update` 每轮 ingest 之后自动对账，只写变化的行并重算受影响成员的 `public_totals`。所以补登 / 改登 / 删登提交后，下一轮日更生效，不需要重跑 ingest。
+- 登记值是 `owner` 之外的成员 id 数组。**空数组表示确认这场没有联动**，用来压制标题推断的误判；全部成员都非法时不会写成空数组。
+- 标题推断只读标题，覆盖约 89% 的已知联动场；标题完全没写人名的少量场次仍需手动登记。候选清单用 `bun scripts/oneoff/suggest-collaborations.ts` 出。
+
+`sync:remote` 默认只新增场次，不会改写已有行的 `participants`；需要立刻落到已部署环境时，用一次性脚本定向更新目标库：
 
 ```bash
-LOCAL=0 bun scripts/apply-collaborations.ts --dry-run   # 看目标、需更新与缺失场次
-LOCAL=0 bun scripts/apply-collaborations.ts             # 写线上并刷新 public_totals
-LOCAL=0 bun scripts/apply-collaborations.ts --verify    # 写完对账
+LOCAL=0 bun scripts/oneoff/apply-collaborations.ts --dry-run   # 看目标、需更新与缺失场次
+LOCAL=0 bun scripts/oneoff/apply-collaborations.ts             # 写线上并刷新 public_totals
+LOCAL=0 bun scripts/oneoff/apply-collaborations.ts --verify    # 写完对账
 ```
 
 - 先应用 `drizzle/` 迁移（`0010` 的 `participants` 列与索引），再按 `videoId + datasetId` 更新，不读 pack、不建场次。
-- 脚本幂等：已是目标值的场次跳过；重复运行只报告、不写入。
+- 脚本只写登记表里的场次，不做标题推断；幂等：已是目标值的场次跳过，重复运行只报告、不写入。
 - 库里没有的场次会列出来，先 `bun run ymmt publish sync -- --recent-days 0` 补 pack，再重跑本脚本。
-- 写完统一跑 `refresh-public-totals`；跳过时成员页汇总会落后于场次列表。
+- 写完统一跑 `db totals`；跳过时成员页汇总会落后于场次列表。
 - 本地忘记跑回填时，也可以用同一脚本（`LOCAL=1`）修本地库。
 
 ## 加一位成员 / 新 dataset
@@ -148,9 +154,13 @@ bun run ymmt transcript new W0bKqP-Eyj4 --dataset nonoka
 bun run ymmt transcript import "D:/messages/archives/2026-10-13_ライブ振り返り.md" --dataset nonoka
 bun run ymmt transcript import "<path>" --dataset nonoka --video-id W0bKqP-Eyj4
 
-# 整个目录批量导入：不合规的稿记跳过，不阻塞其余
-bun run ymmt transcript import "D:/messages/archives/<member>/配信" --dataset nonoka
+# 只传归档根目录：自动发现成员目录的 配信/*.md 与 団体配信/*.md
+bun run ymmt transcript import "D:/messages/archives/夢限大みゅーたいぷ/members"
 ```
+
+dataset 推断顺序：`--dataset` → 路径里的成员目录名（`宮永ののか` → `nonoka`）→
+用 videoId 查数据库 `streams.dataset_id` 取真正的投稿者（团体配信）。成员目录只取 `配信/*.md`，
+`団体配信/` 取顶层 `*.md`，`raw/` 与 `_` / `.` / `00_` / `01_` 开头的索引文件跳过。
 
 导入会按 manifest 补 `date` / `title`，剔除 `<!-- archive-only:start -->` … `<!-- archive-only:end -->` 之间的归档段落；会员限定场次默认拒绝，确需例外加 `--allow-member-only`。
 
