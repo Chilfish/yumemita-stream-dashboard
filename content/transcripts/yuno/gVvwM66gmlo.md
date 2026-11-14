@@ -4,6 +4,7 @@ date: 2026-09-30
 title: "YUNO's+ 限定配信"
 members: [yuno]
 tags: [会员限定, 杂谈]
+membersOnly: true
 summary: 9 月最后一夜的会员回：把抽到天井、连自己的角色都不出的惨案命名成「ぺしょぺしょ天井界隈（ぺしょ天）」，顺手报出频道 5 万订阅与 12 月 5 日的预告。
 tweets: []
 ---

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { WriteDb } from '@/db/connection.ts'
 import { transcripts } from '@/db/schema.ts'
 
@@ -52,6 +52,7 @@ export async function syncTranscripts(db: WriteDb, datasetId: string): Promise<n
   const existing = new Map(existingRows.map(row => [row.videoId, row.contentHash]))
 
   let count = 0
+  const memberOnly: string[] = []
   for (const name of readdirSync(dir)) {
     if (!name.endsWith('.md') || name.startsWith('_') || name.startsWith('.')) continue
     const file = join(dir, name)
@@ -61,9 +62,17 @@ export async function syncTranscripts(db: WriteDb, datasetId: string): Promise<n
     const videoId = typeof meta.videoId === 'string' && meta.videoId
       ? meta.videoId
       : basename(name, '.md')
+    const tags = Array.isArray(meta.tags) ? meta.tags : []
+    const flag = meta.membersOnly
+    if (
+      flag === 'true' || flag === '1' || flag === 'yes'
+      || tags.includes('会员限定') || tags.includes('会限')
+    ) {
+      memberOnly.push(videoId)
+      continue
+    }
     if (existing.get(videoId) === hash) continue
 
-    const tags = Array.isArray(meta.tags) ? meta.tags : []
     const dateValue = typeof meta.date === 'string' ? meta.date.slice(0, 10) : null
 
     await db.insert(transcripts).values({
@@ -90,5 +99,16 @@ export async function syncTranscripts(db: WriteDb, datasetId: string): Promise<n
     })
     count += 1
   }
+
+  // 会员限定稿不发布：已有的元数据行也要清掉，避免列表页继续显示。
+  if (memberOnly.length > 0) {
+    await db
+      .delete(transcripts)
+      .where(and(
+        eq(transcripts.datasetId, datasetId),
+        inArray(transcripts.videoId, memberOnly),
+      ))
+  }
+
   return count
 }

@@ -23,6 +23,7 @@ import {
   TRANSCRIPT_INDEX_KEY,
   TRANSCRIPT_INDEX_SCHEMA,
   TRANSCRIPT_SCHEMA,
+  isMemberOnlyTranscript,
   parseTranscriptFile,
   sortTranscriptEntries,
   toIndexEntry,
@@ -169,6 +170,7 @@ export async function runPublishTranscripts(
   const failures: string[] = []
   const transcripts: PlannedTranscript[] = []
   const seen = new Map<string, string>()
+  let memberOnlySkipped = 0
 
   for (const dirent of readdirSync(CONTENT_ROOT, { withFileTypes: true }).sort((a, b) =>
     a.name.localeCompare(b.name),
@@ -194,6 +196,12 @@ export async function runPublishTranscripts(
       }
       catch (error) {
         failures.push(`${rel}：${error instanceof Error ? error.message : String(error)}`)
+        continue
+      }
+
+      // 会员限定：正文只留在归档侧，不进索引、不上传、不写库。
+      if (isMemberOnlyTranscript(file.frontmatter)) {
+        memberOnlySkipped += 1
         continue
       }
 
@@ -258,7 +266,10 @@ export async function runPublishTranscripts(
     entries,
   })
 
-  log.info(`扫描 ${relative(APP_ROOT, CONTENT_ROOT)}：${transcripts.length} 篇可用，${failures.length} 个失败`)
+  log.info(
+    `扫描 ${relative(APP_ROOT, CONTENT_ROOT)}：${transcripts.length} 篇可用，`
+    + `${memberOnlySkipped} 篇会员限定跳过（保留归档），${failures.length} 个失败`,
+  )
   for (const failure of failures) log.warn(`  x ${failure}`)
   for (const item of transcripts.slice(0, 5))
     log.info(`  · ${item.datasetId}/${item.videoId}  ${item.entry.title}`)
@@ -269,7 +280,13 @@ export async function runPublishTranscripts(
     log.info(`校验完成，已跳过上传（--no-upload）；索引将包含 ${entries.length} 条`)
     return {
       exitCode: failures.length > 0 ? 1 : 0,
-      data: { transcripts: transcripts.length, entries: entries.length, failures: failures.length, upload: false },
+      data: {
+        transcripts: transcripts.length,
+        entries: entries.length,
+        failures: failures.length,
+        memberOnlySkipped,
+        upload: false,
+      },
     }
   }
 
@@ -394,6 +411,7 @@ export async function runPublishTranscripts(
   const base = remoteBase()
   log.info(
     `完成：上传 ${uploaded} 篇，跳过 ${skippedBodies} 篇`
+    + `${memberOnlySkipped > 0 ? `，会员限定 ${memberOnlySkipped} 篇保留归档` : ''}`
     + `${metadataSynced > 0 ? `，元数据 ${metadataSynced} 篇` : ''}`
     + `${failures.length > 0 ? `，失败 ${failures.length} 个` : ''}${base ? ` → ${base}` : ''}`,
   )
@@ -408,6 +426,7 @@ export async function runPublishTranscripts(
       transcripts: transcripts.length,
       uploaded,
       skipped: skippedBodies,
+      memberOnlySkipped,
       entries: entries.length,
       indexWritten,
       metadataSynced,

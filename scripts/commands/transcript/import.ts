@@ -33,6 +33,7 @@ import { inArray } from 'drizzle-orm'
 import { createDb } from '@/db/connection.ts'
 import { streams } from '@/db/schema.ts'
 import {
+  isMemberOnlyTranscript,
   normalizeFrontmatter,
   parseFrontmatter,
   parseTranscriptFile,
@@ -210,6 +211,12 @@ function importOne(
   const datasetOrigin = source.datasetOrigin as DatasetOrigin
   const fileName = basename(filePath)
   const frontmatter = normalizeFrontmatter(parseFrontmatter(text).data)
+  if (isMemberOnlyTranscript(frontmatter) && !context.allowMemberOnly) {
+    return {
+      kind: 'skipped',
+      reason: `${frontmatter.videoId || fileName} 是会员限定场次：逐字稿只留在 archives，确需导入请加 --allow-member-only`,
+    }
+  }
   let videoId = frontmatter.videoId
   let resolvedDate = frontmatter.date
   let resolvedTitle = frontmatter.title

@@ -4,6 +4,7 @@ date: 2026-09-20
 title: "YUNO's+ 限定配信"
 members: [yuno]
 tags: [会员限定, 杂谈]
+membersOnly: true
 summary: 病愈后的会员回，她用近半场把动画反派ビオラ读成「所有人都可能走向的那条世界线」，并把它讲成自己的事。
 tweets: []
 ---

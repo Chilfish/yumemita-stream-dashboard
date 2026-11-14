@@ -4,6 +4,7 @@ date: 2026-08-30
 title: "YUNO's+ 限定配信"
 members: [yuno]
 tags: [会员限定, 杂谈]
+membersOnly: true
 summary: 八月最后的会员杂谈：从「クールビューティー」外壳下的说话方式讲到フェルティローザ与先攻哲学，最后把「珍惜同好」送给观众。
 tweets: []
 ---

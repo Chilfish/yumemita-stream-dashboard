@@ -25,6 +25,8 @@ export interface TranscriptFrontmatter {
   title: string | null;
   members: string[];
   tags: string[];
+  /** 会员限定场次：正文只留在归档侧，不发布。 */
+  membersOnly: boolean;
   summary: string | null;
   tweets: string[];
 }
@@ -191,6 +193,12 @@ function listValue(value: FrontmatterValue | undefined): string[] {
   return text ? [text] : [];
 }
 
+function booleanValue(value: FrontmatterValue | undefined): boolean {
+  if (value == null) return false;
+  const text = Array.isArray(value) ? value.join(",") : String(value);
+  return /^(true|1|yes)$/i.test(text.trim());
+}
+
 export function normalizeFrontmatter(data: Record<string, unknown>): TranscriptFrontmatter {
   const record = data as Record<string, FrontmatterValue | undefined>;
   return {
@@ -199,9 +207,19 @@ export function normalizeFrontmatter(data: Record<string, unknown>): TranscriptF
     title: scalarText(record.title),
     members: listValue(record.members),
     tags: listValue(record.tags),
+    membersOnly: booleanValue(record.membersOnly),
     summary: scalarText(record.summary),
     tweets: listValue(record.tweets),
   };
+}
+
+/** 会员限定的 tag 兜底：作者不一定记得写 `membersOnly: true`。 */
+export const MEMBER_ONLY_TAGS = ["会员限定", "会限"];
+
+export function isMemberOnlyTranscript(
+  frontmatter: Pick<TranscriptFrontmatter, "membersOnly" | "tags">,
+): boolean {
+  return frontmatter.membersOnly || frontmatter.tags.some(tag => MEMBER_ONLY_TAGS.includes(tag));
 }
 
 // ---------------------------------------------------------------------------

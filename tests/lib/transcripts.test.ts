@@ -4,7 +4,9 @@ import {
   extractToc,
   filterTranscripts,
   groupTranscriptsByMonth,
+  isMemberOnlyTranscript,
   matchesTranscriptQuery,
+  normalizeFrontmatter,
   parseFrontmatter,
   parseSubtitleAppendix,
   parseTranscriptFile,
@@ -81,6 +83,25 @@ describe("parseFrontmatter", () => {
     expect(data.videoId).toBe("abc");
     expect(data.title).toBe("标题");
     expect(body.trimStart().startsWith("## 开场")).toBe(true);
+  });
+});
+
+describe("isMemberOnlyTranscript", () => {
+  it("recognizes the explicit membersOnly flag", () => {
+    const frontmatter = normalizeFrontmatter({ videoId: "abc", membersOnly: "true" });
+    expect(frontmatter.membersOnly).toBe(true);
+    expect(isMemberOnlyTranscript(frontmatter)).toBe(true);
+  });
+
+  it("falls back to the member-only tag", () => {
+    const frontmatter = normalizeFrontmatter({ videoId: "abc", tags: ["会员限定", "杂谈"] });
+    expect(frontmatter.membersOnly).toBe(false);
+    expect(isMemberOnlyTranscript(frontmatter)).toBe(true);
+  });
+
+  it("treats ordinary transcripts as publishable", () => {
+    const frontmatter = normalizeFrontmatter({ videoId: "abc", tags: ["雑談"] });
+    expect(isMemberOnlyTranscript(frontmatter)).toBe(false);
   });
 });
 
