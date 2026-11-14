@@ -162,7 +162,7 @@ dataset 推断顺序：`--dataset` → 路径里的成员目录名（`宮永の�
 用 videoId 查数据库 `streams.dataset_id` 取真正的投稿者（团体配信）。成员目录只取 `配信/*.md`，
 `団体配信/` 取顶层 `*.md`，`raw/` 与 `_` / `.` / `00_` / `01_` 开头的索引文件跳过。
 
-导入会按 manifest 补 `date` / `title`，剔除 `<!-- archive-only:start -->` … `<!-- archive-only:end -->` 之间的归档段落；会员限定场次默认拒绝，确需例外加 `--allow-member-only`。会员限定也可以用 frontmatter 的 `membersOnly: true` 显式标注（`tags` 含「会员限定 / 会限」同样识别），这类稿发布时保留归档，不上传、不进索引。
+导入会按 manifest 补 `date` / `title`，剔除 `<!-- archive-only:start -->` … `<!-- archive-only:end -->` 之间的归档段落；会员限定场次默认拒绝，确需例外加 `--allow-member-only`。会员限定用 frontmatter 的 `membersOnly: true` 显式标注（`tags` 含「会员限定 / 会限」同样识别）；导入时会跳过并删除本地副本，发布时保留归档，不上传、不进索引。
 
 落到 `content/transcripts/<datasetId>/<videoId>.md`；以 `_` / `.` 开头的文件是草稿，不参与发布。
 目标文件已存在时默认拒绝，`--force` 才覆盖。目录模式下一篇失败只跳过该篇（缺 videoId、对不上

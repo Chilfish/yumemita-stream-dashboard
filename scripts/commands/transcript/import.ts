@@ -18,14 +18,15 @@
  * - 去掉 `<!-- archive-only:start/end -->` 之间或整节「与既有档案的互证」；
  * - 复制到 `content/transcripts/<datasetId>/<videoId>.md`，其余正文不改写；
  * - 缺 videoId / date / title 时按 manifest 补进 frontmatter（只补缺的字段）；
- * - 会员限定场次默认拒绝导入，确需例外时加 `--allow-member-only`；
+ * - 会员限定场次（`membersOnly: true` 或 tags 含「会员限定 / 会限」）默认拒绝导入，
+ *   并删除 `content/transcripts` 里可能残留的本地副本；确需例外时加 `--allow-member-only`；
  * - 目标文件已存在时默认拒绝，加 `--force` 才覆盖。
  *
  * 目录模式会递归发现稿件：成员目录取 `配信/*.md`，`団体配信/` 取顶层 `*.md`，
  * 跳过 `raw/`、`_` / `.` / `00_` 开头的文件。不合规的稿件记为跳过并继续，
  * 只有读写失败才让退出码变 1；单篇模式仍然失败即退出。
  */
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Option } from 'commander'
@@ -212,9 +213,24 @@ function importOne(
   const fileName = basename(filePath)
   const frontmatter = normalizeFrontmatter(parseFrontmatter(text).data)
   if (isMemberOnlyTranscript(frontmatter) && !context.allowMemberOnly) {
+    const localPath = frontmatter.videoId
+      ? join(CONTENT_ROOT, datasetId, `${frontmatter.videoId}.md`)
+      : null
+    const existsLocally = localPath != null && existsSync(localPath)
+    if (existsLocally && !context.dryRun) {
+      try {
+        unlinkSync(localPath)
+      }
+      catch (error) {
+        return { kind: 'failed', reason: `会员限定稿删除本地副本失败：${errorMessage(error)}` }
+      }
+    }
+    const action = existsLocally
+      ? (context.dryRun ? '，将删除本地副本（dry-run）' : '，已删除本地副本')
+      : ''
     return {
       kind: 'skipped',
-      reason: `${frontmatter.videoId || fileName} 是会员限定场次：逐字稿只留在 archives，确需导入请加 --allow-member-only`,
+      reason: `${frontmatter.videoId || fileName} 是会员限定场次：跳过导入${action}`,
     }
   }
   let videoId = frontmatter.videoId
@@ -596,6 +612,9 @@ export const transcriptImportSpec: CommandSpec = {
     'videoId 来源顺序：frontmatter → `--video-id` → 文件名日期在 manifest 里的唯一匹配。',
     '会去掉只供归档的段落（`<!-- archive-only:start/end -->` 之间，或整节「与既有档案的互证」），',
     '并按 manifest 补上缺的 videoId / date / title（只补缺的字段）。',
+    '',
+    '会员限定场次（`membersOnly: true` 或 tags 含「会员限定 / 会限」）会跳过导入，',
+    '并删除 `content/transcripts` 里可能残留的本地副本（`--allow-member-only` 才放行）。',
     '',
     '批量模式下不合规的稿件记为跳过并继续，只有读写失败才让退出码变 1。',
     '单篇模式仍然失败即退出，避免静默什么都不做。',
