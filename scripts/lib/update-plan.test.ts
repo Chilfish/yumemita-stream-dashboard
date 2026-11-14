@@ -74,23 +74,38 @@ describe('planDataset', () => {
     expect(plan.reasons.get('recent')).toContain('24')
   })
 
-  it('不加 --force 时只重试缺 VSTATS / 缺弹幕的近期场次', () => {
+  it('不加 --force 时只重试近期缺弹幕的场次', () => {
     const plan = planDataset({
       channel: [],
-      knownIds: ['no-vstats', 'no-chat', 'ok', 'stale-vstats', 'member-only'],
+      knownIds: ['no-vstats', 'no-chat', 'ok', 'stale-chat', 'member-only'],
       streams: [
         { videoId: 'no-vstats', endedAt: hoursAgo(48), availability: 'public', vstatsViews: null, chatTotal: 10 },
         { videoId: 'no-chat', endedAt: hoursAgo(48), availability: 'public', vstatsViews: 3, chatTotal: 0 },
         { videoId: 'ok', endedAt: hoursAgo(48), availability: 'public', vstatsViews: 3, chatTotal: 10 },
-        { videoId: 'stale-vstats', endedAt: hoursAgo(24 * 20), availability: 'public', vstatsViews: null, chatTotal: 10 },
+        { videoId: 'stale-chat', endedAt: hoursAgo(24 * 20), availability: 'public', vstatsViews: 3, chatTotal: 0 },
         // 会员限定场次 VSTATS 本来就不收录，不重试。
         { videoId: 'member-only', endedAt: hoursAgo(48), availability: 'subscriber_only', vstatsViews: null, chatTotal: 10 },
       ],
       now,
     })
-    expect(plan.forceIds).toEqual(['no-vstats', 'no-chat'])
-    expect(plan.reasons.get('no-vstats')).toBe('缺 VSTATS')
+    expect(plan.forceIds).toEqual(['no-chat'])
     expect(plan.reasons.get('no-chat')).toBe('缺弹幕')
+    expect(plan.expiredIds).toEqual(['stale-chat'])
+  })
+
+  it('缺 VSTATS 不受 14 天窗口影响，不进 forceIds 也不记成已放弃', () => {
+    const plan = planDataset({
+      channel: [],
+      knownIds: ['recent', 'old'],
+      streams: [
+        { videoId: 'recent', endedAt: hoursAgo(24 * 20), availability: 'public', vstatsViews: null, chatTotal: 10 },
+        { videoId: 'old', endedAt: hoursAgo(24 * 400), availability: 'public', vstatsViews: null, chatTotal: 10 },
+      ],
+      now,
+    })
+    expect(plan.forceIds).toEqual([])
+    expect(plan.expiredIds).toEqual([])
+    expect(plan.reasons.get('old')).toBeUndefined()
   })
 
   it('忽略未来场和正在直播的场次（force 分支）', () => {

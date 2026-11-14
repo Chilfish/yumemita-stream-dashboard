@@ -13,8 +13,9 @@
  *     没有新场次且没有待补数据的成员直接跳过，不恢复、不 ingest。
  *   - 有变化才对该成员 `--restore`（补齐远端 pack，保证 insights 精确），
  *     然后 ingest 数据库、发布封面 / 表情 / archive，其余成员不下载、不上传。
- *   - `--force` 重抓最近 24 小时；平时也会重试近期缺 VSTATS / 缺弹幕的场次，
- *     避免回放或 VSTATS 页面还没生成时被永久判死。
+ *   - 缺 VSTATS 的场次走 `backfill-vstats.ts`：只请求单场页，不重抓素材，也不受 14 天窗口限制。
+ *   - `--force` 重抓最近 24 小时；平时会重试近期缺弹幕的场次，
+ *     避免回放页面还没生成时被永久判死。缺 VSTATS 由单独的补抓步骤处理。
  *   - 发布顺序：抓取 → ingest → 资产 → 逐字稿 → purge；数据库提交成功后才失效缓存。
  */
 import { spawn } from 'node:child_process'
@@ -40,6 +41,7 @@ const THUMB_SCRIPT = join(APP_ROOT, 'scripts', 'fetch-thumbnails.ts')
 const INGEST_SCRIPT = join(APP_ROOT, 'scripts', 'ingest-db.ts')
 const PUBLISH_SCRIPT = join(APP_ROOT, 'scripts', 'publish-data.ts')
 const TRANSCRIPT_SCRIPT = join(APP_ROOT, 'scripts', 'publish-transcripts.ts')
+const VSTATS_SCRIPT = join(APP_ROOT, 'scripts', 'backfill-vstats.ts')
 
 const FORCE_RECENT_HOURS = 24
 const PACK_SUFFIX = '.datapack.json'
@@ -68,6 +70,8 @@ const OPTIONS = {
   'cookies-from-browser': { type: 'string', default: 'firefox' },
   'cookie-cache': { type: 'string' },
   'no-cookies': { type: 'boolean' },
+  'vstats-limit': { type: 'string', default: '20' },
+  'no-vstats': { type: 'boolean' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   'no-publish': { type: 'boolean' },
@@ -89,6 +93,8 @@ const USAGE = `用法：bun scripts/daily-update.ts [选项]
   --cookies-from-browser <b>  导出 cookie 时用哪个浏览器，默认 firefox
   --cookie-cache <文件>       cookie 缓存路径，默认 ~/yt-cookies.txt
   --no-cookies                不使用 cookie，以匿名状态抓取
+  --vstats-limit <n>          每个成员本轮最多补抓 n 场 VSTATS，默认 20
+  --no-vstats                 跳过 VSTATS 补抓
   --force                     额外重抓最近 ${FORCE_RECENT_HOURS} 小时结束的场次
   --dry-run                   只列候选，不抓取、不写库、不发布
   --no-publish                只写本地，不写库、不上传对象存储
@@ -382,6 +388,12 @@ async function main(): Promise<void> {
   const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: values['cookies-from-browser'] })
   const dryRun = Boolean(values['dry-run'])
   const noPublish = Boolean(values['no-publish'])
+  const vstatsLimit = Number(values['vstats-limit'])
+  if (!Number.isInteger(vstatsLimit) || vstatsLimit < 0) {
+    console.error('[update] --vstats-limit 需要是 >= 0 的整数')
+    process.exit(1)
+  }
+  const vstatsEnabled = !dryRun && !noPublish && !values['no-vstats']
 
   const db = createDb(requireEnv('DATABASE_URL'))
   const states = await loadDatabaseStates(db, selected)
@@ -463,7 +475,7 @@ async function main(): Promise<void> {
       console.log('[update] 本地 pack 还没入库，本次补 ingest')
 
     const hasFetchWork = plan.newIds.length > 0 || plan.forceIds.length > 0
-    if (!hasFetchWork && !localAhead) {
+    if (!hasFetchWork && !localAhead && !vstatsEnabled) {
       if (channelList.failed) {
         console.warn(`[update] ${source.id} 没有可处理的变化，但频道列表不可用；记一次失败`)
         failures += 1
@@ -505,7 +517,7 @@ async function main(): Promise<void> {
       }
     }
 
-    // 定点重抓：最近 24 小时 + 缺 VSTATS / 缺弹幕。
+    // 定点重抓：最近 24 小时 + 缺弹幕；VSTATS 由下面的补抓步骤单独处理。
     if (plan.forceIds.length > 0) {
       console.log(`[update] ${source.id} 重抓 ${plan.forceIds.length} 场…`)
       const code = await runScript(FETCH_SCRIPT, [
@@ -523,8 +535,45 @@ async function main(): Promise<void> {
       }
     }
 
+    // VSTATS 只请求单场页；不受 14 天窗口限制，按每轮配额轮转补齐。
+    let vstatsIds: string[] = []
+    if (vstatsEnabled) {
+      const idsOut = join(stateDir, `vstats-updated-${source.id}.txt`)
+      writeFileSync(idsOut, '', 'utf8')
+      console.log(`[update] ${source.id} 补抓 VSTATS…`)
+      const code = await runScript(VSTATS_SCRIPT, [
+        '--dataset', source.id,
+        '--limit', String(vstatsLimit),
+        '--ids-out', idsOut,
+        '--quiet',
+      ])
+      if (code !== 0) {
+        datasetFailed = true
+        console.warn(`[update] ${source.id} VSTATS 补抓有失败项（exit ${code}）`)
+      }
+      else if (existsSync(idsOut)) {
+        vstatsIds = readFileSync(idsOut, 'utf8')
+          .split(/\r?\n/)
+          .map(line => line.trim())
+          .filter(Boolean)
+      }
+      if (vstatsIds.length > 0)
+        console.log(`[update] ${source.id} 补到 VSTATS ${vstatsIds.length} 场`)
+    }
+
     if (noPublish) {
       console.log(`[update] ${source.id} --no-publish，跳过封面与发布`)
+      continue
+    }
+
+    if (!hasFetchWork && !localAhead && vstatsIds.length === 0) {
+      if (channelList.failed) {
+        console.warn(`[update] ${source.id} 没有可处理的变化，但频道列表不可用；记一次失败`)
+        failures += 1
+      }
+      else {
+        console.log(`[update] ${source.id} 没有变化，跳过`)
+      }
       continue
     }
 
@@ -543,9 +592,11 @@ async function main(): Promise<void> {
       }
     }
 
-    // 本次真正会变动的 ID：计划里的新场 / 重抓场；没有明确 ID 时退回最近 7 天改过的 pack。
+    // 本次真正会变动的 ID：新场 / 重抓场 / 补到 VSTATS 的场；都没有时退回最近 7 天改过的 pack。
     // 把它传给 ingest / publish，避免每次都扫全量 pack、查全量 hash。
-    const changedIds = thumbIds.length > 0 ? thumbIds : recentPackIds(source)
+    const changedIds = unique([...thumbIds, ...vstatsIds])
+    if (changedIds.length === 0)
+      changedIds.push(...recentPackIds(source))
     const changedFile = changedIds.length > 0
       ? join(stateDir, `daily-changed-${source.id}.txt`)
       : null
