@@ -24,6 +24,7 @@
 | [001](./001-yt-dlp-chat-duplicate.md) | yt-dlp 字幕的直播段与回放段重复，弹幕 / SC 双倍入库 | SEV-2 | 缺陷 | Mitigated | 归一化只渲染不去重，去重被放到「两份文件合并」且该步骤可能不执行 |
 | [002](./002-dataset-packs-per-render.md) | 每次渲染 dataset 页面都全量拉取明细，Neon 网络出流量异常增长 | SEV-3 | 架构 | Mitigated | 页面汇总复用了单场详情的完整 pack 查询，7 类路由每次冷渲染读 3.5–10.5 MB |
 | [003](./003-stale-yt-cookies-cache.md) | `~/yt-cookies.txt` 长期复用后失效，yt-dlp 命中 bot 检查 | SEV-3 | 缺陷 | Mitigated | cookie 缓存没有失效条件，只要文件里有登录 cookie 就继续用，浏览器轮换 PSIDTS 后文件会话已过期 |
+| [004](./004-chat-replay-unavailable.md) | 平台未保留回放被当成「直播尚未结束」，无弹幕场次每轮重试 | SEV-3 | 缺陷 | Mitigated | 回放采集只看 `isReplay` 布尔值，`null` 被当成「仍在直播」，没有读页面明确给出的 `availabilityMessage` |
 
 > 新增 postmortem 按 [TEMPLATE.md](./TEMPLATE.md) 复制填写，并在此登记。
 
@@ -53,6 +54,7 @@
 | 数据缩水 | 本地 pack 少于数据库时 ingest 是否覆盖 | 确认下架流程，不要先 truncate 再灌 |
 | 会员限定 | 公开范围是否确认 | 不确定就不上传公开桶 |
 | 凭据缓存 | 是否跨运行复用 `~/yt-cookies.txt` | 每次运行重新导出；失效表现为 "Sign in to confirm you're not a bot" |
+| 弹幕缺失归因 | 场次没有弹幕时是否先确认平台有没有保留回放 | 看 `video.hasLiveChatReplay` 与 watch 页 `availabilityMessage`；平台没有就别反复重抓 |
 
 ### 3. 样式与 UI
 

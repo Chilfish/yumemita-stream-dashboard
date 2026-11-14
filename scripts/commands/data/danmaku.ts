@@ -454,6 +454,8 @@ export async function runDanmaku(options: RunDanmakuOptions = {}): Promise<{ exi
       mkdirSync(join(session, 'work'), { recursive: true })
 
       let done = false
+      /** 平台明确没保留回放：yt-dlp 的 live_chat 字幕同样不存在，不用再回退。 */
+      let replayUnavailable = false
       if (engine !== 'yt-dlp') {
         const result = await collectReplay({
           videoId,
@@ -479,13 +481,17 @@ export async function runDanmaku(options: RunDanmakuOptions = {}): Promise<{ exi
         else if (result.status === 'failed') {
           log.info(`${videoId} InnerTube 失败（${result.error ?? 'unknown'}），回退 yt-dlp`)
         }
+        else if (result.reason === 'chat-replay-unavailable') {
+          replayUnavailable = true
+          log.info(`${videoId} 平台未保留这场回放，yt-dlp 同样拿不到，跳过`)
+        }
         else if (result.status === 'no-replay' && engine === 'auto') {
           log.info(`${videoId} watch 页没有回放聊天，回退 yt-dlp`)
         }
       }
 
       if (!done) {
-        if (engine === 'innertube') {
+        if (engine === 'innertube' || replayUnavailable) {
           // 显式指定 InnerTube 时不再回退 yt-dlp；没有回放就是没有。
           writeFileSync(unavailablePath, 'no live_chat replay\n', 'utf8')
           unavailable += 1

@@ -9,6 +9,7 @@ import {
   extractPollContinuation,
   extractReplayContinuation,
   extractWatchPage,
+  isChatReplayUnavailable,
   netscapeCookieHeader,
   parseWatchStatus,
   pollDelayMs,
@@ -155,6 +156,25 @@ describe('watch 页', () => {
     expect(classifyWatchStatus(status({
       availabilityMessage: 'Chat is disabled for this live stream.',
     }))).toBe('chat_disabled')
+  })
+
+  it('平台没保留回放：已结束但没有 liveChatRenderer', () => {
+    const parsed = status({
+      isReplay: null,
+      isLiveNow: false,
+      endTimestamp: '2024-05-03T15:37:10+00:00',
+      availabilityMessage: 'Live chat replay is not available for this video.',
+    })
+    expect(classifyWatchStatus(parsed)).toBe('ended')
+    expect(isChatReplayUnavailable(parsed)).toBe(true)
+  })
+
+  it('直播中 / 正常回放不判成「无回放」', () => {
+    expect(isChatReplayUnavailable(status({ isReplay: false }))).toBe(false)
+    expect(isChatReplayUnavailable(status({ isReplay: true }))).toBe(false)
+    expect(isChatReplayUnavailable(status({
+      availabilityMessage: 'Chat is disabled for this live stream.',
+    }))).toBe(false)
   })
 })
 

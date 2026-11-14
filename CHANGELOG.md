@@ -4,6 +4,7 @@
 
 ### 工程
 
+- **无回放场次不再误判为直播中**：部分场次 YouTube 根本没保留回放聊天，watch 页没有 `liveChatRenderer`（`isReplay` 取不到），只有 `Live chat replay is not available for this video.`。回放采集此前只看 `isReplay`，`null` 被当成「还在直播」，`data danmaku` 报「直播尚未结束」且不写哨兵，每轮都重试。新增 `isChatReplayUnavailable()`，这类场次返回 `no-replay`、写 `chat-unavailable.txt`，auto 模式也不再白跑一次 yt-dlp（字幕同样不存在）。见 [postmortem 004](docs/postmortem/004-chat-replay-unavailable.md)。
 - **同日同时段多场日程**：`event_key` 支持序号（`manual:<date>-<slot>-2`、`-3`…）。同日同时段第二场直接再发一次 `POST` 即可，服务端按标题/时间判定是同一场还是新一场：同一场复用原键保持幂等，新一场顺延空序号，不再静默覆盖前一场。`PATCH` 改期保留序号，撞上已被另一场占用的时段返回 `409`。自动同步与对账改为「未认领 + video id 相容 + 开播时间最近」配对，同槽两条自动行各占一键，不会互相冲掉 `video_id`。
 - **cookie 缓存每次运行重新导出**：浏览器会轮换 `__Secure-*PSIDTS`，`~/yt-cookies.txt` 长期复用后会命中 YouTube bot 检查（同一时刻 `--cookies-from-browser` 却正常）。`resolveCookies` 现在每次运行先导出、导出失败才退回旧缓存，`--refresh-cookies` 移除；顺带修掉 `--no-cookies` 仍把浏览器 cookie 传给 yt-dlp。
 - **R2 迁到独立桶 `yumemita-data`**：封面、表情、逐字稿正文与 `archive/` 从共享 `static` 桶（前缀 `stream-dashboard`）复制到新桶的桶根，不再有公共前缀；`publish:data` / `publish:transcripts` 默认写入新桶，Worker 的 `r2_buckets` binding 读到的 `transcripts.r2_key` 可直接命中。

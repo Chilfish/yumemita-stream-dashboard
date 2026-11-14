@@ -37,6 +37,35 @@ function watchHtml(isReplay: boolean): string {
   return `<html><script>var ytInitialData = ${JSON.stringify(data)};</script><script>var ytInitialPlayerResponse = ${JSON.stringify(player)};</script></html>`
 }
 
+/** 平台没保留回放：没有 liveChatRenderer（isReplay 取不到），只有 availabilityMessage。 */
+function watchHtmlNoReplay(): string {
+  const data = {
+    contents: {
+      twoColumnWatchNextResults: {
+        conversationBar: {
+          availabilityMessage: {
+            messageRenderer: { text: { simpleText: 'Live chat replay is not available for this video.' } },
+          },
+        },
+      },
+    },
+  }
+  const player = {
+    playabilityStatus: { status: 'OK' },
+    videoDetails: { title: '标题', channelId: 'UC1', author: '频道', lengthSeconds: '600' },
+    microformat: {
+      playerMicroformatRenderer: {
+        liveBroadcastDetails: {
+          isLiveNow: false,
+          startTimestamp: '2024-05-03T13:33:59+00:00',
+          endTimestamp: '2024-05-03T15:37:10+00:00',
+        },
+      },
+    },
+  }
+  return `<html><script>var ytInitialData = ${JSON.stringify(data)};</script><script>var ytInitialPlayerResponse = ${JSON.stringify(player)};</script></html>`
+}
+
 function textItem(id: string, ts: number, text: string, author = '@viewer') {
   return {
     addChatItemAction: {
@@ -167,6 +196,16 @@ describe('collectReplay', () => {
     stubFetch({}, watchHtml(false))
     const result = await collectReplay({ videoId: 'LIVE1234567', session, pageDelayMs: 0 })
     expect(result.status).toBe('live')
+    expect(existsSync(join(session, 'danmaku'))).toBe(false)
+  })
+
+  it('已结束但平台没保留回放 → no-replay，不误判为直播中', async () => {
+    const session = tempDir()
+    stubFetch({}, watchHtmlNoReplay())
+    const result = await collectReplay({ videoId: 'NOREPLAY123', session, pageDelayMs: 0 })
+    expect(result.status).toBe('no-replay')
+    expect(result.reason).toBe('chat-replay-unavailable')
+    expect(result.total).toBe(0)
     expect(existsSync(join(session, 'danmaku'))).toBe(false)
   })
 

@@ -107,6 +107,11 @@ const CONTINUATION_KEYS: readonly { key: string, kind: ContinuationKind }[] = [
 const SPONSORS_ONLY_OFFER_ID = 'sponsors_only_video'
 const MEMBERS_ONLY_REASON_RE = /members[- ]?only|available to this channel'?s members/i
 const CHAT_DISABLED_RE = /chat (?:is )?(?:disabled|unavailable|turned off)/i
+/**
+ * 平台没有保留这场直播的回放聊天。此时 `liveChatRenderer` 整个不存在，
+ * `isReplay` 取不到值（`null`），不能只用它判断有没有回放。
+ */
+const CHAT_REPLAY_UNAVAILABLE_RE = /live chat replay is (?:not available|unavailable)|no live chat replay/i
 /** 只剩等待室可用：播放器不能播，但弹幕已经能取。 */
 const WAITING_ROOM_PLAYABILITY = new Set(['LIVE_STREAM_OFFLINE'])
 
@@ -255,6 +260,18 @@ export function classifyWatchStatus(status: WatchStatus): WatchDisposition {
   if (CHAT_DISABLED_RE.test(status.availabilityMessage ?? ''))
     return 'chat_disabled'
   return 'pending'
+}
+
+/**
+ * 平台明确表示这场没有回放聊天（`Live chat replay is not available for this video.`）。
+ *
+ * 这种场次的 watch 页没有 `liveChatRenderer`，`isReplay` 为 `null`，但直播已结束；
+ * 判定的依据只能是 `availabilityMessage`。用 `isReplay` 判断会把它误当成「还在直播」。
+ */
+export function isChatReplayUnavailable(status: WatchStatus): boolean {
+  if (status.isReplay === true)
+    return false
+  return CHAT_REPLAY_UNAVAILABLE_RE.test(status.availabilityMessage ?? '')
 }
 
 /** watch 页 HTML → 标题 / 频道 / 排期 / 状态 / 首个 continuation。 */

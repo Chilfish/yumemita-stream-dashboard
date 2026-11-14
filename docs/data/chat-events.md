@@ -369,6 +369,7 @@ hash   = id 的 `/` 后半段
 | 汇率 | SC / 贴纸金额不换算，按币种分组 |
 | `owner` 判定 | 置顶、投票、Q&A、商品默认按主播操作处理；版主置顶可能也被标为 `owner` |
 | 会员限定 | 实时 / 回放需要 cookie；匿名通常停在 `unplayable` |
+| 平台未保留回放 | 部分场次 YouTube 根本没留回放聊天：watch 页没有 `liveChatRenderer`（`isReplay` 取不到），只有 `Live chat replay is not available for this video.`。这类场次 `chat.total` 为 0，yt-dlp 的 `live_chat` 字幕同样不存在，InnerTube 与 yt-dlp 都补不回来。判定见 `isChatReplayUnavailable()`，`data danmaku` 会写 `chat-unavailable.txt` 并在 auto 模式跳过 yt-dlp 回退 |
 | 坏行 | JSONL 解析失败计 `invalid`，采集器会清理坏行；不阻塞其余记录 |
 | 全量明细 | pack 不含全量弹幕；完整时间线必须读 jsonl 或未来的 `chat_events` 表 |
 

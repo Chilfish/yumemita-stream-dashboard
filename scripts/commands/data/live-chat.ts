@@ -532,6 +532,9 @@ async function collectVideo(
       if (replay.status === 'done') {
         log.info(`${videoId} 回放完成：${replay.total} 条消息、${replay.events} 个事件、${replay.emojis} 个表情 → ${replay.output}`)
       }
+      else if (replay.reason === 'chat-replay-unavailable') {
+        log.info(`${videoId} 平台未保留这场回放，没有可采集的弹幕`)
+      }
       else {
         log.info(`${videoId} 回放未完成（${replay.status}）${replay.error ? `：${replay.error}` : ''}；重跑会从断点续翻`)
       }

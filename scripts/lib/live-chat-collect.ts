@@ -25,6 +25,7 @@ import {
   extractWatchPage,
   hasApiError,
   INNERTUBE_CONTEXT,
+  isChatReplayUnavailable,
   LIVE_CHAT_REPLAY_API_URL,
   WATCH_URL,
   WEB_HEADERS,
@@ -72,6 +73,8 @@ export interface ReplayResult {
   emojis: number
   lastTs: number | null
   error?: string
+  /** `no-replay` 的细分原因：平台明确没保留回放时，yt-dlp 同样拿不到。 */
+  reason?: 'chat-replay-unavailable'
 }
 
 interface ReplayState {
@@ -262,7 +265,16 @@ export async function collectReplay(options: ReplayCollectOptions): Promise<Repl
 
   const watchToken = page.continuation?.token ?? null
   if (!watchToken) {
-    result.status = page.status.isReplay === true ? 'no-replay' : 'live'
+    // 平台没保留回放时 watch 页没有 liveChatRenderer，isReplay 为 null；
+    // 这时直播其实已经结束，不能按「还在直播」返回 live。
+    if (isChatReplayUnavailable(page.status)) {
+      result.status = 'no-replay'
+      // 平台侧就没有这份回放，yt-dlp 的 live_chat 字幕同样拿不到，调用方可直接跳过回退。
+      result.reason = 'chat-replay-unavailable'
+    }
+    else {
+      result.status = page.status.isReplay === true ? 'no-replay' : 'live'
+    }
     return result
   }
   if (page.status.isReplay !== true) {
