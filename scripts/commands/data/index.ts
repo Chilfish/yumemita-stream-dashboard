@@ -4,6 +4,7 @@ import { dataDatapackSpec } from './datapack.ts'
 import { dataEmojiSpec } from './emoji.ts'
 import { dataFetchSpec } from './fetch.ts'
 import { dataLiveChatSpec } from './live-chat.ts'
+import { dataRefetchSpec } from './refetch.ts'
 import { dataThumbnailsSpec } from './thumbnails.ts'
 import { dataUpdateSpec } from './update.ts'
 import { dataVstatsSpec } from './vstats.ts'
@@ -15,6 +16,7 @@ export const dataGroup: CliGroup = {
   commands: [
     dataUpdateSpec,
     dataFetchSpec,
+    dataRefetchSpec,
     dataVstatsSpec,
     dataThumbnailsSpec,
     dataEmojiSpec,

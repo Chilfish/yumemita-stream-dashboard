@@ -51,6 +51,19 @@ bun run dev
 
 不需要手写摘要：`streams` 与 `dataset_insights` 完全由 ingest 从 pack 派生。
 
+## 重抓已有场次
+
+已经入库的场次（补弹幕、评论修订、VSTATS 后补）用一条命令覆盖本地与线上：
+
+```bash
+bun run ymmt data refetch "https://www.youtube.com/watch?v=1dGnP_rXgW0"
+bun run ymmt data refetch 1dGnP_rXgW0 --no-online   # 只改本地 pack / 本地库
+```
+
+它会解析链接或 11 位 ID，按本地 pack 或频道 ID 找到成员，然后依次跑：
+重抓素材 → 重建 datapack → 本地 ingest → 线上 ingest → 定向 verify → publish data → purge。
+`--dry-run` 只打印步骤；`--no-verify` 跳过对账；`--dataset` 可跳过推断。
+
 ## 本地已最新，同步到线上
 
 本地 pack、封面、逐字稿都齐了以后，用一条命令按线上目标跑完整链路。**默认只同步新增场次**：

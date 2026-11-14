@@ -16,12 +16,27 @@ bun run ymmt data update --help            # 单条命令的完整选项
 bun run ymmt describe --json               # 完整命令树，供 agent 自举
 ```
 
+## 重抓单场
+
+```bash
+bun run ymmt data refetch "https://www.youtube.com/watch?v=1dGnP_rXgW0"
+bun run ymmt data refetch 1dGnP_rXgW0 --no-online      # 只改本地 pack / 本地库
+bun run ymmt data refetch <链接> --dataset nonoka --dry-run
+```
+
+- 链接解析支持 `watch?v=`、`youtu.be`、`/live/`、`/shorts/`，也接受裸 11 位 ID。
+- dataset 先按 `data/<id>/<videoId>.datapack.json` 推断；本地没有 pack 时用 yt-dlp 元信息的频道 ID 匹配 `data-sources.json`。
+- 顺序固定：重抓素材 → 重建 datapack → 本地 ingest → 线上 ingest → 定向 verify → publish data → purge。
+- 默认写线上（`.dev.vars` 的 `DATABASE_URL_ONLINE` 与 `R2_*`）；`--no-online` 只写本地并重算本地 manifest / insights。
+- 定向 verify 有差异时继续发布，命令以退出码 1 结束。
+
 ## 命令树
 
 | 命令 | 作用 |
 | --- | --- |
 | `data update` | 每日增量：频道差集 → 定点抓取 → 补 VSTATS / 封面 → ingest → 联动参与者对账 → 发布 → purge |
 | `data fetch` | 按频道补齐历史场次，每 N 场生成 datapack |
+| `data refetch` | 单场重抓并覆盖：给链接或 ID，重抓素材并同步本地库、线上库与索引 |
 | `data vstats` | 只补 VSTATS 单场页数据 |
 | `data thumbnails` | 镜像封面并生成 480 / 960 / 1280w WebP |
 | `data emoji` | 镜像频道与 YouTube 全局表情 |
