@@ -12,7 +12,6 @@ import {
   buildMonthGrid,
   groupEventsByDate,
   relativeDayLabel,
-  weekdayLabel,
 } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "@/types/calendar";
@@ -147,7 +146,6 @@ function DayCell({
       >
         <PopoverTitle className="pb-2 text-footnote font-medium text-foreground">
           {relativeDayLabel(date, now)}
-          <span className="ms-1.5 text-muted-foreground">{weekdayLabel(date)}</span>
           <span className="ms-2 text-caption font-normal text-ink-3">
             {events.length} 场
           </span>

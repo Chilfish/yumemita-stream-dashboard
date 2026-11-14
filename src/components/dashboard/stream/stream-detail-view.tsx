@@ -81,7 +81,6 @@ export function StreamDetailView({
 }: StreamDetailViewProps) {
   const { pack, summary } = row;
   const memberOnly = pack.video.availability === "subscriber_only";
-  const missingVstats = pack.vstats == null;
   const superchatCount = pack.chat.paid.superchats.length;
   // 联动场把全部成员写在一行；单人场为空，页头不额外占用一行。
   const memberLine = memberLabels.length > 1 ? memberLabels.join(" × ") : null;
@@ -152,15 +151,10 @@ export function StreamDetailView({
           title={summary.title}
           titleClassName="text-title line-clamp-2"
         >
-          {memberLine || memberOnly || missingVstats ? (
+          {memberLine || memberOnly ? (
             <span className="flex flex-wrap items-center gap-1.5">
               {memberLine ? <span className="text-footnote text-member-ink">{memberLine}</span> : null}
               {memberOnly ? <Badge variant="warning">会员限定</Badge> : null}
-              {missingVstats ? (
-                <Badge title="没有同接快照" variant="outline">
-                  数据缺失
-                </Badge>
-              ) : null}
             </span>
           ) : null}
         </PageHeader>
