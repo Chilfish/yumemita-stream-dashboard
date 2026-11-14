@@ -149,7 +149,7 @@ data/<id>/*.datapack.json            本地暂存
 - `bun run publish:transcripts` 上传逐字稿正文
 - git 里只保留代码、`data-sources.json` 和手写逐字稿
 
-日常增量用 `bun scripts/daily-update.ts`：按 14:17 JST 的 cron 每天运行一次，先与数据库做频道差集，只处理有新场次或缺 VSTATS / 弹幕的成员，然后 ingest、发布资产并失效缓存。
+日常增量用 `bun scripts/daily-update.ts`：按 14:17 JST 的 cron 每天运行一次，先与数据库做频道差集，只处理有新场次或缺弹幕的成员；缺 VSTATS 的场次只补单场页，不重抓素材。然后 ingest、发布资产并失效缓存。
 
 封面在本地镜像后再上传，不热链 YouTube；数据更新后按 Cache-Tag 失效，不触发前端构建。
 

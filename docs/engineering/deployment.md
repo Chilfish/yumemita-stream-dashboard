@@ -125,6 +125,7 @@ checkout → Bun / Node / Deno / yt-dlp / PO token / mihomo
   → daily-update.ts
       频道差集（对比 streams 表）
       → 抓新场次 / 定点重抓
+      → backfill-vstats（只补单场页，每成员默认 20 场）
       → publish-transcripts
       → ingest-db（事务 upsert + insights）
       → publish-data --assets-only（封面 / 表情 / archive）
@@ -132,7 +133,7 @@ checkout → Bun / Node / Deno / yt-dlp / PO token / mihomo
   → 失败开 issue
 ```
 
-- 安静日：频道无新场次且本地 pack 不比数据库新时，不抓取、不 ingest、不发布。
+- 安静日：频道无新场次、本地 pack 不比数据库新、VSTATS 也没有补到新场次时，不抓取、不 ingest、不发布。
 - `--no-publish` 只写本地，不写库、不上传、不 purge。
 - 没有新场次时不会触发前端构建；页面在 ingest + purge 后生效。
 - 全量弹幕以后另开任务，不进每日流程。

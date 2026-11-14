@@ -188,6 +188,8 @@ bun scripts/daily-update.ts --no-publish    # 只写本地，不上传对象存�
 | `--concurrency <n>` | 抓取并发，默认 3 |
 | `--cookies <文件>` | Netscape cookie jar；CI 用这个 |
 | `--cookies-from-browser <b>` | 本地默认 firefox |
+| `--vstats-limit <n>` | 每个成员本轮最多补抓 n 场 VSTATS，默认 20 |
+| `--no-vstats` | 跳过 VSTATS 补抓 |
 | `--force` | 重抓最近 24 小时结束的场次（刷新播放量 / 点赞 / 评论快照） |
 | `--dry-run` | 只列候选，不抓取、不写库、不发布 |
 | `--no-publish` | 只写本地，不写库、不上传 |
@@ -200,7 +202,8 @@ bun scripts/daily-update.ts --no-publish    # 只写本地，不上传对象存�
   它们会记在「暂缓」里，不会每天重新拉元信息。
 - 没有新场次、本地 pack 也不比数据库新时直接跳过，不恢复 datapack、不 ingest。
 - 有变化时只对该成员 `--restore`，然后依次 `publish-transcripts`、`ingest-db`、`publish-data --assets-only`。
-- 平时会重试近期缺 VSTATS（公开场次，14 天内）或缺弹幕（7 天内）的场次；刚结束的场次不会被写成「不可用」。
+- 平时会重试近期缺弹幕（7 天内）的场次；缺 VSTATS 由 `backfill-vstats.ts` 单独补，只请求单场页，
+  不受 14 天窗口限制。刚结束的场次不会被写成「不可用」。
 - 本地 pack 比数据库新（上次 ingest 失败，或本地跑过 `--no-publish`）时，即使没有新场次也会补一次 ingest。
 - 数据库提交成功后按 `dataset-<id>` / `stream-<id>` / `group` / `sitemap` / `llms` / `transcripts` 调用 purge。
 
@@ -456,6 +459,34 @@ bun run fetch:live-chat --dataset yuno --ids ids.txt --once
 - 回放已翻完的场次再次执行会直接跳过；`--force` 重抓，`--no-replay` 只报告不抓，`--max-pages` 可限流。
 - 会话目录：优先复用已有 `_<videoId>` 目录；没有时用 pack 的 `startedAt` + 成员名新建。
 - 会员限定场次默认复用 `~/yt-cookies.txt`（见上节），也可 `--cookie` / `--cookies` / `YT_COOKIE`。
+
+## 补 VSTATS（单场页）
+
+`scripts/backfill-vstats.ts` 只请求 VSTATS 单场页，把 `vstats` 与派生比值写回本地 pack，
+不重抓 meta / 弹幕 / 评论 / 媒体。VSTATS 对未收录的视频返回 5 字节的 `error`，只记「未收录」，
+不算失败；5xx / 超时下一轮重试。
+
+```powershell
+bun scripts/backfill-vstats.ts --dataset yuno --limit 10
+bun scripts/backfill-vstats.ts --dataset yuno --ids ids.txt --limit 5
+bun scripts/backfill-vstats.ts --dry-run
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--dataset <id>` | 只处理指定 dataset；默认全部 |
+| `--ids <文件>` | 指定 videoId 列表（每行一个），覆盖默认候选 |
+| `--limit <n>` | 本轮最多请求 n 场（全部 dataset 合计），默认 20；0 = 全部 |
+| `--concurrency <n>` | 并发，默认 3；单场之间至少间隔 300ms |
+| `--ids-out <文件>` | 把补到的 videoId 写到文件（每行一个） |
+| `--quiet` | 只打印汇总与更新名单 |
+| `--dry-run` | 只列候选，不发请求、不写文件 |
+
+- 候选来自 `data/<id>/manifest.json`：`vstatsViews` 为空且 `availability = public` 的场次，随机轮转，
+  旧场次不会被饿死；会员限定场次 VSTATS 本来就不收录，不进候选。
+- 本地没有 pack（安静日没恢复）或已有 `vstats` 的场次不发请求。
+- 只改本地 pack 与 manifest；入库 / 上传用 `db:ingest --ids` 与 `publish:assets --ids`，
+  `daily-update` 会自动把补到的 ID 串进这两步。
 
 ## 补主播本人发言（一次性）
 

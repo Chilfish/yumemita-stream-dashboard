@@ -98,7 +98,8 @@ yt-dlp --flat-playlist --print "%(id)s" `
 ## 更新流程
 
 日常更新用 `bun scripts/daily-update.ts`（`.github/workflows/data.yml` 手动触发时也调用它）：先和数据库 `streams` 表
-求差集，只处理有新场次或缺 VSTATS / 弹幕的成员，再固定顺序 ingest → 资产 → purge。没有变化时不会恢复 datapack，
+求差集，只处理有新场次或缺弹幕的成员；缺 VSTATS 的场次由 `backfill-vstats.ts` 只请求单场页补齐，
+不重抓素材、也不受 14 天窗口限制。之后固定顺序 ingest → 资产 → purge。没有变化时不会恢复 datapack，
 也不会重新上传。
 
 ```powershell
