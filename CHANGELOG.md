@@ -103,7 +103,7 @@
 - `sync:data` 改为只生成 `public/data/` 兜底快照（远端 index 可用时原样复用）；`validate:data --remote`
   同时校验根 `index.json`。
 - **数据源迁到对象存储**：manifest / insights / datapack 全部放 R2，git 里只保留 `data-sources.json`。
-- 新增 `bun run publish:data`：以本地 pack 为唯一真源，派生 manifest + insights 后先传 pack、再传索引，
+- 新增 `bun run ymmt publish data`：以本地 pack 为唯一真源，派生 manifest + insights 后先传 pack、再传索引，
   避免索引指向不存在的文件；`--no-upload` 可只生成本地文件。
 - `sync:data` 支持从 `VITE_DATAPACK_BASE` 拉 manifest/insights，带 `node_modules/.cache` 缓存兜底；
   没配地址时回退本地 `data/` 暂存区。

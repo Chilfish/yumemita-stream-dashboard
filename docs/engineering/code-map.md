@@ -11,8 +11,8 @@
 | 新增图表 | `src/components/charts/` | D3 算数学，React 渲染 SVG |
 | 新增 coss 组件 | `src/components/ui/` | 用 shadcn CLI + `@coss` registry，不手写业务 |
 | 数据加载 | `src/db/queries/*`、`src/types/db.ts` | 页面先查库，再传给岛屿 |
-| 数据库 / ingest | `src/db/schema.ts`、`scripts/ingest-db.ts`、`scripts/verify-db.ts` | `bun run db:ingest` / `db:verify` |
-| 数据库读路径 / 压测 | `src/db/batch.ts`、`src/db/queries/*`、`scripts/bench-db.ts` | 先跑 `bun run db:bench`；方案见 [db-optimization.md](../archive/db-optimization.md) |
+| 数据库 / ingest | `src/db/schema.ts`、`scripts/ingest-db.ts`、`scripts/verify-db.ts` | `bun run ymmt db ingest` / `db:verify` |
+| 数据库读路径 / 压测 | `src/db/batch.ts`、`src/db/queries/*`、`scripts/bench-db.ts` | 先跑 `bun run ymmt db bench`；方案见 [db-optimization.md](../archive/db-optimization.md) |
 | 聚合 / 纯函数 | `src/lib/aggregate.ts`、`format.ts`、`classify.ts` | 配对应 `.test.ts` |
 | URL 状态 | `src/lib/table-params.ts`、`src/lib/routes.ts`、`src/lib/router-compat.ts` | 可分享、可刷新 |
 | SEO | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | 请求期输出 head / sitemap |

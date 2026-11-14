@@ -91,7 +91,7 @@
 
 > manifest 是**摘要**，页面图表需要的逐分钟序列、SC 明细、Top 列表在 datapack 里。
 
-频道专属表情是静态资源，手动跑一次即可：`bun run fetch:emoji` 合并
+频道专属表情是静态资源，手动跑一次即可：`bun run ymmt data emoji` 合并
 `data/emoji-<dataset>.html`、`data/emoji-youtube.html`（频道 / YouTube 全局表情选择器）与
 `chat.emojis[].url`，镜像到
 `data/<dataset>/emoji/<hash>.png`，发布到 `<base>/emojis/<dataset>/<hash>.png`；
@@ -101,7 +101,7 @@
 
 封面图是这套数据里唯一的二进制对象：原图放在 `<base>/<dataset>/thumbs/<videoId>.jpg`，
 同目录另有 480 / 960 / 1280w 的 WebP 变体 `<videoId>.<width>.webp`（本地暂存为
-`data/<dataset>/thumbs/…`，gitignore），都由 `bun run fetch:thumbs` 生成（原图从 YouTube 镜像，变体由
+`data/<dataset>/thumbs/…`，gitignore），都由 `bun run ymmt data thumbnails` 生成（原图从 YouTube 镜像，变体由
 `Bun.Image` 编码）。key 只由 dataset + videoId（+ 宽度）推导，不依赖 manifest，离线也能拼出 URL；
 发布顺序是 **thumbs → pack → manifest / insights → index**，所以 `streams[].thumbnail` 出现时
 原图与全部 `srcset` 候选都一定已经在桶里。
@@ -203,7 +203,7 @@
 - `aggregation` 标明跨场口径：`full` = 全部场次用 v2 全量字段重扫，`partial` = 部分场次全量、其余按 Top 列表相加，`top-lists` = 全部按 Top 列表相加。旧 insights 没有该字段时按 `top-lists` 理解。
 - `coverage` 给出参与全量聚合的场次数（`words` / `authors` / `total`），页面的“精确覆盖 X/Y 场”直接读它。
 - 逐场判断：v2 pack 用全量字段，v1 pack 用该场 Top 列表，不会因为少数缺失场次把整个 dataset 判成近似。
-- **生成物，不要手改**；数据更新后重新 `bun run db:ingest`。
+- **生成物，不要手改**；数据更新后重新 `bun run ymmt db ingest`。
 - 列表页依赖它渲染总览；缺失时页面会显示错误态，重新 ingest 即可。
 
 ## 5. datapack
@@ -377,8 +377,8 @@ YouTube 不回传赠送会员的单价，`paid.gifts[].count` 只有个数；实
 yt-dlp 的 `live_chat` 字幕只在直播结束后才存在；等待室与直播中的弹幕走 InnerTube：
 
 ```bash
-bun run fetch:live-chat --video <videoId>          # 跟随到结束，Ctrl-C 保存状态退出
-bun run fetch:live-chat --video <videoId> --once   # 只拉一页（等待室历史 / 定时任务）
+bun run ymmt data live-chat --video <videoId>          # 跟随到结束，Ctrl-C 保存状态退出
+bun run ymmt data live-chat --video <videoId> --once   # 只拉一页（等待室历史 / 定时任务）
 ```
 
 - watch 页必须带浏览器 UA + `hl=en`；continuation 优先级 **reload → timed → invalidation → replay**。
@@ -402,8 +402,8 @@ watch 页 `liveChatRenderer.isReplay === true` 时，拿 `reloadContinuationData
 `youtubei/v1/live_chat/get_live_chat_replay` 即可翻完整个回放（匿名可用）：
 
 ```bash
-bun scripts/fetch-danmaku.ts --dataset <id> --video <videoId>   # 单场补弹幕
-bun run fetch:live-chat --video <videoId>                       # 已结束时也自动走回放
+bun run ymmt data danmaku --dataset <id> --video <videoId>   # 单场补弹幕
+bun run ymmt data live-chat --video <videoId>                       # 已结束时也自动走回放
 ```
 
 - 续页只认 `liveChatReplayContinuationData`；`playerSeekContinuationData` 是跳转进度，不是下一页。
@@ -496,9 +496,9 @@ dataset_id = $1 or $1::text = any(participants)
 ## 校验
 
 ```bash
-bun run db:verify       # 数据库与 pack 字段级对账
-bun run db:query        # 查询层冒烟
-bun run validate:data   # pack 级 schema 校验（旧派生文件检查已停用）
+bun run ymmt db verify       # 数据库与 pack 字段级对账
+bun run ymmt db query        # 查询层冒烟
+bun run ymmt validate data   # pack 级 schema 校验（旧派生文件检查已停用）
 ```
 
 `validate-data.mjs` 校验本地 pack；整站数据以 `db:verify` 为准：

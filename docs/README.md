@@ -25,6 +25,7 @@ docs/
 │   ├── README.md
 │   ├── code-style.md
 │   ├── code-map.md
+│   ├── cli.md
 │   ├── component-organization.md
 │   ├── git-workflow.md
 │   ├── release-checklist.md
@@ -101,6 +102,7 @@ docs/
 | 联动场次 / 多人同场 | [collaboration-streams.md](./planning/collaboration-streams.md) | 归属模型、登记文件、计数口径 |
 | 优化数据库读路径 | [performance.md](./engineering/performance.md) + [db-optimization.md](./archive/db-optimization.md) | 当前结论与历史压测 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
+| 跑脚本 / 数据流水线 | [cli.md](./engineering/cli.md) | `bun run ymmt …` 命令树、`--json` 信封、退出码 |
 | 不确定该改哪个文件 | [code-map.md](./engineering/code-map.md) | 任务意图 → 关键文件；只放入口 |
 | 本地开发 / 测试 | [development.md](./engineering/development.md) + [local-database.md](./engineering/local-database.md) | 环境、脚本、D3、测试；本地 Postgres 与开发代理 |
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |
@@ -159,10 +161,10 @@ requirements/ planning/ → engineering/ → 代码 → research/ postmortem/ re
 bun run check          # astro check + vitest + oxlint
 bun run build          # astro build（Worker + 预渲染 404/500）
 bun run preview        # Cloudflare workerd 预览
-bun run db:bench       # 冷渲染 SQL / HTTP 往返与 p50/p95（本地库）
-bun run db:verify      # 数据库一致性
-bun run db:query       # 查询层冒烟
-bun run validate:data  # 校验数据链路的 index / manifest / insights / group-*
+bun run ymmt db bench       # 冷渲染 SQL / HTTP 往返与 p50/p95（本地库）
+bun run ymmt db verify      # 数据库一致性
+bun run ymmt db query       # 查询层冒烟
+bun run ymmt validate data  # 校验数据链路的 index / manifest / insights / group-*
 ```
 
 - 涉及页面的改动必须在 `bun run dev` 或 `bun run preview` 下手工走查相关路径。

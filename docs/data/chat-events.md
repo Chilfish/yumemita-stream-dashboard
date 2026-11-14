@@ -20,11 +20,11 @@
 
 | 来源 | 命令 | 适用阶段 | 产物 | 事件 | SC 颜色 / 贴纸 |
 | --- | --- | --- | --- | --- | --- |
-| InnerTube 实时 | `bun run fetch:live-chat --video <id>` | 等待室 / 直播中 | `danmaku_live_<id>.jsonl`、`events_<id>.jsonl`、`emoji_<id>.json`、`work/live-chat-state.json` | 有 | 有（新抓取） |
-| InnerTube 回放 | `bun run fetch:danmaku --dataset <id> --video <id> --engine innertube` | 已结束 | `danmaku_<id>.jsonl`、`events_<id>.jsonl`、`emoji_<id>.json`、`work/replay-state.json` | 有 | 有（新抓取） |
+| InnerTube 实时 | `bun run ymmt data live-chat --video <id>` | 等待室 / 直播中 | `danmaku_live_<id>.jsonl`、`events_<id>.jsonl`、`emoji_<id>.json`、`work/live-chat-state.json` | 有 | 有（新抓取） |
+| InnerTube 回放 | `bun run ymmt data danmaku --dataset <id> --video <id> --engine innertube` | 已结束 | `danmaku_<id>.jsonl`、`events_<id>.jsonl`、`emoji_<id>.json`、`work/replay-state.json` | 有 | 有（新抓取） |
 | yt-dlp 回放 | 同上，`--engine yt-dlp` | 已结束 / 会员限定 | `danmaku_<id>.jsonl` | 无 | 有（renderer 带颜色时） |
-| 全量归档 | `bun run fetch:streams --dataset <id>` | 历史补齐 | meta / 评论 / VSTATS + yt-dlp `live_chat` | 无 | 有（renderer 带颜色时） |
-| 表情资源 | `bun run fetch:emoji --dataset <id>` | 任意 | `data/<id>/emoji/*` + `index.json` | — | — |
+| 全量归档 | `bun run ymmt data fetch --dataset <id>` | 历史补齐 | meta / 评论 / VSTATS + yt-dlp `live_chat` | 无 | 有（renderer 带颜色时） |
+| 表情资源 | `bun run ymmt data emoji --dataset <id>` | 任意 | `data/<id>/emoji/*` + `index.json` | — | — |
 
 `fetch:live-chat` 在检测到直播已结束时，默认自动改走 InnerTube 回放并合并实时采集；`--once` 只取一页，不触发完整回放。`fetch:danmaku` 默认 `--engine auto`：先试 InnerTube 回放，失败或没有回放时回退 yt-dlp。
 
@@ -288,7 +288,7 @@ yt-dlp 的 `live_chat` 字幕可能同时含「直播段」和「从开头重写
 - `stream_details.events`：`chat.events ?? []` 写入；`packs.ts` 读回 `chat.events`。
 - `stream_details.emojis`：`chat.emojis ?? []`。
 - `owner_messages` 没有单独列；`packs.ts` 用 `ownerChats.filter(kind !== "event").length` 计算。
-- `stream_details.events` 由 `drizzle/0001_add_stream_events.sql` 添加；部署前执行 `bun run db:migrate`。
+- `stream_details.events` 由 `drizzle/0001_add_stream_events.sql` 添加；部署前执行 `bun run ymmt db migrate`。
 
 ### 7.3 pack 没有的东西
 
@@ -337,7 +337,7 @@ hash   = id 的 `/` 后半段
 
 ### 8.4 生成
 
-`bun run fetch:emoji --dataset <id>` 合并频道 / YouTube 表情选择器与 `chat.emojis`，镜像图片到 `data/<id>/emoji/`，并写 `index.json`。
+`bun run ymmt data emoji --dataset <id>` 合并频道 / YouTube 表情选择器与 `chat.emojis`，镜像图片到 `data/<id>/emoji/`，并写 `index.json`。
 
 ## 9. 时间口径
 
@@ -416,20 +416,20 @@ hash   = id 的 `/` 后半段
 
 ```bash
 # 实时 / 等待室：先取一页，确认 token 与字段
-bun run fetch:live-chat --video <videoId> --once --dry-run
+bun run ymmt data live-chat --video <videoId> --once --dry-run
 
 # 已结束：InnerTube 回放（默认 auto）
-bun run fetch:danmaku --dataset yuno --video <videoId> --dry-run
-bun run fetch:danmaku --dataset yuno --video <videoId> --engine innertube
+bun run ymmt data danmaku --dataset yuno --video <videoId> --dry-run
+bun run ymmt data danmaku --dataset yuno --video <videoId> --engine innertube
 
 # 生成 pack 后校验字段
-bun run validate:data
-bun run db:ingest --dataset yuno
-bun run db:verify --dataset yuno
+bun run ymmt validate data
+bun run ymmt db ingest --dataset yuno
+bun run ymmt db verify --dataset yuno
 ```
 
 写入 `stream_details.events` 前需要应用迁移：
 
 ```bash
-bun run db:migrate
+bun run ymmt db migrate
 ```

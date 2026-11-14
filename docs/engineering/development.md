@@ -21,7 +21,7 @@ bun run dev
 
 ```bash
 bun run dev           # Postgres / 代理缺失时自动启动，已有则复用
-bun run dev:seed      # 可选：从本地 pack 灌数据
+bun run ymmt db ingest      # 可选：从本地 pack 灌数据
 ```
 
 Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整说明与排查见
@@ -29,40 +29,39 @@ Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整�
 
 ## 脚本
 
+所有数据流水线脚本收敛成一个入口，完整命令树、选项与 `--json` 约定见
+[cli.md](./cli.md)。本表只列开发时最常用的。
+
 | 命令 | 作用 |
 | --- | --- |
-| `bun run dev` | 开发入口：准备本地 Postgres / 库 / 代理，再用 Node 启动 Astro |
+| `bun run dev` | 开发入口：准备本地 Postgres / 库 / 代理，再启动 Astro |
 | `bun run build` | `astro build`，输出 Worker + 预渲染的 404 / 500 |
 | `bun run preview` | 本地预览构建产物（workerd；复用后台的本地服务） |
 | `bun run cf:preview` | 构建后预览，部署前检查 |
 | `bun run cf:deploy` | `astro build` + `wrangler deploy --config dist/server/wrangler.json` |
 | `bun run dev:db` | 只做本地库初始化：建库、应用迁移、补 `.dev.vars`（见 [local-database.md](./local-database.md)） |
-| `bun run dev:db:proxy` | 单独前台启动本地 Neon HTTP 兼容代理（`dev` 会自动处理） |
-| `bun run dev:seed` | 本地灌数据；参数同 `db:ingest` |
+| `bun run ymmt dev proxy` | 单独前台启动本地 Neon HTTP 兼容代理（`dev` 会自动处理） |
+| `bun run ymmt db migrate` | 应用 `drizzle/` 迁移（按 `.dev.vars` 与 `LOCAL` 选库） |
+| `bun run ymmt db ingest` | 本地 pack → PostgreSQL（也是本地灌数据入口） |
+| `bun run ymmt db verify` | 数据库与本地 pack 字段级对账 |
+| `bun run ymmt db query` | 查询层冒烟：列表 / insights / 组首页 / 相册 + 本地延迟 |
+| `bun run ymmt test perf` | 页面级性能冒烟（先启动 preview 或 wrangler dev） |
+| `bun run ymmt test smoke` | Worker 路由冒烟（需先起 dev/preview） |
 | `bun run db:generate` / `db:push` / `db:studio` | Drizzle 迁移工具 |
-| `bun run db:migrate` | 应用 `drizzle/` 迁移（按 `.dev.vars` 与 `LOCAL` 选库） |
-| `bun run db:ingest` | 本地 pack → PostgreSQL；支持 `--dataset` / `--ids` / `--limit` / `--all` / `--dry-run` |
-| `bun run db:verify` | 数据库与本地 pack 字段级对账 |
-| `bun scripts/suggest-collaborations.ts` | 扫 manifest 标题里的成员别名 / 组合名 tag 出联动场候选（只读；`--markdown` / `--json`） |
-| `bun scripts/apply-collaborations.ts` | 一次性补丁：把联动登记写进目标库并刷新 public_totals（`--dry-run` / `--verify`） |
-| `bun run db:query` | 查询层冒烟：列表 / insights / 组首页 / 相册 + 本地延迟 |
-| `bun run perf:smoke` | 页面级性能冒烟：响应体大小 / 耗时中位数 / cache tag（先启动 preview 或 wrangler dev） |
-| `bun run publish:assets` | 上传封面 / 表情 / archive（不写 JSON 索引） |
-| `bun run purge:cache` | 按 tag 失效 Workers Cache |
-| `bun run db:latest` | 输出数据库里最新一场（工作流探针） |
-| `bun run validate:data` | 校验 pack 级 schema |
-| `bun run add:datapack` | 加一份 datapack 并更新本地 manifest |
 | `bun run typecheck` | `astro check`（TypeScript 6） |
-| `bun run test` | Vitest 单次 |
+| `bun run typecheck:scripts` | `tsc` 检查 `scripts/` 与 `tests/scripts/` |
+| `bun run test` | Vitest 单次（用例在 `tests/`） |
 | `bun run test:watch` | Vitest watch |
-| `bun run test:smoke` | Worker 路由冒烟（需先起 dev/preview） |
 | `bun run lint` | oxlint |
-| `bun run check` | typecheck + test + lint |
+| `bun run check` | typecheck + typecheck:scripts + test + lint |
 | `bun run ci` | 全链路（CI 同款） |
+
+一次性补丁脚本在 `scripts/oneoff/`，不注册子命令，用法见
+[scripts/README.md](../../scripts/README.md)。
 
 ## 数据库（阶段 1）
 
-- Schema：`src/db/schema.ts`；迁移产物在 `drizzle/`，用 `bun run db:migrate` 应用。
+- Schema：`src/db/schema.ts`；迁移产物在 `drizzle/`，用 `bun run ymmt db migrate` 应用。
 - 读连接：`src/db/connection.ts` 的 `createDb()`，`drizzle-orm/neon-http`；Worker 用 `src/db/client.ts`。
 - 写连接：同文件的 `createWriteDb()`，`drizzle-orm/neon-serverless` 的 WebSocket Pool；只在脚本里用。
 - 本地开发：`DATABASE_URL` 指向 `localhost` 时，脚本自动切 `pg`；workerd 不能直连 TCP，`bun run dev` 会自动准备 `NEON_HTTP_ENDPOINT` 与代理。见 [local-database.md](./local-database.md)。
@@ -231,7 +230,7 @@ bunx --bun shadcn@latest add @coss/ui -y
 - `src/lib/keyboard.test.ts`：快捷键的邻居索引、输入框判定与 ⌘K 判定。
 - `src/lib/classify.test.ts`：标题类型规则与未匹配回退。
 - `src/lib/routes.test.ts`：路由构造、子视图解析、对比 id 解析。
-- 路由冒烟：`bun run test:smoke`（先启动 dev/preview，可通过 `--url` / `BASE_URL` 指定地址）。
+- 路由冒烟：`bun run ymmt test smoke`（先启动 dev/preview，可通过 `--url` / `BASE_URL` 指定地址）。
 - 组件不强制单测；交互复杂时再加 `@testing-library/react`。
 
 ```bash

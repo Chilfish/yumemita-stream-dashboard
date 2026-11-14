@@ -9,8 +9,7 @@
     "scripts/cli.ts",
     "scripts/commands/**/*.ts",
     "scripts/lib/**/*.ts",
-    "tests/scripts/**/*.ts",
-    "src/**/*.ts"
+    "tests/scripts/**/*.ts"
   ],
-  "exclude": ["scripts/oneoff/**", "src/components/**", "src/pages/**"]
+  "exclude": ["scripts/oneoff/**"]
 }

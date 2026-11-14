@@ -97,15 +97,15 @@ yt-dlp --flat-playlist --print "%(id)s" `
 
 ## 更新流程
 
-日常更新用 `bun scripts/daily-update.ts`（`.github/workflows/data.yml` 手动触发时也调用它）：先和数据库 `streams` 表
+日常更新用 `bun run ymmt data update`（`.github/workflows/data.yml` 手动触发时也调用它）：先和数据库 `streams` 表
 求差集，只处理有新场次或缺弹幕的成员；缺 VSTATS 的场次由 `backfill-vstats.ts` 只请求单场页补齐，
 不重抓素材、也不受 14 天窗口限制。之后固定顺序 ingest → 资产 → purge。没有变化时不会恢复 datapack，
 也不会重新上传。
 
 ```powershell
-bun scripts/daily-update.ts                 # 增量（本地用 Firefox cookie）
-bun scripts/daily-update.ts --force         # 额外重抓最近 24 小时
-bun scripts/daily-update.ts --dry-run       # 只列候选
+bun run ymmt data update                 # 增量（本地用 Firefox cookie）
+bun run ymmt data update --force         # 额外重抓最近 24 小时
+bun run ymmt data update --dry-run       # 只列候选
 ```
 
 数据更新工作流在 `.github/workflows/data.yml`，只支持手动 `workflow_dispatch`（每日 cron 已于 2026-11-09 取消）；配置与 cookie 导出见
@@ -115,7 +115,7 @@ bun scripts/daily-update.ts --dry-run       # 只列候选
 
 ```powershell
 # 一次跑完：频道列表 → meta/弹幕/评论/VSTATS → 每 5 场自动生成 datapack
-bun scripts/fetch-streams.ts --dataset <id> `
+bun run ymmt data fetch --dataset <id> `
   --root "D:/projects/claude-messages/temp/youtube-live" `
   --concurrency 3
 
@@ -124,11 +124,11 @@ Get-Content -Wait "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fe
 Get-Content "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch-progress.json"
 
 # 单场返工：清掉该场本地素材重抓，datapack 更新后自动增量发布
-bun scripts/fetch-streams.ts --dataset <id> --force <videoId>
+bun run ymmt data fetch --dataset <id> --force <videoId>
 
 # 最后投影到数据库并校验
-bun run db:ingest
-bun run db:verify
+bun run ymmt db ingest
+bun run ymmt db verify
 ```
 
 `--root` 是**原始会话目录**，不是 `data/`；datapack 仍按 `data-sources.json` 写到 `data/<id>/`。
@@ -145,4 +145,4 @@ bun run db:verify
 - **会员限定**：`availability: "subscriber_only"` 的场次需要已登录 Firefox cookie 才能取到 chat replay。
 - **评论区是抓取上限**：`commentsCaptured` 是 yt-dlp `--write-comments` 抓到的条数，不是视频总评论数。
 - **VSTATS 没有历史曲线**：只有平均/最大同接与最大值时刻，且 2026-08 之前大概率没有条目。
-- **未来场不要走 yt-dlp**：`live_status` 为 `is_upcoming` / 提示 days until premiere 的，`fetch-streams` 直接跳过；需要等待室 / 直播中数据时用 `bun run fetch:live-chat --video <id>`（InnerTube 实时通道）。
+- **未来场不要走 yt-dlp**：`live_status` 为 `is_upcoming` / 提示 days until premiere 的，`fetch-streams` 直接跳过；需要等待室 / 直播中数据时用 `bun run ymmt data live-chat --video <id>`（InnerTube 实时通道）。

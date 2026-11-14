@@ -5,7 +5,7 @@
 1. 先确认 Worker 能连数据库：
 
    ```bash
-   bun run db:query
+   bun run ymmt db query
    ```
 
 2. 看 Worker 日志里的 `x-request-id` 与 `x-response-time`；`DATABASE_URL` 缺失时页面应显示错误态而不是白屏。
@@ -15,12 +15,12 @@
 ## “数据库里没有可用的 dataset”
 
 - `data-sources.json` 为空或 `id` 不合法。
-- 还没跑 `bun run db:ingest`：`datasets` / `streams` 为空。
-- 新增成员后忘了 ingest：`bun run db:ingest --dataset <id>`。
+- 还没跑 `bun run ymmt db ingest`：`datasets` / `streams` 为空。
+- 新增成员后忘了 ingest：`bun run ymmt db ingest --dataset <id>`。
 
 ## “找不到这场直播”（404）
 
-- 该 `videoId` 还没 ingest：`bun run db:ingest --dataset <id>`。
+- 该 `videoId` 还没 ingest：`bun run ymmt db ingest --dataset <id>`。
 - `datasetId` / `videoId` 拼错；`.md` 路由的 `.md` 后缀由路由处理，不要写进参数。
 - 未知单场返回真 404，且 `no-store`，不会长期缓存。
 
@@ -118,23 +118,23 @@ bun run dev -- --port 4322
 
 ## 封面不显示
 
-- 先确认本地有图：`data/<datasetId>/thumbs/<videoId>.jpg`；没有就 `bun run fetch:thumbs --dataset <id>`。
+- 先确认本地有图：`data/<datasetId>/thumbs/<videoId>.jpg`；没有就 `bun run ymmt data thumbnails --dataset <id>`。
 - 生产读的是 `PUBLIC_R2_BASE/<dataset>/thumbs/<videoId>.jpg`，需要 `publish:assets` 上传；只跑 `fetch:thumbs` 不会出现在线上。
 - 图存在但显示成员色兜底：确认 `PUBLIC_R2_BASE` 指向 `yumemita-data` 的公开域名（对象在桶根，不再有公共前缀），以及对象是否公开可读。
 - 相册里个别卡片是兜底：说明那场没有 `video.thumbnail` 或下载失败，可加 `--force` 重抓。
 
 ## 逐字稿不出现
 
-- 单场页的「逐字稿」分段只在索引里有该 `videoId` 时出现；先 `bun run publish:transcripts --no-upload` 看校验是否通过。
+- 单场页的「逐字稿」分段只在索引里有该 `videoId` 时出现；先 `bun run ymmt publish transcripts --no-upload` 看校验是否通过。
 - 本地开发会回退到构建期快照，但新增文件需要 Vite 重新加载（保存一次或重启 dev）。
 - 线上还看不到：检查 `<base>/transcripts/index.json` 是否已更新；发布时索引最后写，失败会保留旧索引。
-- 详情页有稿但列表没有：列表是 SSR + Workers Cache（`transcripts` tag，1 小时）。`publish:transcripts` 成功会自动 purge；若日志出现「缓存失效跳过：未配置 SITE_URL / PURGE_TOKEN」，手动跑 `bun run purge:cache --tags transcripts`。
+- 详情页有稿但列表没有：列表是 SSR + Workers Cache（`transcripts` tag，1 小时）。`publish:transcripts` 成功会自动 purge；若日志出现「缓存失效跳过：未配置 SITE_URL / PURGE_TOKEN」，手动跑 `bun run ymmt publish purge --tags transcripts`。
 - `videoId` 写错不会拦发布，但会和场次对不上；用 `transcript:new` / `transcript:import` 从 manifest 匹配可避免。
 
 ## 数据更新后页面还是旧的
 
 - 页面有 60–300 秒的 Workers Cache；等 TTL 过去或按 tag purge。
-- 改了本地 pack 后忘了 `bun run db:ingest`，数据库仍是旧值。
-- 缓存未失效：跑 `bun run purge:cache --dataset <id>`；Workers Cache 需要 TTL 或 purge 才会更新。
-- 增量发布没传某个 pack：进度记在 `data/.publish-state.json`（上次上传的内容摘要 + 字节数）。远端对象被删、大小对不上会自动重传；怀疑进度记录有问题时用 `bun run publish:assets --force` 全量重传。
+- 改了本地 pack 后忘了 `bun run ymmt db ingest`，数据库仍是旧值。
+- 缓存未失效：跑 `bun run ymmt publish purge --dataset <id>`；Workers Cache 需要 TTL 或 purge 才会更新。
+- 增量发布没传某个 pack：进度记在 `data/.publish-state.json`（上次上传的内容摘要 + 字节数）。远端对象被删、大小对不上会自动重传；怀疑进度记录有问题时用 `bun run ymmt publish data --assets-only --force` 全量重传。
 - 本地 `astro dev` 会热更新；如果是 `preview`，重新 `bun run build && bun run preview`。

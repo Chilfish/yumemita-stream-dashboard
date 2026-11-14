@@ -249,10 +249,10 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 正常情况下 `ingest` 与每日任务会自己清掉已入库的日程、合并重复行。需要手工核对或一次补齐时：
 
 ```bash
-bun run schedule:prune                     # dry-run，列出会删除 / 会合并的行
-bun run schedule:prune --apply             # 写库
-bun run schedule:prune --apply --dataset miyako
-LOCAL=0 bun run schedule:prune --apply     # 线上，使用 .dev.vars 的 DATABASE_URL_ONLINE
+bun run ymmt db schedules                     # dry-run，列出会删除 / 会合并的行
+bun run ymmt db schedules --apply             # 写库
+bun run ymmt db schedules --apply --dataset miyako
+LOCAL=0 bun run ymmt db schedules --apply     # 线上，使用 .dev.vars 的 DATABASE_URL_ONLINE
 ```
 
 - 默认 dry-run；输出里 `-` 是删除、`~` 是合并，并注明命中原因（`video_id` / `链接` / `日期+时段`）。

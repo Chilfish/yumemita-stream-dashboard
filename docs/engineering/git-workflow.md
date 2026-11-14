@@ -61,8 +61,8 @@ feat/xxx ──●───●
 ```bash
 bun run check          # typecheck + test + lint
 bun run build          # astro build（Worker + 预渲染 404/500/about）
-bun run db:verify      # 改 ingest / 数据时必跑
-bun run db:query       # 改查询层时必跑
+bun run ymmt db verify      # 改 ingest / 数据时必跑
+bun run ymmt db query       # 改查询层时必跑
 ```
 
 - 涉及页面的改动必须在 `bun run dev` 或 `vite preview` 下手工走查相关路径，并写清结果。

@@ -89,8 +89,8 @@ bun run dev
 Postgres、建库 / 迁移和 Neon HTTP 代理，已有服务则直接复用：
 
 ```bash
-bun run dev           # Postgres + 代理 + Astro（一条命令）
-bun run dev:seed      # 可选：从本地 pack 灌数据
+bun run dev              # Postgres + 代理 + Astro（一条命令）
+bun run ymmt db ingest   # 可选：从本地 pack 灌数据
 ```
 
 Astro 退出或被 kill 后，Postgres 与代理继续在后台运行。`.dev.vars` 缺失时脚本会自动补写
@@ -129,11 +129,11 @@ PURGE_TOKEN=""
 
 ```text
 data/<id>/*.datapack.json            本地暂存
-        ├─ bun run db:ingest
+        ├─ bun run ymmt db ingest
         │     ▼
         │   Neon PostgreSQL（datasets / streams / details / insights / transcripts）
         │
-        └─ bun run publish:assets
+        └─ bun run ymmt publish data --assets-only
               ▼
             R2  <id>/thumbs/*
                 emojis/<id>/*
@@ -144,12 +144,12 @@ data/<id>/*.datapack.json            本地暂存
 请求期 SSR：组首页 / 成员页 / 场次 / 单场 / 趋势 / 相册 / 对比
 ```
 
-- `bun run db:ingest` 把 pack 事务投影到 PostgreSQL
-- `bun run publish:assets` 上传封面、表情与 pack 归档
-- `bun run publish:transcripts` 上传逐字稿正文
+- `bun run ymmt db ingest` 把 pack 事务投影到 PostgreSQL
+- `bun run ymmt publish data --assets-only` 上传封面、表情与 pack 归档
+- `bun run ymmt publish transcripts` 上传逐字稿正文
 - git 里只保留代码、`data-sources.json` 和手写逐字稿
 
-日常增量用 `bun scripts/daily-update.ts`：按 14:17 JST 的 cron 每天运行一次，先与数据库做频道差集，只处理有新场次或缺弹幕的成员；缺 VSTATS 的场次只补单场页，不重抓素材。然后 ingest、发布资产并失效缓存。
+日常增量用 `bun run ymmt data update`：按 14:17 JST 的 cron 每天运行一次，先与数据库做频道差集，只处理有新场次或缺弹幕的成员；缺 VSTATS 的场次只补单场页，不重抓素材。然后 ingest、发布资产并失效缓存。
 
 封面在本地镜像后再上传，不热链 YouTube；数据更新后按 Cache-Tag 失效，不触发前端构建。
 
@@ -164,21 +164,22 @@ bun run check                # astro check + test + lint
 bun run ci                   # check + build
 
 # 数据库
-bun run dev:db               # 只做本地库初始化（建库 + 迁移）
-bun run dev:db:proxy         # 单独前台启动本地 Neon HTTP 代理（dev 会自动处理）
-bun run dev:seed             # 本地灌数据（参数同 db:ingest）
-bun run db:migrate           # 应用 Drizzle 迁移
-bun run db:ingest            # 本地 pack → PostgreSQL（增量）
-bun run db:verify            # 数据库与 pack 字段级对账
-bun run db:query             # 查询层冒烟与延迟
+bun run dev:db                     # 只做本地库初始化（建库 + 迁移）
+bun run ymmt dev proxy             # 单独前台启动本地 Neon HTTP 代理（dev 会自动处理）
+bun run ymmt db migrate            # 应用 Drizzle 迁移
+bun run ymmt db ingest             # 本地 pack → PostgreSQL（增量）；本地灌数据也用这个
+bun run ymmt db verify             # 数据库与 pack 字段级对账
+bun run ymmt db query              # 查询层冒烟与延迟
 
 # 数据发布
-bun run publish:assets       # 上传封面 / 表情 / archive
-bun scripts/daily-update.ts  # 每日增量：频道差集 → 抓取 → ingest → 资产 → purge
-bun run publish:transcripts  # 增量上传逐字稿
-bun run purge:cache          # 按 tag 失效 Workers Cache
-bun run fetch:thumbs         # 镜像封面到本地
+bun run ymmt publish data --assets-only  # 上传封面 / 表情 / archive
+bun run ymmt data update                 # 每日增量：频道差集 → 抓取 → ingest → 资产 → purge
+bun run ymmt publish transcripts         # 增量上传逐字稿
+bun run ymmt publish purge               # 按 tag 失效 Workers Cache
+bun run ymmt data thumbnails             # 镜像封面到本地
 ```
+
+完整命令树与 `--json` / 退出码约定见 [docs/engineering/cli.md](docs/engineering/cli.md)。
 
 一次性修复脚本（补缺失弹幕、回填 `authorId` 等）没有注册到 `package.json`，用法见 [scripts/README.md](scripts/README.md)。
 
@@ -187,16 +188,16 @@ bun run fetch:thumbs         # 镜像封面到本地
 新增一场直播：
 
 ```bash
-bun run add:datapack nonoka /path/to/<videoId>.datapack.json
-bun run fetch:thumbs --dataset nonoka
-bun run db:ingest --dataset nonoka
-bun run publish:assets --dataset nonoka
-bun run purge:cache --dataset nonoka
+bun scripts/oneoff/add-datapack.mjs nonoka /path/to/<videoId>.datapack.json
+bun run ymmt data thumbnails --dataset nonoka
+bun run ymmt db ingest --dataset nonoka
+bun run ymmt publish data --assets-only --dataset nonoka
+bun run ymmt publish purge --dataset nonoka
 ```
 
-新增一位成员：在 `data/<id>/` 放入 pack，在 `data-sources.json` 增加一条 dataset，再执行 `bun run db:ingest --dataset <id>`。成员入口和页面都按配置生成，不需要修改组件。
+新增一位成员：在 `data/<id>/` 放入 pack，在 `data-sources.json` 增加一条 dataset，再执行 `bun run ymmt db ingest --dataset <id>`。成员入口和页面都按配置生成，不需要修改组件。
 
-逐字稿：先用 `bun run transcript:new <videoId> --dataset nonoka` 建模板，写完执行 `bun run publish:transcripts`。
+逐字稿：先用 `bun run ymmt transcript new <videoId> --dataset nonoka` 建模板，写完执行 `bun run ymmt publish transcripts`。
 
 字段与步骤细节见 [docs/data/adding-data.md](docs/data/adding-data.md)。
 

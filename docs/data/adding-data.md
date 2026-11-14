@@ -28,13 +28,13 @@ data/
 
 ```bash
 # 1. 放进暂存区，顺带更新本地 manifest
-bun run add:datapack nonoka /path/to/abc123XYZ.datapack.json
+bun scripts/oneoff/add-datapack.mjs nonoka /path/to/abc123XYZ.datapack.json
 
 # 2. 投影到 PostgreSQL（增量，按 content_hash 跳过未变化场次）
-bun run db:ingest -- --dataset nonoka
+bun run ymmt db ingest -- --dataset nonoka
 
 # 3. 对账 + 本地看效果
-bun run db:verify -- --dataset nonoka
+bun run ymmt db verify -- --dataset nonoka
 bun run dev
 ```
 
@@ -44,10 +44,10 @@ bun run dev
 ### 手工加（不用脚本）
 
 1. 复制 `<videoId>.datapack.json` 到 `data/<datasetId>/`。
-2. `bun run fetch:thumbs --dataset <id>` 补封面。
-3. `bun run db:ingest --dataset <id>` 写库。
-4. `bun run publish:assets --dataset <id>` 上传封面 / 表情 / archive。
-5. `bun run purge:cache --dataset <id>` 失效缓存。
+2. `bun run ymmt data thumbnails --dataset <id>` 补封面。
+3. `bun run ymmt db ingest --dataset <id>` 写库。
+4. `bun run ymmt publish data --assets-only --dataset <id>` 上传封面 / 表情 / archive。
+5. `bun run ymmt publish purge --dataset <id>` 失效缓存。
 
 不需要手写摘要：`streams` 与 `dataset_insights` 完全由 ingest 从 pack 派生。
 
@@ -56,11 +56,11 @@ bun run dev
 本地 pack、封面、逐字稿都齐了以后，用一条命令按线上目标跑完整链路。**默认只同步新增场次**：
 
 ```bash
-bun run sync:remote -- --dry-run             # 看目标、新增数量与步骤
-bun run sync:remote                          # 只新增缺失场次
-bun run sync:remote -- --dataset nonoka      # 只同步一位
-bun run sync:remote -- --update-existing     # 允许按 hash 刷新已有场次
-bun run sync:remote -- --recent-days 30 --update-existing
+bun run ymmt publish sync -- --dry-run             # 看目标、新增数量与步骤
+bun run ymmt publish sync                          # 只新增缺失场次
+bun run ymmt publish sync -- --dataset nonoka      # 只同步一位
+bun run ymmt publish sync -- --update-existing     # 允许按 hash 刷新已有场次
+bun run ymmt publish sync -- --recent-days 30 --update-existing
 ```
 
 它只读 `.dev.vars` 的线上目标（`DATABASE_URL_ONLINE` / `R2_*`），并在子进程里设置 `LOCAL=0`；`DATABASE_URL_ONLINE` 指向本机时直接拒绝执行。
@@ -102,7 +102,7 @@ LOCAL=0 bun scripts/apply-collaborations.ts --verify    # 写完对账
 
 - 先应用 `drizzle/` 迁移（`0010` 的 `participants` 列与索引），再按 `videoId + datasetId` 更新，不读 pack、不建场次。
 - 脚本幂等：已是目标值的场次跳过；重复运行只报告、不写入。
-- 库里没有的场次会列出来，先 `bun run sync:remote -- --recent-days 0` 补 pack，再重跑本脚本。
+- 库里没有的场次会列出来，先 `bun run ymmt publish sync -- --recent-days 0` 补 pack，再重跑本脚本。
 - 写完统一跑 `refresh-public-totals`；跳过时成员页汇总会落后于场次列表。
 - 本地忘记跑回填时，也可以用同一脚本（`LOCAL=1`）修本地库。
 
@@ -128,9 +128,9 @@ LOCAL=0 bun scripts/apply-collaborations.ts --verify    # 写完对账
 }
 ```
 
-3. `bun run db:ingest --dataset arare` 写入成员与场次；成员入口由数据库查询生成。
-4. `bun run publish:assets --dataset arare` 上传封面 / 表情 / archive。
-5. `bun run purge:cache --dataset arare`；刷新页面即可，不需要重新构建。
+3. `bun run ymmt db ingest --dataset arare` 写入成员与场次；成员入口由数据库查询生成。
+4. `bun run ymmt publish data --assets-only --dataset arare` 上传封面 / 表情 / archive。
+5. `bun run ymmt publish purge --dataset arare`；刷新页面即可，不需要重新构建。
 
 不需要改 React 组件。
 
@@ -142,14 +142,14 @@ LOCAL=0 bun scripts/apply-collaborations.ts --verify    # 写完对账
 
 ```bash
 # 从模板生成，日期 / 标题自动从 data/<dataset>/manifest.json 带出
-bun run transcript:new W0bKqP-Eyj4 --dataset nonoka
+bun run ymmt transcript new W0bKqP-Eyj4 --dataset nonoka
 
 # 或者把已经写好的 Markdown 复制进来（videoId 可从文件名日期匹配 manifest）
-bun run transcript:import "D:/messages/archives/2026-10-13_ライブ振り返り.md" --dataset nonoka
-bun run transcript:import "<path>" --dataset nonoka --video-id W0bKqP-Eyj4
+bun run ymmt transcript import "D:/messages/archives/2026-10-13_ライブ振り返り.md" --dataset nonoka
+bun run ymmt transcript import "<path>" --dataset nonoka --video-id W0bKqP-Eyj4
 
 # 整个目录批量导入：不合规的稿记跳过，不阻塞其余
-bun run transcript:import "D:/messages/archives/<member>/配信" --dataset nonoka
+bun run ymmt transcript import "D:/messages/archives/<member>/配信" --dataset nonoka
 ```
 
 导入会按 manifest 补 `date` / `title`，剔除 `<!-- archive-only:start -->` … `<!-- archive-only:end -->` 之间的归档段落；会员限定场次默认拒绝，确需例外加 `--allow-member-only`。
@@ -186,9 +186,9 @@ summary: 一场把 13th live 从头聊到尾的复盘。
 ### 3. 发布
 
 ```bash
-bun run publish:transcripts --no-upload   # 只校验：缺 videoId / 未知 dataset / 重复 videoId 都会列出来
-bun run publish:transcripts               # 增量上传
-bun run publish:transcripts --force       # 忽略 data/.publish-state.json，全量重传
+bun run ymmt publish transcripts --no-upload   # 只校验：缺 videoId / 未知 dataset / 重复 videoId 都会列出来
+bun run ymmt publish transcripts               # 增量上传
+bun run ymmt publish transcripts --force       # 忽略 data/.publish-state.json，全量重传
 ```
 
 产物：
@@ -226,8 +226,8 @@ bun run publish:transcripts --force       # 忽略 data/.publish-state.json，�
 跑一遍：
 
 ```bash
-bun run db:ingest -- --dataset <id>
-bun run db:verify -- --dataset <id>
+bun run ymmt db ingest -- --dataset <id>
+bun run ymmt db verify -- --dataset <id>
 bun run dev
 ```
 

@@ -28,9 +28,9 @@ bun run build
 
 ## 数据改动
 
-- 新增场次：把 pack 放进 `data/<dataset>/`，然后跑 `bun run db:ingest`（写库）、`bun run publish:assets`（封面 / 表情 / archive）与 `bun run purge:cache`。
+- 新增场次：把 pack 放进 `data/<dataset>/`，然后跑 `bun run ymmt db ingest`（写库）、`bun run ymmt publish data --assets-only`（封面 / 表情 / archive）与 `bun run ymmt publish purge`。
 - 不要手写或手改 manifest / insights：它们由 pack 派生。
-- 数据文件必须能通过 `bun run validate:data`；发布后加 `--remote` 确认对象存储可达。
+- 数据文件必须能通过 `bun run ymmt validate data`；发布后加 `--remote` 确认对象存储可达。
 - 不要提交 `data/`（除 `README.md`）、`dist/`、原始媒体/弹幕/评论抓取。
 - 会员限定内容：确认可公开范围；不确定就不要放到公开桶里。
 
@@ -52,7 +52,7 @@ bun run build
 
 - [ ] `bun run check` 通过
 - [ ] `bun run build` 通过
-- [ ] `bun run validate:data` 通过（如果改了数据）
+- [ ] `bun run ymmt validate data` 通过（如果改了数据）
 - [ ] 新增/修改的交互在浅色与深色主题下都能看
 - [ ] 移动端窄屏不横向溢出（表格允许自身滚动）
 - [ ] 相关文档已更新

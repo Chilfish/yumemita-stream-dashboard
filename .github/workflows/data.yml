@@ -123,7 +123,7 @@ jobs:
             echo "::warning::MIHOMO_SUB_URL 拉取失败，本次直连"
             exit 0
           fi
-          if ! bun scripts/mihomo-config.ts /tmp/mihomo/subscription.yaml /tmp/mihomo/config.yaml; then
+          if ! bun scripts/cli.ts tool mihomo /tmp/mihomo/subscription.yaml /tmp/mihomo/config.yaml; then
             echo "::warning::订阅里没有可用节点，本次直连"
             exit 0
           fi
@@ -186,7 +186,7 @@ jobs:
           YT_COOKIES: ${{ secrets.YT_COOKIES }}
         run: |
           if [ -z "$YT_COOKIES" ]; then
-            echo "::error::Missing YT_COOKIES secret. Run: bun scripts/export-yt-cookies.ts --push"
+            echo "::error::Missing YT_COOKIES secret. Run: bun scripts/cli.ts tool cookies --push"
             exit 1
           fi
           printf '%s\n' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"
@@ -205,7 +205,7 @@ jobs:
           if [ -n "${YTDLP_PROXY:-}" ]; then
             common+=(--proxy "$YTDLP_PROXY")
           fi
-          probe=$(bun scripts/db-latest-video.ts 2>/dev/null || true)
+          probe=$(bun scripts/cli.ts db latest 2>/dev/null || true)
           if [ -z "$probe" ]; then
             channel=$(jq -r '.datasets[0].channelId' data-sources.json)
             probe=$(yt-dlp --flat-playlist --playlist-items 1 --print '%(id)s' "${common[@]}" \
@@ -234,7 +234,7 @@ jobs:
           if [ -n "${{ inputs.dataset }}" ]; then
             args+=(--dataset "${{ inputs.dataset }}")
           fi
-          bun scripts/daily-update.ts "${args[@]}"
+          bun scripts/cli.ts data update "${args[@]}"
 
       - name: Remove cookies
         if: always()

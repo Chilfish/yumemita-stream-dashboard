@@ -25,7 +25,7 @@
 - `scripts/dev-db.ts`：只做建库 + 迁移 + 补 `.dev.vars` 的独立命令。
 - `scripts/lib/local-config.ts`：`LOCAL=1` 的总开关与默认端点 / 凭据。
 - `scripts/lib/dev-silo.ts`：本地 SILO 的启动、建桶与匿名读策略。
-- `scripts/dev-storage.ts`：只准备本地对象存储（`bun run dev:storage`）。
+- `scripts/dev-storage.ts`：只准备本地对象存储（`bun run ymmt dev storage`）。
 
 ## 一次性安装（Windows / Scoop）
 
@@ -51,7 +51,7 @@ SILO 是 MinIO 的维护分支，保持 S3 API、`silo server` 命令与 `MINIO_
 - **macOS**：`brew tap pgsty/infra && brew install pgsty/infra/silo`。
 - **Linux**：下载对应 tar.gz，`sudo install -m 0755 silo /usr/local/bin/silo`。
 
-`bun run dev` / `bun run dev:storage` 会依次查找 `SILO_BIN` → `PATH` 的 `silo` →
+`bun run dev` / `bun run ymmt dev storage` 会依次查找 `SILO_BIN` → `PATH` 的 `silo` →
 Scoop 的 `apps/silo/current/silo.exe`，再回退到已安装的 `minio`（CLI 相同）。
 都找不到时只警告，不阻塞页面读库。
 
@@ -137,8 +137,8 @@ curl http://127.0.0.1:4444/health
 ```bash
 bun run dev:db                                        # 默认 postgres://postgres@localhost:5432/ymmt_dev
 bun run dev:db --url postgres://postgres@localhost:5433/ymmt_dev
-bun run dev:db:proxy                                  # 只起代理（前台）
-LOCAL=1 bun run dev:storage                           # 只准备 SILO 与本地桶
+bun run ymmt dev proxy                                  # 只起代理（前台）
+LOCAL=1 bun run ymmt dev storage                           # 只准备 SILO 与本地桶
 ```
 
 `dev:db` 会拉起 Postgres（未运行时）、补齐 `.dev.vars`、建库并应用迁移，但不起代理；`dev:db:proxy` 需要自己另开终端，`bun run dev` 一般不需要它。只跑 `publish:*` / `fetch:*` 时，先用 `dev:storage` 确认 SILO 就绪。
@@ -147,10 +147,10 @@ LOCAL=1 bun run dev:storage                           # 只准备 SILO 与本地
 
 ```bash
 # 全部成员（首次较慢）
-bun run dev:seed
+bun run ymmt db ingest
 
 # 只灌一个成员
-bun run dev:seed --dataset nonoka
+bun run ymmt db ingest --dataset nonoka
 ```
 
 灌数据写哪张库由 `LOCAL` 决定：`LOCAL=1` 时 `db:ingest` / `db:verify` / `db:query` 指向本地库，
@@ -170,7 +170,7 @@ bun run dev:seed --dataset nonoka
 - 普通键是本地值；`DATABASE_URL_ONLINE` 这类 `*_ONLINE` 是线上目标。
   `LOCAL=1` 用普通键（并忽略 `*_ONLINE`），`LOCAL=0` 用 `*_ONLINE` 覆盖同名键。
 - `LOCAL` 本身以运行环境为准：`LOCAL=0 bun run …` / `bun run dev --local` 都压过文件。
-- 文件只补运行环境里没有的键，所以 `DATABASE_URL=… bun run db:verify` 这种显式覆盖照样生效。
+- 文件只补运行环境里没有的键，所以 `DATABASE_URL=… bun run ymmt db verify` 这种显式覆盖照样生效。
 - 线上模式但 `DATABASE_URL` 仍指向本机时，加载器会清掉它并提示——正是为了拦住
   「对象传到 R2、元数据写进本地库」这种混合状态。
 - 开发服务器（`bun run dev`）不走上面的判定：它始终准备本机 Postgres / 代理。
@@ -209,16 +209,16 @@ kill $(lsof -ti :9000)
 | 启动时提示「数据目录不可用」 | 数据目录没初始化：`initdb -D <PGDATA>`；或 `PGDATA` 指错了 |
 | 页面 500，日志含「无法直连本地 Postgres」 | `.dev.vars` 缺 `NEON_HTTP_ENDPOINT`，或代理没启动；删掉该行后重跑 `bun run dev` 会自动补 |
 | 提示「端口已被另一个开发代理占用」 | 上一个代理连着别的库：按提示的 pid 停掉，或改 `DEV_DB_PROXY_PORT` 并同步 `.dev.vars` |
-| 页面空白 / 表为空 | 本地库还没灌数据：`bun run dev:seed` |
+| 页面空白 / 表为空 | 本地库还没灌数据：`bun run ymmt db ingest` |
 | `pg_isready` 无响应 | `pg_ctl status -D "$PGDATA"`；卡在恢复时看 `temp/postgres.log` |
 | 代理 400 | 代理会把 Postgres 报错原样返回；先修 SQL 或数据 |
 | Astro 报 `ECONNREFUSED`（miniflare） | Astro 被 Bun 执行了；`bun run dev` 已固定用 Node，不要改动 `scripts/dev.ts` 的启动方式 |
-| 端口占用 | `DEV_DB_PROXY_PORT=4445 bun run dev:db:proxy`，同时改 `.dev.vars` 的端点 |
+| 端口占用 | `DEV_DB_PROXY_PORT=4445 bun run ymmt dev proxy`，同时改 `.dev.vars` 的端点 |
 | `LOCAL=1` 但提示「未找到 silo」 | 安装 SILO 并加入 `PATH`，或设 `SILO_BIN`；页面读库仍可用，上传会失败 |
-| 封面 / 表情 404、逐字稿 503 | 先 `LOCAL=1 bun run dev:storage`；确认 `LOCAL=1` 对 dev 进程可见，媒体地址由 `astro.config.mjs` 注入为 `http://127.0.0.1:9000/yumemita-data`，且桶已设为匿名读 |
+| 封面 / 表情 404、逐字稿 503 | 先 `LOCAL=1 bun run ymmt dev storage`；确认 `LOCAL=1` 对 dev 进程可见，媒体地址由 `astro.config.mjs` 注入为 `http://127.0.0.1:9000/yumemita-data`，且桶已设为匿名读 |
 | 上传报 403 / SignatureDoesNotMatch | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` 与 SILO 启动时的 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` 不一致；默认都是 `silo-admin` |
 | 本地发布仍显示「跳过未变化」但桶是空的 | 本地进度在 `data/.publish-state.local.json`，`target` 应带 `local/`；确认 `LOCAL=1` 对当前进程可见，且没有被线上 `.publish-state.json` 干扰 |
 | SILO 启动失败 | 看 `temp/silo.log`；端口冲突时改 `S3_ENDPOINT` 与 `SILO_CONSOLE_PORT` |
 | 线上模式却提示「DATABASE_URL 指向本机」 | `.dev.vars` 只有本地 `DATABASE_URL`、没写 `DATABASE_URL_ONLINE`；补上线上地址，或确认这次本来就要跑本地（`LOCAL=1`） |
 | 改了 `.env` 却不生效 | 已经没有 `.env` 了：变量只有 `.dev.vars` 一个来源，`*_ONLINE` 是线上目标 |
-| 想临时只改一次数据库 | 直接传进程环境：`DATABASE_URL=… LOCAL=0 bun run db:verify` |
+| 想临时只改一次数据库 | 直接传进程环境：`DATABASE_URL=… LOCAL=0 bun run ymmt db verify` |

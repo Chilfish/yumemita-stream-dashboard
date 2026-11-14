@@ -40,16 +40,16 @@ tweets: []
 
 ```bash
 # 从模板建一篇，date / title 自动从 manifest 带出
-bun run transcript:new W0bKqP-Eyj4 --dataset nonoka
+bun run ymmt transcript new W0bKqP-Eyj4 --dataset nonoka
 
 # 导入已经写好的 Markdown（frontmatter 缺 videoId 时可用 --video-id 指定）
-bun run transcript:import "D:/messages/.../2026-10-13_ライブ振り返り.md" --dataset nonoka
+bun run ymmt transcript import "D:/messages/.../2026-10-13_ライブ振り返り.md" --dataset nonoka
 
 # 批量导入一个目录（不递归，跳过不合规的稿）
-bun run transcript:import "D:/messages/archives/.../配信" --dataset nonoka
+bun run ymmt transcript import "D:/messages/archives/.../配信" --dataset nonoka
 
 # 校验 + 发布到对象存储；加 --no-upload 只校验
-bun run publish:transcripts
+bun run ymmt publish transcripts
 ```
 
 导入会按 manifest 补 `date` / `title`，去掉 `archive-only` 段落，并拒绝会员限定场次（逐字稿只留在归档侧；确需例外加 `--allow-member-only`）。

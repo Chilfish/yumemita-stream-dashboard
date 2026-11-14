@@ -100,8 +100,8 @@ bunx wrangler r2 bucket cors list yumemita-data
 ### 内部 purge
 
 ```bash
-bun run purge:cache --dataset nonoka --video <videoId>
-bun scripts/purge-cache.ts --tags group,sitemap,llms
+bun run ymmt publish purge --dataset nonoka --video <videoId>
+bun run ymmt publish purge --tags group,sitemap,llms
 ```
 
 ```http
@@ -142,7 +142,7 @@ checkout → Bun / Node / Deno / yt-dlp / PO token / mihomo
 
 ```bash
 bun run db:generate     # 生成 SQL
-bun run db:migrate      # 应用到 DATABASE_URL
+bun run ymmt db migrate      # 应用到 DATABASE_URL
 ```
 
 - 先加列 / 建表（向后兼容），再部署使用新列的代码；删除列放到下一次。
@@ -152,8 +152,8 @@ bun run db:migrate      # 应用到 DATABASE_URL
 
 ```bash
 bun run preview
-bun run test:smoke
-BASE_URL=https://ymmt.chilfish.top bun run test:smoke   # 线上
+bun run ymmt test smoke
+BASE_URL=https://ymmt.chilfish.top bun run ymmt test smoke   # 线上
 ```
 
 冒烟覆盖 `/`、`/gallery`、成员 6 个栏目、单场、`.md`、302、404、sitemap、llms、robots。

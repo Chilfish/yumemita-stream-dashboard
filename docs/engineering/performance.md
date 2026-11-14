@@ -19,7 +19,7 @@
 ```bash
 bun run build
 bunx wrangler dev --config dist/server/wrangler.json --port 8787 --ip 127.0.0.1
-bun run perf:smoke -- --url http://127.0.0.1:8787
+bun run ymmt test perf -- --url http://127.0.0.1:8787
 ```
 
 `perf:smoke` 每个 URL 请求 5 次，输出响应体中位数、耗时中位数、`cache-tag` 与 `content-type`。
@@ -44,13 +44,13 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 
 - 响应头带 `cloudflare-cdn-cache-control` 与 `Cache-Tag`；middleware 同步一份 `Cache-Control`，让 `<link rel=prefetch>` 的预取能被浏览器复用。
 - 耗时是**本机跨区**访问 Neon 的数字（每轮并行查询 ≈ 1 个 RTT）。同区 Worker + Neon 会低一个量级；线上以 `Cf-Cache-Status` 与 `x-response-time` 为准。
-- `bun run db:query`（列表 + insights，全量场次）：p50 122.5 ms / p95 247.6 ms。
+- `bun run ymmt db query`（列表 + insights，全量场次）：p50 122.5 ms / p95 247.6 ms。
 - 首次请求冷，后续命中 Workers Cache 后只付边缘响应；本地 `wrangler dev` 不复现 Cache HIT，需线上观察。
 
 ### 数据库读路径（2026-11-05）
 
 本地库：1,901 场、5 个成员、`stream_words` 10.3 万行、`stream_authors` 6.1 万行、库大小 59 MB。
-`bun run db:bench` 经本机 Neon HTTP 代理（与 workerd 相同的 `neon-http` 驱动）统计冷渲染的 SQL 条数、`/sql` 请求数与 p50/p95。
+`bun run ymmt db bench` 经本机 Neon HTTP 代理（与 workerd 相同的 `neon-http` 驱动）统计冷渲染的 SQL 条数、`/sql` 请求数与 p50/p95。
 
 | 场景 | 改造前 SQL / HTTP | 改造后 SQL / HTTP | 改造后 p50 / p95 |
 | --- | ---: | ---: | ---: |
@@ -75,8 +75,8 @@ bun run perf:smoke -- --url http://127.0.0.1:8787
 
 ```bash
 bun run dev:db
-bun run db:bench -- --rounds 20 --label after
-bun run db:query
+bun run ymmt db bench -- --rounds 20 --label after
+bun run ymmt db query
 ```
 
 ### 客户端与单场页（2026-11-05 收尾）
@@ -102,7 +102,7 @@ bun run db:query
 ```bash
 bun run build
 bun run preview -- --port 4322
-bun run db:bench -- --rounds 10 --label after-client-perf-3
+bun run ymmt db bench -- --rounds 10 --label after-client-perf-3
 ```
 
 生产 preview 的页面体积：
@@ -181,11 +181,11 @@ bun run db:bench -- --rounds 10 --label after-client-perf-3
 ```bash
 bun run check            # astro check + test + lint
 bun run build            # astro build（Worker + 预渲染 404/500/about）
-bun run db:query         # 查询层冒烟 + P50/P95
-bun run db:bench         # 冷渲染 SQL / HTTP 往返与 p50/p95（本地库）
-bun run db:verify        # 改 ingest / 数据时
-bun run perf:smoke -- --url http://127.0.0.1:8787
-bun run test:smoke       # 功能性路由冒烟
+bun run ymmt db query         # 查询层冒烟 + P50/P95
+bun run ymmt db bench         # 冷渲染 SQL / HTTP 往返与 p50/p95（本地库）
+bun run ymmt db verify        # 改 ingest / 数据时
+bun run ymmt test perf -- --url http://127.0.0.1:8787
+bun run ymmt test smoke       # 功能性路由冒烟
 ```
 
 重点看：

@@ -107,7 +107,7 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 - 覆盖：`src/lib/` 纯函数（聚合、格式化、路由、表格参数、分类、快捷键）与关键数据转换。
 - 结构：Given-When-Then；每条 `it` 至少一条断言。
 - 禁止空 `describe`、全 `skip`、`only` 或条件断言冒充通过。
-- 路由冒烟：`bun run test:smoke`（先启动 dev / preview）。
+- 路由冒烟：`bun run ymmt test smoke`（先启动 dev / preview）。
 - 组件不强制单测；交互复杂时再加 `@testing-library/react`。
 
 ## 禁止事项
@@ -129,7 +129,7 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 ## 验证与诚实
 
 - 当前门禁：`bun run check`（typecheck + test + lint）与 `bun run build`。
-- 数据改动：`bun run validate:data`；发布后 `--remote` 确认可达。
+- 数据改动：`bun run ymmt validate data`；发布后 `--remote` 确认可达。
 - 涉及页面：在 `bun run dev` 或 `bun run preview` 下手工走查，写清路径与结果。
 - 不把「构建通过」当作功能已验证；未执行的检查标注「未验证」。
 - 不接受「既有红灯」作为基线；已知失败先修或移除。

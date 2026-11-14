@@ -15,6 +15,7 @@
 | 新增功能 / 判断边界 | [requirements-spec.md](./docs/requirements/requirements-spec.md) |
 | 架构 / 数据流 / 路由 | [architecture.md](./docs/planning/architecture.md) |
 | 写代码 | [code-style.md](./docs/engineering/code-style.md) |
+| 改 / 跑脚本 | [cli.md](./docs/engineering/cli.md) |
 | 改 UI / 判断信息该不该上屏 | [ui-design/README.md](./docs/ui-design/README.md) + [information-density.md](./docs/ui-design/information-density.md) |
 | 写码前防复现 | [postmortem/README.md](./docs/postmortem/README.md) |
 

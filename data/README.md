@@ -49,16 +49,16 @@ data/
 
 ```bash
 # 单场：放进暂存区并更新本地 manifest
-bun run add:datapack nonoka /path/to/<videoId>.datapack.json
+bun scripts/oneoff/add-datapack.mjs nonoka /path/to/<videoId>.datapack.json
 
 # 投影到 Neon PostgreSQL（增量；先 --limit 小批量验证）
-bun run db:ingest
-bun run db:verify
+bun run ymmt db ingest
+bun run ymmt db verify
 
 # 上传封面 / 表情 / archive（增量）
-bun run publish:assets
-bun run purge:cache --dataset <id>
-bun run validate:data
+bun run ymmt publish data --assets-only
+bun run ymmt publish purge --dataset <id>
+bun run ymmt validate data
 ```
 
 页面请求期查数据库；本地 pack 仍是唯一真源。R2 只保留封面、表情、逐字稿正文与原始 pack 归档。
