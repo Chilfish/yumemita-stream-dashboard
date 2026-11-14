@@ -137,6 +137,23 @@ export function buildRecentStreamsQuery(db: Db) {
     .limit(GROUP_RECENT_LIMIT)
 }
 
+/** 联动关系视图只需要这几列；会员限定场只参与计数，不展示指标。 */
+const COLLABORATION_COLUMNS = {
+  videoId: streams.videoId,
+  datasetId: streams.datasetId,
+  participants: streams.participants,
+  date: streams.date,
+  title: streams.title,
+}
+
+export function buildCollaborationStreamsQuery(db: Db) {
+  return db
+    .select(COLLABORATION_COLUMNS)
+    .from(streams)
+    .where(sql`cardinality(${streams.participants}) > 0`)
+    .orderBy(NEWEST_FIRST)
+}
+
 type GroupStreamRow = Awaited<ReturnType<typeof buildRecentStreamsQuery>>[number]
 
 export function mapGroupStreams(rows: GroupStreamRow[]): GroupStreamSummary[] {

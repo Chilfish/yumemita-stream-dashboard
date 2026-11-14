@@ -110,8 +110,8 @@ function DatasetShell(props: DatasetPageProps) {
 
   // Provider value 必须稳定：否则打开命令面板或切换主题会让正文与图表整页重算。
   const viewValue = useMemo(
-    () => (totals ? { dataset, manifest, rows, totals } : null),
-    [dataset, manifest, rows, totals],
+    () => (totals ? { dataset, datasets, manifest, rows, totals } : null),
+    [dataset, datasets, manifest, rows, totals],
   )
 
   useKeyboardShortcuts({

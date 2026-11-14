@@ -1,6 +1,7 @@
 import { Link } from "@/lib/router-compat";
 import { CopyLinkButton } from "@/components/dashboard/primitives/copy-link-button";
 import { HomeCalendar } from "@/components/dashboard/home/home-calendar";
+import { HomeCoMembers } from "@/components/dashboard/home/home-co-members";
 import { HomeLatestStream } from "@/components/dashboard/home/home-latest-stream";
 import { HomeMonthPanel } from "@/components/dashboard/home/home-month-panel";
 import { HomeRecentStreams } from "@/components/dashboard/home/home-recent-streams";
@@ -23,6 +24,7 @@ import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/da
 
 interface MemberHomeViewProps {
   dataset: DatasetIndexEntry;
+  datasets: DatasetIndexEntry[];
   manifest: BatchManifest;
   rows: StreamSummary[];
   totals: DatasetTotals;
@@ -63,7 +65,7 @@ function HeadlineStats({ items }: { items: HeadlineStat[] }) {
   );
 }
 
-export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeViewProps) {
+export function MemberHomeView({ dataset, datasets, manifest, rows, totals }: MemberHomeViewProps) {
   // 首页大图只放公开场次，会员限定不占主视觉。
   const latest = rows.find(row => !isMemberOnly(row.availability)) ?? null;
   const oldest = rows.at(-1) ?? null;
@@ -176,6 +178,13 @@ export function MemberHomeView({ dataset, manifest, rows, totals }: MemberHomeVi
       ) : null}
 
       <HomeRecentStreams datasetId={dataset.id} rows={rows} />
+
+      <HomeCoMembers
+        datasetId={dataset.id}
+        datasets={datasets}
+        rows={rows}
+        totalStreams={totals.streamCount}
+      />
 
       <HomeCalendar rows={rows} />
 

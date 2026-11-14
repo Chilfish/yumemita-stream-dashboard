@@ -11,6 +11,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { homePath, type GroupViewKey } from '@/lib/routes'
 import { RouterProvider, useNavigate } from '@/lib/router-compat'
 import type { GroupData } from '@/lib/group'
+import type { CollaborationStream } from '@/lib/collaboration'
 import type { CalendarPageData, DayPlan } from '@/types/calendar'
 import type { GroupCompareData } from '@/types/compare'
 import type { DatasetIndexEntry } from '@/types/dataset'
@@ -31,6 +32,8 @@ export interface GroupPageProps {
   todayMonthDay?: string
   /** 组首页「那年今日」的往期场次。 */
   onThisDay?: GroupStreamSummary[]
+  /** 组首页联动关系视图的场次；其他页面为空。 */
+  collaborations?: CollaborationStream[]
   view: GroupView
   section: GroupViewKey
   pathname: string
@@ -55,6 +58,7 @@ function GroupShell({
   today,
   todayMonthDay,
   onThisDay,
+  collaborations = [],
   section,
   pathname,
 }: GroupPageProps) {
@@ -112,6 +116,7 @@ function GroupShell({
                           ? <GroupGalleryPage today={today ?? ''} todayMonthDay={todayMonthDay ?? ''} />
                           : (
                             <GroupHomePage
+                              collaborations={collaborations}
                               dayPlan={dayPlan}
                               monthDay={todayMonthDay ?? ''}
                               onThisDay={onThisDay ?? []}

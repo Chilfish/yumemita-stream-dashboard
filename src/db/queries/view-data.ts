@@ -2,6 +2,7 @@ import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
 import type { DatasetTotals } from '@/lib/aggregate'
 import { buildGroupDataFromStreams, buildGroupDataFromSummary, type GroupData } from '@/lib/group'
+import { toCollaborationStream, type CollaborationStream } from '@/lib/collaboration'
 import { addDays, currentJstDay } from '@/lib/calendar'
 import type { CalendarMember, DayPlan } from '@/types/calendar'
 import type { DatasetIndexEntry, StreamNavItem, StreamSummary } from '@/types/dataset'
@@ -22,6 +23,7 @@ import {
 } from './datasets'
 import {
   assembleGroupSummary,
+  buildCollaborationStreamsQuery,
   buildGroupGalleryQuery,
   buildGroupSummaryQueries,
   buildOnThisDayQuery,
@@ -65,6 +67,8 @@ export interface DatasetPageData {
 export interface GroupPageData {
   datasets: DatasetIndexEntry[]
   data: GroupData
+  /** 组首页联动关系视图的场次；相册等页面为空数组。 */
+  collaborations: CollaborationStream[]
   /** 组首页的今天 / 明天计划；其他页面为 null。 */
   dayPlan: DayPlan | null
   /** JST 今天的完整日期 `YYYY-MM-DD`，相册据此排除今天的场次。 */
@@ -73,6 +77,22 @@ export interface GroupPageData {
   todayMonthDay: string
   /** 组首页「那年今日」的往期场次；其他页面为空数组。 */
   onThisDay: GroupStreamSummary[]
+}
+
+function mapCollaborations(
+  rows: Awaited<ReturnType<typeof buildCollaborationStreamsQuery>>,
+): CollaborationStream[] {
+  return rows
+    .map(row =>
+      toCollaborationStream({
+        videoId: row.videoId,
+        datasetId: row.datasetId,
+        participants: row.participants ?? [],
+        date: row.date ?? '',
+        title: row.title,
+      }),
+    )
+    .filter((row): row is CollaborationStream => row !== null)
 }
 
 export function toIndex(rows: Awaited<ReturnType<typeof getDatasets>>): DatasetIndexEntry[] {
@@ -199,6 +219,7 @@ export async function getGroupPageData(
     return {
       datasets,
       data: buildGroupDataFromStreams(datasets, mapGroupStreams(streamRows)),
+      collaborations: [],
       dayPlan: null,
       today,
       todayMonthDay,
@@ -207,11 +228,12 @@ export async function getGroupPageData(
   }
 
   if (!options.withToday) {
-    const [datasetRows, members, days, latest, recent, participantRows] = await runBatch<
-      [DatasetQueryRow[], ...GroupSummaryParts]
+    const [datasetRows, members, days, latest, recent, participantRows, collaborationRows] = await runBatch<
+      [DatasetQueryRow[], ...GroupSummaryParts, Awaited<ReturnType<typeof buildCollaborationStreamsQuery>>]
     >(db, [
       selectDatasetsQuery(db, undefined),
       ...buildGroupSummaryQueries(db),
+      buildCollaborationStreamsQuery(db),
     ])
     const datasets = toIndex(datasetRows.map(mapDataset))
     return {
@@ -220,6 +242,7 @@ export async function getGroupPageData(
         datasets,
         assembleGroupSummary(members, days, latest, recent, participantRows),
       ),
+      collaborations: mapCollaborations(collaborationRows),
       dayPlan: null,
       today,
       todayMonthDay,
@@ -234,6 +257,7 @@ export async function getGroupPageData(
     latest,
     recent,
     participantRows,
+    collaborationRows,
     todayStreams,
     todaySchedules,
     onThisDayRows,
@@ -241,6 +265,7 @@ export async function getGroupPageData(
     [
       DatasetQueryRow[],
       ...GroupSummaryParts,
+      Awaited<ReturnType<typeof buildCollaborationStreamsQuery>>,
       CalendarStreamRow[],
       CalendarScheduleRow[],
       Awaited<ReturnType<typeof buildOnThisDayQuery>>,
@@ -248,6 +273,7 @@ export async function getGroupPageData(
   >(db, [
     selectDatasetsQuery(db, undefined),
     ...buildGroupSummaryQueries(db),
+    buildCollaborationStreamsQuery(db),
     buildStreamQueries(db, { from: today, to: tomorrow }),
     buildScheduleQueries(db, { from: today, to: tomorrow }),
     buildOnThisDayQuery(db, todayMonthDay, today),
@@ -265,6 +291,7 @@ export async function getGroupPageData(
   return {
     datasets,
     data: buildGroupDataFromSummary(datasets, summary),
+    collaborations: mapCollaborations(collaborationRows),
     dayPlan: buildDayPlanFromRows(todayStreams, todaySchedules, calendarMembers, now, 2),
     today,
     todayMonthDay,

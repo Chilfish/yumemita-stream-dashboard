@@ -4,6 +4,8 @@ import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/da
 
 export interface DatasetViewValue {
   dataset: DatasetIndexEntry;
+  /** 全部成员，用于把参与者 id 换成名称与颜色。 */
+  datasets: DatasetIndexEntry[];
   manifest: BatchManifest;
   rows: StreamSummary[];
   totals: DatasetTotals;

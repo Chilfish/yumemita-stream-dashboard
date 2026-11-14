@@ -1,4 +1,5 @@
 import { GroupHero } from "@/components/dashboard/group/group-hero";
+import { GroupCollaborationMatrix } from "@/components/dashboard/group/group-collaboration-matrix";
 import { GroupMemberPanel } from "@/components/dashboard/group/group-member-panel";
 import { GroupOnThisDay } from "@/components/dashboard/group/group-on-this-day";
 import { GroupPulse } from "@/components/dashboard/group/group-pulse";
@@ -6,6 +7,7 @@ import { DayTimeline, DayTimelineLink } from "@/components/dashboard/calendar/da
 import { useGroupDataContext } from "@/components/dashboard/contexts/group-data-context";
 import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { formatDate, formatTime } from "@/lib/format";
+import type { CollaborationStream } from "@/lib/collaboration";
 import type { DayPlan } from "@/types/calendar";
 import type { GroupStreamSummary } from "@/types/group";
 
@@ -14,13 +16,14 @@ interface GroupHomePageProps {
   /** JST 今天的 `MM-DD`。 */
   monthDay?: string;
   onThisDay?: GroupStreamSummary[];
+  collaborations?: CollaborationStream[];
 }
 
 /**
  * 组首页：先回答「最近谁播了」，再给全组状态，最后才是浏览入口。
  * 顺序即优先级——脉冲只有三行数字，hero 拿走整块封面，最近更新与入口留在下面。
  */
-export function GroupHomePage({ dayPlan, monthDay = "", onThisDay = [] }: GroupHomePageProps) {
+export function GroupHomePage({ dayPlan, monthDay = "", onThisDay = [], collaborations = [] }: GroupHomePageProps) {
   const { attendanceEnd, attendanceStart, days, members, rows, totals } = useGroupDataContext();
   const latest = rows[0] ?? null;
 
@@ -45,6 +48,7 @@ export function GroupHomePage({ dayPlan, monthDay = "", onThisDay = [] }: GroupH
         days={days}
         members={members}
       />
+      <GroupCollaborationMatrix collaborations={collaborations} members={members} />
     </div>
   );
 }
