@@ -359,7 +359,7 @@ T+1d   日历读取时命中 streams → done，链到单场页
 2. 「今天与明天」时间线：按 JST 自然日分组，跨天朝活放在「明天」；不再使用「接下来 · 7 天」横条。
 3. 视图切换：`SegmentedControl` 月 / 列表。
 4. 月网格或议程列表。
-5. 页脚 `PanelNote`：图例与口径说明。
+5. 页脚图例：一行状态说明，不写统计口径。
 
 ### 7.4 月网格规格
 
@@ -412,7 +412,7 @@ chip 标题     text-footnote text-foreground
 
 | 需求 | 组件 | 说明 |
 | --- | --- | --- |
-| 页面外壳 | `Panel` / `PanelHead` / `PanelBody` / `PanelNote` | 与现有 dashboard 一致；`PanelBody` 用 `flush` 去掉内边距，让网格贴边 |
+| 页面外壳 | `Panel` / `PanelHead` / `PanelBody` | 与现有 dashboard 一致；`PanelBody` 用 `flush` 去掉内边距，让网格贴边 |
 | 页头 | `PageHeader` | 标题、facts、操作区 |
 | 视图切换 | `SegmentedControl` | 月 / 列表 |
 | 月份切换 | `Button variant="ghost" size="icon-sm"` | `ChevronLeft` / `ChevronRight`，带 `aria-label` |
