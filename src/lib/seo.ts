@@ -29,6 +29,8 @@ export type SeoDataset = {
   id: string;
   label: string;
   count?: number | null;
+  /** 已解析成绝对地址的成员头像；没有头像时为 null。 */
+  avatarImage?: string | null;
 };
 
 export type SeoStream = {
@@ -285,6 +287,37 @@ function websiteJsonLd(origin: string, basePath: string, description: string): R
   };
 }
 
+/**
+ * 站点实体。`WebSite` 描述的是这个站，`Organization` 才描述「夢限大みゅーたいぷ 数据台」
+ * 这个署名方；成员页的 `Person.worksFor` 指向它。
+ */
+function organizationJsonLd(origin: string, basePath: string): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE_NAME,
+    alternateName: GROUP_NAME,
+    url: absoluteUrl(origin, basePath, "/"),
+    logo: absoluteUrl(origin, basePath, "/icon-512.png"),
+  };
+}
+
+/** 成员页的 `Person`：名字 + 站内主页 + 所属站点实体。 */
+function personJsonLd(
+  origin: string,
+  basePath: string,
+  dataset: SeoDataset,
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: dataset.label,
+    url: absoluteUrl(origin, basePath, `/${dataset.id}`),
+    ...(dataset.avatarImage ? { image: dataset.avatarImage } : {}),
+    worksFor: organizationJsonLd(origin, basePath),
+  };
+}
+
 function imageAltFor(ctx: SeoContext): string | null {
   if (!ctx.image) return null;
   if (ctx.stream) {
@@ -410,7 +443,10 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
       robots,
       ogType: "website",
       publishedTime: null,
-      jsonLd: [websiteJsonLd(ctx.origin, ctx.basePath, description)],
+      jsonLd: [
+        organizationJsonLd(ctx.origin, ctx.basePath),
+        websiteJsonLd(ctx.origin, ctx.basePath, description),
+      ],
     };
   }
 
@@ -434,7 +470,7 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
     const stream = ctx.stream;
     const date = formatDate(stream.startedAt);
     const description = streamDescription(stream, dataset.label, date);
-    const title = `${truncateText(stream.title, 40)} · ${dataset.label} | ${SITE_NAME}`;
+    const title = `${truncateText(stream.title, 34)} · ${dataset.label} | ${SITE_NAME}`;
 
     const duration = isoDuration(stream.durationSec);
     const streamUrl = absoluteUrl(
@@ -524,7 +560,10 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
     robots,
     ogType: "website",
     publishedTime: null,
-    jsonLd: [breadcrumbList(ctx.origin, ctx.basePath, breadcrumb)],
+    jsonLd: [
+      personJsonLd(ctx.origin, ctx.basePath, dataset),
+      breadcrumbList(ctx.origin, ctx.basePath, breadcrumb),
+    ],
   };
 }
 

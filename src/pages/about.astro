@@ -19,10 +19,13 @@ catch (error) {
 
 if (data) Astro.cache.set({ maxAge: 3600, swr: 86400, tags: ['group'] })
 
+const latest = data?.data.rows[0] ?? null
 const meta = pageSeo(Astro, {
   section: 'about',
   memberCount: data?.datasets.length ?? null,
   streamCount: data?.data.totals.streamCount ?? null,
+  updatedAt: latest?.startedAt ?? null,
+  imageStream: latest ? { datasetId: latest.datasetId, videoId: latest.videoId } : null,
 })
 ---
 

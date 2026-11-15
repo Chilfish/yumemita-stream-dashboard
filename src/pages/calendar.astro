@@ -46,10 +46,15 @@ catch (error) {
 
 if (calendar) Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group', 'schedule'] })
 
+// 日历没有「最新一场」可当分享图，取窗口里第一场已结束的直播封面。
+const latest = calendar?.events.find(event => event.videoId) ?? null
 const meta = pageSeo(Astro, {
   section: 'calendar',
   memberCount: datasets.length || null,
   streamCount: datasets.reduce((total, dataset) => total + dataset.count, 0) || null,
+  imageStream: latest?.videoId
+    ? { datasetId: latest.datasetId, videoId: latest.videoId }
+    : null,
 })
 ---
 

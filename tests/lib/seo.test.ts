@@ -48,14 +48,14 @@ describe("URL 拼接", () => {
 });
 
 describe("组级页面", () => {
-  it("首页是 WebSite 结构化数据", () => {
+  it("首页带 Organization 与 WebSite 结构化数据", () => {
     const meta = build({ memberCount: 5, streamCount: 1891, updatedAt: "2026-10-29T12:00:00Z" });
     expect(meta.title).toContain("夢限大みゅーたいぷ");
     expect(meta.description).toContain("5 位成员");
     expect(meta.description).toContain("1,891 场直播");
     expect(meta.canonical).toBe("https://example.com/dashboard/");
     expect(meta.robots).toBe("index,follow");
-    expect(meta.jsonLd[0]?.["@type"]).toBe("WebSite");
+    expect(meta.jsonLd.map(item => item["@type"])).toEqual(["Organization", "WebSite"]);
   });
 
   it("全组相册有自己的标题", () => {
@@ -107,6 +107,19 @@ describe("成员页面", () => {
   it("对比页不收录", () => {
     const meta = build({ dataset, pathname: "/nonoka/compare", section: "compare" });
     expect(meta.robots).toBe("noindex,follow");
+  });
+
+  it("成员页输出 Person，并把头像解析进 image", () => {
+    const meta = build({
+      dataset: { ...dataset, avatarImage: "https://cdn.example.com/avatars/nonoka.webp" },
+      pathname: "/nonoka",
+    });
+    const person = meta.jsonLd.find(item => item["@type"] === "Person");
+    expect(person).toBeTruthy();
+    expect(person?.name).toBe("宮永ののか");
+    expect(person?.url).toBe("https://example.com/dashboard/nonoka");
+    expect(person?.image).toBe("https://cdn.example.com/avatars/nonoka.webp");
+    expect((person?.worksFor as Record<string, unknown>)["@type"]).toBe("Organization");
   });
 });
 
@@ -171,8 +184,10 @@ describe("单场页", () => {
       section: "stream",
       stream: { ...stream, title: "あ".repeat(80) },
     });
-    expect(meta.title.startsWith("あ".repeat(39))).toBe(true);
+    expect(meta.title.startsWith("あ".repeat(33))).toBe(true);
     expect(meta.title).toContain("…");
+    // 搜索结果里 60 字以上会被截断；截断逻辑必须保证整条 title 不越界。
+    expect(Array.from(meta.title).length).toBeLessThanOrEqual(60);
   });
 
   it("缺少指标时不出现占位符", () => {

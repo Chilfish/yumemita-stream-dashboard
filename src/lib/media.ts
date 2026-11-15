@@ -21,6 +21,11 @@ export function thumbnailSrcSet(datasetId: string, videoId: string): string {
   ).join(', ')
 }
 
+/** 成员头像：key 形如 `avatars/...`；没有头像时返回 null。 */
+export function avatarUrl(key: string | null | undefined): string | null {
+  return key ? assetUrl(key) : null;
+}
+
 /** 频道专属表情：`emojis/<dataset>/<hash>.png`；id 不合法时返回 null。 */
 export function emojiUrl(datasetId: string, emojiId: string): string | null {
   const file = emojiFileName(emojiId)
