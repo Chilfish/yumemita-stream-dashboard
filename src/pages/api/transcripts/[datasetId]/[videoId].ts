@@ -83,7 +83,10 @@ export const GET: APIRoute = async (context) => {
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'link': `<${(context.site?.origin ?? DEFAULT_SITE_URL).replace(/\/+$/, '')}/schemas/transcript.v1.json>; rel="describedby"; type="application/schema+json"`,
-      ...(access.keyed ? { 'cache-control': 'private, no-store' } : {}),
+      // 边缘缓存之外还要让浏览器能复用：正文是不可变的派生对象，和 `cache.set` 的口径保持一致。
+      'cache-control': access.keyed
+        ? 'private, no-store'
+        : 'public, max-age=3600, stale-while-revalidate=86400',
     },
   })
 }
