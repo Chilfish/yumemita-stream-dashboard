@@ -1,7 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro'
 import ErrorState from '@/components/shared/ErrorState.astro'
-import { DatasetPage } from '@/components/app/dataset-page'
+import { StreamApp } from '@/components/app/views/stream-app'
 import { db } from '@/db/client'
 import { getStreamPageData, getStreamPageExtras } from '@/db/queries/view-data'
 import { memberOnlyCachePolicy } from '@/lib/member-access'
@@ -153,7 +153,7 @@ const markdownHref = summary && !blocked
       )
     : data && summary
     ? (
-        <DatasetPage
+        <StreamApp
           client:idle
           compareDensities={{}}
           dataset={data.dataset}

@@ -1,7 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro'
 import ErrorState from '@/components/shared/ErrorState.astro'
-import { DatasetPage } from '@/components/app/dataset-page'
+import { TranscriptsApp } from '@/components/app/views/transcripts-app'
 import { db } from '@/db/client'
 import { getTranscriptIndex } from '@/db/queries/transcripts'
 import { getDatasetPageData } from '@/db/queries/view-data'
@@ -53,7 +53,7 @@ const meta = data
 <Layout meta={meta}>
   {data
     ? (
-        <DatasetPage
+        <TranscriptsApp
           client:idle
           compareDensities={{}}
           dataset={data.dataset}

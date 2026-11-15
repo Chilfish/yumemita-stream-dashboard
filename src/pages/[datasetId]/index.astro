@@ -1,7 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro'
 import ErrorState from '@/components/shared/ErrorState.astro'
-import { DatasetPage } from '@/components/app/dataset-page'
+import { HomeApp } from '@/components/app/views/home-app'
 import { db } from '@/db/client'
 import { getDatasetPageData } from '@/db/queries/view-data'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
@@ -45,7 +45,7 @@ const meta = data
 <Layout meta={meta}>
   {data
     ? (
-        <DatasetPage
+        <HomeApp
           client:idle
           compareDensities={{}}
           dataset={data.dataset}

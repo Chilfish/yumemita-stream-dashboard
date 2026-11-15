@@ -1,7 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro'
 import ErrorState from '@/components/shared/ErrorState.astro'
-import { DatasetPage } from '@/components/app/dataset-page'
+import { CalendarApp } from '@/components/app/views/calendar-app'
 import { db } from '@/db/client'
 import { getCalendarData } from '@/db/queries/calendar'
 import { getDatasets } from '@/db/queries/datasets'
@@ -71,7 +71,7 @@ const meta = dataset
 <Layout meta={meta}>
   {dataset && calendar
     ? (
-        <DatasetPage
+        <CalendarApp
           client:idle
           calendar={calendar}
           compareDensities={{}}

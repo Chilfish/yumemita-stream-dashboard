@@ -1,7 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro'
 import ErrorState from '@/components/shared/ErrorState.astro'
-import { GroupPage } from '@/components/app/group-page'
+import { GroupCompareApp } from '@/components/app/views/group-compare-app'
 import { db } from '@/db/client'
 import { getGroupCompareData, type GroupComparePageData } from '@/db/queries/group-compare'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
@@ -35,7 +35,7 @@ const meta = pageSeo(Astro, {
 <Layout meta={meta}>
   {pageData
     ? (
-        <GroupPage
+        <GroupCompareApp
           client:idle
           compare={pageData.data}
           data={null}
