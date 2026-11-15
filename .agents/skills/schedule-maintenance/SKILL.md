@@ -25,7 +25,8 @@ metadata:
 
 1. 找到当前仓库根目录（包含 `.dev.vars` 与 `package.json`）。
 2. 选择目标：
-   - **本地**：`http://localhost:4321`。未启动时运行 `bun run dev`。
+   - **本地**：`http://localhost:4321`。未启动时运行 `bun run ymmt dev server`
+     （`bun run dev` 只打印子命令帮助，不会起服务；起完等到 4321 返回 401 才算就绪）。
    - **线上**：读取 `.dev.vars` 里的 `SITE_URL`，例如 `https://ymmt.chilfish.top`。
 3. 从 `.dev.vars` 读取 `ADMIN_USER` 与 `ADMIN_PASSWORD`，只在 curl 命令里使用。
    - 不要在回复里打印、复述或写入任何凭据。
@@ -78,8 +79,28 @@ metadata:
 预告里带 YouTube 链接时，标题与开播时间以 yt-dlp 为准，推文文案只作兜底：
 
 - 推文标题常被手写缩写（「リベンジ！歌枠！！」），完整标题里才有【#歌枠】、成员名等可检索信息。
-- `release_timestamp` 给出精确开播时刻，比「22:00」这类口头时间可靠。
+- `release_timestamp` 已排期时给出精确开播时刻，比「22:00」这类口头时间可靠；
+  但先按下一节验真，占位值不可用。
 - `availability` 能区分会员限定，避免把 `subscriber_only` 的场次当公开场。
+
+### 先验真：元信息可能是占位值
+
+未开播的直播页在创建后、正式排期前，YouTube 会返回一个**假排期**，`release_timestamp`
+通常是 `2028-01-01T23:30+09:00`、`2028-09-07T23:45+09:00` 这类固定占位值，`timestamp`
+同理（epoch 对应 2024 年）。它不是真实开播时间，照抄会把日程写到两年后。
+
+每次拿到元信息都要过一遍：
+
+1. 把 `release_timestamp` 转 JST，和当前时间、推文预告的日期对照。
+   差值离谱（跨年）、或落在 `2028-01-01` / `2028-09-07` 附近，一律判定为占位。
+2. 同时看 `live_status`：占位视频长期停在 `is_upcoming`，即使推文说的时间已过多时也不开播。
+3. 占位时**不要**用它的时间，退回推文口径（`date + slot` 或推文里的 `HH:00`），
+   并**不要**顺手把该视频的「最新 upcoming」当成这一场的链接——链接要能对上内容与时间。
+4. 判断今天真正在播哪场，看成员的 `/streams` 列表里 `is_live` 的那条，
+   用它的标题与 id 回填；`is_upcoming` 的占位条目一律忽略。
+
+推文只给频道首页（`youtube.com/@xxx_yumemita`）而不是 `/watch` 或 `/live` 链接时，
+说明官方没给具体视频，此时查频道更像是「确认有没有已经开起来的场」，不是「认领视频」。
 
 ```powershell
 $url = 'https://www.youtube.com/live/z0GRgSUrY0A'
@@ -87,6 +108,7 @@ $meta = yt-dlp -J --skip-download --no-warnings --ignore-no-formats-error $url |
 
 $meta.id, $meta.title, $meta.live_status, $meta.availability, $meta.channel_id, $meta.duration
 [DateTimeOffset]::FromUnixTimeSeconds($meta.release_timestamp).ToOffset([TimeSpan]::FromHours(9)).ToString('yyyy-MM-ddTHH:mm:ss+09:00')
+"now: " + [DateTimeOffset]::UtcNow.ToOffset([TimeSpan]::FromHours(9)).ToString('yyyy-MM-dd HH:mm')
 ```
 
 - `--ignore-no-formats-error` 必加：未开播的直播本来没有任何格式，不加会直接报
@@ -101,7 +123,7 @@ $meta.id, $meta.title, $meta.live_status, $meta.availability, $meta.channel_id, 
 | yt-dlp 字段 | 用法 |
 | --- | --- |
 | `title` | 直接作 `title`，保留完整标题，不改写、不截断 |
-| `release_timestamp` | 转成带 `+09:00` 的 ISO 时间作 `scheduledAt`，`date` / `slot` 由服务端派生 |
+| `release_timestamp` | 验真后转成带 `+09:00` 的 ISO 时间作 `scheduledAt`，`date` / `slot` 由服务端派生；占位值不用 |
 | `availability` | `subscriber_only` 原样传；`public` 可省略 |
 | `duration` | 仅已结束场次有值；取分钟数作 `expectedMinutes`（服务端限制 15–720） |
 | `channel_id` | 对照 `data-sources.json` 校验成员，防止贴错链接 |
@@ -233,6 +255,16 @@ curl -s -u "$AUTH" -X DELETE \
 - PATCH 该行，传 `date: "2026-11-09"`、`slot: "late"`。
 - 再 GET 确认。
 
+**示例 4：预告只给频道首页**
+
+用户说：「按这条推文排今天的，链接点进去是各成员频道」
+
+操作：
+
+- 频道链接只说明成员，不是具体视频，不能据此反推「最新 upcoming 就是他这一场」。
+- 先按推文的 `HH:00` + `slot` 写入，标题空着。
+- 再抓频道 `/streams`：谁 `is_live` 就用那条的标题与 id 回填；仍 `is_upcoming` 的一律当未开播，不挂链接。
+
 ## 故障排除
 
 ### 401
@@ -258,6 +290,14 @@ curl -s -u "$AUTH" -X DELETE \
 **原因**：目标是 `source = youtube` 的自动行。
 
 **解决**：不要删；等每日任务自己清理，或改用 PATCH 取消。
+
+### 日程被写到两年后
+
+**原因**：直接用了 `release_timestamp`，而该直播页还没正式排期，YouTube 返回的是占位值
+（`2028-01-01` / `2028-09-07` 之类）。
+
+**解决**：按「先验真」判定占位，改用推文口径重排；已写入的行用 PATCH 改 `scheduledAt`，
+并把错的 `url` 清成 `null`。
 
 ### 400 需要 date + slot
 
