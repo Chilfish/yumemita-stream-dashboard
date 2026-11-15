@@ -119,6 +119,7 @@ docs/
 | 改 UI / 组件 | [ui-design/README.md](./ui-design/README.md) + [GENERAL.md](./ui-design/GENERAL.md) | Token、排版、coss 原子组件；时间输入见 [time-input.md](./ui-design/time-input.md) |
 | 判断信息该不该上屏 | [information-density.md](./ui-design/information-density.md) | 一屏一个焦点、四个冗余信号、删除清单与组首页反例 |
 | 理解 AI 生成页面的通病 | [ai-generated-ui-density.md](./research/ai-generated-ui-density.md) | 外部观察、机制分析、组首页案例与规避方法 |
+| SEO 审计 / 线上站点体检 | [seo-audit-2026-11-15.md](./research/seo-audit-2026-11-15.md) | claude-seo 工具评估、发现分级、修复顺序 |
 | 写文档 / 界面文案 | [writing-style.md](./writing-style.md) | 语气、用词、术语、反例 |
 | 代码审查 | [reviews/README.md](./reviews/README.md) + [TEMPLATE.md](./reviews/TEMPLATE.md) | 审查视角、问题分级、承接流程 |
 | 状态判定 / 隐式状态机 | [review-2026-11-08-implicit-state-machines.md](./reviews/review-2026-11-08-implicit-state-machines.md) + [state-machine-remediation.md](./archive/state-machine-remediation.md) | 状态清单、问题分级、阶段与验收（已关闭） |
