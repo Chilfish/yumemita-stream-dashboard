@@ -496,10 +496,10 @@ chip 标题     text-footnote text-foreground
 | 文件 | 改动 |
 | --- | --- |
 | `src/lib/routes.ts` | `VIEWS` 末尾追加 `calendar`；新增 `calendarPath(id)`、`groupCalendarPath()`；`viewPath` 加 case；`sectionFromPathname` 识别 `calendar` |
-| `src/pages/calendar.astro` | 新增。`prerender = false`，查日历数据，`pageSeo`，`Astro.cache.set`，渲染 `<GroupPage view="calendar">` |
-| `src/pages/[datasetId]/calendar.astro` | 新增。同上，渲染 `<DatasetPage view="calendar">` |
-| `src/components/app/group-page.tsx` | `GroupView` 加 `calendar`，switch 分支到 `GroupCalendarPage` |
-| `src/components/app/dataset-page.tsx` | `DatasetView` 加 `calendar`，switch 分支到 `CalendarPage` |
+| `src/pages/calendar.astro` | 新增。`prerender = false`，查日历数据，`pageSeo`，`Astro.cache.set`，渲染 `<GroupCalendarApp>` |
+| `src/pages/[datasetId]/calendar.astro` | 新增。同上，渲染 `<CalendarApp>` |
+| `src/components/app/views/group-calendar-app.tsx` | 新增路由入口：`GroupShell` + `GroupCalendarPage` |
+| `src/components/app/views/calendar-app.tsx` | 新增路由入口：`DatasetShell` + `CalendarPage` |
 | `src/components/pages/calendar-page.tsx` | 新增薄壳：`useDatasetView()` → `CalendarView` |
 | `src/components/pages/group-calendar-page.tsx` | 新增薄壳：`useGroupDataContext()` 或页面 props → `CalendarView` |
 | `src/components/dashboard/calendar-view.tsx` | 新增，真正实现 |
