@@ -56,17 +56,24 @@ const llmsHref = new URL(`${import.meta.env.BASE_URL}llms.txt`, Astro.site ?? As
           location.replace(location.hash.slice(1))
           return
         }
-        try {
-          const raw = localStorage.getItem('app-config-store')
-          const theme = raw ? JSON.parse(raw).state.theme : 'system'
-          const resolved = theme === 'system'
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-            : theme
-          document.documentElement.classList.add(resolved)
+        function applyTheme() {
+          const root = document.documentElement
+          root.classList.remove('light', 'dark')
+          try {
+            const raw = localStorage.getItem('app-config-store')
+            const theme = raw ? JSON.parse(raw).state.theme : 'system'
+            root.classList.add(theme === 'system'
+              ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+              : theme)
+          }
+          catch {
+            root.classList.add('light')
+          }
         }
-        catch {
-          document.documentElement.classList.add('light')
-        }
+        applyTheme()
+        // ClientRouter 换页时用服务端输出的 <html class> 覆盖根属性，会把运行时加的主题类抹掉。
+        // 每次交换后重新套用一次，避免站内跳转后回到浅色。
+        document.addEventListener('astro:after-swap', applyTheme)
       })()
     </script>
   </head>
