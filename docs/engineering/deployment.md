@@ -71,9 +71,11 @@ emojis/youtube/<hash>.png
 <datasetId>/transcripts/<videoId>.json        # 逐字稿正文
 ```
 
-- 封面 / 表情走 R2 公开域名 `https://ymmt-s3.chilfish.top`；逐字稿正文通过 Worker binding 读取，不直接暴露。
+- 封面 / 表情走 R2 公开域名 `https://ymmt-s3.chilfish.top`。
+- **注意：该域名是桶级公开，`archive/` 与 `*/transcripts/` 也能匿名下载**（[postmortem 006](../postmortem/006-public-r2-member-only-leak.md)）。在迁移到私有桶之前，必须用 Cloudflare WAF 规则 block 这两类前缀；Worker binding 只解决页面读取路径，不解决对象可达性。
 - 不再写 `index.json` / `manifest.json` / `insights.json` / `group-*.json` / `authors.json`；这些由数据库查询生成。
 - `wrangler.jsonc` 的 `r2_buckets` 必须绑定这个桶；Worker 用 `transcripts.r2_key` 直接 `get()`，不要再拼前缀。
+- 反向验证：匿名 `curl -I https://ymmt-s3.chilfish.top/<datasetId>/transcripts/<videoId>.json` 必须是非 200。返回 200 说明 WAF 规则没生效或规则被绕过。
 
 ### CORS
 

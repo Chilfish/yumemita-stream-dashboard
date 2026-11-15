@@ -26,6 +26,7 @@
 | [003](./003-stale-yt-cookies-cache.md) | `~/yt-cookies.txt` 长期复用后失效，yt-dlp 命中 bot 检查 | SEV-3 | 缺陷 | Mitigated | cookie 缓存没有失效条件，只要文件里有登录 cookie 就继续用，浏览器轮换 PSIDTS 后文件会话已过期 |
 | [004](./004-chat-replay-unavailable.md) | 平台未保留回放被当成「直播尚未结束」，无弹幕场次每轮重试 | SEV-3 | 缺陷 | Mitigated | 回放采集只看 `isReplay` 布尔值，`null` 被当成「仍在直播」，没有读页面明确给出的 `availabilityMessage` |
 | [005](./005-cjk-fallback-after-webfont-removal.md) | 移除 CJK webfont 后简体中文在 Windows 上落到日文字形 | SEV-2 | 缺陷 | Mitigated | 字体栈里日文字体排在中文前面，但此前被第一个 CJK webfont 遮住，顺序从未被验证 |
+| [006](./006-public-r2-member-only-leak.md) | 公开 R2 域名直接暴露会限逐字稿与原始 pack | SEV-1 | 架构 | Active | 公开媒体与私有正文同桶，公开自定义域按桶暴露全部 key |
 
 > 新增 postmortem 按 [TEMPLATE.md](./TEMPLATE.md) 复制填写，并在此登记。
 
@@ -54,6 +55,7 @@
 | 来源内部重复 | yt-dlp `live_chat` 是否同时含直播段与回放段 | `normalizeLiveChat` 按 `rendererId` 去重，不依赖后续合并 |
 | 数据缩水 | 本地 pack 少于数据库时 ingest 是否覆盖 | 确认下架流程，不要先 truncate 再灌 |
 | 会员限定 | 公开范围是否确认 | 不确定就不上传公开桶 |
+| 私有对象可达性 | 逐字稿 / archive 是否在公开域名下匿名可取 | 匿名请求抽查；私有内容单独桶 |
 | 凭据缓存 | 是否跨运行复用 `~/yt-cookies.txt` | 每次运行重新导出；失效表现为 "Sign in to confirm you're not a bot" |
 | 弹幕缺失归因 | 场次没有弹幕时是否先确认平台有没有保留回放 | 看 `video.hasLiveChatReplay` 与 watch 页 `availabilityMessage`；平台没有就别反复重抓 |
 
@@ -106,7 +108,7 @@
 | `.md` 重复收录 | `.md` 是否进了 sitemap | `X-Robots-Tag: noindex`，不进 sitemap |
 | 全量弹幕体积 | 是否把 691 万条弹幕塞进热表 | 先聚合，`chat_events` 分区后再上 |
 | 数据工作流依赖 | 加了 Drizzle / Neon import 后是否仍没装包 | 工作流显式 `bun install --frozen-lockfile` |
-| 公开桶范围 | 逐字稿正文是否走了公开 R2 域名 | 正文走同源 `/api/transcripts/...` + binding |
+| 公开桶范围 | 应用层鉴权是否被当成对象不可达 | 对公开域名匿名请求 `archive/` 与 `*/transcripts/`，必须 404 / 403；见 [006](./006-public-r2-member-only-leak.md) |
 | 页面汇总查询粒度 | 是否为一个汇总数字加载整份明细 / 全部子表 | 汇总走 `dataset_insights` 预聚合或 SQL 聚合，只返回小结果 |
 | 查询结果体积 | 单次渲染从数据库读了多少字节 | 用窄列查询；估算方法：dataset 明细体积 ÷ 页面数 |
 

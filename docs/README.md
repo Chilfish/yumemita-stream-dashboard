@@ -51,12 +51,14 @@ docs/
 ├── research/                    # 通用问题调研
 │   ├── README.md
 │   ├── agents-md-structure.md
-│   └── ai-generated-ui-density.md
+│   ├── ai-generated-ui-density.md
+│   └── security-review-2026-11-15.md
 ├── postmortem/                  # 事故复盘与基线雷区
 │   ├── README.md
 │   ├── 001-yt-dlp-chat-duplicate.md
 │   ├── 002-dataset-packs-per-render.md
 │   ├── 003-stale-yt-cookies-cache.md
+│   ├── 006-public-r2-member-only-leak.md
 │   └── TEMPLATE.md
 ├── reviews/                     # 代码审查记录
 │   ├── README.md
@@ -73,7 +75,8 @@ docs/
 │   ├── 2026-11-09.md
 │   ├── 2026-11-10.md
 │   ├── 2026-11-12.md
-│   └── 2026-11-14.md
+│   ├── 2026-11-14.md
+│   └── 2026-11-15.md
 └── archive/                     # 历史调研与已完成阶段方案
     ├── README.md
     ├── ssg-research.md
@@ -120,6 +123,7 @@ docs/
 | 判断信息该不该上屏 | [information-density.md](./ui-design/information-density.md) | 一屏一个焦点、四个冗余信号、删除清单与组首页反例 |
 | 理解 AI 生成页面的通病 | [ai-generated-ui-density.md](./research/ai-generated-ui-density.md) | 外部观察、机制分析、组首页案例与规避方法 |
 | SEO 审计 / 线上站点体检 | [seo-audit-2026-11-15.md](./research/seo-audit-2026-11-15.md) | claude-seo 工具评估、发现分级、修复顺序 |
+| 安全自查 / 加固 | [security-review-2026-11-15.md](./research/security-review-2026-11-15.md) + [postmortem/006](./postmortem/006-public-r2-member-only-leak.md) | 鉴权与对象存储的匿名可达性、CSP、注入面 |
 | 写文档 / 界面文案 | [writing-style.md](./writing-style.md) | 语气、用词、术语、反例 |
 | 代码审查 | [reviews/README.md](./reviews/README.md) + [TEMPLATE.md](./reviews/TEMPLATE.md) | 审查视角、问题分级、承接流程 |
 | 状态判定 / 隐式状态机 | [review-2026-11-08-implicit-state-machines.md](./reviews/review-2026-11-08-implicit-state-machines.md) + [state-machine-remediation.md](./archive/state-machine-remediation.md) | 状态清单、问题分级、阶段与验收（已关闭） |

@@ -1,6 +1,6 @@
 ---
 import type { SeoMeta } from '@/lib/seo'
-import { SITE_NAME, TWITTER_SITE } from '@/lib/seo'
+import { SITE_NAME, TWITTER_SITE, serializeJsonLd } from '@/lib/seo'
 
 interface Props {
   meta: SeoMeta
@@ -41,5 +41,5 @@ const {
 <meta name="twitter:description" content={description} />
 {image && <meta name="twitter:image" content={image} />}
 {jsonLd.map(item => (
-  <script type="application/ld+json" set:html={JSON.stringify(item)} />
+  <script type="application/ld+json" set:html={serializeJsonLd(item)} />
 ))}

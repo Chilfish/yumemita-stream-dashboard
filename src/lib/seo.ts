@@ -567,6 +567,19 @@ export function buildSeo(ctx: SeoContext): SeoMeta {
   };
 }
 
+/**
+ * JSON-LD 要嵌进 `<script>`；JSON.stringify 不转义 `<`，标题里出现 `</script>` 就能提前闭合标签。
+ * 只做最少的字符转义，输出仍可被 JSON.parse 还原。
+ */
+export function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, "&amp;")

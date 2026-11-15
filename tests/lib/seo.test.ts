@@ -5,6 +5,7 @@ import {
   buildSitemap,
   isoDateKey,
   normalizePath,
+  serializeJsonLd,
   SITE_NAME,
   truncateText,
   type SeoContext,
@@ -212,6 +213,25 @@ describe("单场页", () => {
     expect(meta.title).toContain("找不到这场直播");
     expect(meta.robots).toBe("noindex,follow");
     expect(meta.jsonLd).toEqual([]);
+  });
+});
+
+describe("JSON-LD 序列化", () => {
+  it("标题里的 HTML 闭合标签不会提前结束 script", () => {
+    const value = { name: "</script><script>alert(1)</script>" };
+    const serialized = serializeJsonLd(value);
+    expect(serialized).not.toContain("</script>");
+    expect(serialized).toContain("\\u003c/script");
+    expect(JSON.parse(serialized)).toEqual(value);
+  });
+
+  it("转义行分隔符与 &，保持 JSON 可解析", () => {
+    const value = { text: "a&b\u2028c\u2029d" };
+    const serialized = serializeJsonLd(value);
+    expect(serialized).toContain("\\u0026");
+    expect(serialized).toContain("\\u2028");
+    expect(serialized).toContain("\\u2029");
+    expect(JSON.parse(serialized)).toEqual(value);
   });
 });
 
