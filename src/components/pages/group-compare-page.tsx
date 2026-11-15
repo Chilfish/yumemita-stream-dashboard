@@ -276,8 +276,6 @@ export function GroupComparePage({ datasets, data }: GroupComparePageProps) {
               </Button>
             )
           }
-          eyebrow="同一时间段 · 同一内容类型"
-          meta="筛选会写进 URL，可直接分享当前对比"
           title="对比范围"
         />
         <PanelBody className="flex flex-col gap-4">
