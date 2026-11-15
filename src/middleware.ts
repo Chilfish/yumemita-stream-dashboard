@@ -185,7 +185,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const redirect = forceHttps(context)
   if (redirect) return redirect
 
-  context.locals.admin = await hasAdminSession(context)
+  // 预渲染页在构建期也会跑一遍 middleware，此时 `request.headers` 不可用，读 Cookie 会触发
+  // Astro 的警告；这些页面最终是静态 HTML，会话状态没有意义。
+  context.locals.admin = context.isPrerendered ? false : await hasAdminSession(context)
 
   const admin = isAdminPath(context.url.pathname)
   if (admin) {
