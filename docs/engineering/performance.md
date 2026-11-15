@@ -156,7 +156,7 @@ bun run ymmt db bench -- --rounds 10 --label after-client-perf-3
 ### 仍待优化
 
 - **壳层流式输出**：目前整个页面（侧栏 + 页头 + 内容）是一个岛屿，Astro 必须等它 SSR 完才开始输出。把壳层拆成 Astro 布局 + `transition:persist` 的独立岛屿，内容区用 `server:defer` / 流式渲染，首字节可以更早到达。参考 [Astro streaming recipe](https://docs.astro.build/en/recipes/streaming-improve-page-performance/)。
-- **按视图拆岛屿**：`DatasetPage` / `GroupPage` 仍静态引入全部视图。直接改 `React.lazy` 会让 SSR 输出 Suspense fallback，单场与成员页丢失正文；正确做法是把壳层移出 React 岛屿，再按视图挂独立岛屿，属于结构性改造，暂缓。
+- ~~按视图拆岛屿~~：2026-11-15 已完成，见下方「按路由拆岛屿」。
 - **岛屿 props 体积**：列表首屏已限 100 / 60 行，但完整 `rows` 仍作为 props 序列化进成员列表页；下一步按路由裁剪字段，或改成 `/api/streams` 分页。对比页仍带着该成员全部 `rows`，密度已经单独取。
 - **Worker 同区**：生产必须让 Worker 与 Neon 区域接近，否则每个请求固定多一个 RTT。
 - **线上实测**：`Cf-Cache-Status`、purge 生效、Worker CPU 与 wall time 仍待部署后记录。
@@ -172,6 +172,34 @@ bun run ymmt db bench -- --rounds 10 --label after-client-perf-3
 - 首屏 HTML 直接含 17 个 `<blockquote>`，水合后 0 次 `/api/transcripts` 请求。
 - 体积：逐字稿页 485 KB raw / 113 KB gzip，概览页 308 KB / 55 KB。差值里 props 的 `initialTranscript` 占 54 KB（≈8 KB gzip），其余是原本在客户端生成的 DOM；同时省下 48 KB gzip 的 API 响应，净多传约 10 KB。
 - 代价是每次冷渲染多一次 R2 读取；边缘缓存 1 小时 + `swr` 一天，命中后只付边缘响应。
+
+## 按路由拆岛屿（2026-11-15）
+
+此前 `DatasetPage` / `GroupPage` 各自静态引入全部视图，一个 chunk 装下八个页面：单场页会连日历、相册、趋势、对比一起下载，其中约 63% 用不到。
+
+现在壳层（`dataset-shell.tsx` / `group-shell.tsx`）只负责侧栏、页头、底栏与上下文，视图由 `src/components/app/views/*-app.tsx` 按路由传入，每个 `.astro` 指向自己的入口。壳层仍是同一个岛屿，所以 SSR 正文、`RouterProvider`、`DatasetViewContext` 的行为都没变；变的只是 chunk 边界。
+
+| chunk | 之前 | 之后 |
+| --- | ---: | ---: |
+| `dataset-page` | 311 KB（全部 8 个视图） | 不存在 |
+| `group-page` | 125 KB（全部 5 个视图） | 不存在 |
+| 单场页入口 | — | `stream-app` 226 KB |
+| 全组相册入口 | — | `group-gallery-app` 83 KB |
+
+按 gzip 计的单页脚本总量（本地生产构建，含 React 运行时）：
+
+| 路由 | gzip |
+| --- | ---: |
+| 单场页 | 271 KiB |
+| 成员首页 | 213 KiB |
+| 成员相册 | 169 KiB |
+| 成员逐字稿索引 | 176 KiB |
+| 全组 about | 156 KiB |
+| 全组相册 | 194 KiB |
+
+单场页的 `unused-javascript` 从线上报告的 184 KiB 降到 99 KiB（`stream-app` 40.3 / `client` 29.4 / `FloatingPortalLite` 28.8）。剩下的主要是壳层与 React 运行时，属于「整个页面一个岛屿」的固定成本，要再降得走壳层流式输出那条路。
+
+注意：不要为了省 import 把视图塞回共享入口，也不要用 `React.lazy` 替代入口拆分——前者让 chunk 重新变大，后者会让 SSR 输出 Suspense fallback、丢掉正文。
 
 ## 图片
 

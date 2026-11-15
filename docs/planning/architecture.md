@@ -194,7 +194,7 @@ src/db/
 ```text
 src/pages/                文件路由 + endpoint
 src/layouts/Layout.astro  SEO、主题内联脚本、ClientRouter、全局岛屿
-src/components/app/       DatasetPage / GroupPage / 侧栏 / 顶栏 / 标签栏
+src/components/app/       壳层（dataset-shell / group-shell）+ views/ 下按路由的岛屿入口
 src/components/dashboard/ 视图组件（表格、相册、单场、趋势、对比……）
 src/components/charts/    D3 数学 + React SVG
 src/components/ui/        coss primitives（生成，不写业务）
@@ -210,7 +210,7 @@ src/types/                datapack / dataset / db DTO
 
 1. 在 `src/pages/` 新建 `.astro`，显式 `export const prerender = false`。
 2. 在 frontmatter 查库，组装可序列化 props。
-3. 视图挂在 `DatasetPage` / `GroupPage` 的分支里，或新建岛屿。
+3. 在 `src/components/app/views/` 加一个 `<name>-app.tsx`：`RouterProvider` + 对应壳层 + 该路由的视图，页面里把岛屿指向它。不要让某个路由的视图被别的路由静态引入，否则会回到「一个岛屿装全部视图」的老问题。
 4. 在 `src/lib/routes.ts` 与 `dashboard/shell/app-sidebar.tsx` 的 `NAV_ITEMS` 补路由。
 5. 补 `sitemap.xml`（如果应该被收录）与缓存 tag。
 

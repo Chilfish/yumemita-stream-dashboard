@@ -43,6 +43,7 @@
 | 旧链接兼容 | `#/...` 与旧 `overview` / `table` 是否有重定向 | Astro `redirect` + 客户端 hash 兼容脚本 |
 | 错误边界 | 页面是否有三态与 500 兜底 | 错误态视图 / `500.astro` |
 | 子路径部署 | Astro `base` 与链接前缀是否一致 | 子路径下验证链接与静态资源 |
+| 根节点运行时属性 | 运行时加到 `<html>` / `<body>` 的 class 是否只写在首屏脚本里（ClientRouter 换页会用服务端输出的根属性覆盖） | 在 `astro:after-swap` 里重新套用，例如 `Layout.astro` 的主题脚本 |
 
 ### 2. 数据与对象存储
 

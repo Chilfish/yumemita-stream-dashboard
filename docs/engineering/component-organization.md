@@ -25,8 +25,11 @@ src/components/dashboard/
 └─ trends/         趋势页、月度/类型表与榜单
 ```
 
-`src/components/app/` 仍只放页面外壳岛屿（`DatasetPage` / `GroupPage`），
+`src/components/app/` 放壳层（`dataset-shell.tsx` / `group-shell.tsx`）与 `views/` 下按路由的岛屿入口（`stream-app.tsx`、`calendar-app.tsx` …），
 `src/components/pages/` 放按页面组合的视图，二者只从上述目录导入，不再定义区块。
+
+每个路由一个 entry 是刻意的：视图被哪个入口静态引入，就会被打进哪个路由的 chunk。
+把 `CalendarPage` 塞回共享入口，所有页面都会重新下载日历代码。
 
 ## 分层与依赖方向
 
