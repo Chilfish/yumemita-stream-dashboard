@@ -42,6 +42,7 @@
 - Worker 读连接加 statement timeout。
 - 稳定 `useKeyboardShortcuts` 监听器、预计算排序日期、删除隐藏端重复列表。
 - 评论 / SC / 对比勾选列表加 `content-visibility:auto` 或复用 `VirtualList`。
+- 类名体积：表格 / 列表里重复的长 cva 类串收成语义类（raw 收益大、压缩收益小）；类名重命名只在 CSS 侧有确定性收益。实测见 [ssr-html-classname-weight.md](../research/ssr-html-classname-weight.md)，待办 B49。
 - 客户端持久缓存：逐字稿、pack、表情索引走 sessionStorage + SWR + 请求去重。
 - 让 HTML 与 query 解耦（岛屿挂载后读 `location.search`），收敛缓存条目。
 - `cross_version_cache: true` + 部署后按 `astro-version` tag purge。
