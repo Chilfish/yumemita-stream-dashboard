@@ -14,6 +14,32 @@ import { isAdminPath, isApiPath } from '@/lib/admin-path'
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
+/** 本地开发 / 预览走 http 是正常的，别把 localhost 也 301 到 https。 */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
+
+function isLocalHost(hostname: string): boolean {
+  return LOCAL_HOSTS.has(hostname) || hostname.endsWith('.local')
+}
+
+/**
+ * 线上不允许明文访问：`http://` 一律 301 到同 host + path + query 的 https。
+ * Cloudflare 侧没开 Always Use HTTPS 时，这是唯一能保证的地方。
+ */
+function forceHttps(context: APIContext): Response | null {
+  if (context.url.protocol !== 'http:') return null
+  if (isLocalHost(context.url.hostname)) return null
+
+  const target = new URL(context.url.href)
+  target.protocol = 'https:'
+  return new Response(null, {
+    status: 301,
+    headers: {
+      location: target.href,
+      'cache-control': 'public, max-age=3600',
+    },
+  })
+}
+
 function unauthorized(context: APIContext): Response {
   if (isApiPath(context.url.pathname)) {
     return Response.json(
@@ -114,6 +140,17 @@ function applyHeaders(context: APIContext, response: Response, admin: boolean): 
   headers.set('x-frame-options', 'SAMEORIGIN')
   headers.set('permissions-policy', 'geolocation=(), microphone=(), camera=()')
 
+  // 声明 HSTS 需要 TLS 真的生效；本地 http 下发了也没用，还会污染 127.0.0.1 的后续访问。
+  if (context.url.protocol === 'https:') {
+    headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains')
+  }
+
+  // Astro 出去的 `text/html` 不带 charset，按 Content-Type 解码的客户端会退回 latin-1。
+  const contentType = headers.get('content-type')
+  if (contentType && /^text\/[^;]+$/i.test(contentType)) {
+    headers.set('content-type', `${contentType}; charset=utf-8`)
+  }
+
   if (admin) {
     headers.set('cache-control', 'no-store')
     headers.set('x-robots-tag', 'noindex, nofollow')
@@ -129,6 +166,9 @@ function applyHeaders(context: APIContext, response: Response, admin: boolean): 
 export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.requestId = crypto.randomUUID()
   context.locals.startedAt = performance.now()
+
+  const redirect = forceHttps(context)
+  if (redirect) return redirect
 
   const admin = isAdminPath(context.url.pathname)
   if (admin) {
