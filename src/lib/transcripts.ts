@@ -581,6 +581,23 @@ export function parseTranscriptFile(text: string, filename: string): TranscriptF
   };
 }
 
+/**
+ * R2 里的逐字稿是带 frontmatter 的 JSON 载荷（`TranscriptPayload`）。
+ * 服务端预渲染与客户端按需加载都走这一个转换，避免两套字段处理漂移。
+ */
+export function transcriptFileFromPayload(payload: TranscriptPayload): TranscriptFile {
+  const markdown = typeof payload.markdown === "string" ? payload.markdown.trimEnd() : "";
+  return {
+    datasetId: payload.datasetId || "",
+    videoId: payload.videoId || "",
+    frontmatter: payload.frontmatter
+      ? normalizeFrontmatter(payload.frontmatter as unknown as Record<string, unknown>)
+      : normalizeFrontmatter({}),
+    markdown,
+    toc: extractToc(markdown),
+  };
+}
+
 /** 由解析结果派生索引条目（`updatedAt` 由调用方给：文件 mtime 或发布时间）。 */
 export function toIndexEntry(file: TranscriptFile, updatedAt: string): TranscriptIndexEntry {
   return {

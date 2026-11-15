@@ -18,6 +18,7 @@ import {
   timecodeSeconds,
   toIndexEntry,
   transcriptExcerpt,
+  transcriptFileFromPayload,
   transcriptMonthShortLabel,
   transcriptObjectKey,
   youtubeTimeUrl,
@@ -83,6 +84,46 @@ describe("parseFrontmatter", () => {
     expect(data.videoId).toBe("abc");
     expect(data.title).toBe("标题");
     expect(body.trimStart().startsWith("## 开场")).toBe(true);
+  });
+});
+
+describe("transcriptFileFromPayload", () => {
+  it("builds the same shape as the file parser for an R2 payload", () => {
+    const file = transcriptFileFromPayload({
+      schema: "yumemita.transcript/v1",
+      datasetId: "nonoka",
+      videoId: "W0bKqP-Eyj4",
+      updatedAt: "2026-11-13T00:00:00.000Z",
+      frontmatter: normalizeFrontmatter({
+        videoId: "W0bKqP-Eyj4",
+        title: "标题",
+        tags: ["杂谈"],
+        members: ["nonoka"],
+      }),
+      markdown: "## 开场\n\n[00:00:12] 正文。\n\n",
+    });
+
+    expect(file.datasetId).toBe("nonoka");
+    expect(file.videoId).toBe("W0bKqP-Eyj4");
+    expect(file.frontmatter.title).toBe("标题");
+    expect(file.frontmatter.members).toEqual(["nonoka"]);
+    expect(file.markdown).toBe("## 开场\n\n[00:00:12] 正文。");
+    expect(file.toc.map(item => item.text)).toEqual(["开场"]);
+  });
+
+  it("keeps a payload without frontmatter usable", () => {
+    const file = transcriptFileFromPayload({
+      schema: "yumemita.transcript/v1",
+      datasetId: "arale",
+      videoId: "abc",
+      updatedAt: "",
+      frontmatter: undefined as never,
+      markdown: "正文",
+    });
+
+    expect(file.frontmatter.videoId).toBe("");
+    expect(file.toc).toEqual([]);
+    expect(file.markdown).toBe("正文");
   });
 });
 

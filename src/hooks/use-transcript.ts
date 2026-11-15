@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   type TranscriptFile,
   type TranscriptPayload,
-  extractToc,
-  normalizeFrontmatter,
   parseTranscriptFile,
+  transcriptFileFromPayload,
 } from "@/lib/transcripts";
 
 /**
@@ -88,15 +87,7 @@ function loadLocalFile(key: string): Promise<TranscriptFile> | null {
 function fileFromPayload(payload: TranscriptPayload, fallback: TranscriptFile | null): TranscriptFile {
   const markdown = typeof payload.markdown === "string" ? payload.markdown.trimEnd() : "";
   if (!markdown && fallback) return fallback;
-  return {
-    datasetId: payload.datasetId || fallback?.datasetId || "",
-    videoId: payload.videoId || fallback?.videoId || "",
-    frontmatter: payload.frontmatter
-      ? normalizeFrontmatter(payload.frontmatter as unknown as Record<string, unknown>)
-      : (fallback?.frontmatter ?? normalizeFrontmatter({})),
-    markdown,
-    toc: extractToc(markdown),
-  };
+  return transcriptFileFromPayload(payload);
 }
 
 const transcriptCache = new Map<string, Promise<TranscriptFile>>();
@@ -182,9 +173,17 @@ export function useTranscript(
   datasetId: string | null,
   videoId: string | null,
   accessKey: string | null = null,
+  initialFile: TranscriptFile | null = null,
 ): TranscriptResult {
   const key = datasetId && videoId ? transcriptCacheKey(datasetId, videoId, accessKey) : EMPTY_KEY;
-  const [state, setState] = useState<FileState>({ key: EMPTY_KEY, file: null, status: "idle", error: null });
+  // 服务端预渲染的正文直接作为初始状态：SSR 与首次客户端渲染必须看到同一份数据，
+  // 否则会先闪一帧骨架再补上正文，LCP 又回到水合之后。
+  const seeded = initialFile && initialFile.videoId === videoId ? initialFile : null;
+  const [state, setState] = useState<FileState>(() =>
+    seeded
+      ? { key, file: seeded, status: "ready", error: null }
+      : { key: EMPTY_KEY, file: null, status: "idle", error: null },
+  );
   const [attempt, setAttempt] = useState(0);
   // force 只作用于紧随其后的一次请求；重试成功后共享缓存重新生效。
   const forceNextRef = useRef(false);
@@ -194,6 +193,15 @@ export function useTranscript(
     const controller = new AbortController();
     const force = forceNextRef.current;
     forceNextRef.current = false;
+
+    // 预渲染正文已经就位：只把它登记进共享缓存，不再发一次同样的请求。
+    // 重试（force）仍然走真实请求，避免服务端快照过期后无法刷新。
+    if (seeded && !force) {
+      resolvedTranscriptCache.set(key, seeded);
+      transcriptCache.set(key, Promise.resolve(seeded));
+      return () => controller.abort();
+    }
+
     // oxlint-disable-next-line react/set-state-in-effect -- 切换场次时必须重置加载状态
     setState({ key, file: null, status: "loading", error: null });
 
@@ -213,7 +221,7 @@ export function useTranscript(
       });
 
     return () => controller.abort();
-  }, [accessKey, datasetId, videoId, key, attempt]);
+  }, [accessKey, datasetId, videoId, key, attempt, seeded]);
 
   const retry = (): void => {
     forceNextRef.current = true;

@@ -32,7 +32,7 @@ import {
   type ViewKey,
 } from '@/lib/routes'
 import { RouterProvider, useNavigate, useSearchParams } from '@/lib/router-compat'
-import type { TranscriptIndexEntry } from '@/lib/transcripts'
+import type { TranscriptFile, TranscriptIndexEntry } from '@/lib/transcripts'
 import type { CalendarPageData } from '@/types/calendar'
 import type { StreamDatapack } from '@/types/datapack'
 import type { BatchManifest, DatasetIndexEntry, StreamNavItem, StreamSummary } from '@/types/dataset'
@@ -74,6 +74,8 @@ export interface DatasetPageProps {
   transcripts?: TranscriptIndexEntry[]
   transcriptError?: string | null
   hasTranscript?: boolean
+  /** 首屏即逐字稿时由服务端预渲染的正文，省掉水合后的一次往返。 */
+  initialTranscript?: TranscriptFile | null
   /** 会员限定单场：复用详情页外壳，正文换成公开范围说明。 */
   locked?: boolean
 }
@@ -222,7 +224,16 @@ function DatasetBody(props: DatasetPageProps) {
   }
 }
 
-function StreamBody({ datasets, dataset, rows, stream, pack, hasTranscript, locked }: DatasetPageProps) {
+function StreamBody({
+  datasets,
+  dataset,
+  rows,
+  stream,
+  pack,
+  hasTranscript,
+  initialTranscript,
+  locked,
+}: DatasetPageProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const view = parseStreamSubView(searchParams.get('view'))
@@ -246,6 +257,7 @@ function StreamBody({ datasets, dataset, rows, stream, pack, hasTranscript, lock
       // 联动场从参与者页进来时，封面、表情这些资源仍按频道主取。
       datasetId={stream.datasetId ?? dataset.id}
       hasTranscript={hasTranscript ?? false}
+      initialTranscript={initialTranscript ?? null}
       memberLabels={memberLabelsOf(stream, datasets)}
       onSelect={nextId => navigate(streamPath(dataset.id, nextId))}
       onViewChange={(next) => {

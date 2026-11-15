@@ -6,6 +6,8 @@ import { db } from '@/db/client'
 import { getStreamPageData, getStreamPageExtras } from '@/db/queries/view-data'
 import { memberOnlyCachePolicy } from '@/lib/member-access'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import { parseStreamSubView } from '@/lib/routes'
+import { readTranscriptFile } from '@/lib/transcript-read'
 import { isMemberOnly } from '@/lib/visibility'
 import type { StreamSummary } from '@/types/dataset'
 
@@ -43,6 +45,13 @@ const extras = summary && !blocked
 const transcript = extras?.transcript ?? null
 const pack = extras?.pack ?? null
 const hasTranscript = Boolean(transcript)
+
+// `?view=transcript` 的正文原本要等 client:idle 水合后才由客户端请求，LCP 因此被拖到 4 秒后。
+// 首屏是逐字稿时服务端直接把正文一起输出；会限场次不预渲染，正文仍走带访问参数的客户端请求。
+const initialView = parseStreamSubView(Astro.url.searchParams.get('view'))
+const initialTranscript = initialView === 'transcript' && transcript && !memberOnly
+  ? await readTranscriptFile(transcript.r2Key)
+  : null
 const neighborById = new Map((extras?.neighbors ?? []).map(item => [item.videoId, item]))
 const rows: StreamSummary[] = []
 if (data && summary) {
@@ -150,6 +159,7 @@ const markdownHref = summary && !blocked
           dataset={data.dataset}
           datasets={data.datasets}
           hasTranscript={hasTranscript}
+          initialTranscript={initialTranscript}
           locked={locked}
           navItems={data.navItems}
           pack={pack}

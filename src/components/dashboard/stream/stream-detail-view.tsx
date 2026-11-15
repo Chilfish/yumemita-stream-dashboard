@@ -10,6 +10,7 @@ import { StreamCover } from "@/components/dashboard/primitives/stream-cover";
 import { StreamTimelinePanel } from "@/components/dashboard/stream/stream-timeline-panel";
 import { StreamWordsPanel } from "@/components/dashboard/stream/stream-words-panel";
 import { TranscriptView } from "@/components/dashboard/transcript/transcript-view";
+import type { TranscriptFile } from "@/lib/transcripts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
@@ -43,12 +44,15 @@ interface StreamDetailViewProps {
   onViewChange: (view: StreamSubView) => void;
   onSelect: (videoId: string) => void;
   hasTranscript: boolean;
+  /** 服务端预渲染的逐字稿正文；只在首屏就是这一场的逐字稿时才有值。 */
+  initialTranscript?: TranscriptFile | null;
 }
 
 function renderSubview(
   view: StreamSubView,
   row: StreamRow,
   datasetId: string,
+  initialTranscript: TranscriptFile | null,
 ): ReactNode {
   switch (view) {
     case "timeline":
@@ -61,7 +65,11 @@ function renderSubview(
       return <StreamCommentsPanel row={row} />;
     case "transcript":
       return (
-        <TranscriptView datasetId={datasetId} videoId={row.summary.videoId} />
+        <TranscriptView
+          datasetId={datasetId}
+          initialFile={initialTranscript}
+          videoId={row.summary.videoId}
+        />
       );
     case "overview":
     default:
@@ -78,8 +86,12 @@ export function StreamDetailView({
   onViewChange,
   onSelect,
   hasTranscript: hasTranscriptProp,
+  initialTranscript,
 }: StreamDetailViewProps) {
   const { pack, summary } = row;
+  // 预渲染的正文只属于首屏那一场；换了场次就退回客户端加载。
+  const transcriptFile =
+    initialTranscript && initialTranscript.videoId === summary.videoId ? initialTranscript : null;
   const memberOnly = pack.video.availability === "subscriber_only";
   const superchatCount = pack.chat.paid.superchats.length;
   // 联动场把全部成员写在一行；单人场为空，页头不额外占用一行。
@@ -187,7 +199,7 @@ export function StreamDetailView({
         {rows.length > 1 ? (
           <nav aria-label="切换场次" className="flex items-center gap-1">
             <Button
-              aria-label={newer ? `较新一场：${newer.title}` : "没有较新的场次"}
+              aria-label={newer ? `较新：${newer.title}` : "没有较新的场次"}
               disabled={newer == null}
               onClick={() => newer && onSelect(newer.videoId)}
               size="xs"
@@ -199,7 +211,7 @@ export function StreamDetailView({
               较新
             </Button>
             <Button
-              aria-label={older ? `较早一场：${older.title}` : "没有较早的场次"}
+              aria-label={older ? `较早：${older.title}` : "没有较早的场次"}
               disabled={older == null}
               onClick={() => older && onSelect(older.videoId)}
               size="xs"
@@ -217,7 +229,7 @@ export function StreamDetailView({
       <Panel className="p-4 md:p-5">
         {/* 子视图互换：只做 170ms 的淡入位移，高度跳变由淡入盖住。 */}
         <div className="motion-swap" key={activeView}>
-          {renderSubview(activeView, row, datasetId)}
+          {renderSubview(activeView, row, datasetId, transcriptFile)}
         </div>
       </Panel>
     </div>
