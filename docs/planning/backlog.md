@@ -22,7 +22,7 @@
 | B33 | 峰值解释：把峰值分钟与人工标注的事件对齐 | P3 | 事件标注数据 | 2026-11-03 roadmap | 📋 |
 | B34 | 推文联动：先用手动 pin 验证价值，外部服务只做增强 | P3 | 无 | roadmap | 📋 |
 | B35 | 空数据 / 部分数据的更明确提示（已有基础版） | P3 | 无 | roadmap | 📋 |
-| B38 | SEO 审计修复：`http` 不跳 `https` / 无 HSTS、`/gallery` HTML 超 2 MB、图片缺宽高、`og:image` 缺失、成员页补 `Person` | P1 | 无 | 2026-11-15 审计 | 📋 清单与验收见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) |
+| B38 | SEO 审计修复：`http` 不跳 `https` / 无 HSTS、CJK 字体 2.36 MB、缩略图缓存仅 4 小时、图库 HTML 超 2 MB、图片选档过大、19 处对比度、`og:image` 缺失、成员页补 `Person` | P1 | 无 | 2026-11-15 审计 | 📋 清单与验收见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) |
 
 > 2026-11-08 隐式状态机审查的 Z / R / E / U 问题已全部关闭，记录见 [review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md) 与 [archive/state-machine-remediation.md](../archive/state-machine-remediation.md)。
 
