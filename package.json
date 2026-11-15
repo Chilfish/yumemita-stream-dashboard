@@ -11,7 +11,7 @@
   },
   "scripts": {
     "ymmt": "bun scripts/cli.ts",
-    "dev": "bun scripts/cli.ts dev",
+    "dev": "bun scripts/cli.ts dev server",
     "dev:db": "bun scripts/cli.ts dev db",
     "build": "astro build",
     "preview": "astro preview",
