@@ -15,6 +15,11 @@
 - **`.md` 封面地址修正**：frontmatter 的 `image` 改用 `PUBLIC_R2_BASE` 拼绝对地址，不再拼成站内 `/thumbs/...`（会 404）。
 - **缓存失效补齐**：`daily-update` 与 `purge-cache --dataset` 在成员有新增场次时同时失效 `gallery`，全组相册不再等 TTL 自然过期。
 - **dashboard 组件按领域重组**：59 个平铺文件拆到 `contexts/`、`primitives/`、`shell/` 与 10 个领域目录，页面外壳只做组合；新增 [component-organization.md](docs/engineering/component-organization.md) 约定分层、依赖方向与拆分门槛。
+- **按路由拆岛屿（B42）**：`dataset-page` / `group-page` 两个入口静态引入了全部视图，单场页会连日历、相册、趋势一起下载。现拆成 `dataset-shell` / `group-shell` 壳层加 `views/*-app.tsx` 的 13 个路由入口，13 个 `.astro` 各自指向自己的视图。`dataset-page`（311 KB）与 `group-page`（125 KB）两个巨石 chunk 消失，单场页 `unused-javascript` 184 → 99 KiB。不用 `React.lazy`，因为 SSR 会输出 Suspense fallback 丢掉正文。
+- **单场页逐字稿首屏服务端渲染**：`?view=transcript` 的正文原本要等 `client:idle` 水合后才请求，线上 LCP 5.0 s。现在首屏是逐字稿时由服务端读 R2 并作为 `initialTranscript` 传给岛屿，水合后不再重复发 `/api/transcripts`；会限场次仍走带访问参数的客户端路径。净多传约 10 KB gzip，换来正文进入首字节。
+- **站内跳转不再丢主题**：ClientRouter 换页会用服务端输出的 `<html>` 属性覆盖运行时加上的 `light` / `dark`，`ThemeProvider` 的 effect 因值未变不会重跑，深色被抹掉。主题应用收成 `applyTheme()`，首屏执行一次并挂到 `astro:after-swap` 重放；该事件在 DOM 交换后同步触发，不会闪。
+- **构建期 404 / 500 不再有 `Astro.request.headers` 警告**：预渲染页也会跑 middleware，`hasAdminSession()` 里的 `cookies.get()` 会读 request headers。改为 `context.isPrerendered` 时直接跳过会话解析，静态 HTML 本来不带会话状态。
+- **重复类串收成组件**：按 Tailwind 官方的 reusing styles，把筛选 chip、区块标题、列表区块表面分别收进 `filter-chip.tsx` 与 `section.tsx` 的 `SectionHeading` / `SectionCard`，差异项走 `className`；输出与改前逐 token 相同。调研与取舍见 [ssr-html-classname-weight.md](docs/research/ssr-html-classname-weight.md)。
 
 ### 文档
 
