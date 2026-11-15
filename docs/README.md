@@ -58,6 +58,8 @@ docs/
 │   ├── 001-yt-dlp-chat-duplicate.md
 │   ├── 002-dataset-packs-per-render.md
 │   ├── 003-stale-yt-cookies-cache.md
+│   ├── 004-chat-replay-unavailable.md
+│   ├── 005-cjk-fallback-after-webfont-removal.md
 │   ├── 006-public-r2-member-only-leak.md
 │   └── TEMPLATE.md
 ├── reviews/                     # 代码审查记录
