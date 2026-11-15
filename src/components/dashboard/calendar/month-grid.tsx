@@ -1,6 +1,7 @@
 import { Lock } from "lucide-react";
 import { useMemo } from "react";
 import { CalendarEventRow } from "@/components/dashboard/calendar/calendar-event-row";
+import { SectionCard } from "@/components/dashboard/primitives/section";
 import { eventAriaLabel, eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
 import {
   Popover,
@@ -197,7 +198,7 @@ export function MonthGrid({
   const byDate = useMemo(() => groupEventsByDate(events), [events]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-hairline bg-card">
+    <SectionCard as="div">
       <div className="grid grid-cols-7 border-b border-hairline bg-muted/40">
         {WEEKDAYS.map(label => (
           <div
@@ -225,6 +226,6 @@ export function MonthGrid({
           )),
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }

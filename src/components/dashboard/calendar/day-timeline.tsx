@@ -2,6 +2,7 @@ import { ArrowRight, Lock } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ContentTypeIcon } from "@/components/dashboard/calendar/content-type-icon";
 import { ShareButton } from "@/components/dashboard/calendar/share-button";
+import { SectionCard } from "@/components/dashboard/primitives/section";
 import { Badge } from "@/components/ui/badge";
 import {
   deriveCalendarEventState,
@@ -178,7 +179,7 @@ export function DayTimeline({ plan, action, now: externalNow }: DayTimelineProps
   const hasEvents = days.some(day => day.events.length > 0);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-hairline bg-card">
+    <SectionCard>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-5 py-3">
         <h2 className="text-headline text-foreground">直播预定</h2>
         <div className="flex items-center gap-1">
@@ -194,7 +195,7 @@ export function DayTimeline({ plan, action, now: externalNow }: DayTimelineProps
       </div>
 
 
-    </section>
+    </SectionCard>
   );
 }
 

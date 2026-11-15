@@ -1,6 +1,7 @@
 import { CalendarDays } from "lucide-react";
 import { useMemo } from "react";
 import { CalendarEventRow } from "@/components/dashboard/calendar/calendar-event-row";
+import { SectionCard } from "@/components/dashboard/primitives/section";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -85,7 +86,7 @@ export function AgendaList({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-hairline bg-card">
+    <SectionCard as="div">
       {dates.map(date => {
         const dayEvents = byDate.get(date) ?? [];
         const relative = date === today ? "今天" : date === tomorrow ? "明天" : null;
@@ -122,6 +123,6 @@ export function AgendaList({
           </section>
         );
       })}
-    </div>
+    </SectionCard>
   );
 }

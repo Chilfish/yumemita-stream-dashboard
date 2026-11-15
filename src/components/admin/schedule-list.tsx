@@ -1,6 +1,7 @@
 import { CalendarPlus, Pencil, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import type { DatasetOption } from "@/components/admin/schedule-form-state";
+import { SectionCard } from "@/components/dashboard/primitives/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -127,7 +128,7 @@ export function ScheduleList({ items, datasets, onEdit, onDelete }: ScheduleList
   const grouped = useMemo(() => groupSchedulesByDate(items), [items]);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-hairline bg-card">
+    <SectionCard>
       <div className="flex items-baseline justify-between gap-2 border-b border-hairline px-4 py-3 sm:px-5">
         <h2 className="text-headline text-foreground">未来日程</h2>
         <span className="text-caption text-ink-3">近 7 天到未来 60 天</span>
@@ -241,6 +242,6 @@ export function ScheduleList({ items, datasets, onEdit, onDelete }: ScheduleList
               ))}
             </div>
           )}
-    </section>
+    </SectionCard>
   );
 }
