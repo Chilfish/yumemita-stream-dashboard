@@ -1,5 +1,6 @@
 import { RotateCcw, Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { FilterChip } from "@/components/dashboard/primitives/filter-chip";
 import { Button } from "@/components/ui/button";
 import {
   InputGroup,
@@ -39,9 +40,6 @@ const SORT_OPTIONS: { value: TranscriptSortOrder; label: string }[] = [
 ];
 
 const SEARCH_DEBOUNCE_MS = 200;
-
-const CHIP_CLASS =
-  "min-h-11 rounded-full px-2.5 text-footnote text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background md:min-h-6";
 
 function FilterCount({ count }: { count: number }) {
   return (
@@ -130,15 +128,15 @@ export function TranscriptsToolbar({ params, onChange, tags }: TranscriptsToolba
         value={params.tags}
       >
         {tags.map(item => (
-          <ToggleGroupItem
+          <FilterChip
             aria-label={`${item.tag}，${item.count} 篇`}
-            className={CHIP_CLASS}
+            className="min-h-11 md:min-h-6"
             key={item.tag}
             value={item.tag}
           >
             <span className="max-w-40 truncate">{item.tag}</span>
             <span className="text-caption tabular-nums opacity-64">{item.count}</span>
-          </ToggleGroupItem>
+          </FilterChip>
         ))}
       </ToggleGroup>
     );

@@ -4,11 +4,12 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "@/lib/router-compat";
 import { GalleryView } from "@/components/dashboard/gallery/gallery-view";
 import { useGroupDataContext } from "@/components/dashboard/contexts/group-data-context";
+import { FilterChip } from "@/components/dashboard/primitives/filter-chip";
 import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import {
   CONTENT_TYPE_LABELS,
   type ContentTypeKey,
@@ -27,9 +28,6 @@ import {
   type GalleryTypeFilter,
 } from "@/lib/gallery-params";
 import { DEFAULT_MEMBER_COLOR } from "@/lib/group";
-
-const CHIP_CLASS =
-  "gap-1.5 rounded-full px-2.5 text-footnote text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background";
 
 const CHIP_ROW_CLASS = "flex min-w-0 max-w-full flex-wrap gap-1";
 
@@ -185,20 +183,20 @@ export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps
             size="sm"
             value={day === null ? ["all"] : day === todayMonthDay ? ["today"] : []}
           >
-            <ToggleGroupItem
+            <FilterChip
               aria-label={`全部日子 · ${formatInteger(rows.length)} 场`}
-              className={CHIP_CLASS}
+              className="gap-1.5"
               value="all"
             >
               全部
-            </ToggleGroupItem>
-            <ToggleGroupItem
+            </FilterChip>
+            <FilterChip
               aria-label={`那年今日 · ${galleryDayLabel(todayMonthDay)}`}
-              className={CHIP_CLASS}
+              className="gap-1.5"
               value="today"
             >
               那年今日
-            </ToggleGroupItem>
+            </FilterChip>
           </ToggleGroup>
           <Popover onOpenChange={setDayPickerOpen} open={dayPickerOpen}>
             <PopoverTrigger
@@ -234,22 +232,22 @@ export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps
           size="sm"
           value={[member ?? GALLERY_ALL_MEMBERS]}
         >
-          <ToggleGroupItem
+          <FilterChip
             aria-label={`全部成员 · ${formatInteger(counts.memberTotal)} 场`}
-            className={CHIP_CLASS}
+            className="gap-1.5"
             value={GALLERY_ALL_MEMBERS}
           >
             全部
             <span className="tabular-nums">· {formatInteger(counts.memberTotal)}</span>
-          </ToggleGroupItem>
+          </FilterChip>
           {members.map(item => {
             const color = item.dataset.color ?? DEFAULT_MEMBER_COLOR;
             const count = counts.byMember.get(item.dataset.id) ?? 0;
 
             return (
-              <ToggleGroupItem
+              <FilterChip
                 aria-label={`成员：${item.dataset.label} · ${formatInteger(count)} 场`}
-                className={CHIP_CLASS}
+                className="gap-1.5"
                 key={item.dataset.id}
                 value={item.dataset.id}
               >
@@ -260,7 +258,7 @@ export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps
                 />
                 {item.dataset.label}
                 <span className="tabular-nums">· {formatInteger(count)}</span>
-              </ToggleGroupItem>
+              </FilterChip>
             );
           })}
         </ToggleGroup>
@@ -282,15 +280,15 @@ export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps
                 : (counts.byType.get(option.value) ?? 0);
 
             return (
-              <ToggleGroupItem
+              <FilterChip
                 aria-label={`内容类型：${option.label} · ${formatInteger(count)} 场`}
-                className={CHIP_CLASS}
+                className="gap-1.5"
                 key={option.value}
                 value={option.value}
               >
                 {option.label}
                 <span className="tabular-nums">· {formatInteger(count)}</span>
-              </ToggleGroupItem>
+              </FilterChip>
             );
           })}
         </ToggleGroup>

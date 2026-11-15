@@ -2,11 +2,12 @@ import { type ReactNode, useMemo, useState } from "react";
 import { ChartCard } from "@/components/charts/chart-card";
 import { StreamShapeChart } from "@/components/charts/stream-shape";
 import { TrendLine } from "@/components/charts/trend-line";
+import { FilterChip } from "@/components/dashboard/primitives/filter-chip";
 import { PageHeader, type Fact } from "@/components/dashboard/primitives/page-header";
 import { Panel, PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
 import { TopAuthors } from "@/components/dashboard/trends/top-authors";
 import { TopWords } from "@/components/dashboard/trends/top-words";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import {
   buildContentTypeStats,
   buildMonthlySeries,
@@ -162,13 +163,9 @@ export function TrendsView({ rows, totals }: TrendsViewProps) {
             value={[metric]}
           >
             {METRIC_OPTIONS.map(option => (
-              <ToggleGroupItem
-                className="rounded-full px-2.5 text-footnote text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background"
-                key={option.value}
-                value={option.value}
-              >
+              <FilterChip key={option.value} value={option.value}>
                 {option.label}
-              </ToggleGroupItem>
+              </FilterChip>
             ))}
           </ToggleGroup>
         }

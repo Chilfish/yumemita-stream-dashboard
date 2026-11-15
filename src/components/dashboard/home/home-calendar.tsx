@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { CalendarHeatmap } from "@/components/charts/calendar-heatmap";
+import { FilterChip } from "@/components/dashboard/primitives/filter-chip";
 import { Panel, PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import {
   buildCalendarDays,
   type CalendarMetric,
@@ -46,13 +47,9 @@ export function HomeCalendar({ rows }: HomeCalendarProps) {
             value={[metric]}
           >
             {METRIC_OPTIONS.map(option => (
-              <ToggleGroupItem
-                className="rounded-full px-2.5 text-footnote text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background"
-                key={option.value}
-                value={option.value}
-              >
+              <FilterChip key={option.value} value={option.value}>
                 {option.label}
-              </ToggleGroupItem>
+              </FilterChip>
             ))}
           </ToggleGroup>
         }

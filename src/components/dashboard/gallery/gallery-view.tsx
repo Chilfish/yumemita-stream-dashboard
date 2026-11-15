@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useSearchParams } from "@/lib/router-compat";
+import { FilterChip } from "@/components/dashboard/primitives/filter-chip";
 import { StreamCover } from "@/components/dashboard/primitives/stream-cover";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import { memberAccent } from "@/lib/color";
 import { formatDate, formatInteger } from "@/lib/format";
 import { type GalleryOrder, parseGalleryOrder, writeGalleryOrder } from "@/lib/gallery-params";
@@ -51,9 +52,6 @@ const ORDER_OPTIONS: { value: GalleryOrder; label: string }[] = [
 const UNKNOWN_MONTH = "unknown";
 const INITIAL_VISIBLE_ROWS = 60;
 const VISIBLE_STEP = 120;
-
-const CHIP_CLASS =
-  "rounded-full px-2.5 text-footnote text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background";
 
 /** 成员色缓存：同一成员的所有卡片共用一份明暗两套 ink，避免逐卡计算对比度。 */
 const INK_CACHE = new Map<string, { light: string; dark: string }>();
@@ -218,14 +216,13 @@ export function GalleryView({
             </p>
             <ToggleGroup aria-label="相册排序" onValueChange={changeOrder} size="sm" value={[order]}>
               {ORDER_OPTIONS.map(option => (
-                <ToggleGroupItem
+                <FilterChip
                   aria-label={`排序：${option.label}`}
-                  className={CHIP_CLASS}
                   key={option.value}
                   value={option.value}
                 >
                   {option.label}
-                </ToggleGroupItem>
+                </FilterChip>
               ))}
             </ToggleGroup>
           </div>

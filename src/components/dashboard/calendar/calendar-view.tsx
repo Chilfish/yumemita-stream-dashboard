@@ -3,12 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { AgendaList } from "@/components/dashboard/calendar/agenda-list";
 import { CalendarEventRow } from "@/components/dashboard/calendar/calendar-event-row";
 import { DayTimeline } from "@/components/dashboard/calendar/day-timeline";
+import { FilterChip } from "@/components/dashboard/primitives/filter-chip";
 import { MemberDot } from "@/components/dashboard/primitives/member-avatar";
 import { MonthGrid } from "@/components/dashboard/calendar/month-grid";
 import { PageHeader } from "@/components/dashboard/primitives/page-header";
+import { SectionCard } from "@/components/dashboard/primitives/section";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import {
   buildDayPlan,
   currentJstDay,
@@ -33,9 +35,6 @@ import type {
   CalendarParams,
   CalendarViewMode,
 } from "@/types/calendar";
-
-const CHIP_CLASS =
-  "gap-1.5 rounded-full px-2.5 text-muted-foreground before:rounded-full hover:text-foreground data-pressed:bg-foreground data-pressed:text-background data-pressed:hover:bg-foreground data-pressed:hover:text-background";
 
 interface CalendarViewProps {
   data: CalendarPageData;
@@ -263,19 +262,15 @@ function MemberFilter({
         value={selected}
       >
         {members.map(member => (
-          <ToggleGroupItem
+          <FilterChip
             aria-label={`成员：${member.label}`}
-            className={CHIP_CLASS}
+            className="gap-1.5"
             key={member.id}
-            style={{
-              fontSize: "var(--text-footnote)",
-              lineHeight: "var(--text-footnote--line-height)",
-            }}
             value={member.id}
           >
             <MemberDot color={member.color ?? "var(--member-color)"} />
             {member.label}
-          </ToggleGroupItem>
+          </FilterChip>
         ))}
       </ToggleGroup>
       {selected.length > 0
@@ -291,7 +286,7 @@ function MemberFilter({
 
 function UndatedBlock({ events }: { events: CalendarEvent[] }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-hairline bg-card">
+    <SectionCard>
       <h2 className="border-b border-hairline px-3 py-2 text-footnote font-medium text-foreground">
         日期待定
         <span className="ms-2 text-caption font-normal text-ink-3">
@@ -305,6 +300,6 @@ function UndatedBlock({ events }: { events: CalendarEvent[] }) {
           </li>
         ))}
       </ul>
-    </section>
+    </SectionCard>
   );
 }
