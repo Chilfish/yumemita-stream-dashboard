@@ -1,7 +1,7 @@
 # 性能优化：剩余项
 
 > **状态**：2026-11-05 审计的 P0 大部分已落地。本文只保留尚未执行的优化项；已完成项的 before / after 见 [performance.md](../engineering/performance.md) 与 git 历史。
-> **已完成**：逐字稿 DEV 守卫、列表窄列、对比页密度 API、单场页取数收敛、搜索防抖、`DatasetViewContext` memo、图表 hover 节流、命令面板按需加载、图表占位。
+> **已完成**：逐字稿 DEV 守卫、列表窄列、对比页密度 API、单场页取数收敛、搜索防抖、`DatasetViewContext` memo、图表 hover 节流、命令面板按需加载、图表占位、按路由拆岛屿。
 > **当前基线**：客户端 JS 1.52 → 0.98 MB，单场页 HTML 696 → 281 KB，对比页 3 场 9 → 4 SQL。
 
 ## 1. props 收敛（P0）
@@ -16,12 +16,10 @@
 
 ## 2. 壳层重构与按视图拆包（P1）
 
-当前每个页面只有一个大岛屿，静态引入全部视图；`React.lazy` 会让 SSR 输出 fallback，必须先做壳层拆分。
+按视图拆包已完成（2026-11-15）：每个路由一个 `views/*-app.tsx` 入口，`dataset-page` / `group-page` 巨石 chunk 消失，before / after 见 [performance.md](../engineering/performance.md)。剩下的是把壳层本身移出岛屿：
 
 - 把侧栏 / 页头移出 React 岛屿，改成 Astro 布局 + `transition:persist`。
 - 正文用 `server:defer` 流式输出。
-- 壳层稳定后，再按 `view` 拆分岛屿或 `React.lazy`，让每个路由只加载自己的视图。
-- 命令面板保持打开时才挂载。
 
 ## 3. ingest / publish 批量化（P1）
 
@@ -54,7 +52,7 @@
 ## 5. 执行顺序
 
 1. props 收敛：先减少 HTML 与传输量，风险最低。
-2. 壳层重构：侧栏 / 页头移出岛屿，再按视图拆包与流式输出。
+2. 壳层重构：按视图拆包已完成，剩余侧栏 / 页头移出岛屿与流式输出。
 3. 管线批量化：ingest + publish 增量，先保证读侧稳定。
 4. 结构性项：query 解耦、跨版本缓存，等前三步数字出来后再评估。
 
