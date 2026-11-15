@@ -2,7 +2,7 @@ import { ExternalLink, ListTree, RotateCcw, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import Markdown, { type Components } from "react-markdown";
-import { Link } from "@/lib/router-compat";
+import { Link, useSearchParams } from "@/lib/router-compat";
 import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -344,7 +344,10 @@ export interface TranscriptViewProps {
 }
 
 export function TranscriptView({ datasetId, videoId, className }: TranscriptViewProps) {
-  const { file, status, error, retry } = useTranscript(datasetId, videoId);
+  // 会员限定场次靠 URL 上的访问参数放行，正文请求必须把它带给 API。
+  const [searchParams] = useSearchParams();
+  const accessKey = searchParams.get("key");
+  const { file, status, error, retry } = useTranscript(datasetId, videoId, accessKey);
 
   const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>(readSubtitleMode);
   // 附录默认折叠：正文才是主要阅读路径，字幕按需展开。

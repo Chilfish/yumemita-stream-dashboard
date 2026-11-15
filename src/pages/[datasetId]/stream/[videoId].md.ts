@@ -90,7 +90,7 @@ async function handleGet(context: Parameters<APIRoute>[0]): Promise<Response> {
   if (!summary) return notFound()
 
   const origin = context.site?.origin ?? DEFAULT_SITE_URL
-  const access = memberOnlyAccess(context.url)
+  const access = memberOnlyAccess(context.url, context.locals.admin)
   if (access.keyed) context.cache.set(false)
 
   const transcriptMeta = mapTranscriptMeta(transcriptRows[0])
@@ -194,7 +194,7 @@ export const HEAD: APIRoute = async (context) => {
     return new Response(null, { status: 404, headers: { ...headers, 'cache-control': 'no-store' } })
   }
 
-  const access = memberOnlyAccess(context.url)
+  const access = memberOnlyAccess(context.url, context.locals.admin)
   const memberOnly = isMemberOnly(summary.availability)
   if (memberOnly && !access.configured) {
     return new Response(null, { status: 503, headers: { ...headers, 'cache-control': 'no-store' } })

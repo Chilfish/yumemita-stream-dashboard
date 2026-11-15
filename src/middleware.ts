@@ -11,8 +11,14 @@ import {
   verifySession,
 } from '@/lib/admin-auth'
 import { isAdminPath, isApiPath } from '@/lib/admin-path'
+import { contentSecurityPolicy } from '@/lib/security-headers'
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
+/** dev 模式有 Vite HMR websocket，CSP 只在构建产物里下发。 */
+const CSP = import.meta.env.PROD
+  ? contentSecurityPolicy({ assetOrigin: import.meta.env.PUBLIC_R2_BASE })
+  : null
 
 /** 本地开发 / 预览走 http 是正常的，别把 localhost 也 301 到 https。 */
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
@@ -58,6 +64,12 @@ function unauthorized(context: APIContext): Response {
   })
 }
 
+async function hasAdminSession(context: APIContext): Promise<boolean> {
+  if (!ADMIN_SESSION_SECRET) return false
+  const cookie = context.cookies.get(SESSION_COOKIE)?.value
+  return verifySession(cookie, ADMIN_SESSION_SECRET)
+}
+
 async function guardAdmin(context: APIContext): Promise<Response | null> {
   if (!ADMIN_USER || !ADMIN_PASSWORD) {
     return Response.json(
@@ -75,8 +87,7 @@ async function guardAdmin(context: APIContext): Promise<Response | null> {
 
   const pathname = context.url.pathname
   const secret = ADMIN_SESSION_SECRET
-  const cookie = context.cookies.get(SESSION_COOKIE)?.value
-  const cookieValid = await verifySession(cookie, secret)
+  const cookieValid = context.locals.admin
 
   const basic = parseBasicAuth(context.request.headers.get('authorization'))
   const basicValid = Boolean(
@@ -151,6 +162,10 @@ function applyHeaders(context: APIContext, response: Response, admin: boolean): 
     headers.set('content-type', `${contentType}; charset=utf-8`)
   }
 
+  if (CSP && contentType?.toLowerCase().startsWith('text/html')) {
+    headers.set('content-security-policy', CSP)
+  }
+
   if (admin) {
     headers.set('cache-control', 'no-store')
     headers.set('x-robots-tag', 'noindex, nofollow')
@@ -169,6 +184,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const redirect = forceHttps(context)
   if (redirect) return redirect
+
+  context.locals.admin = await hasAdminSession(context)
 
   const admin = isAdminPath(context.url.pathname)
   if (admin) {

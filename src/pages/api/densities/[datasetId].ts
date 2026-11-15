@@ -21,7 +21,7 @@ export const GET: APIRoute = async (context) => {
     )
   }
 
-  const { unlocked, keyed } = memberOnlyAccess(context.url)
+  const { unlocked, keyed } = memberOnlyAccess(context.url, context.locals.admin)
   if (keyed) context.cache.set(false)
 
   try {

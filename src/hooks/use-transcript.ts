@@ -103,21 +103,33 @@ const transcriptCache = new Map<string, Promise<TranscriptFile>>();
 /** 已解析的正文：切换场次时可以直接显示，不必先闪一帧骨架。 */
 const resolvedTranscriptCache = new Map<string, TranscriptFile>();
 
-function loadTranscript(datasetId: string, videoId: string, force = false): Promise<TranscriptFile> {
-  const key = `${datasetId}/${videoId}`;
+/** 带访问参数的请求单独成档，避免把管理员 / 持钥视图缓存给无权限的会话。 */
+function transcriptCacheKey(datasetId: string, videoId: string, accessKey: string | null): string {
+  return accessKey ? `${datasetId}/${videoId}?key` : `${datasetId}/${videoId}`;
+}
+
+function loadTranscript(
+  datasetId: string,
+  videoId: string,
+  accessKey: string | null,
+  force = false,
+): Promise<TranscriptFile> {
+  const key = transcriptCacheKey(datasetId, videoId, accessKey);
+  const localKey = `${datasetId}/${videoId}`;
   if (force) {
     transcriptCache.delete(key);
-    localFileCache.delete(key);
+    localFileCache.delete(localKey);
     resolvedTranscriptCache.delete(key);
   }
   const cached = transcriptCache.get(key);
   if (cached) return cached;
 
   const loadLocal = (): Promise<TranscriptFile | null> =>
-    loadLocalFile(key)?.catch(() => null) ?? Promise.resolve(null);
+    loadLocalFile(localKey)?.catch(() => null) ?? Promise.resolve(null);
 
+  const query = accessKey ? `?key=${encodeURIComponent(accessKey)}` : "";
   const request = fetch(
-    `/api/transcripts/${encodeURIComponent(datasetId)}/${encodeURIComponent(videoId)}`,
+    `/api/transcripts/${encodeURIComponent(datasetId)}/${encodeURIComponent(videoId)}${query}`,
     { headers: { Accept: "application/json" } },
   )
     .then(async response => {
@@ -166,8 +178,12 @@ export interface TranscriptResult {
 
 const EMPTY_KEY = "";
 
-export function useTranscript(datasetId: string | null, videoId: string | null): TranscriptResult {
-  const key = datasetId && videoId ? `${datasetId}/${videoId}` : EMPTY_KEY;
+export function useTranscript(
+  datasetId: string | null,
+  videoId: string | null,
+  accessKey: string | null = null,
+): TranscriptResult {
+  const key = datasetId && videoId ? transcriptCacheKey(datasetId, videoId, accessKey) : EMPTY_KEY;
   const [state, setState] = useState<FileState>({ key: EMPTY_KEY, file: null, status: "idle", error: null });
   const [attempt, setAttempt] = useState(0);
   // force 只作用于紧随其后的一次请求；重试成功后共享缓存重新生效。
@@ -181,7 +197,7 @@ export function useTranscript(datasetId: string | null, videoId: string | null):
     // oxlint-disable-next-line react/set-state-in-effect -- 切换场次时必须重置加载状态
     setState({ key, file: null, status: "loading", error: null });
 
-    guard(loadTranscript(datasetId, videoId, force), controller.signal)
+    guard(loadTranscript(datasetId, videoId, accessKey, force), controller.signal)
       .then(file => {
         if (controller.signal.aborted) return;
         setState({ key, file, status: "ready", error: null });
@@ -197,7 +213,7 @@ export function useTranscript(datasetId: string | null, videoId: string | null):
       });
 
     return () => controller.abort();
-  }, [datasetId, videoId, key, attempt]);
+  }, [accessKey, datasetId, videoId, key, attempt]);
 
   const retry = (): void => {
     forceNextRef.current = true;

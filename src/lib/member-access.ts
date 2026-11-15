@@ -11,7 +11,9 @@ export interface MemberOnlyAccess {
   configured: boolean;
 }
 
-function readAccess(url: URL): MemberOnlyAccess {
+function readAccess(url: URL, admin: boolean): MemberOnlyAccess {
+  if (admin) return { unlocked: true, keyed: true, configured: true };
+
   const unlocked = memberOnlyUnlocked(url.searchParams.get(MEMBER_ONLY_PARAM), MEMBER_ONLY_KEY);
   return {
     unlocked,
@@ -20,13 +22,13 @@ function readAccess(url: URL): MemberOnlyAccess {
   };
 }
 
-export function memberOnlyAccess(url: URL): MemberOnlyAccess {
-  return readAccess(url);
+export function memberOnlyAccess(url: URL, admin = false): MemberOnlyAccess {
+  return readAccess(url, admin);
 }
 
 /** 页面用：处理访问判断，并在带访问参数时关掉 Astro / CDN 缓存。 */
 export function memberOnlyCachePolicy(astro: AstroGlobal): MemberOnlyAccess {
-  const access = readAccess(astro.url);
+  const access = readAccess(astro.url, astro.locals.admin);
   if (access.keyed) {
     astro.cache.set(false);
     astro.response.headers.set("cache-control", "private, no-store");

@@ -23,7 +23,7 @@ export const GET: APIRoute = async (context) => {
     return json({ error: '缺少参数' }, 400)
   }
 
-  const access = memberOnlyAccess(context.url)
+  const access = memberOnlyAccess(context.url, context.locals.admin)
   if (access.keyed) context.cache.set(false)
 
   let summary

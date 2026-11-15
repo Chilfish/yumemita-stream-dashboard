@@ -9,5 +9,7 @@ declare namespace App {
   interface Locals {
     requestId: string
     startedAt: number
+    /** 请求携带有效的 admin 会话 Cookie。 */
+    admin: boolean
   }
 }
