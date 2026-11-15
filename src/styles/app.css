@@ -1,6 +1,10 @@
-/* 中日英共用一套字形：Noto Sans 负责拉丁与等宽数字，Noto Sans SC 负责简中与假名。 */
+/*
+ * 字形分工：拉丁与等宽数字用自托管的 Noto Sans，中日文交给系统字体。
+ * `@fontsource-variable/noto-sans-sc` 会带 101 个 woff2 子集（4.29 MB），
+ * 一页命中 40+ 个就是 2 MB 以上的字体请求；CJK 正文字体不值得这个代价。
+ * 中日文回落到 PingFang / Hiragino / Yu Gothic / 微软雅黑 / Noto Sans CJK。
+ */
 @import "@fontsource-variable/noto-sans";
-@import "@fontsource-variable/noto-sans-sc";
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -12,8 +16,8 @@
     --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
     --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
     --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-    --font-heading: "Noto Sans Variable", "Noto Sans SC Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Microsoft YaHei", sans-serif;
-    --font-sans: "Noto Sans Variable", "Noto Sans SC Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Microsoft YaHei", sans-serif;
+    --font-heading: "Noto Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Yu Gothic UI", "Microsoft YaHei", sans-serif;
+    --font-sans: "Noto Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Yu Gothic UI", "Microsoft YaHei", sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
@@ -239,7 +243,8 @@
     --label: #000000;
     /* HIG 的 secondaryLabel（60%）在 12px 中文上只有 3.4:1，按可达性压深。 */
     --secondary-label: #5f5f66;
-    --tertiary-label: #8a8a92;
+    /* tertiaryLabel 同理由 #8a8a92 压深：原值在侧栏底上只有 2.9:1，11–12px 的日期与单位读不清。 */
+    --tertiary-label: #66666f;
     --separator: rgb(60 60 67 / 0.29);
     --separator-soft: rgb(60 60 67 / 0.12);
     --fill-secondary: rgb(120 120 128 / 0.16);
@@ -287,7 +292,8 @@
     --sidebar-accent: --alpha(var(--color-black) / 4%);
     --sidebar-accent-foreground: var(--color-neutral-800);
     --sidebar-border: var(--hairline);
-    --sidebar-foreground: color-mix(in srgb, var(--color-neutral-800) 64%, var(--sidebar));
+    /* 64% 混色在 #efe9ee 上只有 4.35:1，差一点点不够 4.5；72% 到 5.5:1。 */
+    --sidebar-foreground: color-mix(in srgb, var(--color-neutral-800) 72%, var(--sidebar));
     --sidebar-primary: var(--color-neutral-800);
     --sidebar-primary-foreground: var(--color-neutral-50);
     --sidebar-ring: var(--color-neutral-400);
