@@ -168,7 +168,7 @@ bun run ymmt db bench -- --rounds 10 --label after-client-perf-3
 - **头像**：900×900 JPG → 128×128 JPEG（quality 82），5 张合计 631.6 KB → 29.8 KB（-95%）。界面上只显示 20–24 px，128 px 足够覆盖高 DPI。
 - **封面**：原图 1280×720 JPEG；`fetch:thumbs` 用 `Bun.Image` 生成 480 / 960 / 1280w WebP（quality 78）。列表与相册用 `srcset` 只下 480w，首屏主图用 `sizes` + `fetchPriority="high"` 下 960w / 1280w。
 - 封面 / 表情由 `PUBLIC_R2_BASE` 直接提供。**注意**：Bun 的 S3 写入只能给 Content-Type，设不了 `Cache-Control`，所以桶里这些对象目前走 R2 自定义域名默认的 4 小时；要 1 年 immutable 得在 Cloudflare 侧加 Cache Rule（见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) M7）。容器固定 `aspect-video`，图片解码前就预留高度，CLS 接近 0。
-- 逐字稿正文不公开暴露，按需走 `/api/transcripts/:datasetId/:videoId`。
+- 逐字稿正文按需走 `/api/transcripts/:datasetId/:videoId`；但公开 R2 域名会暴露桶内全部 key，见 [postmortem 006](../postmortem/006-public-r2-member-only-leak.md)。
 
 ## 字体
 
@@ -176,6 +176,42 @@ bun run ymmt db bench -- --rounds 10 --label after-client-perf-3
 - 曾经自托管 Noto Sans SC：那个包带 101 个 woff2 子集共 4.29 MB，首页命中 48 个就是 2.36 MB，占整页载荷 69%，LCP 3.4 s。CJK 正文字体不值得这个代价，2026-11-15 移除。
 - `font-display: swap`，首帧先用系统字体。
 - 没有 preload 字体：本地实测 LCP 元素是首屏封面图，提前拉字体会和图片抢带宽。
+
+## API 压测（2026-11-15，本地）
+
+对象存储删除 / 访问策略调整后的本地基线。环境：`bun run build` + `astro preview`（单进程 workerd）、本地 PostgreSQL、SILO、Neon HTTP 代理；压测工具 `autocannon v9`。这些是**本机数字**，不能直接外推到线上 Worker（并发模型、缓存与网络都不同）。
+
+### 环境
+
+```bash
+bun run ymmt dev db        # PostgreSQL
+bun run ymmt dev storage   # SILO
+bun run ymmt dev proxy     # Neon HTTP 兼容代理
+bun run build
+bunx astro preview --port 4322
+
+bunx autocannon -c 20 -d 10 -j http://localhost:4322/api/packs/<datasetId>/<videoId>
+bunx autocannon -c 50 -d 10 -j http://localhost:4322/api/admin/schedule
+```
+
+### 结果
+
+| 接口 | 并发 | RPS | p50 | p97.5 | p99 | 非 2xx |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/api/transcripts/<dataset>/<id>`（公开） | 20 | 169 | 115 ms | — | 165 ms | 0 |
+| 同上 | 50 | 227 | 209 ms | 314 ms | 342 ms | 0 |
+| `/api/packs/<dataset>/<id>` | 20 | 223 | 87 ms | — | 135 ms | 0 |
+| `/api/densities/<dataset>?ids=…` | 20 | 471 | 39 ms | — | 73 ms | 0 |
+| `/api/transcripts/<dataset>/<会限 id>` | 20 | 506 | 36 ms | — | 67 ms | 5,061（403） |
+| `/api/admin/schedule`（未登录） | 20 | 874 | 20 ms | — | 77 ms | 8,735（401） |
+| 同上 | 50 | 1,017 | 44 ms | 84 ms | 99 ms | 10,174（401） |
+
+### 结论
+
+- 公开逐字稿最慢：每请求要读一次 R2（preview 下缓存不生效），20 并发 p50 已到 115 ms；packs / densities 主要吃数据库，前者 87 ms、后者 39 ms。
+- 会限 403 与 admin 401 只做参数 / 会话判定，不触库，20 并发 p50 分别为 36 / 20 ms。
+- **没有任何限速**：admin 401 跑到约 1,000 RPS 也没有 429，说明防护只能靠 Cloudflare Rate Limiting（B44），Worker 内没有兜底。
+- 公开接口全程 0 错误；本地没有出现连接堆积或 5xx。
 
 ## 回归方式
 

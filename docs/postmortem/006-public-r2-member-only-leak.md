@@ -19,7 +19,8 @@
 ## 影响
 
 - 会员限定场的逐字稿全文、弹幕、SC、评论可被任意第三方获取，访问参数形同虚设。
-- 影响范围是所有已发布到该桶的会限场次，数量未逐一核对。
+- 逐字稿对象：桶内共 164 个，其中会限场 1 个（`ritsu/transcripts/jAAu3rz0TTI.json`），已删除并复查 404。
+- 原始 pack：会限场 125 个，仍在公开域下，待迁移。
 - 未发现写入或删除能力；泄露面是读。
 
 ## 时间线
@@ -47,7 +48,9 @@
 ## 处置
 
 - 代码层：没有可单独修复的点；需要桶 / 路由配置。
-- 待执行：Cloudflare WAF 规则拦截公开域上的 `*/transcripts/*` 与 `/archive/*`；随后把这两类对象迁到私有桶。
+- 2026-11-15：用 `wrangler r2 object delete` 删除唯一一个会限逐字稿对象，匿名复查 404；重新枚举后会限逐字稿为 0。
+- 待执行：Cloudflare WAF 规则拦截公开域上的 `*/transcripts/*` 与 `/archive/*`；随后把这两类对象迁到私有桶。125 个会限 archive pack 仍未处理。
+- 发布侧现状：`publish transcripts` 按 frontmatter 跳过会限稿，`transcript import` 默认拒绝会限并清理本地副本；本次误传发生在这些守卫生效之前。
 - 与本次同时修复的相邻问题：JSON-LD 注入转义、页面 CSP、访问参数透传（见 [security-review-2026-11-15.md](../research/security-review-2026-11-15.md)）。
 
 ## 做得对的地方
@@ -59,6 +62,7 @@
 
 ### 缓解（针对已发生的具体缺口）
 
+- [x] P0 维护者：删除已误传的会限逐字稿对象（1 个，复查 404）
 - [ ] P0 维护者：给 `ymmt-s3.chilfish.top` 加 WAF 规则，block `*/transcripts/*` 与 `/archive/*`
 - [ ] P0 维护者：把 `archive/` 与 `*/transcripts/` 迁移到私有桶，Worker 增加私有 binding
 - [ ] P0 维护者：轮换 `MEMBER_ONLY_KEY`（即便当前参数未直接泄漏，公开对象已使授权失效）
