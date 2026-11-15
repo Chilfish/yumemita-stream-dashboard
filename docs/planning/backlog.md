@@ -24,7 +24,8 @@
 | B35 | 空数据 / 部分数据的更明确提示（已有基础版） | P3 | 无 | roadmap | 📋 |
 | B39 | `/gallery` 载荷：SSR 只渲染首屏，其余按页从服务端拉取，别把 1,837 行塞进 `astro-island` props（当前 1.71 MB / 全页 1.89 MB） | P2 | 需要新端点与三态 | 2026-11-15 审计 | 📋 背景见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) |
 | B40 | `ymmt-s3.chilfish.top` 加 Cloudflare Cache Rule：`Cache-Control: public, max-age=31536000, immutable`（现为 R2 默认 4 小时） | P2 | 无 | 2026-11-15 审计 | 📋 桶侧配置，代码改不了 |
-| B41 | 重新跑 Lighthouse（干净 Chrome profile + mobile preset），复核可访问性与 LCP | P3 | 无 | 2026-11-15 审计 | 📋 本机报告的 1,593 KB `unused-javascript` 是浏览器扩展污染 |
+| B41 | 部署后线上复测 Lighthouse（mobile preset），并单独补一次桌面 preset 复核对比度 | P3 | 需先部署 | 2026-11-15 审计 | 📋 本地 preview 不压缩，得不到可比数字 |
+| B42 | 自有 JS 体积：干净 profile 下报约 454 KB 未使用（`shell-theme` 222 KB / `calendar` 155 KB / `client` 204 KB / `group-page` 117 KB），排查主题壳层为何这么大 | P2 | 无 | 2026-11-15 移动端复测 | 📋 部分是 `ClientRouter` 预取的路由 chunk |
 
 > 2026-11-08 隐式状态机审查的 Z / R / E / U 问题已全部关闭，记录见 [review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md) 与 [archive/state-machine-remediation.md](../archive/state-machine-remediation.md)。
 
