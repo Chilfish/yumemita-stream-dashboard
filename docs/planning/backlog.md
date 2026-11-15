@@ -24,7 +24,7 @@
 | B35 | 空数据 / 部分数据的更明确提示（已有基础版） | P3 | 无 | roadmap | 📋 |
 | B39 | `/gallery` 载荷：SSR 只渲染首屏，其余按页从服务端拉取，别把 1,837 行塞进 `astro-island` props（当前 1.71 MB / 全页 1.89 MB） | P2 | 需要新端点与三态 | 2026-11-15 审计 | 📋 背景见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) |
 | B40 | `ymmt-s3.chilfish.top` 加 Cloudflare Cache Rule：`Cache-Control: public, max-age=31536000, immutable`（现为 R2 默认 4 小时） | P2 | 无 | 2026-11-15 审计 | 📋 桶侧配置，代码改不了 |
-| B41 | 部署后线上复测 Lighthouse（mobile preset），并单独补一次桌面 preset 复核对比度 | P3 | 需先部署 | 2026-11-15 审计 | 📋 本地 preview 不压缩，得不到可比数字 |
+| B41 | 部署后线上复测 Lighthouse：mobile preset（首页）、桌面 preset（对比度复核），以及逐字稿页的 SSR 与 CSP 修复 | P3 | 需先部署 | 2026-11-15 审计 | 🚧 线上复核与修复见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) 第八节；本地生产构建 a11y / BP / SEO 均 100，线上数字仍待复测 |
 | B42 | 自有 JS 体积：干净 profile 下报约 454 KB 未使用（`shell-theme` 222 KB / `calendar` 155 KB / `client` 204 KB / `group-page` 117 KB），排查主题壳层为何这么大 | P2 | 无 | 2026-11-15 移动端复测 | 📋 部分是 `ClientRouter` 预取的路由 chunk |
 | B43 | 公开域名 `ymmt-s3.chilfish.top` 可直接下载 `archive/` 与 `*/transcripts/`（会限正文与原始 pack）：先加 WAF block，再把两类对象迁到私有桶并补匿名可达性检查 | P0 | Cloudflare 配置 / 新桶 | 2026-11-15 安全自查 | 🚧 误传的 1 个会限逐字稿已删除；125 个会限 archive pack 仍公开，见 [postmortem 006](../postmortem/006-public-r2-member-only-leak.md) |
 | B44 | `/admin`、`/api/admin` 与会限 API 加 Cloudflare Rate Limiting；`MEMBER_ONLY_KEY` 改为 32 位以上随机值并建立轮换 | P1 | 无 | 2026-11-15 安全自查 | 📋 见 [security-review-2026-11-15.md](../research/security-review-2026-11-15.md) |

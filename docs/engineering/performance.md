@@ -163,6 +163,16 @@ bun run ymmt db bench -- --rounds 10 --label after-client-perf-3
 - **预聚合进 ingest**：`datasets.stream_count` 与组首页 summary 目前仍在请求期计算，场次继续增长后可像 `public_totals` 一样落库。
 - **分页替代 2,000 上限**：`getDatasetPageData()` 仍一次取当前成员全部场次；超过上限需要服务端分页或按路由裁剪 props。
 
+## 逐字稿首屏预渲染（2026-11-15）
+
+`?view=transcript` 的正文原本要等 `client:idle` 水合后由 `useTranscript` 请求 `/api/transcripts/*`。线上 Lighthouse 测得该请求到 4.4 s 才发出，LCP 5.0 s（其中元素渲染延迟 4.0 s）。
+
+现在首屏是逐字稿时，页面在服务端直接读 R2（`src/lib/transcript-read.ts`），把 `TranscriptFile` 作为 `initialTranscript` 往下传给岛屿；`useTranscript` 用它做初始状态，不再发重复请求。会限场次（`memberOnly`）不预渲染，仍走带访问参数的客户端路径。
+
+- 首屏 HTML 直接含 17 个 `<blockquote>`，水合后 0 次 `/api/transcripts` 请求。
+- 体积：逐字稿页 485 KB raw / 113 KB gzip，概览页 308 KB / 55 KB。差值里 props 的 `initialTranscript` 占 54 KB（≈8 KB gzip），其余是原本在客户端生成的 DOM；同时省下 48 KB gzip 的 API 响应，净多传约 10 KB。
+- 代价是每次冷渲染多一次 R2 读取；边缘缓存 1 小时 + `swr` 一天，命中后只付边缘响应。
+
 ## 图片
 
 - **头像**：900×900 JPG → 128×128 JPEG（quality 82），5 张合计 631.6 KB → 29.8 KB（-95%）。界面上只显示 20–24 px，128 px 足够覆盖高 DPI。
