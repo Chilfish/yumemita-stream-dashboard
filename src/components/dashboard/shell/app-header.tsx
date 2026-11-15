@@ -79,13 +79,14 @@ export function AppHeader({
           {chatTotal != null ? ` · ${formatInteger(chatTotal)} 条弹幕` : ""}
         </p>
         <Button
-          aria-label="搜索场次与成员（⌘K）"
           className="text-muted-foreground"
           onClick={onOpenCommand}
           size="sm"
           type="button"
           variant="ghost"
         >
+          {/* 断点收窄后可见文字会被藏起来，用 sr-only 补语义；aria-label 会让可见文本不在可访问名里。 */}
+          <span className="sr-only">搜索场次与成员</span>
           <Search aria-hidden="true" />
           <span className="hidden lg:inline">搜索</span>
           <Kbd className="hidden md:inline-flex">⌘K</Kbd>

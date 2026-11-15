@@ -83,7 +83,7 @@ function TranscriptToc({
       {items.map(item => (
         <li className={cn("min-w-0", item.depth === 3 && "ps-3")} key={item.id}>
           <button
-            className="block w-full text-start text-footnote leading-snug text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
+            className="block min-h-6 w-full text-start text-footnote leading-snug text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
             onClick={() => onSelect(item.id)}
             type="button"
           >
@@ -341,13 +341,20 @@ export interface TranscriptViewProps {
   datasetId: string;
   videoId: string;
   className?: string;
+  /** 服务端预渲染的正文：首屏已是逐字稿时直接用它，不必等水合后再请求。 */
+  initialFile?: TranscriptFile | null;
 }
 
-export function TranscriptView({ datasetId, videoId, className }: TranscriptViewProps) {
+export function TranscriptView({ datasetId, videoId, className, initialFile }: TranscriptViewProps) {
   // 会员限定场次靠 URL 上的访问参数放行，正文请求必须把它带给 API。
   const [searchParams] = useSearchParams();
   const accessKey = searchParams.get("key");
-  const { file, status, error, retry } = useTranscript(datasetId, videoId, accessKey);
+  const { file, status, error, retry } = useTranscript(
+    datasetId,
+    videoId,
+    accessKey,
+    initialFile ?? null,
+  );
 
   const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>(readSubtitleMode);
   // 附录默认折叠：正文才是主要阅读路径，字幕按需展开。
@@ -454,7 +461,7 @@ export function TranscriptView({ datasetId, videoId, className }: TranscriptView
             <TranscriptToc items={toc} onSelect={navigateToHeading} />
             {toc.length > 0 ? (
               <button
-                className="mt-3 text-caption text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
+                className="mt-3 min-h-6 text-caption text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
                 onClick={() => window.scrollTo({ top: 0 })}
                 type="button"
               >
