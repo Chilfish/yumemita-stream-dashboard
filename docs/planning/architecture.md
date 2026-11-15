@@ -152,8 +152,10 @@ src/db/
 | `/:datasetId/overview` | 302 → 成员首页 | 页面 |
 | `/:datasetId/table` | 302 → 场次列表 | 页面 |
 | `/sitemap.xml`、`/llms.txt` | SEO / Agent 入口 | SSR endpoint |
+| `/schemas/stream-datapack.v2.json` 等 | 对外 JSON Schema（draft-07） | endpoint |
 | `/api/packs/:datasetId/:videoId` | 单场 pack | endpoint |
 | `/api/transcripts/:datasetId/:videoId` | 逐字稿正文 | endpoint |
+| `/api/densities/:datasetId?ids=` | 对比页逐分钟密度 | endpoint |
 | `/api/internal/cache/purge` | 内部缓存失效 | endpoint |
 
 站内导航用 `<a href>`（ClientRouter 接管）；脚本内用 `navigate()`。不要用 `window.location.href`。
@@ -172,7 +174,9 @@ src/db/
 - 单场页静态 head 由 SSR 直接输出，不再有构建期注入脚本。
 - `sitemap.xml` 查 `datasets` + `streams`，条数为 `2 + 6 × 成员数 + 单场数`。
 - `.md` 不进 sitemap，带 `X-Robots-Tag: noindex`；HTML 单场页带 `<link rel="alternate" type="text/markdown">`。
-- `llms.txt` 列出成员、最近场次与 `.md` 链接。
+- `llms.txt` 按 [llmstxt.org v2](https://llmstxt.org/)：H1 → 摘要 blockquote → 说明段 → H2 文件列表 → `## Optional`，条目一律 `- [name](url): notes`。内容由 `src/lib/agent-llms.ts` 生成，列出成员、最近公开场次、Markdown 参数、结构化接口与 schema 入口。会员限定场次不进「最近场次」。
+- 任意 HTML 页在 `<head>` 里带 `<link rel="describedby" type="text/plain">` 指向 `/llms.txt`。
+- `/schemas/*.json` 是对外 JSON Schema（draft-07），由 `src/lib/json-schema.ts` 定义；`/api/packs`、`/api/transcripts`、`/api/densities` 的成功响应用 `Link: rel="describedby"` 指过去。schema 的字段集合与 `src/types/datapack.ts` 等在编译期强校验，改类型不改 schema 会编译失败。
 
 ## 图表策略：React + D3
 

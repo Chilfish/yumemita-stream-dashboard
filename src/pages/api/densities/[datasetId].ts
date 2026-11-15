@@ -3,12 +3,14 @@ import { db } from '@/db/client'
 import { getCompareDensityResult } from '@/db/queries/packs'
 import { memberOnlyAccess } from '@/lib/member-access'
 import { parseCompareIds } from '@/lib/routes'
+import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
 
 export const prerender = false
 
 /** 对比页按需补拉：只返回逐分钟弹幕，不还原整份 pack。 */
 export const GET: APIRoute = async (context) => {
   const datasetId = context.params.datasetId
+  const origin = (context.site?.origin ?? DEFAULT_SITE_URL).replace(/\/+$/, '')
   if (!datasetId) {
     return Response.json({ error: '缺少参数' }, { status: 400 })
   }
@@ -17,7 +19,12 @@ export const GET: APIRoute = async (context) => {
   if (videoIds.length === 0) {
     return Response.json(
       { densities: {}, locked: [] },
-      { headers: { 'cache-control': 'no-store' } },
+      {
+        headers: {
+          'cache-control': 'no-store',
+          'link': `<${origin}/schemas/densities.v1.json>; rel="describedby"; type="application/schema+json"`,
+        },
+      },
     )
   }
 
@@ -42,6 +49,7 @@ export const GET: APIRoute = async (context) => {
         'cache-control': keyed
           ? 'private, no-store'
           : 'public, max-age=3600, stale-while-revalidate=86400',
+        'link': `<${origin}/schemas/densities.v1.json>; rel="describedby"; type="application/schema+json"`,
       },
     })
   }

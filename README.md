@@ -213,6 +213,7 @@ bun run cf:deploy      # astro build + wrangler deploy --config dist/server/wran
 - 数据页请求期查 Neon；首页、成员页、场次、单场、趋势、相册与对比都由数据库驱动
 - 单场 Markdown：`/{datasetId}/stream/{videoId}.md`，返回 `text/markdown` 并附带逐字稿
 - `sitemap.xml` / `llms.txt` 由 endpoint 生成，`robots.txt` 是静态文件
+- 对外 JSON Schema：`/schemas/stream-datapack.v2.json`、`transcript.v1.json`、`densities.v1.json`；API 成功响应用 `Link: rel="describedby"` 指向
 - 数据更新后调用内部 `POST /api/internal/cache/purge`（Bearer `PURGE_TOKEN`）按 tag 失效
 
 详见 [docs/engineering/deployment.md](docs/engineering/deployment.md)。

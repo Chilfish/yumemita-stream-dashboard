@@ -3,14 +3,14 @@ import { runBatch } from '@/db/batch'
 import { db } from '@/db/client'
 import { mapDataset, selectDatasetsQuery, type DatasetQueryRow } from '@/db/queries/datasets'
 import { buildAllStreamHeadsQuery } from '@/db/queries/streams'
+import { renderLlmsTxt, type LlmsStreamInput } from '@/lib/agent-llms'
 import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
-import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
 
 export const GET: APIRoute = async (context) => {
   context.cache.set({ maxAge: 3600, swr: 86400, tags: ['llms'] })
-  const origin = context.site?.origin ?? DEFAULT_SITE_URL
+  const origin = (context.site?.origin ?? DEFAULT_SITE_URL).replace(/\/+$/, '')
 
   // 全部成员的最新场次标题一次取回，再按成员分组。
   const [datasetRows, streamRows] = await runBatch<[
@@ -20,62 +20,31 @@ export const GET: APIRoute = async (context) => {
     selectDatasetsQuery(db, undefined),
     buildAllStreamHeadsQuery(db),
   ])
-  const datasets = datasetRows.map(mapDataset)
 
-  const lines: string[] = [
-    '# ゆめみた 配信数据台',
-    '',
-    '> 夢限大みゅーたいぷ 成员直播数据的可视化数据台。每个单场页都有对应的 Markdown 视图，字段含概览、时间轴、弹幕、付费、评论与逐字稿。',
-    '',
-    '## 成员',
-    '',
-  ]
+  const streams: LlmsStreamInput[] = streamRows.map(row => ({
+    datasetId: row.datasetId,
+    videoId: row.videoId,
+    title: row.title,
+    date: row.date ?? '',
+    availability: row.availability,
+  }))
 
-  for (const dataset of datasets) {
-    lines.push(`- [${dataset.label}](${origin}/${dataset.id}) · ${dataset.streamCount} 场 · Markdown 索引：${origin}/${dataset.id}/streams`)
-  }
+  const body = renderLlmsTxt({
+    origin,
+    members: datasetRows.map(mapDataset).map(dataset => ({
+      id: dataset.id,
+      label: dataset.label,
+      streamCount: dataset.streamCount,
+    })),
+    streams,
+  })
 
-  lines.push('', '## 最近场次', '')
-
-  const byDataset = new Map<string, typeof streamRows>()
-  for (const row of streamRows) {
-    const list = byDataset.get(row.datasetId)
-    if (list) {
-      if (list.length < 20) list.push(row)
-    }
-    else {
-      byDataset.set(row.datasetId, [row])
-    }
-  }
-
-  const recent = datasets.flatMap(dataset =>
-    (byDataset.get(dataset.id) ?? [])
-      .filter(stream => !isMemberOnly(stream.availability))
-      .slice(0, 5)
-      .map(stream => ({ dataset, stream })),
-  )
-
-  for (const { dataset, stream } of recent.slice(0, 20)) {
-    lines.push(
-      `- ${dataset.label} · ${stream.date} · ${stream.title} — ${origin}/${dataset.id}/stream/${stream.videoId}.md`,
-    )
-  }
-
-  lines.push(
-    '',
-    '## 约定',
-    '',
-    '- 说明与免责：`/about`',
-    '- 单场 Markdown：`/<datasetId>/stream/<videoId>.md`',
-    '- HTML 单场页在 `<head>` 里用 `rel="alternate" type="text/markdown"` 指向 Markdown。',
-    '- 时间一律 JST；金额按币种分列，不做汇率换算。',
-    '- Markdown 视图用 `X-Robots-Tag: noindex`，不进 sitemap。',
-    '',
-  )
-
-  return new Response(lines.join('\n'), {
+  return new Response(body, {
     headers: {
-      'content-type': 'text/plain; charset=utf-8',
+      'content-type': 'text/markdown; charset=utf-8',
+      // 与 `.md` 端点保持一致：显式声明缓存，不依赖 provider 的派生头。
+      'cache-control': 'public, max-age=3600, stale-while-revalidate=86400',
+      'content-signal': 'ai-train=no, search=yes, ai-input=yes',
     },
   })
 }

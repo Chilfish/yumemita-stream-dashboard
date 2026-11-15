@@ -4,6 +4,7 @@ import { getStream } from '@/db/queries/streams'
 import { getTranscriptMeta } from '@/db/queries/transcripts'
 import { memberOnlyAccess } from '@/lib/member-access'
 import { readObject } from '@/lib/object-read'
+import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
 import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
@@ -81,6 +82,7 @@ export const GET: APIRoute = async (context) => {
   return new Response(result.text, {
     headers: {
       'content-type': 'application/json; charset=utf-8',
+      'link': `<${(context.site?.origin ?? DEFAULT_SITE_URL).replace(/\/+$/, '')}/schemas/transcript.v1.json>; rel="describedby"; type="application/schema+json"`,
       ...(access.keyed ? { 'cache-control': 'private, no-store' } : {}),
     },
   })

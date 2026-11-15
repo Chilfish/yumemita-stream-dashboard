@@ -4,6 +4,7 @@ import { db } from '@/db/client'
 import { assembleStreamPack, buildStreamPackQueries, type StreamPackParts } from '@/db/queries/packs'
 import { mapStreamRow, selectStreamQuery, type StreamQueryRow } from '@/db/queries/streams'
 import { memberOnlyAccess } from '@/lib/member-access'
+import { DEFAULT_SITE_URL } from '@/lib/site-defaults'
 import { isMemberOnly } from '@/lib/visibility'
 
 export const prerender = false
@@ -11,6 +12,7 @@ export const prerender = false
 export const GET: APIRoute = async (context) => {
   const datasetId = context.params.datasetId
   const videoId = context.params.videoId
+  const origin = (context.site?.origin ?? DEFAULT_SITE_URL).replace(/\/+$/, '')
   if (!datasetId || !videoId) {
     return Response.json({ error: '缺少参数' }, { status: 400 })
   }
@@ -64,6 +66,7 @@ export const GET: APIRoute = async (context) => {
         'cache-control': access.keyed
           ? 'private, no-store'
           : 'public, max-age=3600, stale-while-revalidate=86400',
+        'link': `<${origin}/schemas/stream-datapack.v2.json>; rel="describedby"; type="application/schema+json"`,
       },
     })
   }

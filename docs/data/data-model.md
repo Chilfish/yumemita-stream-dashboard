@@ -210,6 +210,8 @@
 
 `<base>/<dataset>/<videoId>.datapack.json`（对象存储），schema `yumemita.stream-datapack/v1` 或 `/v2`。本地暂存在 `data/<dataset>/<videoId>.datapack.json`，是唯一真源。v2 在 v1 基础上追加全量作者与全量词频；旧 pack 继续可用。
 
+对外发布的机器可读结构在 `/schemas/stream-datapack.v2.json`（draft-07，见 `src/lib/json-schema.ts`）；v1 缺失的字段在 schema 里都是可选的，同一份也能校验旧 pack。`/api/packs` 的响应头用 `Link: rel="describedby"` 指过去。同理有 `transcript.v1.json` 与 `densities.v1.json`。**改 `src/types/datapack.ts` 必须同步 `src/lib/json-schema.ts`，否则编译失败。**
+
 ### 顶层
 
 | 字段 | 说明 |
