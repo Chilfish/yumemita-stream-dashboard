@@ -13,6 +13,10 @@ interface Props {
 }
 
 const { meta, lang = 'zh-CN', alternateMarkdown } = Astro.props
+// 封面与表情在独立域名上，首屏最大的图要等一次 DNS + TLS；提前握手。
+const assetOrigin = (import.meta.env.PUBLIC_R2_BASE ?? '').replace(/\/+$/, '')
+// `rel="describedby"` 要绝对地址；子路径部署时还要带上 BASE_URL 前缀。
+const llmsHref = new URL(`${import.meta.env.BASE_URL}llms.txt`, Astro.site ?? Astro.url).href
 ---
 
 <!doctype html>
@@ -30,9 +34,17 @@ const { meta, lang = 'zh-CN', alternateMarkdown } = Astro.props
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    {assetOrigin && (
+      <>
+        <link rel="preconnect" href={assetOrigin} crossorigin />
+        <link rel="dns-prefetch" href={assetOrigin} />
+      </>
+    )}
     {alternateMarkdown && (
       <link rel="alternate" type="text/markdown" href={alternateMarkdown} />
     )}
+    <!-- llms.txt v2：声明覆盖本站的 Agent 描述文件，任意页面都能被找到。 -->
+    <link rel="describedby" type="text/plain" href={llmsHref} />
 
     <SEO meta={meta} />
     <ClientRouter />

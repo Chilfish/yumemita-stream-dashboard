@@ -45,9 +45,14 @@ export function StreamCover({
   const [failedSrcSet, setFailedSrcSet] = useState<string | null>(null);
   // 按 src 记录已解码的那一张：切换场次时新图会重新淡入，旧图不会闪白。
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  // 首帧用的 src 用惰性 state 记住：SSR 与客户端首帧取值相同，不会有水合差异。
+  // 首帧必须直接可见——`opacity: 0` 的元素不算 LCP，整页最大的封面图一旦从透明
+  // 起步，LCP 就得等 `client:idle` 水合之后才成立（线上移动端实测 17.2s）。
+  // 淡入只在首帧之后换 src 时才生效。
+  const [firstSrc] = useState(src);
   const useSrcSet = srcSet !== null && failedSrcSet !== src;
   const showImage = src !== null && failedSrc !== src;
-  const loaded = !showImage || loadedSrc === src;
+  const loaded = !showImage || firstSrc === src || loadedSrc === src;
   const initial = firstGlyph(title);
 
   return (
