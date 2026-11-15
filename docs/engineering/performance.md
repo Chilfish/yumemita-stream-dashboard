@@ -167,14 +167,15 @@ bun run ymmt db bench -- --rounds 10 --label after-client-perf-3
 
 - **头像**：900×900 JPG → 128×128 JPEG（quality 82），5 张合计 631.6 KB → 29.8 KB（-95%）。界面上只显示 20–24 px，128 px 足够覆盖高 DPI。
 - **封面**：原图 1280×720 JPEG；`fetch:thumbs` 用 `Bun.Image` 生成 480 / 960 / 1280w WebP（quality 78）。列表与相册用 `srcset` 只下 480w，首屏主图用 `sizes` + `fetchPriority="high"` 下 960w / 1280w。
-- 封面 / 表情由 `PUBLIC_R2_BASE` 直接提供，长缓存由 R2 自定义域名的 Cache Rule 控制；容器固定 `aspect-video`，图片解码前就预留高度，CLS 接近 0。
+- 封面 / 表情由 `PUBLIC_R2_BASE` 直接提供。**注意**：Bun 的 S3 写入只能给 Content-Type，设不了 `Cache-Control`，所以桶里这些对象目前走 R2 自定义域名默认的 4 小时；要 1 年 immutable 得在 Cloudflare 侧加 Cache Rule（见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) M7）。容器固定 `aspect-video`，图片解码前就预留高度，CLS 接近 0。
 - 逐字稿正文不公开暴露，按需走 `/api/transcripts/:datasetId/:videoId`。
 
 ## 字体
 
-- Noto Sans 与 Noto Sans SC 都是 variable 字体，按 `unicode-range` 拆成大量子集；浏览器只下载页面实际用到的子集。
+- 只有拉丁与数字用自托管的 Noto Sans（variable，按 `unicode-range` 拆成 8 个子集）；中日文走系统字体栈（PingFang SC / Hiragino Sans / Noto Sans CJK / 微软雅黑）。
+- 曾经自托管 Noto Sans SC：那个包带 101 个 woff2 子集共 4.29 MB，首页命中 48 个就是 2.36 MB，占整页载荷 69%，LCP 3.4 s。CJK 正文字体不值得这个代价，2026-11-15 移除。
 - `font-display: swap`，首帧先用系统字体。
-- 没有 preload 字体：本地实测 LCP 元素是首屏封面图，提前拉 100 KB 字体会和图片抢带宽。
+- 没有 preload 字体：本地实测 LCP 元素是首屏封面图，提前拉字体会和图片抢带宽。
 
 ## 回归方式
 

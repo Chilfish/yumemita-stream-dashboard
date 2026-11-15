@@ -22,7 +22,9 @@
 | B33 | 峰值解释：把峰值分钟与人工标注的事件对齐 | P3 | 事件标注数据 | 2026-11-03 roadmap | 📋 |
 | B34 | 推文联动：先用手动 pin 验证价值，外部服务只做增强 | P3 | 无 | roadmap | 📋 |
 | B35 | 空数据 / 部分数据的更明确提示（已有基础版） | P3 | 无 | roadmap | 📋 |
-| B38 | SEO 审计修复：`http` 不跳 `https` / 无 HSTS、CJK 字体 2.36 MB、缩略图缓存仅 4 小时、图库 HTML 超 2 MB、图片选档过大、19 处对比度、`og:image` 缺失、成员页补 `Person` | P1 | 无 | 2026-11-15 审计 | 📋 清单与验收见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) |
+| B39 | `/gallery` 载荷：SSR 只渲染首屏，其余按页从服务端拉取，别把 1,837 行塞进 `astro-island` props（当前 1.71 MB / 全页 1.89 MB） | P2 | 需要新端点与三态 | 2026-11-15 审计 | 📋 背景见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) |
+| B40 | `ymmt-s3.chilfish.top` 加 Cloudflare Cache Rule：`Cache-Control: public, max-age=31536000, immutable`（现为 R2 默认 4 小时） | P2 | 无 | 2026-11-15 审计 | 📋 桶侧配置，代码改不了 |
+| B41 | 重新跑 Lighthouse（干净 Chrome profile + mobile preset），复核可访问性与 LCP | P3 | 无 | 2026-11-15 审计 | 📋 本机报告的 1,593 KB `unused-javascript` 是浏览器扩展污染 |
 
 > 2026-11-08 隐式状态机审查的 Z / R / E / U 问题已全部关闭，记录见 [review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md) 与 [archive/state-machine-remediation.md](../archive/state-machine-remediation.md)。
 

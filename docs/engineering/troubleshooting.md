@@ -75,7 +75,7 @@
 
 ## 构建报 CSS / 字体错误
 
-- 本项目用 `@fontsource-variable/noto-sans` 与 `@fontsource-variable/noto-sans-sc`，在 `src/styles/app.css` 顶部导入。
+- 本项目用 `@fontsource-variable/noto-sans`（拉丁与数字），中日文回落到系统字体；在 `src/styles/app.css` 顶部导入。`noto-sans-sc` 已移除，别再加回来（原因见 [performance.md](./performance.md) 的「字体」）。
 - `src/styles/app.css` 的 `@import`（字体、Tailwind）必须排在其他规则之前。
 - coss ui 的 token 在 `app.css` 的 `@theme inline` / `:root` / `.dark` 里；不要删。
 

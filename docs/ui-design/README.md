@@ -67,7 +67,7 @@
 
 | 用途 | Token / 类 | 说明 |
 | --- | --- | --- |
-| 正文 | `font-sans` / `text-sm` / `text-base` | Noto Sans → 系统 sans |
+| 正文 | `font-sans` / `text-sm` / `text-base` | 自托管 Noto Sans（拉丁与数字）→ 系统中日文字体 |
 | 标题 | `font-heading` | 与正文同族，靠字重区分 |
 | 等宽 | `font-mono` | Geist Mono；只用于代码、时间码 |
 | 页面标题 | 28/34，600 | 成员名、页面主标题 |

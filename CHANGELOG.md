@@ -4,6 +4,8 @@
 
 ### 工程
 
+- **SEO / 性能一轮修复**（来自 [线上站点审计](docs/research/seo-audit-2026-11-15.md)）：`http://` 现在 301 到 `https://`（中间件，localhost 豁免），HTTPS 响应补 `Strict-Transport-Security`，`text/*` 响应补 `charset=utf-8`；首页结构化数据补 `Organization`、成员页补 `Person`；`/about` 与 `/calendar` 补 `og:image`；单场页标题截断收紧到 60 字内；`--tertiary-label` 与侧栏前景色压深，消除 19 处对比度不达标。
+- **移除自托管 CJK 字体**：`@fontsource-variable/noto-sans-sc` 带 101 个 woff2 子集共 4.29 MB，首页命中 48 个即 2.36 MB（占整页载荷 69%）。中日文改走系统字体栈，拉丁与数字仍用自托管 Noto Sans。构建产物 `@font-face` 101 → 8，CSS 未压缩 390 KB → 282 KB。
 - **单场重抓一条命令**：新增 `bun run ymmt data refetch <链接|ID>`，解析 YouTube 链接/视频 ID 后按本地 pack 或频道 ID 找到成员，串起重抓素材 → 重建 datapack → 本地 ingest → 线上 ingest → 定向 verify → publish data → purge，默认同时覆盖本地与线上（`--no-online` 只改本地）。线上环境切换抽到 `scripts/lib/online-env.ts`，与 `publish sync` 共用。
 - **修 `data fetch` 的取反开关**：`--no-publish` / `--no-build` / `--no-restore` / `--no-cookies` 此前读错 commander 的存储键，传了也会照常执行；现在按 `x === false` 判断。`db verify --ids` 的 `dataset_insights` 对比改为始终用全量 pack 重算，不再必然报差异。
 - **无回放场次不再误判为直播中**：部分场次 YouTube 根本没保留回放聊天，watch 页没有 `liveChatRenderer`（`isReplay` 取不到），只有 `Live chat replay is not available for this video.`。回放采集此前只看 `isReplay`，`null` 被当成「还在直播」，`data danmaku` 报「直播尚未结束」且不写哨兵，每轮都重试。新增 `isChatReplayUnavailable()`，这类场次返回 `no-replay`、写 `chat-unavailable.txt`，auto 模式也不再白跑一次 yt-dlp（字幕同样不存在）。见 [postmortem 004](docs/postmortem/004-chat-replay-unavailable.md)。
