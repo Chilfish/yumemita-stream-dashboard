@@ -25,6 +25,7 @@
 | [002](./002-dataset-packs-per-render.md) | 每次渲染 dataset 页面都全量拉取明细，Neon 网络出流量异常增长 | SEV-3 | 架构 | Mitigated | 页面汇总复用了单场详情的完整 pack 查询，7 类路由每次冷渲染读 3.5–10.5 MB |
 | [003](./003-stale-yt-cookies-cache.md) | `~/yt-cookies.txt` 长期复用后失效，yt-dlp 命中 bot 检查 | SEV-3 | 缺陷 | Mitigated | cookie 缓存没有失效条件，只要文件里有登录 cookie 就继续用，浏览器轮换 PSIDTS 后文件会话已过期 |
 | [004](./004-chat-replay-unavailable.md) | 平台未保留回放被当成「直播尚未结束」，无弹幕场次每轮重试 | SEV-3 | 缺陷 | Mitigated | 回放采集只看 `isReplay` 布尔值，`null` 被当成「仍在直播」，没有读页面明确给出的 `availabilityMessage` |
+| [005](./005-cjk-fallback-after-webfont-removal.md) | 移除 CJK webfont 后简体中文在 Windows 上落到日文字形 | SEV-2 | 缺陷 | Mitigated | 字体栈里日文字体排在中文前面，但此前被第一个 CJK webfont 遮住，顺序从未被验证 |
 
 > 新增 postmortem 按 [TEMPLATE.md](./TEMPLATE.md) 复制填写，并在此登记。
 
@@ -69,6 +70,7 @@
 | 口径脚注 | 是否在界面解释统计口径 | 口径写进 `docs/data/data-model.md`，界面不写 |
 | 自证式导航 | 是否加了「详情 →」「进入 X →」 | 标题本身可点，一个区块最多一个动作 |
 | 数据驱动区块 | 区块是否只因为字段存在而存在 | 先写这一屏回答的问题；与现有区块重复的删掉 |
+| 字体栈顺序 | 是否同时列了中日字体、且顺序与页面主语言一致 | 中文在 `html lang="zh-CN"` 下必须排在日文字体之前；换字体 / 删字体包后截图核对字形，别只看体积（见 [005](./005-cjk-fallback-after-webfont-removal.md)） |
 
 ### 4. 构建与部署
 

@@ -16,8 +16,14 @@
     --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
     --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
     --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-    --font-heading: "Noto Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Yu Gothic UI", "Microsoft YaHei", sans-serif;
-    --font-sans: "Noto Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Yu Gothic UI", "Microsoft YaHei", sans-serif;
+    /*
+     * 顺序即优先级：拉丁用 Noto Sans，之后必须把**中文**字体排在日文字体之前。
+     * 站点是 zh-CN，日文只出现在场次标题与人名里；把 Yu Gothic / Hiragino Sans
+     * 放在 Microsoft YaHei 前面会让 Windows 上所有简体字落到日文字形（直 / 说 / 剧
+     * 那一批汉字会明显串味）。
+     */
+    --font-heading: "Noto Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Yu Gothic UI", "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
+    --font-sans: "Noto Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Yu Gothic UI", "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);

@@ -67,7 +67,7 @@
 
 | 用途 | Token / 类 | 说明 |
 | --- | --- | --- |
-| 正文 | `font-sans` / `text-sm` / `text-base` | 自托管 Noto Sans（拉丁与数字）→ 系统中日文字体 |
+| 正文 | `font-sans` / `text-sm` / `text-base` | 自托管 Noto Sans（拉丁与数字）→ 系统中文字体 → 系统日文字体 |
 | 标题 | `font-heading` | 与正文同族，靠字重区分 |
 | 等宽 | `font-mono` | Geist Mono；只用于代码、时间码 |
 | 页面标题 | 28/34，600 | 成员名、页面主标题 |
@@ -78,6 +78,7 @@
 - 数值用 `font-variant-numeric: tabular-nums`，右对齐。
 - 中文行高 1.5–1.75；不用全大写英文作区块标题。
 - 手机端最小 12px，桌面最小 11px；11px 不承载长句。
+- **字体栈顺序即优先级**：站点是 `zh-CN`，中文字体必须排在日文字体之前，否则 Windows 上简体字会落到 Yu Gothic 的字形（直 / 说 / 剧 会明显串味）。改动字体栈或删字体包后要截图核对字形，见 [postmortem 005](../postmortem/005-cjk-fallback-after-webfont-removal.md)。
 
 ## 4. 间距与圆角
 
