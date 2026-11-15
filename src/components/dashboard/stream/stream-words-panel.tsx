@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { TopBars } from "@/components/charts/top-bars";
 import { EmojiImage } from "@/components/dashboard/primitives/emoji-image";
+import { SectionHeading } from "@/components/dashboard/primitives/section";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
@@ -136,12 +137,10 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
 
       {ownerChats.length > 0 ? (
         <section className="border-t border-hairline pt-5">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-headline text-foreground">主播本人发言</h2>
-            <p className="text-caption text-ink-3">
-              共 {formatInteger(ownerChats.length)} 条
-            </p>
-          </div>
+          <SectionHeading
+            meta={<>共 {formatInteger(ownerChats.length)} 条</>}
+            title="主播本人发言"
+          />
           {ownerChats.length > 24 ? (
             <ScrollArea className="mt-2 h-[min(50dvh,26rem)] pe-2">
               <OwnerChatList

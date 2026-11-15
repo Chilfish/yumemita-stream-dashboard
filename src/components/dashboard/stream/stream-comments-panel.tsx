@@ -1,3 +1,4 @@
+import { SectionHeading } from "@/components/dashboard/primitives/section";
 import { Badge } from "@/components/ui/badge";
 import type { StreamRow } from "@/lib/aggregate";
 import { formatInteger } from "@/lib/format";
@@ -21,12 +22,14 @@ export function StreamCommentsPanel({ row }: StreamCommentsPanelProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-headline text-foreground">评论区 · {formatInteger(items.length)} 条</h2>
-        <p className="text-caption text-ink-3">
-          置顶 {formatInteger(pinned)} · 合计赞 {formatInteger(totalLikes)}
-        </p>
-      </div>
+      <SectionHeading
+        meta={
+          <>
+            置顶 {formatInteger(pinned)} · 合计赞 {formatInteger(totalLikes)}
+          </>
+        }
+        title={<>评论区 · {formatInteger(items.length)} 条</>}
+      />
 
       <ul className="divide-y divide-hairline">
         {items.map((comment, index) => (

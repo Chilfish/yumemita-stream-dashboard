@@ -4,6 +4,7 @@ import { CopyLinkButton } from "@/components/dashboard/primitives/copy-link-butt
 import { DataTable, type DataColumn } from "@/components/dashboard/primitives/data-table";
 import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { Panel, PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
+import { SectionHeading } from "@/components/dashboard/primitives/section";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -359,10 +360,7 @@ export function GroupComparePage({ datasets, data }: GroupComparePageProps) {
       </Panel>
 
       <section className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-headline text-foreground">指标矩阵</h2>
-          <p className="text-caption text-ink-3">加粗为同期最高值</p>
-        </div>
+        <SectionHeading meta="加粗为同期最高值" title="指标矩阵" />
         {hasData ? (
           <>
             <DataTable

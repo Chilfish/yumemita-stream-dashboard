@@ -1,5 +1,6 @@
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { EmojiImage } from "@/components/dashboard/primitives/emoji-image";
+import { SectionHeading } from "@/components/dashboard/primitives/section";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
@@ -75,14 +76,16 @@ export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
     <div className="flex flex-col gap-5">
       {hasSc ? (
         <section>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-headline text-foreground">SC 合计</h2>
-            <p className="text-caption text-ink-3">
-              共 {formatInteger(superchats.length)} 笔 ·{" "}
-              {pack.derived.scPerHour?.toFixed(2) ?? "—"} 笔/小时 · 付费弹幕占{" "}
-              {formatPercent(paid.paidSharePct)}
-            </p>
-          </div>
+          <SectionHeading
+            meta={
+              <>
+                共 {formatInteger(superchats.length)} 笔 ·{" "}
+                {pack.derived.scPerHour?.toFixed(2) ?? "—"} 笔/小时 · 付费弹幕占{" "}
+                {formatPercent(paid.paidSharePct)}
+              </>
+            }
+            title="SC 合计"
+          />
 
           <dl className="mt-2 grid grid-cols-1 divide-y divide-hairline sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             {scTotals.map(([currency, total], index) => (
