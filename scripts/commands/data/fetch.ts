@@ -34,6 +34,7 @@ import { sentinelIsFresh } from '@scripts/lib/sentinel.ts'
 import { mergeDanmakuFiles } from '@scripts/lib/danmaku-merge.ts'
 import { readCredentials } from '@scripts/lib/object-storage.ts'
 import { restoreDataset } from '@scripts/lib/restore-datapacks.ts'
+import { parseVstats, VSTATS_MIN_HTML_BYTES } from '@scripts/lib/vstats.ts'
 import { resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
@@ -129,11 +130,14 @@ function withinGrace(info: InfoJson | undefined, hours: number): boolean {
 }
 
 /**
- * 正常单场页固定带「平均視聴者数」；站点错误页 / bot 检查页同样可能超过 1KB，
- * 只按长度判断会把垃圾写进快照。识别不出来就按「没有条目」处理。
+ * 正常单场页固定带统计块；站点错误页 / bot 检查页同样可能超过 1KB，
+ * 只按长度判断会把垃圾写进快照。解析不出统计字段就按「没有条目」处理。
  */
 function isVstatsPage(html: string): boolean {
-  return html.length > 1000 && html.includes('平均視聴者数')
+  if (html.length < VSTATS_MIN_HTML_BYTES)
+    return false
+  const vstats = parseVstats(html)
+  return vstats.views != null || vstats.avgConcurrent != null
 }
 
 /**
@@ -826,8 +830,6 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
         return existsSync(join(session, 'danmaku', `danmaku_${id}.jsonl`)) || sentinelIsFresh(join(session, 'work', 'chat-unavailable.txt'))
       if (step === 'comments')
         return isValidInfoJson(join(session, 'comments', `comments_${id}.json`), id)
-      if (step === 'vstats')
-        return existsSync(join(session, 'web', `vstats_video_${id}.html`)) || sentinelIsFresh(join(session, 'work', 'vstats-unavailable.txt'))
       return false
     }
 
