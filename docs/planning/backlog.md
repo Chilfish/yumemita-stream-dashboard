@@ -28,7 +28,7 @@
 | B43 | 公开域名 `ymmt-s3.chilfish.top` 可直接下载 `archive/` 与 `*/transcripts/`（会限正文与原始 pack）：先加 WAF block，再把两类对象迁到私有桶并补匿名可达性检查 | P0 | Cloudflare 配置 / 新桶 | 2026-11-15 安全自查 | 🚧 误传的 1 个会限逐字稿已删除；125 个会限 archive pack 仍公开，见 [postmortem 006](../postmortem/006-public-r2-member-only-leak.md) |
 | B44 | `/admin`、`/api/admin` 与会限 API 加 Cloudflare Rate Limiting；`MEMBER_ONLY_KEY` 改为 32 位以上随机值并建立轮换 | P1 | 无 | 2026-11-15 安全自查 | 📋 见 [security-review-2026-11-15.md](../research/security-review-2026-11-15.md) |
 | B49 | 类名体积：把表格 / 列表里重复的长 cva 类串收成语义类（`/arale/streams` 一条 352 字符的 `td` 类名重复 400 次 = 140 KB raw）；类名重命名只在 CSS 侧有确定性收益，先用 `npx minwind measure` 出只读预估再决定 | P2 | 无 | 2026-11-15 类名调研 | 📋 实测与方案对比见 [ssr-html-classname-weight.md](../research/ssr-html-classname-weight.md) |
-| B50 | 成员串门发言：单场 `chat.memberChats` + `?view=words` 独立区块；历史 143 场回填 | P2 | 无 | 2026-11-18 需求 | 🚧 本地回填 142 场并入库；线上 pack / 对象存储回填待做。方案见 [member-chats.md](member-chats.md) |
+| B50 | 成员串门发言：单场 `chat.memberChats` + `?view=words` 独立区块；历史 143 场回填 | P2 | 无 | 2026-11-18 需求 | 🚧 本地与线上数据回填完成、对账 0 问题；等待部署上线。方案见 [member-chats.md](member-chats.md) |
 
 > 2026-11-08 隐式状态机审查的 Z / R / E / U 问题已全部关闭，记录见 [review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md) 与 [archive/state-machine-remediation.md](../archive/state-machine-remediation.md)。
 
