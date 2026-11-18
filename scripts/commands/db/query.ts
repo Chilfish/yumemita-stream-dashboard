@@ -30,6 +30,7 @@ import {
   currentJstMonth,
   monthRange,
 } from '@/lib/calendar.ts'
+import { isMemberOnly } from '@/lib/visibility.ts'
 
 /** 只取命令需要的日志通道；默认空操作。 */
 export type QueryLog = Pick<Logger, 'info' | 'warn' | 'error' | 'line'>
@@ -129,7 +130,9 @@ export async function runQuerySmoke(options: QuerySmokeOptions = {}): Promise<Qu
   })
   check(calendar.members.length === datasets.length, 'calendar 成员数与 datasets 不一致')
   check(
-    calendar.events.every(event => event.datasetId === SMOKE_DATASET),
+    calendar.events.every(
+      event => event.datasetId === SMOKE_DATASET || event.participantIds.includes(SMOKE_DATASET),
+    ),
     'calendar 混入了其他成员',
   )
   check(
@@ -201,7 +204,11 @@ export async function runQuerySmoke(options: QuerySmokeOptions = {}): Promise<Qu
     'group compare 桶的场次数异常',
   )
 
-  const densityIds = list.streams.slice(0, 3).map(row => row.videoId)
+  // 对比页的密度按公开口径取；会员限定场在默认参数下本来就不返回。
+  const densityIds = list.streams
+    .filter(row => !isMemberOnly(row.availability))
+    .slice(0, 3)
+    .map(row => row.videoId)
   const densities = await getCompareDensityMap(db, SMOKE_DATASET, densityIds)
   check(
     densityIds.every(videoId => Array.isArray(densities[videoId])),
