@@ -22,10 +22,10 @@ import {
   streamOffsetSeconds,
 } from "@/lib/format";
 import { youtubeTimeUrl } from "@/lib/transcripts";
-import type { EmojiAsset, OwnerChat } from "@/types/datapack";
+import type { EmojiAsset, MemberChat } from "@/types/datapack";
 
-/** 所有主播发言的时间戳共用一个 tooltip：长列表只挂一个 Portal，相邻条目间也没有打开延迟。 */
-const ownerTimeTooltip = TooltipCreateHandle<{ at: string }>();
+/** 所有发言行的时间戳共用一个 tooltip：长列表只挂一个 Portal，相邻条目间也没有打开延迟。 */
+const chatTimeTooltip = TooltipCreateHandle<{ at: string }>();
 
 interface StreamWordsPanelProps {
   datasetId: string;
@@ -46,6 +46,7 @@ function sortCounts(counts: Record<string, number>): [string, number][] {
 export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
   const { pack } = row;
   const chat = pack.chat;
+  const memberChats = chat.memberChats ?? [];
 
   const words = streamTopWords(chat).slice(0, 16).map(word => ({
     label: word.word,
@@ -68,6 +69,9 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
     ...(giftCount > 0 ? [{ label: "赠送会员", value: formatInteger(giftCount) }] : []),
     { label: "纯表情条目", value: formatInteger(chat.pureEmojiOnly) },
     { label: "主播本人发言", value: formatInteger(chat.ownerMessages) },
+    ...(memberChats.length > 0
+      ? [{ label: "其他成员发言", value: formatInteger(memberChats.length) }]
+      : []),
   ];
 
   const badgeRows: KeyValueRow[] = sortCounts(chat.badges).map(([name, count]) => ({
@@ -84,6 +88,21 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
       emojiAssets.set(id, { id, name, url: "" });
   }
   const ownerChats = chat.ownerChats ?? [];
+  // 成员发言按人分组；保持首次出现顺序，组内仍是时间顺序。
+  const memberGroups = (() => {
+    const groups = new Map<string, { id: string; label: string; author: string; chats: MemberChat[] }>();
+    for (const message of memberChats) {
+      const group = groups.get(message.memberId) ?? {
+        id: message.memberId,
+        label: message.memberLabel,
+        author: message.author,
+        chats: [],
+      };
+      group.chats.push(message);
+      groups.set(message.memberId, group);
+    }
+    return [...groups.values()];
+  })();
   const ownerStartedAt = pack.video.startedAt ?? row.summary.startedAt;
   const emojiRows: KeyValueRow[] = [
     { label: "表情种类", value: formatInteger(chat.emojiKinds.distinct) },
@@ -143,8 +162,8 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
           />
           {ownerChats.length > 24 ? (
             <ScrollArea className="mt-2 h-[min(50dvh,26rem)] pe-2">
-              <OwnerChatList
-                chats={ownerChats}
+              <ChatRows
+                items={ownerChats}
                 datasetId={datasetId}
                 emojiAssets={emojiAssets}
                 startedAt={ownerStartedAt}
@@ -153,8 +172,8 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
             </ScrollArea>
           ) : (
             <div className="mt-2">
-              <OwnerChatList
-                chats={ownerChats}
+              <ChatRows
+                items={ownerChats}
                 datasetId={datasetId}
                 emojiAssets={emojiAssets}
                 startedAt={ownerStartedAt}
@@ -162,6 +181,37 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
               />
             </div>
           )}
+        </section>
+      ) : null}
+
+      {memberChats.length > 0 ? (
+        <section className="border-t border-hairline pt-5">
+          <SectionHeading
+            meta={
+              <>
+                共 {formatInteger(memberChats.length)} 条 · {formatInteger(memberGroups.length)} 位成员
+              </>
+            }
+            title="其他成员发言"
+          />
+          <div className="mt-2 flex flex-col gap-4">
+            {memberGroups.map((group) => (
+              <div key={group.id}>
+                <h3 className="flex flex-wrap items-baseline gap-x-2 text-caption">
+                  <span className="font-semibold text-foreground">{group.label}</span>
+                  <span className="truncate text-muted-foreground">{group.author}</span>
+                  <span className="text-ink-3">· {formatInteger(group.chats.length)} 条</span>
+                </h3>
+                <ChatRows
+                  items={group.chats}
+                  datasetId={datasetId}
+                  emojiAssets={emojiAssets}
+                  startedAt={ownerStartedAt}
+                  videoId={pack.video.id}
+                />
+              </div>
+            ))}
+          </div>
         </section>
       ) : null}
 
@@ -177,24 +227,31 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
   );
 }
 
-interface OwnerChatListProps {
-  chats: OwnerChat[];
+/** 主播发言与成员发言共用的最小行结构。 */
+interface ChatLine {
+  at: string;
+  text: string;
+  emojis?: string[];
+}
+
+interface ChatRowsProps {
+  items: ChatLine[];
   datasetId: string;
   emojiAssets: Map<string, EmojiAsset>;
   startedAt: string | null;
   videoId: string;
 }
 
-function OwnerChatList({
-  chats,
+function ChatRows({
+  items,
   datasetId,
   emojiAssets,
   startedAt,
   videoId,
-}: OwnerChatListProps) {
+}: ChatRowsProps) {
   return (
     <>
-      <Tooltip handle={ownerTimeTooltip}>
+      <Tooltip handle={chatTimeTooltip}>
         {({ payload }) => (
           <TooltipPopup align="start" className="max-w-72">
             <span className="block font-medium text-foreground">在 YouTube 打开</span>
@@ -207,7 +264,7 @@ function OwnerChatList({
         )}
       </Tooltip>
       <ol className="flex flex-col divide-y divide-hairline">
-        {chats.map((message, index) => {
+        {items.map((message, index) => {
           const offset = streamOffsetSeconds(message.at, startedAt);
           return (
             <li
@@ -220,7 +277,7 @@ function OwnerChatList({
                 </span>
               ) : (
                 <TooltipTrigger
-                  handle={ownerTimeTooltip}
+                  handle={chatTimeTooltip}
                   payload={{ at: message.at }}
                   render={props => (
                     <a
