@@ -628,6 +628,7 @@ async function ingestPack(
       hashtags: chat.hashtags,
       emojiKinds: chat.emojiKinds,
       ownerChats: chat.ownerChats ?? [],
+      memberChats: chat.memberChats ?? [],
       emojis: chat.emojis ?? [],
       events: chat.events ?? [],
       videoExtra: {

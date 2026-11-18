@@ -1,0 +1,1 @@
+ALTER TABLE "stream_details" ADD COLUMN "member_chats" jsonb;

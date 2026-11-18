@@ -21,6 +21,7 @@ import type {
   EmojiAsset,
   EmojiKinds,
   GiftMembership,
+  MemberChat,
   Membership,
   OwnerChat,
   PaidInfo,
@@ -52,6 +53,7 @@ const DETAIL_COLUMNS = {
   hashtags: streamDetails.hashtags,
   emojiKinds: streamDetails.emojiKinds,
   ownerChats: streamDetails.ownerChats,
+  memberChats: streamDetails.memberChats,
   emojis: streamDetails.emojis,
   events: streamDetails.events,
   videoExtra: streamDetails.videoExtra,
@@ -170,6 +172,7 @@ function buildChat(
   authorRows: AuthorRow[],
 ): ChatInfo {
   const ownerChats = asArray<OwnerChat>(detail?.ownerChats)
+  const memberChats = asArray<MemberChat>(detail?.memberChats)
   const events = asArray<ChatEvent>(detail?.events)
   const emojiKinds = (detail?.emojiKinds ?? { distinct: 0, top: [] }) as EmojiKinds
   const density = (detail?.density ?? {
@@ -226,6 +229,7 @@ function buildChat(
     emojiKinds,
     emojis: asArray<EmojiAsset>(detail?.emojis),
     ownerChats,
+    memberChats,
     events,
   }
 }

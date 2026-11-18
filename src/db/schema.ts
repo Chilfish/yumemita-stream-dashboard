@@ -150,6 +150,7 @@ export const streamDetails = pgTable('stream_details', {
   hashtags: jsonb('hashtags'),
   emojiKinds: jsonb('emoji_kinds'),
   ownerChats: jsonb('owner_chats'),
+  memberChats: jsonb('member_chats'),
   emojis: jsonb('emojis'),
   events: jsonb('events'),
   videoExtra: jsonb('video_extra'),
