@@ -282,6 +282,7 @@
 | `hashtags` | `#` / `＃` 标签计数 |
 | `emojiKinds` | 表情种类数 + Top 15 |
 | `ownerChats` | 主播本人发言，按时间顺序全量：`at` / `kind` / `text` / `emojis`；`kind: "event"` 表示置顶 / 投票 / Q&A 等主播操作。旧 pack 缺失 |
+| `memberChats` | 其他团体成员的发言，按时间顺序全量：`at` / `memberId` / `memberLabel` / `author` / `authorId` / `kind` / `text` / `emojis`；身份按 `authorId` 匹配 `data-sources.json`，排除本场主播。旧 pack 缺失 |
 | `emojis` | 本场出现过的频道专属表情：`id`（`<channelId>/<hash>`）/ `name` / `url`（InnerTube 原图）；旧 pack 缺失 |
 | `events` | 非消息事件：`at` / `type` / `owner` / `author` / `text` / `data`。`type` 取 `banner` / `bannerRemoved` / `poll` / `pollUpdate` / `qna` / `product` / `system` / `modeChange` / `deleted` / `deletedAuthor` / `replaced` / `panel` / `other`；投票的 `data.choices` 是最后一次快照。没有实时采集时缺失 |
 
@@ -393,7 +394,7 @@ bun run ymmt data live-chat --video <videoId> --once   # 只拉一页（等待�
   合并按 `ts` 排序并重编 `seq`。只有实时采集、没有回放时，`stream-datapack` 会回退读 `danmaku_live_`
   （仍需 `fetch:streams` 抓到 `meta/info.json`）。
 - 词频只统计消息正文，不含系统提示；主播操作通过 `chat.ownerChats`（`kind: "event"`）进入 `?view=words`，
-  全部事件保留在 `chat.events`。
+  全部事件保留在 `chat.events`；其他团体成员的发言单独进 `chat.memberChats`。
 - 登录态每次运行从浏览器重新导出到 `~/yt-cookies.txt`，整轮复用；导出失败才退回旧缓存。
   浏览器会轮换 `__Secure-*PSIDTS`，旧 jar 会命中 YouTube bot 检查。`--no-cookies` 以匿名状态抓取
   （yt-dlp 也不会回退浏览器）。CI 用 `--cookies <文件>` 或 `YT_COOKIE`。

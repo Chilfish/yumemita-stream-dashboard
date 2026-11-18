@@ -61,6 +61,7 @@
 | `emojiKinds`                                | 表情种类数 ＋ Top 15（频道表情的 id 形如 `<channelId>/<hash>`）           |
 | `emojis`                                    | 本场频道专属表情的 `id` / `name` / `url`，供 `fetch:emoji` 镜像；旧 pack 缺失 |
 | `ownerChats`                                | 主播本人发言明细（徽章 `Owner`），按时间顺序全量：`at` / `kind` / `text` / `emojis`；旧 pack 缺失 |
+| `memberChats`                               | 其他团体成员的发言明细，按时间顺序全量：`at` / `memberId` / `memberLabel` / `author` / `authorId` / `kind` / `text` / `emojis`；身份按 `authorId` 匹配 `data-sources.json`，旧 pack 缺失 |
 
 `derived`：
 

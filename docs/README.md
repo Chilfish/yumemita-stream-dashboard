@@ -20,6 +20,7 @@ docs/
 │   ├── backlog.md
 │   ├── live-calendar.md
 │   ├── collaboration-streams.md
+│   ├── member-chats.md
 │   └── performance-audit.md
 ├── engineering/                 # 工程规范、开发、部署、性能、排查
 │   ├── README.md
@@ -78,7 +79,8 @@ docs/
 │   ├── 2026-11-10.md
 │   ├── 2026-11-12.md
 │   ├── 2026-11-14.md
-│   └── 2026-11-15.md
+│   ├── 2026-11-15.md
+│   └── 2026-11-18.md
 └── archive/                     # 历史调研与已完成阶段方案
     ├── README.md
     ├── ssg-research.md
@@ -105,6 +107,7 @@ docs/
 | 追溯迁移决策 / 数据模型 | [astro-ssr-migration.md](./archive/astro-ssr-migration.md) + [astro-experiments.md](./engineering/astro-experiments.md) | 已完成的迁移方案、数据模型、`.md` 路由、缓存与发布 |
 | 继续做直播日历 | [live-calendar.md](./planning/live-calendar.md) + [backlog.md](./planning/backlog.md) | 剩余首页 / 场次页入口与 ICS |
 | 联动场次 / 多人同场 | [collaboration-streams.md](./planning/collaboration-streams.md) | 归属模型、登记文件、计数口径 |
+| 成员串门发言 / 回填 | [member-chats.md](./planning/member-chats.md) | `chat.memberChats` 识别口径、页面与历史回填 |
 | 优化数据库读路径 | [performance.md](./engineering/performance.md) + [db-optimization.md](./archive/db-optimization.md) | 当前结论与历史压测 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
 | 跑脚本 / 数据流水线 | [cli.md](./engineering/cli.md) | `bun run ymmt …` 命令树、`--json` 信封、退出码 |

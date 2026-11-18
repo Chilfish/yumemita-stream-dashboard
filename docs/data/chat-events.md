@@ -280,11 +280,13 @@ yt-dlp 的 `live_chat` 字幕可能同时含「直播段」和「从开头重写
 | `emojiKinds` | `msg.emoji` | 种类数 + Top 15 |
 | `emojis` | `emoji_*.json` | 本场表情资源 |
 | `ownerChats` | Owner 消息 + owner 事件 | 按时间排序；事件 `kind: "event"` |
+| `memberChats` | `authorId` 匹配其他 `channelId` | 其他团体成员的发言；成员互为版主，不能按徽章判断 |
 | `events` | `events_*.jsonl` | 紧凑事件；投票合并为最后一次快照；不保留 `raw` |
 
 ### 7.2 数据库
 
 - `stream_details.owner_chats`：`chat.ownerChats` 原样写入；`kind: "event"` 表示主播操作。
+- `stream_details.member_chats`：`chat.memberChats ?? []` 写入；旧 pack 缺字段时为空数组。列由 `drizzle/0011_add_member_chats.sql` 添加。
 - `stream_details.events`：`chat.events ?? []` 写入；`packs.ts` 读回 `chat.events`。
 - `stream_details.emojis`：`chat.emojis ?? []`。
 - `owner_messages` 没有单独列；`packs.ts` 用 `ownerChats.filter(kind !== "event").length` 计算。
@@ -370,6 +372,7 @@ hash   = id 的 `/` 后半段
 | `owner` 判定 | 置顶、投票、Q&A、商品默认按主播操作处理；版主置顶可能也被标为 `owner` |
 | 会员限定 | 实时 / 回放需要 cookie；匿名通常停在 `unplayable` |
 | 平台未保留回放 | 部分场次 YouTube 根本没留回放聊天：watch 页没有 `liveChatRenderer`（`isReplay` 取不到），只有 `Live chat replay is not available for this video.`。这类场次 `chat.total` 为 0，yt-dlp 的 `live_chat` 字幕同样不存在，InnerTube 与 yt-dlp 都补不回来。判定见 `isChatReplayUnavailable()`，`data danmaku` 会写 `chat-unavailable.txt` 并在 auto 模式跳过 yt-dlp 回退 |
+| 投票不回放 | 直播投票（`showLiveChatActionPanelAction` / `updateLiveChatPollAction`）只出现在直播中的实时聊天流；赛后 InnerTube 回放（匿名与登录态都试过）和 yt-dlp 字幕都不含投票 action。2026-11-18 `vdSknMZJ87Y`（クイズみやこ）实测：回放 138–199 页、9243 条消息、0 事件，但弹幕里能看到「アンケート」和观众回复选项。投票数据只能在开播时用 `fetch:live-chat` 采集 |
 | 坏行 | JSONL 解析失败计 `invalid`，采集器会清理坏行；不阻塞其余记录 |
 | 全量明细 | pack 不含全量弹幕；完整时间线必须读 jsonl 或未来的 `chat_events` 表 |
 
