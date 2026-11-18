@@ -18,7 +18,7 @@ const CF_INSIGHTS_REPORT = "https://cloudflareinsights.com";
 
 /**
  * CSP 的 host-source 不是任意 URL：路径不以 `/` 结尾时按精确匹配处理，
- * 本地对象存储地址带路径（`http://127.0.0.1:9000/ymmt`）会把子路径全部挡掉。
+ * 本地对象存储地址带路径会把子路径全部挡掉。
  * 这里统一收敛到 origin。
  */
 function assetSource(value: string | null | undefined): string | null {
