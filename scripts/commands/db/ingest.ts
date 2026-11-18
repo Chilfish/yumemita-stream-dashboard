@@ -270,6 +270,9 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
   }
 
   try {
+    // insights 依赖全部成员的当前行状态（联动场的 participants 会互相影响），
+    // 先记下需要重算的成员，等所有 pack 写完再统一算，避免按 dataset 顺序留下过期汇总。
+    const insightsToRefresh = new Set<string>()
     for (const source of selected) {
       const report: DatasetReport = {
         id: source.id,
@@ -407,25 +410,7 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
         console.log(`[ingest] ${source.id}: 小批量模式，跳过 dataset_insights 重算`)
       }
       else if (changed || args.all || insightsStale) {
-        const all = readPacks(source.id).map(({ file, raw }) => ({
-          pack: JSON.parse(raw) as StreamDatapack,
-          rel: `data/${source.id}/${basename(file)}`,
-        }))
-        const totals = buildInsights(all)
-        const publicTotals = await computeDatasetPublicTotals(readDb!, source.id)
-        await db.insert(datasetInsights).values({
-          datasetId: source.id,
-          totals,
-          publicTotals,
-          aggregation: totals.aggregation ?? null,
-          generatedAt: new Date(),
-        }).onConflictDoUpdate({
-          target: datasetInsights.datasetId,
-          set: { totals, publicTotals, aggregation: totals.aggregation ?? null, generatedAt: new Date() },
-        })
-        console.log(
-          `[ingest] ${source.id}: insights 已更新（${all.length} 场；public_totals ${publicTotals.streamCount} 场 / ${JSON.stringify(publicTotals).length} B）`,
-        )
+        insightsToRefresh.add(source.id)
       }
 
       const transcriptCount = await syncTranscripts(db, source.id)
@@ -437,6 +422,30 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
       if (prunedSchedules.length > 0) {
         console.log(`[ingest] ${source.id}: 清理已入库日程 ${prunedSchedules.length} 条`)
       }
+    }
+
+    for (const sourceId of insightsToRefresh) {
+      if (!db || !readDb)
+        continue
+      const all = readPacks(sourceId).map(({ file, raw }) => ({
+        pack: JSON.parse(raw) as StreamDatapack,
+        rel: `data/${sourceId}/${basename(file)}`,
+      }))
+      const totals = buildInsights(all)
+      const publicTotals = await computeDatasetPublicTotals(readDb, sourceId)
+      await db.insert(datasetInsights).values({
+        datasetId: sourceId,
+        totals,
+        publicTotals,
+        aggregation: totals.aggregation ?? null,
+        generatedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: datasetInsights.datasetId,
+        set: { totals, publicTotals, aggregation: totals.aggregation ?? null, generatedAt: new Date() },
+      })
+      console.log(
+        `[ingest] ${sourceId}: insights 已更新（${all.length} 场；public_totals ${publicTotals.streamCount} 场 / ${JSON.stringify(publicTotals).length} B）`,
+      )
     }
 
     const failures = reports.reduce((sum, report) => sum + report.failed, 0)
