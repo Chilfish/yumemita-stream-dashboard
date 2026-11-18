@@ -173,6 +173,18 @@ function pack(): Record<string, unknown> {
       emojiKinds: { distinct: 2, top: [{ id: "UC1/hash", count: 4 }] },
       emojis: [{ id: "UC1/hash", name: "hi", url: "https://example.com/e.png" }],
       ownerChats: [{ at: "11:00", kind: "text", text: "こんにちは", emojis: [] }],
+      memberChats: [
+        {
+          at: "11:01",
+          memberId: "yuno",
+          memberLabel: "千石ユノ",
+          author: "@yuno_yumemita",
+          authorId: "UCyuno",
+          kind: "text",
+          text: "うわ…",
+          emojis: ["UC1/hash"],
+        },
+      ],
       events: [
         { at: "11:05", type: "poll", owner: true, text: null, data: { options: [] } },
       ],
@@ -217,6 +229,7 @@ describe("JSON Schema 与真实响应同形", () => {
     delete chat.wordCounts;
     delete chat.emojis;
     delete chat.ownerChats;
+    delete chat.memberChats;
     delete chat.events;
     const paid = chat.paid as Record<string, unknown>;
     delete paid.gifts;

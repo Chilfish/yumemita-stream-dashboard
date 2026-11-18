@@ -12,6 +12,7 @@ import type {
   EmojiCount,
   EmojiKinds,
   GiftMembership,
+  MemberChat,
   Membership,
   OwnerChat,
   PaidInfo,
@@ -81,6 +82,7 @@ export type SchemaKeyParity = AssertAllTrue<
     AssertSameKeys<keyof typeof emojiCount.properties, keyof EmojiCount>,
     AssertSameKeys<keyof typeof emojiKinds.properties, keyof EmojiKinds>,
     AssertSameKeys<keyof typeof ownerChat.properties, keyof OwnerChat>,
+    AssertSameKeys<keyof typeof memberChat.properties, keyof MemberChat>,
     AssertSameKeys<keyof typeof chatEvent.properties, keyof ChatEvent>,
     AssertSameKeys<keyof typeof chat.properties, keyof ChatInfo>,
     AssertSameKeys<keyof typeof commentItem.properties, keyof CommentItem>,
@@ -375,6 +377,21 @@ const ownerChat = {
     emojis: arrayOf({ type: 'string' }),
   },
 } as const
+const memberChat = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['at', 'memberId', 'memberLabel', 'author', 'authorId', 'kind', 'text'],
+  properties: {
+    at: { type: 'string' },
+    memberId: { type: 'string' },
+    memberLabel: { type: 'string' },
+    author: { type: 'string' },
+    authorId: { type: 'string' },
+    kind: { type: 'string', enum: ['text', 'superchat', 'sticker', 'membership', 'gift'] },
+    text: { type: 'string' },
+    emojis: arrayOf({ type: 'string' }),
+  },
+} as const
 const chatEvent = {
   type: 'object',
   additionalProperties: false,
@@ -444,6 +461,7 @@ const chat = {
     emojiKinds: ref('emojiKinds'),
     emojis: arrayOf(ref('emojiAsset')),
     ownerChats: arrayOf(ref('ownerChat')),
+    memberChats: arrayOf(ref('memberChat')),
     events: arrayOf(ref('chatEvent')),
   },
 } as const
@@ -524,6 +542,7 @@ const datapackSchema = {
     emojiCount,
     emojiKinds,
     ownerChat,
+    memberChat,
     chatEvent,
     chat,
     commentItem,

@@ -197,6 +197,24 @@ export interface OwnerChat {
   emojis?: string[];
 }
 
+/**
+ * 非本场主播的团体成员在聊天里的一条发言。
+ * 身份按 `authorId` 匹配 `data-sources.json` 的 `channelId`，不依赖徽章（成员互相是版主）。
+ */
+export interface MemberChat {
+  at: string;
+  /** 发言成员的 dataset id，如 `yuno`。 */
+  memberId: string;
+  /** 发言成员的展示名，如「千石ユノ」。 */
+  memberLabel: string;
+  /** 聊天显示名，如 `@yuno_yumemita`。 */
+  author: string;
+  authorId: string;
+  kind: "text" | "superchat" | "sticker" | "membership" | "gift";
+  text: string;
+  emojis?: string[];
+}
+
 /** 直播中的非消息事件（置顶、投票、系统提示、删除等）；来自实时采集的 events jsonl。 */
 export interface ChatEvent {
   /** JST ISO 时间；没有原生时间戳的事件用采集时刻。 */
@@ -247,6 +265,8 @@ export interface ChatInfo {
   emojis?: EmojiAsset[];
   /** 主播本人发言明细（全量，按时间顺序）；旧 pack 没有这个字段。 */
   ownerChats?: OwnerChat[];
+  /** 其他团体成员的发言明细（全量，按时间顺序）；旧 pack 没有这个字段。 */
+  memberChats?: MemberChat[];
   /** 非消息事件（置顶 / 投票 / Q&A / 商品 / 系统 / 删除）；旧 pack 或没跑实时采集时缺失。 */
   events?: ChatEvent[];
 }

@@ -29,12 +29,13 @@ import { upsertManifestStream } from '@scripts/lib/dataset-manifest.ts'
 import { deriveVstats, parseVstats } from '@scripts/lib/vstats.ts'
 import { isStopword } from '@/lib/stopwords.ts'
 import type { ChatRecord } from '@scripts/lib/live-chat.ts'
+import { jstIso } from '@scripts/lib/jst.ts'
+import { chatTimestamp, collectMemberChats, memberChannelMap } from '@scripts/lib/member-chats.ts'
 
 const APP_ROOT = resolve(import.meta.dir, '../../..')
 const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
 
 const SCHEMA = 'yumemita.stream-datapack/v2'
-const JST_OFFSET_MIN = 540
 const ANY_DANMAKU_RE = /^danmaku_.*\.jsonl$/
 
 /** 注入的日志器；默认静默，方便测试与进程内调用。 */
@@ -173,11 +174,6 @@ function resolveDataset(
   return sources.find(source => source.channelId && source.channelId === channelId) ?? null
 }
 
-function jstIso(seconds: number): string {
-  const d = new Date((seconds + JST_OFFSET_MIN * 60) * 1000)
-  return `${d.toISOString().slice(0, 19)}+09:00`
-}
-
 function hms(seconds: number): string {
   const s = Math.max(0, Math.round(seconds))
   return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
@@ -204,16 +200,6 @@ function readJson<T>(path: string): T | null {
   catch {
     return null
   }
-}
-
-function chatTimestamp(record: ChatRecord): number | null {
-  const us = record.msg.timestampUs
-  if (us != null) {
-    const n = Number(us) / 1_000_000
-    if (Number.isFinite(n))
-      return n
-  }
-  return typeof record.ts === 'number' ? record.ts : null
 }
 
 /** 会员里程碑（入会/续费）的文案只在原始 chat 回放里，按时间戳对回去。 */
@@ -294,7 +280,7 @@ function topWords(counts: Map<string, number>, limit = 40): { word: string, coun
     .map(([word, count]) => ({ word, count }))
 }
 
-function buildPack(sessionDir: string, vstatsOverride: string | null) {
+function buildPack(sessionDir: string, vstatsOverride: string | null, sources: DatasetSource[]) {
   const info = readJson<InfoJson>(join(sessionDir, 'meta', 'info.json'))
   if (!info?.id)
     throw new Error(`找不到 meta/info.json 或缺少 id：${sessionDir}`)
@@ -330,6 +316,8 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
     .map(record => ({ record, at: chatTimestamp(record) }))
     .filter((entry): entry is { record: ChatRecord, at: number } => entry.at != null)
     .sort((a, b) => a.at - b.at)
+
+  const memberChats = collectMemberChats(timed, memberChannelMap(sources, info.channel_id ?? null))
 
   const byKind = { text: 0, superchat: 0, sticker: 0, membership: 0, gift: 0 }
   // 按稳定 ID 去重；没有 ID 的旧数据退回显示名。显示名会改、会重名，不能当主键。
@@ -659,6 +647,7 @@ function buildPack(sessionDir: string, vstatsOverride: string | null) {
       emojiKinds: { distinct: emoji.size, top: [...emoji.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([id, count]) => ({ id, count })) },
       ...(emojiAssets.length ? { emojis: emojiAssets } : {}),
       ...(ownerChats.length ? { ownerChats } : {}),
+      ...(memberChats.length ? { memberChats } : {}),
       ...(chatEvents.length ? { events: chatEvents } : {}),
     },
     comments: comments
@@ -726,7 +715,7 @@ export function runDatapack(options: RunDatapackOptions): { exitCode: number, da
   for (const positional of sessions) {
     const sessionDir = resolve(positional)
     try {
-      const { pack, channelId, stats } = buildPack(sessionDir, vstatsOverride)
+      const { pack, channelId, stats } = buildPack(sessionDir, vstatsOverride, sources)
       const dataset = resolveDataset(sources, channelId, options.dataset)
       if (options.dataset && !dataset)
         throw new Error(`data-sources.json 里没有 dataset：${options.dataset}`)

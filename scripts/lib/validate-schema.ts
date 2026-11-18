@@ -142,6 +142,17 @@ const OwnerChatSchema = v.object({
   emojis: v.optional(v.array(v.string())),
 });
 
+const MemberChatSchema = v.object({
+  at: v.string(),
+  memberId: v.string(),
+  memberLabel: v.string(),
+  author: v.string(),
+  authorId: v.string(),
+  kind: v.picklist(["text", "superchat", "sticker", "membership", "gift"]),
+  text: v.string(),
+  emojis: v.optional(v.array(v.string())),
+});
+
 const ChatEventSchema = v.object({
   at: v.string(),
   type: v.picklist([
@@ -184,6 +195,8 @@ const DatapackChatSchema = v.object({
   emojis: v.optional(v.array(EmojiAssetSchema)),
   // 主播本人发言明细；旧 pack 没有。
   ownerChats: v.optional(v.array(OwnerChatSchema)),
+  // 其他团体成员发言明细；旧 pack 没有。
+  memberChats: v.optional(v.array(MemberChatSchema)),
   // 非消息事件（置顶 / 投票 / 系统 / 删除等）；只有实时采集过的场次才有。
   events: v.optional(v.array(ChatEventSchema)),
 });
