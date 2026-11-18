@@ -1,24 +1,20 @@
 import { Link } from "@/lib/router-compat";
 import { CopyLinkButton } from "@/components/dashboard/primitives/copy-link-button";
 import { HomeCalendar } from "@/components/dashboard/home/home-calendar";
-import { HomeCoMembers } from "@/components/dashboard/home/home-co-members";
 import { HomeLatestStream } from "@/components/dashboard/home/home-latest-stream";
-import { HomeMonthPanel } from "@/components/dashboard/home/home-month-panel";
 import { HomeRecentStreams } from "@/components/dashboard/home/home-recent-streams";
 import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { Panel } from "@/components/dashboard/primitives/panel";
 import { Button } from "@/components/ui/button";
 import type { DatasetTotals } from "@/lib/aggregate";
 import {
-  formatDate,
   formatDateTime,
   formatDurationLong,
   formatFullDate,
   formatInteger,
   formatPercent,
-  formatTime,
 } from "@/lib/format";
-import { galleryPath, streamsPath, streamPath } from "@/lib/routes";
+import { galleryPath, streamsPath } from "@/lib/routes";
 import { isMemberOnly } from "@/lib/visibility";
 import type { BatchManifest, DatasetIndexEntry, StreamSummary } from "@/types/dataset";
 
@@ -93,9 +89,6 @@ export function MemberHomeView({ dataset, datasets, manifest, rows, totals }: Me
     `${formatInteger(totals.memberOnlyCount)} 场会员限定`,
   ];
 
-  const peak = totals.peakChatMinute;
-  const bestSc = totals.bestBySc;
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-5">
@@ -136,55 +129,11 @@ export function MemberHomeView({ dataset, datasets, manifest, rows, totals }: Me
 
       {latest ? (
         <Panel>
-          <div className="grid grid-cols-1 divide-y divide-hairline lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
-            <HomeLatestStream datasetId={dataset.id} rows={rows} stream={latest} />
-            <div className="flex min-w-0 flex-col">
-              <HomeMonthPanel rows={rows} />
-              {peak || bestSc ? (
-                <div className="mt-auto border-t border-hairline px-5 py-3">
-                  <p className="text-caption text-ink-3">全期记录</p>
-                  <dl className="mt-1 flex flex-col gap-1 text-caption">
-                    {peak ? (
-                      <div className="flex items-baseline justify-between gap-3">
-                        <dt className="shrink-0 text-muted-foreground">峰值弹幕</dt>
-                        <dd className="min-w-0 truncate text-right tabular-nums text-foreground">
-                          <span className="font-medium">{formatInteger(peak.value)} 条/分</span>
-                          <span className="ml-1.5 text-ink-3">
-                            {formatDate(peak.at)} {formatTime(peak.at)}
-                          </span>
-                        </dd>
-                      </div>
-                    ) : null}
-                    {bestSc ? (
-                      <div className="flex items-baseline justify-between gap-3">
-                        <dt className="shrink-0 text-muted-foreground">单场 SC</dt>
-                        <dd className="min-w-0 truncate text-right tabular-nums text-foreground">
-                          <span className="font-medium">{formatInteger(bestSc.value)} 笔</span>
-                          <Link
-                            className="ml-1.5 text-ink-3 underline-offset-2 transition-colors duration-120 ease-out hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink"
-                            to={streamPath(dataset.id, bestSc.videoId)}
-                          >
-                            {bestSc.title}
-                          </Link>
-                        </dd>
-                      </div>
-                    ) : null}
-                  </dl>
-                </div>
-              ) : null}
-            </div>
-          </div>
+          <HomeLatestStream datasetId={dataset.id} rows={rows} stream={latest} />
         </Panel>
       ) : null}
 
       <HomeRecentStreams datasetId={dataset.id} rows={rows} />
-
-      <HomeCoMembers
-        datasetId={dataset.id}
-        datasets={datasets}
-        rows={rows}
-        totalStreams={totals.streamCount}
-      />
 
       <HomeCalendar rows={rows} />
 
@@ -194,4 +143,3 @@ export function MemberHomeView({ dataset, datasets, manifest, rows, totals }: Me
     </div>
   );
 }
-
