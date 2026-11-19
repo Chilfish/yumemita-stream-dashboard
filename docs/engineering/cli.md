@@ -3,7 +3,7 @@
 数据流水线的所有脚本收敛成一个入口：`bun scripts/cli.ts <group> <command> [选项]`，
 别名 `bun run ymmt <group> <command>`。
 
-- 参数解析、`--help`、日志、退出码、JSON 信封由 `scripts/lib/cli/` 统一提供。
+- 参数解析、`--help`、日志、退出码、JSON 信封由 `@chilfish/devkit/cli` 统一提供。
 - 命令实现在 `scripts/commands/<group>/<command>.ts`，每个文件导出一个 `CommandSpec`。
 - 一次性补丁脚本在 `scripts/oneoff/`，不注册子命令、不进 `package.json`。
 
@@ -182,15 +182,15 @@ bun scripts/oneoff/add-datapack.mjs <path>
 
 ```text
 scripts/
-├─ cli.ts                    # 唯一入口：总装 groups + rootCommands
+├─ cli.ts                    # 唯一入口：buildCli({ config, version, groups, rootCommands, labels })
+├─ dev.config.ts             # devkit 配置：数据库 / 代理 / 桶 / 迁移 / 日志 / dev server
 ├─ commands/
-│  ├─ index.ts               # 汇总所有 CliGroup（data / db / publish / …）
-│  ├─ data/  db/  publish/  transcript/  validate/  test/  dev/  tool/
+│  ├─ index.ts               # 汇总所有 CommandGroup（data / db / publish / … / dev / tool）
+│  ├─ dev-group.ts           # createDevCommands(devkit) + 中文帮助文案
+│  ├─ data/  db/  publish/  transcript/  validate/  test/  tool/
 │  │  ├─ <command>.ts        # 一个文件一个 CommandSpec
-│  │  └─ index.ts            # 该分组导出 CliGroup
+│  │  └─ index.ts            # 该分组导出 CommandGroup
 │  └─ deploy.ts              # 顶层命令
 ├─ oneoff/                   # 一次性补丁，不经 cli.ts
-└─ lib/
-   ├─ cli/                   # runtime / logger / envelope / exit
-   └─ …                       # 抓取、发布、存储等共享逻辑
+└─ lib/                      # 抓取、发布、存储等共享逻辑
 ```

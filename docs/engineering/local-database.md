@@ -1,6 +1,6 @@
 # 本地开发环境（PostgreSQL + SILO）
 
-> **最后更新**：2026-11-07
+> **最后更新**：2026-11-19
 > 本地开发默认连本机 Postgres + SILO，避免把开发 / 预览 / 爬虫流量算进线上出流量。
 > 环境变量只有一个文件：`.dev.vars`。本地值写普通键，线上目标写 `*_ONLINE`。
 > `LOCAL=1` 同时切换数据库、对象存储与媒体地址；见下方「本地对象存储」。
@@ -13,19 +13,18 @@
 
 | 场景 | 驱动 | 说明 |
 | --- | --- | --- |
-| workerd（dev / preview） | Neon HTTP 驱动 → `dev:db:proxy` → 本机 Postgres | 代理把 `/sql` 翻译成 `pg` 查询 |
+| workerd（dev / preview） | Neon HTTP 驱动 → `bun run ymmt dev proxy` → 本机 Postgres | 代理把 `/sql` 翻译成 `pg` 查询 |
 | Bun / Node 脚本（ingest / verify） | `pg` 直连 | `DATABASE_URL` 是本机地址时自动切换 |
 
 代码位置：
 
 - `src/db/connection.ts`：URL 是本机（`localhost` / `127.0.0.1` / `::1`）时，`createDb` / `createWriteDb` 走 `pg`；传入 `NEON_HTTP_ENDPOINT` 时强制走 HTTP 驱动。
-- `scripts/dev.ts`：`bun run dev` 的入口，先准备本地服务，再用 Node 启动 Astro。
-- `scripts/lib/dev-services.ts`：启动 / 复用 Postgres 与代理、建库、跑迁移、补齐 `.dev.vars`。
-- `scripts/dev-db-proxy.ts`：本地 `/sql` 代理，只接受本机数据库地址。
-- `scripts/dev-db.ts`：只做建库 + 迁移 + 补 `.dev.vars` 的独立命令。
-- `scripts/lib/local-config.ts`：`LOCAL=1` 的总开关与默认端点 / 凭据。
-- `scripts/lib/dev-silo.ts`：本地 SILO 的启动、建桶与匿名读策略。
-- `scripts/dev-storage.ts`：只准备本地对象存储（`bun run ymmt dev storage`）。
+- `scripts/cli.ts`：唯一 CLI 入口；`bun run dev` 等价于 `bun scripts/cli.ts dev server`。
+- `scripts/dev.config.ts`：数据库、代理、桶、迁移目录、日志目录与 dev server 的配置。
+- `@chilfish/devkit/local`：启动 / 复用 Postgres 与代理、建库、跑迁移、补齐 `.dev.vars`。
+- `@chilfish/devkit/proxy`：本地 `/sql` 代理，只接受本机数据库地址。
+- `@chilfish/devkit/storage`：本地 SILO 的启动、建桶与匿名读策略。
+- `@chilfish/devkit/commands`：`dev server` / `dev db` / `dev proxy` / `dev storage` 四个命令。
 
 ## 一次性安装（Windows / Scoop）
 
@@ -110,16 +109,16 @@ bun run dev --local    # 强制 LOCAL=1，并把开关写回 .dev.vars
 输出示例：
 
 ```text
-[env] 本地模式（LOCAL=1） · 数据库 localhost:5432/ymmt_dev · 对象存储 http://127.0.0.1:9000/yumemita-data
-[dev] Postgres 已在运行（D:\Scoop\apps\postgresql\current\data）
-[dev] 代理就绪（pid 925604）：http://127.0.0.1:4444/sql -> localhost:5432/ymmt_dev
-[dev] SILO 就绪：http://127.0.0.1:9000（数据 I:\dev\yumemita-stream-dashboard\temp\silo-data）
- astro  v7.4.5  ready in 9979 ms
+[dev.server] local mode (LOCAL=1) · database localhost:5432/ymmt_dev · local storage http://127.0.0.1:9000/yumemita-data
+[dev.server/services] Postgres is already running (D:\Scoop\apps\postgresql\current\data)
+[dev.server/services] reusing running proxy (pid 925604, ymmt_dev)
+[dev.server/services] SILO is already running (http://127.0.0.1:9000)
+ astro  v7.4.7  ready in 9979 ms
 ```
 
 **Postgres 与代理不由 Astro 托管。** `astro dev` 退出、被 Ctrl+C 或被 `taskkill /T` 杀掉后，
 两者继续在后台运行；再次 `bun run dev` 会复用它们，只有健康检查失败时才重启代理。
-Postgres 日志在 `temp/postgres.log`，代理日志在 `temp/dev-db-proxy.log`。
+Postgres 日志在 `temp/postgres.log`，代理日志在 `temp/dev-proxy.log`。
 
 验证代理：
 
@@ -166,7 +165,7 @@ bun run ymmt db ingest --dataset nonoka
 | `.dev.vars.example` | 模板，列出所有键与说明 | 是 |
 
 - wrangler / astro dev 原生读 `.dev.vars`；脚本、`astro.config.mjs`、`drizzle.config.ts`
-  统一走 `loadEnvFiles()`（`scripts/lib/env.ts`），不再有 `.env` / `.env.local`。
+  统一走 `loadEnvFile()`（`@chilfish/devkit/env`），不再有 `.env` / `.env.local`。
 - 普通键是本地值；`DATABASE_URL_ONLINE` 这类 `*_ONLINE` 是线上目标。
   `LOCAL=1` 用普通键（并忽略 `*_ONLINE`），`LOCAL=0` 用 `*_ONLINE` 覆盖同名键。
 - `LOCAL` 本身以运行环境为准：`LOCAL=0 bun run …` / `bun run dev --local` 都压过文件。
@@ -177,7 +176,7 @@ bun run ymmt db ingest --dataset nonoka
 - `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` 只在 `LOCAL=1` 时生效；线上仍用 `R2_*`。
 - `LOCAL=1` 打开后，`DATABASE_URL` / `NEON_HTTP_ENDPOINT` / `PUBLIC_R2_BASE` 会在加载后强制切到本机。
 - 发布资产、每日任务、部署前看脚本首行的目标环境，确认是 Neon 而不是 `localhost`。
-- CI 不用文件：GitHub Actions 直接把变量注入进程环境，`loadEnvFiles()` 发现没有 `.dev.vars` 就跳过。
+- CI 不用文件：GitHub Actions 直接把变量注入进程环境，`loadEnvFile()` 发现没有 `.dev.vars` 就跳过。
 
 ## 停止
 
@@ -212,7 +211,7 @@ kill $(lsof -ti :9000)
 | 页面空白 / 表为空 | 本地库还没灌数据：`bun run ymmt db ingest` |
 | `pg_isready` 无响应 | `pg_ctl status -D "$PGDATA"`；卡在恢复时看 `temp/postgres.log` |
 | 代理 400 | 代理会把 Postgres 报错原样返回；先修 SQL 或数据 |
-| Astro 报 `ECONNREFUSED`（miniflare） | Astro 被 Bun 执行了；`bun run dev` 已固定用 Node，不要改动 `scripts/dev.ts` 的启动方式 |
+| Astro 报 `ECONNREFUSED`（miniflare） | Astro 被 Bun 执行了；`bun run dev` 已通过 devkit 固定用 Node，不要把 `dev.config.ts` 的 `runtime` 改成 `bun` |
 | 端口占用 | `DEV_DB_PROXY_PORT=4445 bun run ymmt dev proxy`，同时改 `.dev.vars` 的端点 |
 | `LOCAL=1` 但提示「未找到 silo」 | 安装 SILO 并加入 `PATH`，或设 `SILO_BIN`；页面读库仍可用，上传会失败 |
 | 封面 / 表情 404、逐字稿 503 | 先 `LOCAL=1 bun run ymmt dev storage`；确认 `LOCAL=1` 对 dev 进程可见，媒体地址由 `astro.config.mjs` 注入为 `http://127.0.0.1:9000/yumemita-data`，且桶已设为匿名读 |

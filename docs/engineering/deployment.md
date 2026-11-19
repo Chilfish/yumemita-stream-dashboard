@@ -24,7 +24,7 @@ bun run cf:preview   # build + preview
 - 开发环境 `Astro.cache.enabled === false`，缓存调用是 no-op；要验证缓存必须用生产构建或线上。
 - `.dev.vars` 是唯一的环境文件：`DATABASE_URL` / `DATABASE_URL_ONLINE`、R2、`PUBLIC_R2_BASE`、`SITE_URL`、`PURGE_TOKEN`、管理端凭据。
 - `astro preview` 下 R2 binding 不可用时，逐字稿 API 返回 503，客户端回退到本地 `content/transcripts/` 快照。
-- `astro.config.mjs` 通过 `loadEnvFiles()` 读同一个文件；进程环境里的同名变量优先，临时切换用 `SITE_URL=… bun run cf:deploy`。
+- `astro.config.mjs` 通过 `loadEnvFile()` 读同一个文件；进程环境里的同名变量优先，临时切换用 `SITE_URL=… bun run cf:deploy`。
 
 ## 部署
 
