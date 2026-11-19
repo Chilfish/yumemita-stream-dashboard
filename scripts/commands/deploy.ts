@@ -6,7 +6,7 @@
  *   bun run ymmt deploy --no-deploy  # 只构建并校验产物
  *
  * 1. 强制 `LOCAL=0`：`.dev.vars` 里的 `LOCAL=1` 不会带进构建；
- * 2. `loadEnvFiles()` 走线上分支，用 `DATABASE_URL_ONLINE` 等线上目标；
+ * 2. `loadEnvFile()` 走线上分支，用 `DATABASE_URL_ONLINE` 等线上目标；
  * 3. `PUBLIC_R2_BASE` 指向本机时拒绝（它会被内联进客户端 bundle）；
  * 4. 构建后扫描 `dist/`：出现本机媒体 / 代理地址就中止，不部署；
  * 5. 以上通过才 `wrangler deploy --config dist/server/wrangler.json`。
@@ -17,11 +17,10 @@ import { dirname, extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Option } from 'commander'
 import { isLocalUrl } from '@/lib/local-url.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError, ConfigError } from '@scripts/lib/cli/exit.ts'
-import { createLogger, type Logger } from '@scripts/lib/cli/logger.ts'
-import { loadEnvFiles } from '@scripts/lib/env.ts'
-import { DEFAULT_LOCAL_PROXY_ENDPOINT, localPublicBase } from '@scripts/lib/local-config.ts'
+import { type CommandSpec, CliError, ConfigError, createLogger, type Logger } from '@chilfish/devkit/cli'
+import { loadEnvFile } from '@chilfish/devkit/env'
+import { localBucket, localEndpoint, localPublicBase } from '@chilfish/devkit/shared'
+import { devkit } from '../dev.config.ts'
 
 // 文件在 scripts/commands/，仓库根在上一级。
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -56,8 +55,8 @@ export interface DeployResult {
 /** 只认「我们自己的」本机地址：媒体库 / 代理 / 本地开发端口，别的 127.0.0.1（如系统代理变量）不算。 */
 function localMarkers(): string[] {
   const endpoints = [
-    localPublicBase(),
-    DEFAULT_LOCAL_PROXY_ENDPOINT,
+    localPublicBase(localEndpoint(process.env), localBucket(process.env, devkit.storage.bucket)),
+    devkit.database.proxyEndpoint,
     process.env.S3_ENDPOINT ?? '',
     process.env.MINIO_ENDPOINT ?? '',
   ]
@@ -132,7 +131,7 @@ function runStep(args: string[], label: string): void {
 /**
  * 业务主体：强制线上环境 → 校验 `PUBLIC_R2_BASE` → 从零构建 → 扫描 `dist/` → 可选部署。
  *
- * 永远按线上处理：一开始就把 `LOCAL` 设成 `0`，再用 `loadEnvFiles()` 选 `*_ONLINE` 那套值。
+ * 永远按线上处理：一开始就把 `LOCAL` 设成 `0`，再用 `loadEnvFile()` 选 `*_ONLINE` 那套值。
  * 构建产物里出现本机地址时中止（退出码 1），绝不部署一个指向 localhost 的构建。
  */
 export async function runDeploy(options: DeployOptions): Promise<DeployResult> {
@@ -151,7 +150,7 @@ export async function runDeploy(options: DeployOptions): Promise<DeployResult> {
 
   // 线上模式是硬约束：不管 `.dev.vars` 与调用方怎么写，都不许部署本地构建。
   process.env.LOCAL = '0'
-  loadEnvFiles({ log: false })
+  loadEnvFile({ config: devkit, log: false })
   log.info('部署固定按线上处理（LOCAL=0），不使用 `.dev.vars` 的本地目标')
 
   const publicBase = (process.env.PUBLIC_R2_BASE ?? '').replace(/\/+$/, '')

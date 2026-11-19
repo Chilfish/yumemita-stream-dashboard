@@ -27,10 +27,9 @@ import { Option } from 'commander'
 import { inArray, sql } from 'drizzle-orm'
 import { createDb } from '@/db/connection.ts'
 import { streams, transcripts } from '@/db/schema.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
-import { applyOnlineEnv, readOnlineTarget } from '@scripts/lib/online-env.ts'
+import { type CommandSpec, CliError, type Logger } from '@chilfish/devkit/cli'
+import { applyOnlineEnv, readOnlineTarget } from '@chilfish/devkit/env'
+import { devkit } from '../../dev.config.ts'
 import { createObjectStore, readCredentials } from '@scripts/lib/object-storage.ts'
 import { runMigrate } from '../db/migrate.ts'
 import { runRefreshTotals } from '../db/totals.ts'
@@ -145,7 +144,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
   const dryRun = options.dryRun === true
   const force = options.force === true
 
-  const { remote, databaseUrl, bucket } = readOnlineTarget(APP_ROOT)
+  const { remote, databaseUrl, bucket } = readOnlineTarget({ config: devkit, cwd: APP_ROOT })
 
   const sources = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as { datasets?: DatasetSource[] }
   const all = sources.datasets ?? []
@@ -433,7 +432,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     })
   }
 
-  const restoreEnv = applyOnlineEnv(remote)
+  const restoreEnv = applyOnlineEnv({ config: devkit, remote })
   try {
     if (!options.skipMigrate) {
       log.info('=== 数据库迁移 ===')

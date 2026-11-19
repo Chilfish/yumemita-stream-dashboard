@@ -30,9 +30,7 @@ import { buildAuthorIndex } from '@/lib/author-index.ts'
 import { THUMB_VARIANTS } from '@/lib/thumb-variants.ts'
 import type { StreamDatapack } from '@/types/datapack.ts'
 import type { BatchManifest } from '@/types/dataset.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, CliError, type Logger } from '@chilfish/devkit/cli'
 import { INDEX_KEY, buildDatasetIndex } from '@scripts/lib/dataset-index.ts'
 import type { DatasetIndex, DatasetIndexSource } from '@scripts/lib/dataset-index.ts'
 import { buildStreamSummary, isoJst } from '@scripts/lib/dataset-manifest.ts'
@@ -55,8 +53,14 @@ import {
   thumbVariantKey,
   thumbsKey,
 } from '@scripts/lib/object-storage.ts'
-import { digestBody, digestBytes, isUnchanged, readPublishState, writePublishState } from '@scripts/lib/publish-state.ts'
-import { publishStatePath } from '@scripts/lib/local-config.ts'
+import {
+  digestBody,
+  digestBytes,
+  isUnchanged,
+  publishStatePath,
+  readPublishState,
+  writePublishState,
+} from '@scripts/lib/publish-state.ts'
 
 interface DatasetSource {
   id: string

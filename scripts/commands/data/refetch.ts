@@ -12,10 +12,9 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError, UsageError } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
-import { applyOnlineEnv, readOnlineTarget } from '@scripts/lib/online-env.ts'
+import { type CommandSpec, CliError, UsageError, type Logger } from '@chilfish/devkit/cli'
+import { applyOnlineEnv, readOnlineTarget } from '@chilfish/devkit/env'
+import { devkit } from '../../dev.config.ts'
 import { parseVideoRef } from '@scripts/lib/video-ref.ts'
 import { DEFAULT_COOKIE_BROWSER, resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
 import { runIngest } from '../db/ingest.ts'
@@ -263,8 +262,8 @@ export async function runRefetch(options: RefetchOptions): Promise<{ exitCode: n
 
   let verifyProblems = 0
   if (online) {
-    const target = readOnlineTarget(APP_ROOT)
-    const restoreEnv = applyOnlineEnv(target.remote)
+    const target = readOnlineTarget({ config: devkit, cwd: APP_ROOT })
+    const restoreEnv = applyOnlineEnv({ config: devkit, remote: target.remote })
     try {
       log.info(`线上目标：${new URL(target.databaseUrl).host} · r2://${target.bucket}`)
 

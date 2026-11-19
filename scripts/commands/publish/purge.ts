@@ -16,9 +16,7 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Option } from 'commander'
 import { ALL_CACHE_TAGS, CACHE_TAGS, datasetTag, streamTag } from '@/lib/cache-tags.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, CliError, type Logger } from '@chilfish/devkit/cli'
 import { purgeCache } from '@scripts/lib/purge.ts'
 
 const APP_ROOT = resolve(import.meta.dir, '../../..')

@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { eq, sql } from 'drizzle-orm'
 import { basename, resolve } from 'node:path'
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
+import { type CommandSpec, requireEnv } from '@chilfish/devkit/cli'
 import { aggregateDataset, type StreamRow } from '@/lib/aggregate.ts'
 import { isStopword } from '@/lib/stopwords.ts'
 import { createDb, createWriteDb } from '@/db/connection.ts'
@@ -23,7 +23,6 @@ import {
 import type { StreamDatapack } from '@/types/datapack.ts'
 import { buildStreamSummary } from '@scripts/lib/dataset-manifest.ts'
 import { loadCollaborations, resolveParticipants, type LoadCollaborationsResult } from '@scripts/lib/collaborations.ts'
-import { requireEnv } from '@scripts/lib/env.ts'
 import { syncTranscripts } from '@scripts/lib/transcripts-db.ts'
 import { pruneMatchedSchedules } from '@scripts/lib/schedule-match.ts'
 
@@ -246,7 +245,7 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
   let readDb: ReturnType<typeof createDb> | null = null
 
   if (!args.dryRun) {
-    const url = requireEnv('DATABASE_URL')
+    const url = requireEnv('DATABASE_URL', '缺少环境变量 DATABASE_URL；请在 .dev.vars 中配置')
     const connection = createWriteDb(url)
     db = connection.db
     pool = connection.pool

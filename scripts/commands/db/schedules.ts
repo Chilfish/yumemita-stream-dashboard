@@ -9,9 +9,7 @@
  *   LOCAL=0 bun run ymmt db schedules --apply --dataset miyako
  */
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { requireEnvVar } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, requireEnvVar, type Logger } from '@chilfish/devkit/cli'
 import { createDb, type Db } from '@/db/connection.ts'
 import { scheduledStreams } from '@/db/schema.ts'
 import { normalizeScheduleKeys, pruneMatchedSchedules } from '@scripts/lib/schedule-match.ts'

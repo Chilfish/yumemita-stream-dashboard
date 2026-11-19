@@ -5,8 +5,7 @@
  * 结论以 `data` 返回（--json 时进信封），人读模式逐行打一行摘要。
  */
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { createLogger, type Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, createLogger, type Logger } from '@chilfish/devkit/cli'
 
 export interface PerfOptions {
   url?: string

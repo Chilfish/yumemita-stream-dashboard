@@ -41,9 +41,7 @@ import {
   stripArchiveBlock,
 } from '@/lib/transcripts.ts'
 import type { BatchManifest } from '@/types/dataset.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError, UsageError } from '@scripts/lib/cli/exit.ts'
-import { createLogger, type Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, CliError, UsageError, createLogger, type Logger } from '@chilfish/devkit/cli'
 import {
   collectTranscriptSources,
   datasetFromPath,

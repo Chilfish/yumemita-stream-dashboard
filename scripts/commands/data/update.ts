@@ -28,9 +28,7 @@ import { runBatch } from '@/db/batch.ts'
 import { createDb, createWriteDb } from '@/db/connection.ts'
 import { datasetInsights, streams } from '@/db/schema.ts'
 import { CACHE_TAGS, datasetTag, streamTag } from '@/lib/cache-tags.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
-import { CliError } from '@scripts/lib/cli/exit.ts'
+import { type CommandSpec, type Logger, CliError, requireEnv } from '@chilfish/devkit/cli'
 import { loadCollaborations } from '@scripts/lib/collaborations.ts'
 import {
   planCollaborationUpdates,
@@ -38,7 +36,6 @@ import {
   writeCollaborationChanges,
   type CollaborationRow,
 } from '@scripts/lib/collaboration-sync.ts'
-import { requireEnv } from '@scripts/lib/env.ts'
 import { purgeCache } from '@scripts/lib/purge.ts'
 import { syncScheduleFromChannel } from '@scripts/lib/schedule-sync.ts'
 import { planDataset, type ChannelEntry, type PlanStream } from '@scripts/lib/update-plan.ts'
@@ -421,7 +418,7 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResu
   }
   const vstatsEnabled = !dryRun && !noPublish && !options.noVstats
 
-  const databaseUrl = requireEnv('DATABASE_URL')
+  const databaseUrl = requireEnv('DATABASE_URL', '缺少环境变量 DATABASE_URL；请在 .dev.vars 中配置')
   const db = createDb(databaseUrl)
   const { states, collaborationRows } = await loadDatabaseStates(db, selected)
   const knownDatasetIds = sources.map(source => source.id)

@@ -10,9 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError, UsageError } from '@scripts/lib/cli/exit.ts'
-import { createLogger, type Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, CliError, UsageError, createLogger, type Logger } from '@chilfish/devkit/cli'
 import type { BatchManifest } from '@/types/dataset.ts'
 
 interface DatasetSource {

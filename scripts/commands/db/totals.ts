@@ -11,9 +11,7 @@
  */
 import { eq } from 'drizzle-orm'
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError, requireEnvVar } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, CliError, requireEnvVar, type Logger } from '@chilfish/devkit/cli'
 import { createDb, createWriteDb } from '@/db/connection.ts'
 import { computeDatasetPublicTotals } from '@/db/queries/dataset-totals.ts'
 import { datasetInsights, datasets } from '@/db/schema.ts'

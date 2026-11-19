@@ -19,9 +19,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError } from '@scripts/lib/cli/exit.ts'
-import { createLogger, type Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, CliError, createLogger, type Logger } from '@chilfish/devkit/cli'
 import { defaultCookieCachePath, exportCookieJar } from '@scripts/lib/yt-cookies.ts'
 
 // 文件在 scripts/commands/tool/，仓库根在上三级。

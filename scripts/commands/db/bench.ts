@@ -7,9 +7,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, CliError, type Logger } from '@chilfish/devkit/cli'
 import { runBatch } from '@/db/batch.ts'
 import { createDb, type Db } from '@/db/connection.ts'
 import { getCalendarData } from '@/db/queries/calendar.ts'
@@ -42,7 +40,8 @@ import {
   getStreamPageExtras,
 } from '@/db/queries/view-data.ts'
 import { calendarWindow, currentJstMonth, monthRange } from '@/lib/calendar.ts'
-import { ensureDevServices } from '@scripts/lib/dev-services.ts'
+import { ensureDevServices } from '@chilfish/devkit/local'
+import { devkit } from '../../dev.config.ts'
 
 /** 只取命令需要的日志通道；默认空操作。 */
 export type BenchLog = Pick<Logger, 'info' | 'warn' | 'error' | 'line'>
@@ -240,8 +239,9 @@ export async function runBench(options: BenchOptions = {}): Promise<BenchResult>
   const rounds = Math.max(1, options.rounds ?? DEFAULT_ROUNDS)
 
   const services = await ensureDevServices({
-    url: options.url,
-    endpoint: options.endpoint,
+    config: devkit,
+    ...(options.url ? { databaseUrl: options.url } : {}),
+    ...(options.endpoint ? { endpoint: options.endpoint } : {}),
   })
   if (!services.local) {
     throw new CliError('db bench 只接受本地数据库', {

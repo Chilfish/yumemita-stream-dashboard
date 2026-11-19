@@ -4,9 +4,7 @@
  * 不是单元测试，而是「数据库里真的有数据、查询真的按契约返回」的连通性检查；
  * CI / 部署前跑一次，能在页面渲染前发现空库、排序错、跨成员串数据。
  */
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { requireEnvVar } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, requireEnvVar, type Logger } from '@chilfish/devkit/cli'
 import { createDb } from '@/db/connection.ts'
 import {
   getAdminScheduleList,

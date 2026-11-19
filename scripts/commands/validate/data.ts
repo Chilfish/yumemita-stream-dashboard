@@ -7,8 +7,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import { safeParse } from 'valibot'
 import { Option } from 'commander'
-import type { CommandSpec } from '../../lib/cli/runtime.ts'
-import { CliError } from '../../lib/cli/exit.ts'
+import { type CommandSpec, CliError } from '@chilfish/devkit/cli'
 import { DatapackSchema, formatIssues } from '../../lib/validate-schema.ts'
 
 const APP_ROOT = resolve(import.meta.dir, '..', '..', '..')

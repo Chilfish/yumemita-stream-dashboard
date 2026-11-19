@@ -1,6 +1,5 @@
 import { Option } from 'commander'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError, requireEnvVar } from '@scripts/lib/cli/exit.ts'
+import { type CommandSpec, CliError, requireEnvVar } from '@chilfish/devkit/cli'
 import { desc, eq } from 'drizzle-orm'
 import { createDb } from '@/db/connection.ts'
 import { streams } from '@/db/schema.ts'

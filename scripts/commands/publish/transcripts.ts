@@ -31,9 +31,7 @@ import {
 } from '@/lib/transcripts.ts'
 import type { TranscriptIndexEntry } from '@/lib/transcripts.ts'
 import type { BatchManifest } from '@/types/dataset.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, CliError, type Logger } from '@chilfish/devkit/cli'
 import {
   createObjectStore,
   publishTarget,
@@ -44,10 +42,10 @@ import {
 import {
   digestBody,
   isUnchanged,
+  publishStatePath,
   readPublishState,
   writePublishState,
 } from '@scripts/lib/publish-state.ts'
-import { publishStatePath } from '@scripts/lib/local-config.ts'
 import { purgeCache } from '@scripts/lib/purge.ts'
 import { syncTranscripts } from '@scripts/lib/transcripts-db.ts'
 

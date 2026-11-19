@@ -21,9 +21,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Option } from 'commander'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { CliError, UsageError } from '@scripts/lib/cli/exit.ts'
+import { type Logger, type CommandSpec, CliError, UsageError } from '@chilfish/devkit/cli'
 import { THUMB_VARIANTS, thumbVariantName } from '@/lib/thumb-variants.ts'
 import { runPool } from '@scripts/lib/object-storage.ts'
 

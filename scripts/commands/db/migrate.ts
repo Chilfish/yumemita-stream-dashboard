@@ -4,9 +4,7 @@
  * 本地（localhost）走 `pg` 直连，线上走 Neon serverless Pool；
  * 两条分支的迁移算法与原脚本一致，只是换了入口。
  */
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { requireEnvVar } from '@scripts/lib/cli/exit.ts'
-import type { Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, requireEnvVar, type Logger } from '@chilfish/devkit/cli'
 import { isLocalDatabaseUrl } from '@/db/connection.ts'
 
 /** 只取命令需要的日志通道；默认空操作。 */

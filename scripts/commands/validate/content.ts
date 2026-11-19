@@ -24,9 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { Option } from 'commander'
 import { isStopword } from '@/lib/stopwords.ts'
 import { archiveKey, createObjectStore, readCredentials, remoteBase } from '@scripts/lib/object-storage.ts'
-import type { CommandSpec } from '@scripts/lib/cli/runtime.ts'
-import { ConfigError } from '@scripts/lib/cli/exit.ts'
-import { createLogger, type Logger } from '@scripts/lib/cli/logger.ts'
+import { type CommandSpec, ConfigError, createLogger, type Logger } from '@chilfish/devkit/cli'
 
 // 文件在 scripts/commands/validate/，仓库根在上三级。
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
