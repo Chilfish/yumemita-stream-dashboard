@@ -4,7 +4,7 @@
 
 ### 工程
 
-- **本地基建迁到 `@chilfish/devkit@0.1.2`**：CLI runtime / envelope / exit / logger、环境加载、本地 Postgres 与 `/sql` 代理、SILO 编排改走包入口，删除 `scripts/lib/cli/*`、`env.ts`、`online-env.ts`、`local-config.ts`、`dev-services.ts`、`dev-silo.ts` 与 `scripts/commands/dev/*`。新增 `scripts/dev.config.ts`；`dev` 组由 `createDevCommands` 生成，`describe --json` 与改造前一致。0.1.2 修复了代理入口；Windows 下 `dev server` 的 Node 启动仍待上游修复（[devkit#7](https://github.com/Chilfish/devkit/issues/7)）。
+- **本地基建迁到 `@chilfish/devkit@0.1.4`**：CLI runtime / envelope / exit / logger、环境加载、本地 Postgres 与 `/sql` 代理、SILO 编排改走包入口，删除 `scripts/lib/cli/*`、`env.ts`、`online-env.ts`、`local-config.ts`、`dev-services.ts`、`dev-silo.ts` 与 `scripts/commands/dev/*`。新增 `scripts/dev.config.ts`；`dev` 组由 `createDevCommands` 生成，`describe --json` 与改造前一致。0.1.2–0.1.4 依次修复代理入口、Windows shim 启动与 endpoint 覆盖，本地 `bun run dev` 全链路已验证。
 - **SEO / 性能一轮修复**（来自 [线上站点审计](docs/research/seo-audit-2026-11-15.md)）：`http://` 现在 301 到 `https://`（中间件，localhost 豁免），HTTPS 响应补 `Strict-Transport-Security`，`text/*` 响应补 `charset=utf-8`；首页结构化数据补 `Organization`、成员页补 `Person`；`/about` 与 `/calendar` 补 `og:image`；单场页标题截断收紧到 60 字内；`--tertiary-label` 与侧栏前景色压深，消除 19 处对比度不达标。
 - **移除自托管 CJK 字体**：`@fontsource-variable/noto-sans-sc` 带 101 个 woff2 子集共 4.29 MB，首页命中 48 个即 2.36 MB（占整页载荷 69%）。中日文改走系统字体栈，拉丁与数字仍用自托管 Noto Sans。构建产物 `@font-face` 101 → 8，CSS 未压缩 390 KB → 282 KB。
 - **单场重抓一条命令**：新增 `bun run ymmt data refetch <链接|ID>`，解析 YouTube 链接/视频 ID 后按本地 pack 或频道 ID 找到成员，串起重抓素材 → 重建 datapack → 本地 ingest → 线上 ingest → 定向 verify → publish data → purge，默认同时覆盖本地与线上（`--no-online` 只改本地）。线上环境切换由 `@chilfish/devkit/env` 提供，与 `publish sync` 共用。

@@ -29,7 +29,6 @@
 | B44 | `/admin`、`/api/admin` 与会限 API 加 Cloudflare Rate Limiting；`MEMBER_ONLY_KEY` 改为 32 位以上随机值并建立轮换 | P1 | 无 | 2026-11-15 安全自查 | 📋 见 [security-review-2026-11-15.md](../research/security-review-2026-11-15.md) |
 | B49 | 类名体积：把表格 / 列表里重复的长 cva 类串收成语义类（`/arale/streams` 一条 352 字符的 `td` 类名重复 400 次 = 140 KB raw）；类名重命名只在 CSS 侧有确定性收益，先用 `npx minwind measure` 出只读预估再决定 | P2 | 无 | 2026-11-15 类名调研 | 📋 实测与方案对比见 [ssr-html-classname-weight.md](../research/ssr-html-classname-weight.md) |
 | B50 | 成员串门发言：单场 `chat.memberChats` + `?view=words` 独立区块；历史 143 场回填 | P2 | 无 | 2026-11-18 需求 | 🚧 本地与线上数据回填完成、对账 0 问题；等待部署上线。方案见 [member-chats.md](member-chats.md) |
-| B51 | 迁移到 `@chilfish/devkit`（删除本地 CLI / env / dev-services / dev-silo 副本） | P1 | devkit 修复 Windows `.bin` shim 启动 | 2026-11-19 依赖收敛 | 🚧 `0.1.2` 已接入，CLI / env / 本地编排迁移完成，`describe` / `typecheck` / `test` / `build` / `validate data` / `db verify` 通过；代理与页面已验证，`bun run dev` 的 Astro 启动被 [devkit#7](https://github.com/Chilfish/devkit/issues/7) 阻塞 |
 
 > 2026-11-08 隐式状态机审查的 Z / R / E / U 问题已全部关闭，记录见 [review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md) 与 [archive/state-machine-remediation.md](../archive/state-machine-remediation.md)。
 
