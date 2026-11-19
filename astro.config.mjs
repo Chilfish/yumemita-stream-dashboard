@@ -8,20 +8,21 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, envField } from 'astro/config'
 import { CACHE_TAGS } from './src/lib/cache-tags.ts'
 import { DEFAULT_SITE_URL } from './src/lib/site-defaults.ts'
-import { isLocalMode, localPublicBase } from './scripts/lib/local-config.ts'
-import { loadEnvFiles } from './scripts/lib/env.ts'
+import { loadEnvFile } from '@chilfish/devkit/env'
+import { isLocalMode, localBucket, localEndpoint, localPublicBase } from '@chilfish/devkit/shared'
+import { devkit } from './scripts/dev.config.ts'
 import { loadPreviewData, loadEmojiIndex } from './scripts/lib/live-chat-preview-data.ts'
 
 // 环境变量只有一个来源：.dev.vars（脚本、wrangler、astro dev 都读它）。
 // 在这里加载一次，SITE_URL / PUBLIC_R2_BASE / LOCAL 才不会静默回退。
-loadEnvFiles()
+loadEnvFile({ config: devkit })
 const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).replace(/\/+$/, '')
 
 // `LOCAL=1` 时媒体地址由配置直接指向本机 SILO，不把派生值写进文件，
 // 避免关掉开关后仍把 localhost 地址带进生产构建。
-const localMode = isLocalMode()
+const localMode = isLocalMode(process.env, devkit.env.localFlag)
 const publicR2Base = (localMode
-  ? localPublicBase()
+  ? localPublicBase(localEndpoint(process.env), localBucket(process.env, devkit.storage.bucket))
   : (process.env.PUBLIC_R2_BASE || '')).replace(/\/+$/, '')
 
 if (!publicR2Base) {

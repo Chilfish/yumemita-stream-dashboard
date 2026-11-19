@@ -16,6 +16,8 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { loadEnvFile } from '@chilfish/devkit/env'
+import { devkit } from '../dev.config.ts'
 import type { ChatRecord } from '@scripts/lib/live-chat.ts'
 import { chatTimestamp, collectMemberChats, memberChannelMap, type MemberSource } from '@scripts/lib/member-chats.ts'
 import type { StreamDatapack } from '@/types/datapack.ts'
@@ -97,9 +99,8 @@ if (upload) {
 }
 
 async function createStore() {
-  const { loadEnvFiles } = await import('@scripts/lib/env.ts')
   const { archiveKey, createObjectStore, readCredentials } = await import('@scripts/lib/object-storage.ts')
-  loadEnvFiles({ prefix: 'backfill' })
+  loadEnvFile({ config: devkit })
   const credentials = readCredentials()
   if (!credentials)
     return null

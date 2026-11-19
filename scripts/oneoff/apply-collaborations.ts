@@ -24,7 +24,9 @@ import { createDb, createWriteDb } from '@/db/connection.ts'
 import { streams } from '@/db/schema.ts'
 import { loadCollaborations } from '@scripts/lib/collaborations.ts'
 import { planCollaborationUpdates, writeCollaborationChanges, type CollaborationRow } from '@scripts/lib/collaboration-sync.ts'
-import { loadEnvFiles, requireEnv } from '@scripts/lib/env.ts'
+import { requireEnv } from '@chilfish/devkit/cli'
+import { loadEnvFile } from '@chilfish/devkit/env'
+import { devkit } from '../dev.config.ts'
 
 const USAGE = `用法：bun scripts/oneoff/apply-collaborations.ts [选项]
 
@@ -70,8 +72,8 @@ function run(label: string, command: string[], args: string[] = []): number {
   return result.status ?? 1
 }
 
-loadEnvFiles({ prefix: 'apply' })
-const url = requireEnv('DATABASE_URL')
+loadEnvFile({ config: devkit })
+const url = requireEnv('DATABASE_URL', '缺少环境变量 DATABASE_URL；请在 .dev.vars 中配置')
 const { datasets } = JSON.parse(readFileSync('data-sources.json', 'utf8')) as { datasets: DataSource[] }
 const known = datasets.map(dataset => dataset.id)
 const collaboration = loadCollaborations({ knownDatasetIds: known })

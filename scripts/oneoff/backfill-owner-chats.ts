@@ -16,9 +16,10 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { loadEnvFile } from '@chilfish/devkit/env'
+import { devkit } from '../dev.config.ts'
 import { normalizeLiveChat, type ChatRecord } from '@scripts/lib/live-chat.ts'
 import { archiveKey, createObjectStore, datapackKey, readCredentials } from '@scripts/lib/object-storage.ts'
-import { loadEnvFiles } from '@scripts/lib/env.ts'
 import { resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
 import type { OwnerChat, StreamDatapack } from '@/types/datapack.ts'
 
@@ -169,7 +170,7 @@ if (selected.length === 0)
 if (values.ids && selected.length !== 1)
   fail('用 --ids 时请同时指定且只指定一个 --dataset')
 
-loadEnvFiles({ prefix: 'backfill' })
+loadEnvFile({ config: devkit })
 
 const credentials = readCredentials()
 if (!values['dry-run'] && !credentials && !values['no-upload'])

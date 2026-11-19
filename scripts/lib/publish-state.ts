@@ -7,6 +7,9 @@
  */
 import { createHash } from 'node:crypto'
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { isLocalMode } from '@chilfish/devkit/shared'
+import { devkit } from '../dev.config.ts'
 
 export const PUBLISH_STATE_SCHEMA = 'yumemita.publish-state/v1'
 
@@ -93,6 +96,14 @@ export function readPublishState(path: string, target: string): PublishState {
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : new Date().toISOString(),
     objects,
   }
+}
+
+/** 发布进度的落盘路径。本地与线上分开，切回线上时不会因为 target 变化触发全量重传。 */
+export function publishStatePath(
+  root: string,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  return resolve(root, 'data', isLocalMode(env, devkit.env.localFlag) ? '.publish-state.local.json' : '.publish-state.json')
 }
 
 export function writePublishState(path: string, state: PublishState): void {

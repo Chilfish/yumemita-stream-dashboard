@@ -1,4 +1,4 @@
-import { UsageError } from './cli/exit.ts'
+import { UsageError } from '@chilfish/devkit/cli'
 
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/
 

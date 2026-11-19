@@ -1,5 +1,6 @@
 /** 调用 Worker 内部 purge 端点；zone 级 purge 不影响 Workers Cache，只能走这里。 */
-import { isLocalMode } from './local-config.ts'
+import { isLocalMode } from '@chilfish/devkit/shared'
+import { devkit } from '../dev.config.ts'
 
 export interface PurgeOptions {
   /** 站点根地址；默认读 SITE_URL。 */
@@ -19,7 +20,7 @@ export interface PurgeResult {
 }
 
 export async function purgeCache(options: PurgeOptions): Promise<PurgeResult> {
-  if (isLocalMode()) {
+  if (isLocalMode(process.env, devkit.env.localFlag)) {
     return { success: true, skipped: true, reason: 'LOCAL=1：本地开发不做线上缓存失效' }
   }
 

@@ -6,25 +6,9 @@
  */
 import { S3Client } from 'bun'
 import { thumbVariantName } from '@/lib/thumb-variants.ts'
-import {
-  DEFAULT_LOCAL_ACCESS_KEY,
-  DEFAULT_LOCAL_SECRET_KEY,
-  isLocalMode,
-  localBucket,
-  localEndpoint,
-  localPublicBase,
-} from './local-config.ts'
-
-export {
-  DEFAULT_LOCAL_ACCESS_KEY,
-  DEFAULT_LOCAL_BUCKET,
-  DEFAULT_LOCAL_ENDPOINT,
-  DEFAULT_LOCAL_SECRET_KEY,
-  isLocalMode,
-  localBucket,
-  localEndpoint,
-  localPublicBase,
-} from './local-config.ts'
+import { isLocalMode, localBucket, localEndpoint, localPublicBase } from '@chilfish/devkit/shared'
+import { DEFAULT_LOCAL_ACCESS_KEY, DEFAULT_LOCAL_SECRET_KEY } from '@chilfish/devkit/storage'
+import { devkit } from '../dev.config.ts'
 
 export const MANIFEST_SCHEMA = 'yumemita.stream-datapack.batch/v1'
 export const INSIGHTS_SCHEMA = 'yumemita.dashboard.insights/v1'
@@ -34,7 +18,9 @@ export function remoteBase(): string {
   const configured = (process.env.DATAPACK_BASE ?? '').replace(/\/+$/, '')
   if (configured)
     return configured
-  return isLocalMode() ? localPublicBase() : ''
+  return isLocalMode(process.env, devkit.env.localFlag)
+    ? localPublicBase(localEndpoint(process.env), localBucket(process.env, devkit.storage.bucket))
+    : ''
 }
 
 export function datapackKey(datasetId: string, videoId: string): string {
@@ -104,12 +90,12 @@ export interface Credentials {
 export function readCredentials(env: Record<string, string | undefined> = process.env): Credentials | null {
   const prefix = (env.R2_PREFIX ?? '').replace(/^\/+|\/+$/g, '')
 
-  if (isLocalMode(env)) {
+  if (isLocalMode(env, devkit.env.localFlag)) {
     return {
       accountId: '',
       accessKeyId: env.S3_ACCESS_KEY_ID ?? env.MINIO_ROOT_USER ?? DEFAULT_LOCAL_ACCESS_KEY,
       secretAccessKey: env.S3_SECRET_ACCESS_KEY ?? env.MINIO_ROOT_PASSWORD ?? DEFAULT_LOCAL_SECRET_KEY,
-      bucket: localBucket(env),
+      bucket: localBucket(env, devkit.storage.bucket),
       prefix,
       endpoint: localEndpoint(env),
     }
@@ -134,7 +120,7 @@ export function readCredentials(env: Record<string, string | undefined> = proces
 /** 发布进度的目标标识；本地与线上共用一个 `.publish-state.json` 时必须分开。 */
 export function publishTarget(credentials: Credentials): string {
   const base = `${credentials.bucket}/${credentials.prefix}`
-  return isLocalMode() ? `local/${base}` : base
+  return isLocalMode(process.env, devkit.env.localFlag) ? `local/${base}` : base
 }
 
 export interface ObjectStore {

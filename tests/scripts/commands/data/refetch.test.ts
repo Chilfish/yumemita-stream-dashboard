@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseVideoRef } from '@scripts/lib/video-ref.ts'
-import { UsageError } from '@scripts/lib/cli/exit.ts'
+import { UsageError } from '@chilfish/devkit/cli'
 
 describe('parseVideoRef', () => {
   it('接受裸 11 位视频 ID', () => {

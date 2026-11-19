@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isUnchanged, type BodyDigest, type PublishStateEntry } from '@scripts/lib/publish-state.ts'
+import { isUnchanged, publishStatePath, type BodyDigest, type PublishStateEntry } from '@scripts/lib/publish-state.ts'
 
 const digest: BodyDigest = { sha256: 'abc', size: 10 }
 const entry: PublishStateEntry = { sha256: 'abc', size: 10, uploadedAt: '2026-11-06T00:00:00.000Z' }
@@ -31,5 +31,12 @@ describe('isUnchanged', () => {
   it('远端没有这个对象时重传', () => {
     expect(isUnchanged(undefined, digest, new Map(), 'a', { adoptRemoteSize: true })).toBe(false)
     expect(isUnchanged(entry, digest, new Map(), 'a')).toBe(false)
+  })
+})
+
+describe('publishStatePath', () => {
+  it('本地与线上使用独立的进度文件', () => {
+    expect(publishStatePath('C:/repo', { LOCAL: '1' })).toMatch(/\.publish-state\.local\.json$/)
+    expect(publishStatePath('C:/repo', { LOCAL: '0' })).toMatch(/\.publish-state\.json$/)
   })
 })

@@ -31,7 +31,7 @@ tests/
 | 被测代码 | 写法 |
 | --- | --- |
 | `src/lib/format.ts` | `import { formatDate } from '@/lib/format'` |
-| `scripts/lib/env.ts` | `import { loadEnvFiles } from '@scripts/lib/env.ts'` |
+| `scripts/lib/publish-state.ts` | `import { publishStatePath } from '@scripts/lib/publish-state.ts'` |
 
 - `@/*` → `src/*`，`@scripts/*` → `scripts/*`，两者在 `vitest.config.ts` 与 `tsconfig.json` 里同步声明。
 - 源码内部互相导入仍按源码自己的风格写；只有测试文件用别名。
