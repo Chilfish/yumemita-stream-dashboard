@@ -5,7 +5,7 @@ import { basename, resolve } from 'node:path'
 import { Option } from 'commander'
 import { type CommandSpec, requireEnv } from '@chilfish/devkit/cli'
 import { aggregateDataset, type StreamRow } from '@/lib/aggregate.ts'
-import { isStopword } from '@/lib/stopwords.ts'
+import { canonicalWord, isStopword } from '@/lib/stopwords.ts'
 import { createDb, createWriteDb } from '@/db/connection.ts'
 import { computeDatasetPublicTotals } from '@/db/queries/dataset-totals.ts'
 import {
@@ -31,6 +31,11 @@ interface DataSource {
   label: string
   /** `member` = 成员个人频道（默认），`official` = 官方账号。 */
   kind?: 'member' | 'official'
+  /**
+   * 官方账号的参与者规则：`all` 默认全员、`cast` 按简介出演者、`none` 只认登记。
+   * 成员频道忽略这个字段。
+   */
+  participants?: 'all' | 'cast' | 'none'
   color?: string
   avatar?: string
   channelId?: string
@@ -198,8 +203,18 @@ function collectWords(pack: StreamDatapack): { word: string, count: number }[] {
     ? Object.entries(pack.chat.wordCounts).map(([word, count]) => ({ word, count }))
     : pack.chat.topWords
 
-  return source
-    .filter(entry => entry.count >= 3 && !isStopword(entry.word))
+  // 先按归一化词形合并再卡阈值：同一句笑声的不同写法（`ww` / `wwww`）算同一个词。
+  const merged = new Map<string, number>()
+  for (const entry of source) {
+    if (isStopword(entry.word))
+      continue
+    const key = canonicalWord(entry.word)
+    merged.set(key, (merged.get(key) ?? 0) + entry.count)
+  }
+
+  return [...merged.entries()]
+    .filter(([, count]) => count >= 3)
+    .map(([word, count]) => ({ word, count }))
     .sort((a, b) => b.count - a.count)
 }
 
@@ -516,17 +531,33 @@ async function ingestPack(
   const video = pack.video
   const chat = pack.chat
   const startedAt = toTimestamp(video.startedAt)
-  // 登记优先（空数组表示确认无联动），没登记的场次用标题推断。
+  // 成员频道：登记优先（空数组表示确认无联动），没登记的按标题推断。
+  // 官方账号：登记优先，否则按账号规则（默认全员 / 简介出演者 / 不推断）。
+  // 官方账号即使没配规则也不能回落到标题推断，所以传 null 而不是 undefined。
+  const official = source.kind === 'official'
+    ? { mode: source.participants ?? ('none' as const) }
+    : null
   const resolved = resolveParticipants({
     videoId: video.id,
     ownerId: source.id,
     title: video.title,
+    description: video.description,
     manual: collaborations.byVideo,
     knownDatasetIds,
+    official,
   })
   const participants = resolved.ids.filter(datasetId => datasetId !== source.id)
   if (resolved.source === 'title' && participants.length > 0) {
     console.log(`[ingest] ${source.id}/${video.id}: 标题推断参与者 ${participants.join(', ')}`)
+  }
+  else if (resolved.source === 'default' && participants.length > 0) {
+    console.log(`[ingest] ${source.id}/${video.id}: 官方场次默认全员 ${participants.join(', ')}`)
+  }
+  else if (resolved.source === 'cast' && participants.length > 0) {
+    console.log(`[ingest] ${source.id}/${video.id}: 简介出演者 ${participants.join(', ')}`)
+  }
+  else if (official && resolved.source === 'none' && participants.length === 0) {
+    console.log(`[ingest] ${source.id}/${video.id}: 官方场次未确认出演成员（需手动登记）`)
   }
 
   await db.transaction(async (tx) => {

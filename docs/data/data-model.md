@@ -496,6 +496,7 @@ dataset_id = $1
 - **评论区是抓取上限内的条数**，不等于视频总评论数；`video.snapshot.comments` 是 YouTube 侧的总数。
 - **Top 列表有截断**：`topWords` 最多 40、`topAuthors` 最多 20，单场页直接用它们。
 - **英文虚词与寒暄词不进词频**：`Intl.Segmenter` 会把英文句子切成完整单词，`said` / `hi` / `the` 这类不承载内容的 token 不该挤进高频词。分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表，旧 pack 里残留的这类词在展示时也会被过滤。
+- **笑声词形归一**：`ww` / `wwww` / 全角 `ｗｗｗ` 等连续 `w` 在分词、入库、聚合查询与单场展示时都统一记作 `www`；旧 `stream_words` 行没重写也会在汇总时合并。
 - **跨场精确聚合依赖 v2**：v2 pack 另存全量 `wordCounts` / `authors`，`ingest-db` 用 `aggregateDataset` 重算；v1 场次自动回退到该场的 Top 列表相加。`dataset_insights.aggregation` 标出 `full` / `partial` / `top-lists` 与覆盖率，页面文案随之切换。
 - **频道专属表情靠频道字典补图**：`data/emoji-<dataset>.html` 覆盖该频道当前的表情，旧 pack 不需要重新归一化；字典里没有的历史表情退回占位。Unicode 表情不镜像，直接显示字符。
 - **作者身份以 `authorId` 为准**：旧 jsonl 没有该字段（显示名会改、会重名），需要归档侧重跑归一化才能补齐；缺 ID 时只能按显示名匹配，重叠结果仅供参考。

@@ -1,6 +1,6 @@
 # 官方账号场次
 
-> 状态：🚧 POC（2026-11-21 起）。正式实现待 POC 验证后开工。
+> 状态：🚧 实施中（2026-11-21 起）。`datasets.kind`、查询层口径、日历 / 相册、`data official` 与 `yumemita` 抓取已完成；`bangdream` 的 `filtered` 待接。
 > 关联：`datasets.kind`、`streams.participants` 语义、`data update` 频道范围、`scheduled_streams`、日历、侧栏与组级口径。
 > 相关文档：[data-model.md](../data/data-model.md)、[collaboration-streams.md](./collaboration-streams.md)、[live-calendar.md](./live-calendar.md)。
 
@@ -153,17 +153,31 @@ dataset_id = $1
 
 ## 4. 渠道清单与同步模式
 
-| `id` | 频道 | `kind` | `sync` | 过滤 |
-| --- | --- | --- | --- | --- |
-| `nonoka` … `yuno` | 5 个成员频道 | `member` | `channel` | — |
-| `yumemita` | `@BDP_yumemita` | `official` | `channel` | — |
-| `bangdream` | `@bang_dream_official` | `filtered` | 标题粗筛 + 简介 cast |
-| `other` | 任意第三方官方账号 | `official` | `manual` | 手动命令 + 参与者参数 |
+| `id` | 频道 | `kind` | `sync` | `participants` | 过滤 |
+| --- | --- | --- | --- | --- | --- |
+| `nonoka` … `yuno` | 5 个成员频道 | `member` | `channel` | — | — |
+| `yumemita` | `@BDP_yumemita` | `official` | `channel` | `all` | 整频道收录 |
+| `bangdream` | `@bang_dream_official` | `official` | `filtered` | `cast` | 标题粗筛 + 简介 cast |
+| `other` | 任意第三方官方账号 | `official` | `manual` | `none` | 手动命令 + 参与者参数 |
+
+### 4.0 参与者规则（`participants`）
+
+`data-sources.json` 的 `participants` 决定官方场次的成员从哪来，`db ingest` 与 `data official` 共用：
+
+| 取值 | 适用 | 行为 |
+| --- | --- | --- |
+| `all` | 团体官方号 | 默认全员在场；单人特番用登记覆盖 |
+| `cast` | 企划母频道 | 只取简介「出演者 / キャスト」区块命中的成员；没有出演者区块则不收录参与者 |
+| `none` | 第三方聚合 | 不推断，只能靠 `content/collaborations.json` 登记 |
+
+优先级始终是**登记 > 规则**。成员频道没有这个字段，仍走「登记 > 标题推断」。
+
+`cast` 只截取简介里的出演者区块（`出演 / 出演者 / キャスト / cast` 之后约 600 字），不扫整段：每位成员的简介模板都带全员名单与链接，整段匹配会误命中。
 
 ### 4.1 `filtered` 的两段过滤
 
 1. 标题粗筛：`TV LIVE|ゆめ∞みた|Our Notes|ゆめみた|夢限大|むーたいぷ`。命中数远大于真实收录数，只是候选池。
-2. 简介确认：拉 `-J` 元信息，取「出演者」区块，命中成员全名才收录。命中后写 `participants`。
+2. 简介确认：拉 `-J` 元信息，取「出演者」区块（`castFromDescription`），命中成员全名才收录。命中后由 `ingest` 按 `participants: "cast"` 写入参与者。
 
 成本：首次回填约 300 集需要拉元信息，但不需要弹幕 / 评论。之后每日只处理新出现的集数。
 
@@ -197,7 +211,7 @@ bun run ymmt data official <链接> --participants arale --dataset limista --no-
 5. `data fetch --ids` → 本地 ingest → 线上 ingest → verify → publish → purge。
 6. `--no-online` 只改本地；`--dry-run` 只打印计划。
 
-`participants` 是必填项：标题推断对官方场次无效（实测团体号 71 场命中 1 场，母频道 0 场）。
+`participants` 是必填项：标题推断对官方场次无效（实测团体号 71 场命中 1 场，母频道 0 场）。命令写进 `content/collaborations.json` 的登记优先于账号的 `participants` 规则，所以单人特番可以覆盖 `all`。
 
 ## 5. 数据链路改动
 
@@ -205,7 +219,7 @@ bun run ymmt data official <链接> --participants arale --dataset limista --no-
 | --- | --- |
 | `data update` | 只遍历 `sync !== 'manual'` 的账号；`filtered` 在 `planDataset` 前套用过滤；联动对账的已知成员集合排除官方账号 |
 | `schedule-sync` | 使用与抓取同一套过滤，避免「预告进了日程、成片没入库」 |
-| `db ingest` | 写 `datasets.kind`；官方场次照常写 streams / details，不参与成员汇总；参与者登记只接受成员 id |
+| `db ingest` | 写 `datasets.kind`；官方场次照常写 streams / details，不参与成员汇总；参与者按 `participants` 规则（`all` / `cast` / `none`）解析，登记优先 |
 | `dataset_insights` | 官方 dataset 照常算自己的 totals，不混入成员 |
 | `publish` | 官方场次的封面 / archive 按自己的 dataset 前缀上传 |
 | purge | 官方 ingest 后失效 `dataset-<id>` / `stream-<id>` / `schedule` / `sitemap` / `llms` / `gallery`；不失效 `group` 的成员口径 |
@@ -283,6 +297,8 @@ bun run ymmt data official <链接> --participants arale --dataset limista --no-
 
 ## 9. POC 计划
 
+> 已在 POC 阶段执行完毕，结论见 9.3。正式实施按 9.4 推进。
+
 目标：用本地库验证「官方场次入独立 dataset、不污染成员口径」是否成立，以及页面与查询是否需要更大改动。
 
 ### 9.1 步骤
@@ -357,6 +373,50 @@ POC 中发现并修掉的问题：
 - `filtered` 的简介「出演者」解析尚未实现，`bangdream` 的自动同步还不可用。
 - 官方 dataset 的 insights 目前靠手工补行；正式实现要并进 ingest。
 - 全组相册包含官方场次后，页头「N 场」仍是成员口径，与实际渲染行数不同；正式实现需要决定是否在页头注明。
+
+### 9.4 正式实施（2026-11-21）
+
+POC 完成后按计划推进，先补 `yumemita`。
+
+**参与者规则**：`data-sources.json` 新增 `participants`，取值 `all` / `cast` / `none`，由 `ingest` 与 `data official` 共用（见 4.0）。官方场次不再回落标题推断——`resolveParticipants` 收到 `official: null` 时直接返回空，避免误判。
+
+**`yumemita` 抓取**：
+
+```bash
+bun run ymmt data fetch --dataset yumemita --concurrency 4 --build-every 5 --no-publish
+```
+
+- 频道列表 71 条，全部收录；两场先验证（`u7f5p223ByA` 3 周年、`3kxGlR9CzWA` 万圣节）后跑完整批次。
+- 产物落在 `data/yumemita/`：`manifest.json` + 每场一个 pack。
+- 首两场实测：弹幕 18,420 / 16,022 条，评论 36 / 23 条，VSTATS 同接 2440/3614 与 3220/3924，简介含全部 5 位成员名。
+- 入库后 `participants` 自动补成 5 人，`dataset_insights` 由 ingest 自动生成（2 场 / 34,442 条弹幕），成员场次数不变。
+
+**状态**：
+
+| 项 | 状态 |
+| --- | --- |
+| `datasets.kind` 与查询层口径 | ✅ |
+| 日历 / 全组相册 / 侧栏分组 | ✅ |
+| 参与者规则（`all` / `cast` / `none`） | ✅ 单测 12 条 |
+| `data official` | ✅ 单测 9 条 |
+| `yumemita` 抓取与入库 | ✅ 71 场，本地 + 线上 |
+| `bangdream` 的 `filtered` 抓取 | 📋 待接 |
+| `other` 的真实场次 | 📋 待手动添加 |
+
+`yumemita` 实测结果（2026-11-21）：
+
+| 项 | 值 |
+| --- | --- |
+| 场次 | 71（2023-11-20 – 2026-11-20） |
+| 参与者 | 71 场全部 5 人（`participants: all`） |
+| 弹幕 | 652,022 条；1 场无回放（`bTIrg2oomaQ`，YouTube 侧无 `live_chat`） |
+| SC | 191 笔 |
+| VSTATS | 12 场有数据，其余早于站点收录期，属正常缺失 |
+| 封面 | 71 张原图 + 213 个 WebP 变体 |
+| insights | 自动生成（71 场 / 652,022 条弹幕） |
+| 成员口径 | 未受影响；成员与官方账号没有任何重复 videoId |
+
+发布注意：本地开发要看到封面，必须用 `LOCAL=1` 跑一次 `publish data --assets-only`，把资产传进本地 SILO；`LOCAL=0` 只写线上 R2。
 
 ## 10. 验收标准
 

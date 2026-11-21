@@ -191,7 +191,7 @@ export function inferParticipants(
   return aliasParticipants(cleaned, ownerId, knownDatasetIds)
 }
 
-export type ParticipantSource = 'manual' | 'title' | 'none'
+export type ParticipantSource = 'manual' | 'title' | 'default' | 'cast' | 'none'
 
 export interface ResolvedParticipants {
   ids: string[]
@@ -199,20 +199,78 @@ export interface ResolvedParticipants {
 }
 
 /**
- * 参与者取值优先级：手动登记（含显式空数组）> 标题推断 > 空。
- * ingest 与每日对账共用这一个函数，避免两处口径漂移。
+ * 从简介里取「出演者」区块，返回命中的成员 id。
+ *
+ * 企划母频道（`bangdream`）的标题里不会有成员名，出演信息只写在简介的
+ * 「出演 / 出演者 / キャスト」区块。只截取该区块，避免命中简介模板里的全员名单。
+ */
+export function castFromDescription(
+  description: string | null | undefined,
+  knownDatasetIds: Iterable<string>,
+  aliases: Record<string, string[]> = MEMBER_TITLE_ALIASES,
+): string[] {
+  if (!description) return []
+  const known = new Set(knownDatasetIds)
+  // 区块到下一次空行或常见分隔符为止；6 个换行足够覆盖「出演者」列表。
+  const block = /(?:出演者?|キャスト|cast)[\s\S]{0,600}/i.exec(description)?.[0] ?? ''
+  if (!block) return []
+
+  return Object.entries(aliases)
+    .filter(([id]) => known.has(id))
+    .filter(([, names]) => names.some(name => block.includes(name)))
+    .map(([id]) => id)
+}
+
+export interface OfficialParticipantRule {
+  /**
+   * `all`：整频道默认全员在场（团体官方号）。
+   * `cast`：只收简介「出演者」命中的成员（企划母频道）。
+   * `none`：不推断，必须人工登记（第三方聚合账号）。
+   */
+  mode: 'all' | 'cast' | 'none'
+}
+
+/**
+ * 参与者取值优先级：
+ *
+ * - 成员频道：手动登记（含显式空数组）> 标题推断 > 空。
+ * - 官方账号：手动登记 > 官方规则（默认全员 / 简介出演者）> 空。
+ *
+ * 官方场次不做标题推断：实测团体号 71 场只有 1 场标题写了成员名。
  */
 export function resolveParticipants(options: {
   videoId: string
   ownerId: string
   title: string | null | undefined
+  description?: string | null
   manual: Map<string, string[]>
   knownDatasetIds: Iterable<string>
+  /** owner 是官方账号时给出；`null` 表示官方账号但不推断，缺省按成员频道处理。 */
+  official?: OfficialParticipantRule | null
 }): ResolvedParticipants {
   const manual = options.manual.get(options.videoId)
   if (manual !== undefined) {
     return { ids: manual.filter(id => id !== options.ownerId), source: 'manual' }
   }
+
+  // 官方场次不做标题推断：标题写的是团名，命中率极低且容易误判。
+  // 没有给 official 规则时按「不推断」处理，而不是回落到成员频道的标题推断。
+  if (options.official === null) return { ids: [], source: 'none' }
+
+  if (options.official) {
+    if (options.official.mode === 'none') return { ids: [], source: 'none' }
+    if (options.official.mode === 'cast') {
+      const cast = castFromDescription(
+        options.description,
+        options.knownDatasetIds,
+      ).filter(id => id !== options.ownerId)
+      return { ids: cast, source: cast.length > 0 ? 'cast' : 'none' }
+    }
+    // `all`：整频道默认全员在场。
+    const all = [...new Set(options.knownDatasetIds)].filter(id => id !== options.ownerId)
+    return { ids: all, source: all.length > 0 ? 'default' : 'none' }
+  }
+
   const inferred = inferParticipants(options.title ?? '', options.ownerId, options.knownDatasetIds)
   return { ids: inferred, source: inferred.length > 0 ? 'title' : 'none' }
 }

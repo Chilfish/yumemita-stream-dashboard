@@ -72,7 +72,8 @@
       "subject": null,
       "scope": "团体官方号全部直播；官方场次不并入成员个人场次",
       "note": "官方场次默认全员在场；单人特番按标题 / 登记覆盖。",
-      "sync": "channel"
+      "sync": "channel",
+      "participants": "all"
     },
     {
       "id": "bangdream",
@@ -87,6 +88,7 @@
       "scope": "企划母频道中本团成员出演的场次",
       "note": "按简介「出演者」过滤，只收本团成员在场的场次。",
       "sync": "filtered",
+      "participants": "cast",
       "include": {
         "titlePattern": "TV LIVE|ゆめ∞みた|Our Notes|ゆめみた|夢限大|むーたいぷ",
         "descriptionCast": true
@@ -104,7 +106,8 @@
       "subject": null,
       "scope": "其余官方账号里本团成员出演的直播；手动登记",
       "note": "聚合第三方账号的活动联动场次，参与者由手动命令指定。",
-      "sync": "manual"
+      "sync": "manual",
+      "participants": "none"
     }
   ]
 }
