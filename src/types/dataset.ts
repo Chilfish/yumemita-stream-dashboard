@@ -73,6 +73,8 @@ export interface BatchManifest {
 export interface DatasetIndexEntry {
   id: string;
   label: string;
+  /** `member` = 成员个人频道；`official` = 官方账号。组级人数与默认对比集合只算成员。 */
+  kind?: "member" | "official" | string;
   color?: string | null;
   avatar?: string | null;
   channelId: string | null;

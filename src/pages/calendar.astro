@@ -8,6 +8,7 @@ import { getDatasets } from '@/db/queries/datasets'
 import { toIndex } from '@/db/queries/view-data'
 import { calendarWindow, currentJstMonth, isMonthKey, monthRange } from '@/lib/calendar'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import { countMembers } from '@/lib/dataset-kind'
 import type { CalendarMember, CalendarPageData } from '@/types/calendar'
 import type { DatasetIndexEntry } from '@/types/dataset'
 
@@ -26,6 +27,7 @@ try {
   const members: CalendarMember[] = datasets.map(dataset => ({
     id: dataset.id,
     label: dataset.label,
+    kind: dataset.kind === 'official' ? 'official' : 'member',
     color: dataset.color ?? null,
     avatar: dataset.avatar ?? null,
     streamCount: dataset.count,
@@ -50,8 +52,11 @@ if (calendar) Astro.cache.set({ maxAge: 60, swr: 300, tags: ['group', 'schedule'
 const latest = calendar?.events.find(event => event.videoId) ?? null
 const meta = pageSeo(Astro, {
   section: 'calendar',
-  memberCount: datasets.length || null,
-  streamCount: datasets.reduce((total, dataset) => total + dataset.count, 0) || null,
+  memberCount: countMembers(datasets) || null,
+  // 场次数只累加成员；官方账号的场次不计入组级口径。
+  streamCount: datasets
+    .filter(dataset => dataset.kind !== 'official')
+    .reduce((total, dataset) => total + dataset.count, 0) || null,
   imageStream: latest?.videoId
     ? { datasetId: latest.datasetId, videoId: latest.videoId }
     : null,

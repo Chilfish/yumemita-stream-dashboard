@@ -189,8 +189,12 @@ export function buildCompareView(
   params: CompareParams,
 ): GroupCompareView {
   const datasetById = new Map(datasets.map(dataset => [dataset.id, dataset]));
-  const memberIds = [...new Set(params.members.length > 0 ? params.members : datasets.map(d => d.id))]
-    .filter(id => datasetById.has(id));
+  // 全员对比只针对成员；官方账号的场次不参与横向比较。
+  const memberIds = [...new Set(
+    params.members.length > 0
+      ? params.members
+      : datasets.filter(dataset => dataset.kind !== "official").map(dataset => dataset.id),
+  )].filter(id => datasetById.has(id));
 
   const allMonths = [...new Set(buckets.map(bucket => bucket.month))].sort();
   const months =

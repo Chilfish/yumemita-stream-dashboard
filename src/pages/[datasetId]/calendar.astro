@@ -33,6 +33,7 @@ try {
     const members: CalendarMember[] = datasets.map(item => ({
       id: item.id,
       label: item.label,
+      kind: item.kind === 'official' ? 'official' : 'member',
       color: item.color ?? null,
       avatar: item.avatar ?? null,
       streamCount: item.count,

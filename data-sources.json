@@ -59,6 +59,52 @@
       "subject": "千石ユノ",
       "scope": "按频道顺序补齐的历史场次；按标题去重，保留正片",
       "note": "vstats 为 null 表示该场没有 VSTATS 条目（会员限定，或站点未收录）。"
+    },
+    {
+      "id": "yumemita",
+      "label": "夢限大みゅーたいぷ",
+      "kind": "official",
+      "color": null,
+      "avatar": null,
+      "channelId": "UCxL_Vlnhfo46sN6vPHR_4hA",
+      "manifest": "data/yumemita/manifest.json",
+      "datapackDir": "data/yumemita",
+      "subject": null,
+      "scope": "团体官方号全部直播；官方场次不并入成员个人场次",
+      "note": "官方场次默认全员在场；单人特番按标题 / 登记覆盖。",
+      "sync": "channel"
+    },
+    {
+      "id": "bangdream",
+      "label": "バンドリちゃんねる☆",
+      "kind": "official",
+      "color": null,
+      "avatar": null,
+      "channelId": "UCN-bFIdJM0gQlgX7h6LKcZA",
+      "manifest": "data/bangdream/manifest.json",
+      "datapackDir": "data/bangdream",
+      "subject": null,
+      "scope": "企划母频道中本团成员出演的场次",
+      "note": "按简介「出演者」过滤，只收本团成员在场的场次。",
+      "sync": "filtered",
+      "include": {
+        "titlePattern": "TV LIVE|ゆめ∞みた|Our Notes|ゆめみた|夢限大|むーたいぷ",
+        "descriptionCast": true
+      }
+    },
+    {
+      "id": "other",
+      "label": "其他联动",
+      "kind": "official",
+      "color": null,
+      "avatar": null,
+      "channelId": null,
+      "manifest": "data/other/manifest.json",
+      "datapackDir": "data/other",
+      "subject": null,
+      "scope": "其余官方账号里本团成员出演的直播；手动登记",
+      "note": "聚合第三方账号的活动联动场次，参与者由手动命令指定。",
+      "sync": "manual"
     }
   ]
 }

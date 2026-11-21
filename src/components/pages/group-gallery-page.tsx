@@ -102,11 +102,14 @@ interface GroupGalleryPageProps {
  * 成员 / 内容类型筛选写进 URL（默认值不写），可分享、可回退。
  */
 export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps) {
-  const { rows, members, totals } = useGroupDataContext();
+  const { rows, galleryMembers, members, totals } = useGroupDataContext();
+  // 相册包含官方场次，筛选数据源要用「成员 + 官方」；其余组级面板仍只看成员。
+  const sources = galleryMembers ?? members;
+  const memberCount = members.length;
   const [searchParams, setSearchParams] = useSearchParams();
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
 
-  const memberIds = useMemo(() => members.map(member => member.dataset.id), [members]);
+  const memberIds = useMemo(() => sources.map(item => item.dataset.id), [sources]);
   const params = parseGalleryParams(searchParams, memberIds);
   const { member, type, day } = params;
 
@@ -162,7 +165,7 @@ export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps
   const dayLabel = day ? galleryDayLabel(day) : null;
   const selectedDay = monthDayToDate(day ?? "", today);
   const memberLabel =
-    members.find(item => item.dataset.id === member)?.dataset.label ?? null;
+    sources.find(item => item.dataset.id === member)?.dataset.label ?? null;
   const typeLabel = type === "all" ? null : CONTENT_TYPE_LABELS[type];
   const activeLabels = [
     dayLabel ? `日期「${dayLabel}」` : null,
@@ -240,13 +243,13 @@ export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps
             全部
             <span className="tabular-nums">· {formatInteger(counts.memberTotal)}</span>
           </FilterChip>
-          {members.map(item => {
+          {sources.map(item => {
             const color = item.dataset.color ?? DEFAULT_MEMBER_COLOR;
             const count = counts.byMember.get(item.dataset.id) ?? 0;
 
             return (
               <FilterChip
-                aria-label={`成员：${item.dataset.label} · ${formatInteger(count)} 场`}
+                aria-label={`${item.dataset.kind === "official" ? "官方账号" : "成员"}：${item.dataset.label} · ${formatInteger(count)} 场`}
                 className="gap-1.5"
                 key={item.dataset.id}
                 value={item.dataset.id}
@@ -320,7 +323,7 @@ export function GroupGalleryPage({ today, todayMonthDay }: GroupGalleryPageProps
         eyebrow={
           dayLabel
             ? dayLabel
-            : `${formatInteger(members.length)} 名成员 · ${formatInteger(totals.streamCount)} 场`
+            : `${formatInteger(memberCount)} 名成员 · ${formatInteger(totals.streamCount)} 场`
         }
         title={dayLabel ? "那年今日" : "全组相册"}
       />

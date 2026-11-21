@@ -29,6 +29,8 @@ import { pruneMatchedSchedules } from '@scripts/lib/schedule-match.ts'
 interface DataSource {
   id: string
   label: string
+  /** `member` = 成员个人频道（默认），`official` = 官方账号。 */
+  kind?: 'member' | 'official'
   color?: string
   avatar?: string
   channelId?: string
@@ -219,10 +221,14 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
   const selected = sources.datasets.filter(item => !args.dataset || item.id === args.dataset)
   if (selected.length === 0) throw new Error(`找不到 dataset: ${args.dataset}`)
 
-  const collaborations = loadCollaborations({
-    knownDatasetIds: sources.datasets.map(item => item.id),
-  })
-  const knownDatasetIds = sources.datasets.map(item => item.id)
+  // 参与者只能是成员：官方账号的场次里 `participants` 表示「在场的成员」，
+  // 把官方账号写进去没有意义，也会让成员口径出现不存在的「联动」。
+  const memberIds = sources.datasets
+    .filter(item => (item.kind ?? 'member') === 'member')
+    .map(item => item.id)
+
+  const collaborations = loadCollaborations({ knownDatasetIds: memberIds })
+  const knownDatasetIds = memberIds
   const collaborationSkipped = collaborations.skipped.length
   if (collaborationSkipped > 0) {
     console.warn(`[ingest] 跳过 ${collaborationSkipped} 条参与者登记`)
@@ -309,6 +315,7 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
       await db.insert(datasets).values({
         id: source.id,
         label: source.label,
+        kind: source.kind ?? 'member',
         color: source.color ?? null,
         avatarKey: source.avatar ?? null,
         channelId: source.channelId ?? null,
@@ -319,6 +326,7 @@ async function main(argv: string[]): Promise<{ exitCode: number, data: unknown }
         target: datasets.id,
         set: {
           label: source.label,
+          kind: source.kind ?? 'member',
           color: source.color ?? null,
           avatarKey: source.avatar ?? null,
           channelId: source.channelId ?? null,

@@ -18,6 +18,11 @@ import {
 export const datasets = pgTable('datasets', {
   id: text('id').primaryKey(),
   label: text('label').notNull(),
+  /**
+   * `member` = 成员个人频道，`official` = 官方账号。
+   * 官方场次计入官方账号自己的场次与汇总，不并入任何成员的个人场次。
+   */
+  kind: text('kind').notNull().default('member'),
   color: text('color'),
   avatarKey: text('avatar_key'),
   channelId: text('channel_id'),

@@ -75,6 +75,9 @@
 | `FR-DATA-001` | P0 | 由 pack 派生 streams / insights | `AC-DATA-001`：`bun run db:ingest` 重建 `streams` + `dataset_insights`；`db:verify` 0 problems；不手改数据库（手工 / 脚本） | ✅ | data-model |
 | `FR-DATA-005` | P2 | 联动场次归属到多位成员 | `AC-DATA-005`：一场直播有 owner 与参与者；参与者登记在 `content/collaborations.json`，`db:ingest` 写入 `streams.participants`；参与者的场次列表、日历、成员汇总都能看到该场；全组计数按 videoId 去重，不等于各成员之和（单测 + 手工） | ✅ | 2026-11-12 需求 |
 | `FR-DATA-006` | P3 | 联动关系视图 | `AC-DATA-006`：成员页列出「对方 · 同场次数 · 最近一次 · 占比」，按次数降序、0 次显示 `—`；组级用 5×5 同场次数矩阵，数字按 videoId 去重；三人场在每对格子里各计 1 次，明细标出人数；不使用节点连线图；390 / 320px 无横向溢出（手工 + 单测） | 📋 前置：B36 回填 | 2026-11-12 需求 |
+| `FR-DATA-007` | P1 | 官方账号场次独立归属 | `AC-DATA-007`：官方场次的 owner 是官方账号，计入它自己的场次与汇总；成员页场次数、汇总、相册、趋势、逐字稿索引不因官方场次变化；官方场次只从官方账号路径打开，成员路径 404；组级成员口径与相册外的组级统计不含官方场次；日历与全组相册包含官方场次（单测 + 手工） | 🚧 POC 通过，待正式落地 | 2026-11-21 需求；方案见 [official-channels.md](../planning/official-channels.md) |
+| `FR-DATA-008` | P2 | 官方账号同步范围 | `AC-DATA-008`：`data update` 只遍历 `data-sources.json` 里 `sync` 为 `channel` / `filtered` 的账号；`filtered` 按标题粗筛 + 简介出演者确认；`manual` 完全跳过；未确认出演的候选不写日程（脚本测试） | 🚧 POC：`manual` 跳过已实现，`filtered` 待做 | 2026-11-21 需求 |
+| `FR-DATA-009` | P2 | 手动添加官方联动场次 | `AC-DATA-009`：`data official <链接> --participants` 拉元信息、登记参与者、抓取、入库与发布；`all` 展开全员，未知成员报错；默认归到 `other` 聚合账号，指向成员频道被拒绝；未结束的场次被拒（单测 + 脚本） | 🚧 POC 通过 | 2026-11-21 需求 |
 | `FR-DATA-002` | P0 | 资产发布到 R2 | `AC-DATA-002`：`publish:assets` 上传顺序为 thumbs → emoji → archive；逐字稿单独发布；对象可达（手工） | ✅ | deployment |
 | `FR-DATA-003` | P0 | 每日增量抓取与入库 | `AC-DATA-003`：`daily-update.ts` 与 `streams` 做差集；安静日不抓取、不 ingest；失败开 issue（手工 / Actions 日志） | ✅ | deployment |
 | `FR-DATA-004` | P1 | 数据更新后刷新缓存与 SEO 产物 | `AC-DATA-004`：ingest 后调 `POST /api/internal/cache/purge` 按 tag 失效；sitemap 请求期生成；线上 MISS → HIT 与 purge 后回源已实测 | ✅ | astro-ssr-migration |
@@ -118,6 +121,7 @@
 | `FR-DATA-*` | `scripts/publish-data.ts`、`scripts/daily-update.ts`、`scripts/lib/` | 数据链路 |
 | `FR-DATA-005` | `content/collaborations.json`、`scripts/lib/collaborations.ts`、`scripts/ingest-db.ts`、`src/db/queries/streams.ts`、`src/db/queries/group.ts`、`src/db/queries/datasets.ts` | 联动场次归属，方案见 [collaboration-streams.md](../planning/collaboration-streams.md) |
 | `FR-DATA-006` | 待实现：成员页联动面板、组级同场次数矩阵 | 设计见 [collaboration-streams.md](../planning/collaboration-streams.md) §9；前置 B36 |
+| `FR-DATA-007` / `FR-DATA-008` / `FR-DATA-009` | `src/db/schema.ts`、`src/db/queries/datasets.ts`、`src/db/queries/streams.ts`、`src/db/queries/group.ts`、`src/lib/dataset-kind.ts`、`scripts/commands/data/official.ts`、`scripts/commands/data/update.ts`、`data-sources.json` | 官方账号归属、同步范围与手动登记，方案见 [official-channels.md](../planning/official-channels.md) |
 | `FR-SEO-*` | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | SEO |
 | `FR-AGENT-001` / `FR-ARCH-001` | `src/pages/[datasetId]/stream/[videoId].md.ts`、`src/lib/agent-markdown.ts`、`src/db/queries/` | Agent 视图与数据库查询 |
 
@@ -135,3 +139,5 @@
 | 2026-11-09 | `FR-TRANSCRIPT-001` 补充附录中日对照的语言开关：默认中文、可切双语 / 日文、逐条展开，偏好存本地 | v1.7 |
 | 2026-11-12 | 新增 `FR-DATA-005` 联动场次：一场直播可有 owner 与参与者，参与者可见该场，全组计数按 videoId 去重 | v1.8 |
 | 2026-11-12 | 新增 `FR-DATA-006` 联动关系视图（📋）：成员页面板 + 组级同场次数矩阵，前置为 B36 回填 | v1.9 |
+| 2026-11-21 | 新增 `FR-DATA-007` / `FR-DATA-008` 官方账号场次：独立归属、不并入成员个人场次；`data update` 只同步配置账号，其他官方场次手动添加。POC 中 | v1.10 |
+| 2026-11-21 | 新增 `FR-DATA-009` 手动添加官方联动场次（`data official`）；明确日历与全组相册包含官方场次，成员口径不含 | v1.11 |

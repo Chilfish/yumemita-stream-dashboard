@@ -9,6 +9,8 @@
 export interface LlmsMemberInput {
   id: string
   label: string
+  /** `member` = 成员个人频道；`official` = 官方账号。成员段只列成员。 */
+  kind?: string
   /** 含联动场；与场次列表、成员页同一口径。 */
   streamCount: number
 }
@@ -67,7 +69,9 @@ function recentByMember(streams: LlmsStreamInput[]): Map<string, LlmsStreamInput
 
 export function renderLlmsTxt(input: LlmsTxtInput): string {
   const origin = input.origin.replace(/\/+$/, '')
-  const members = input.members
+  // 成员段只列成员：官方账号不进「成员」，另放 Optional。
+  const members = input.members.filter(member => (member.kind ?? 'member') === 'member')
+  const officials = input.members.filter(member => member.kind === 'official')
   // 会员限定的 .md 只返回标题与封面，列出来会误导读者，直接跳过。
   const publicStreams = input.streams.filter(stream => stream.availability !== 'subscriber_only')
   const grouped = recentByMember(publicStreams)
@@ -215,8 +219,20 @@ export function renderLlmsTxt(input: LlmsTxtInput): string {
     item(`${origin}/gallery`, '全组封面墙', '按 JST 自然月排列的直播封面，仅浏览用'),
     item(`${origin}/calendar`, '全组直播日历', '未来日程与近期场次，含预定与直播中，仅浏览用'),
     item(`${origin}/compare`, '全员对比', '按同一时间段与内容类型横向对比成员，noindex，仅浏览用'),
-    '',
   )
+
+  // 官方账号的场次不计入成员场次数；单独列出，避免被当成成员。
+  for (const official of officials) {
+    lines.push(
+      item(
+        `${origin}/${official.id}`,
+        official.label,
+        `官方账号，${official.streamCount} 场公开直播；场次不计入成员个人统计`,
+      ),
+    )
+  }
+
+  lines.push('')
 
   return lines.join('\n')
 }

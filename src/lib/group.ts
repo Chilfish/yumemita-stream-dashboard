@@ -51,8 +51,18 @@ export interface GroupTotals {
 }
 
 export interface GroupData {
+  /** 组级列表：成员场次 + 官方场次，供全组相册铺满时间线。 */
   rows: GroupStreamRow[];
+  /** 只含成员频道场次，按开播时间倒序；组首页「最近」与脉搏用它。 */
+  memberRows: GroupStreamRow[];
   members: GroupMemberSummary[];
+  /**
+   * 全组相册的成员筛选数据源：成员 + 官方账号。
+   * 官方账号只出现在这里与它自己的页面，不进成员榜、出勤条与联动矩阵。
+   */
+  galleryMembers?: GroupMemberSummary[];
+  /** `galleryMembers` 里属于官方账号的那部分，供相册分组展示。 */
+  officialMembers?: GroupMemberSummary[];
   totals: GroupTotals;
   /**
    * 组首页出勤条用的近 100 天日桶，已限定在 `attendanceStart`–`attendanceEnd` 内。
@@ -160,6 +170,7 @@ function summarizeMember(
 /**
  * 全组合计。按去重后的场次行算，不累加成员汇总：
  * 联动场同时属于两位成员，累加会把全组场次数与弹幕算两遍。
+ * 官方账号的场次不进全组口径，由调用方只传成员场次。
  */
 function totalsOf(
   rows: GroupStreamSummary[],
@@ -303,6 +314,8 @@ export function buildGroupDataFromSummary(
 
   return {
     members,
+    // summary 路径只加载成员口径的 recent，不涉及官方场次。
+    memberRows: sortRows(rows),
     rows: sortRows(rows),
     totals: {
       streamCount: summary.totals.streamCount,
@@ -330,9 +343,13 @@ export function buildGroupDataFromStreams(
   const datasetById = new Map(datasets.map(dataset => [dataset.id, dataset]));
 
   // rows 是全组唯一列表（每个 videoId 一条），成员统计另行按 owner ∪ 参与者展开。
+  // 官方场次的「参与者」是在场成员，不是联动，所以不参与成员维度的展开。
   const byMember = new Map<string, GroupStreamSummary[]>();
   for (const stream of streams) {
-    const memberIds = [stream.datasetId, ...(stream.participants ?? [])];
+    const ownerOfficial = datasetById.get(stream.datasetId)?.kind === 'official';
+    const memberIds = ownerOfficial
+      ? [stream.datasetId]
+      : [stream.datasetId, ...(stream.participants ?? [])];
     for (const memberId of new Set(memberIds)) {
       const bucket = byMember.get(memberId);
       if (bucket) bucket.push(stream);
@@ -341,7 +358,7 @@ export function buildGroupDataFromStreams(
   }
 
   const rows: GroupStreamRow[] = [];
-  const members: GroupMemberSummary[] = [];
+  const allMembers: GroupMemberSummary[] = [];
 
   for (const dataset of datasets) {
     // 没有场次的成员也要留在 members 里：组首页的 idle 列表靠它渲染。
@@ -356,7 +373,7 @@ export function buildGroupDataFromStreams(
       memberOnly: isMemberOnly(row.availability),
     }));
 
-    members.push(
+    allMembers.push(
       summarizeMember(
         dataset,
         stats,
@@ -367,16 +384,32 @@ export function buildGroupDataFromStreams(
     );
   }
 
+  const galleryMembers = allMembers;
+  const members = allMembers.filter(member => member.dataset.kind !== 'official');
+  const officialMembers = allMembers.filter(member => member.dataset.kind === 'official');
+
   // 全组列表按频道主归属铺一次，联动场不会因为参与者多出一行。
   for (const stream of streams) {
     const dataset = datasetById.get(stream.datasetId);
     if (dataset) rows.push(attachMember(dataset, stream, datasetById));
   }
 
+  const sortedRows = sortRows(rows);
+  const memberIds = new Set(members.map(member => member.dataset.id));
+  const memberRows = sortedRows.filter(row => memberIds.has(row.ownerDatasetId));
+
   return {
     members,
-    rows: sortRows(rows),
-    totals: totalsOf(streams, weekStart, monthKey),
+    galleryMembers,
+    officialMembers,
+    rows: sortedRows,
+    memberRows,
+    // 全组合计只按成员场次算，官方账号不进组级口径。
+    totals: totalsOf(
+      streams.filter(stream => memberIds.has(stream.datasetId)),
+      weekStart,
+      monthKey,
+    ),
     days: [],
     attendanceStart: null,
     attendanceEnd: null,

@@ -7,6 +7,8 @@ import type { StreamSummary } from './dataset'
 export interface DatasetSummary {
   id: string
   label: string
+  /** `member` = 成员个人频道；`official` = 官方账号。组级口径只含成员。 */
+  kind: string
   color: string | null
   avatarKey: string | null
   channelId: string | null

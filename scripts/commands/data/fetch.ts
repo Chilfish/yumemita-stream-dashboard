@@ -328,8 +328,11 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
   const forced = forceAll || forcedIds.size > 0
   const shouldPublish = !values['no-publish'] && (values.publish === true || forced)
 
-  if (!dataset.channelId) {
-    report('error', `dataset ${dataset.id} 缺少 channelId`)
+  // 官方聚合账号（`other`）没有固定频道：只按 --ids / --force 处理点名场次。
+  // 需要拉频道列表时才强制要求 channelId。
+  const usesExplicitIds = typeof values.ids === 'string' || forcedIds.size > 0 || forceAll
+  if (!dataset.channelId && !usesExplicitIds) {
+    report('error', `dataset ${dataset.id} 缺少 channelId；没有固定频道的账号请用 --ids <文件> 或 --force <id>`)
     return { exitCode: 1 }
   }
 

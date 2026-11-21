@@ -1,6 +1,7 @@
+import { sql } from 'drizzle-orm'
 import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
-import { streams } from '@/db/schema'
+import { datasets, streams } from '@/db/schema'
 import { buildCompareBuckets, type CompareStreamRow } from '@/lib/compare'
 import { MIN_COMPARE_SAMPLE } from '@/lib/compare-params'
 import { isMemberOnly } from '@/lib/visibility'
@@ -23,6 +24,7 @@ export interface GroupComparePageData {
  *
  * 组级对比是纯指标聚合，会员限定场的指标不公开，
  * 因此只把公开场次送进桶子；场次/日期类统计仍由首页与相册负责。
+ * 官方账号的场次不属于成员横向比较，这里一并排除。
  */
 export async function getGroupCompareData(db: Db): Promise<GroupComparePageData> {
   const rowsQuery = db
@@ -39,6 +41,10 @@ export async function getGroupCompareData(db: Db): Promise<GroupComparePageData>
       commentsCaptured: streams.commentsCaptured,
     })
     .from(streams)
+    .where(sql`exists (
+      select 1 from ${datasets} owner
+       where owner.id = ${streams.datasetId} and owner.kind = 'member'
+    )`)
 
   const [datasetRows, rows] = await runBatch<[
     DatasetQueryRow[],

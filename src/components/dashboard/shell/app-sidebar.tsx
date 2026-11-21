@@ -6,6 +6,7 @@ import {
   Info,
   LayoutDashboard,
   Moon,
+  Radio,
   Sun,
   Table2,
   TrendingUp,
@@ -109,6 +110,9 @@ export function AppSidebar({
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const activeSection: ViewKey | GroupViewKey = section === "stream" ? "streams" : section;
+  // 官方账号不算成员：侧栏分组、人数文案与全员对比都只按成员。
+  const members = datasets.filter(dataset => dataset.kind !== "official");
+  const officials = datasets.filter(dataset => dataset.kind === "official");
 
   function isActive(key: ViewKey): boolean {
     if (!dataset) return false;
@@ -161,7 +165,7 @@ export function AppSidebar({
                     ? chatTotal != null
                       ? `${formatInteger(chatTotal)} 条弹幕`
                       : `${formatInteger(dataset.count)} 场`
-                    : `${datasets.length} 位成员`}
+                    : `${members.length} 位成员`}
                 </span>
               </span>
             </SidebarMenuButton>
@@ -174,7 +178,7 @@ export function AppSidebar({
           <SidebarGroupLabel>成员</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {datasets.map(member => {
+              {members.map(member => {
                 const color = member.color ?? DEFAULT_MEMBER_COLOR;
                 return (
                   <SidebarMenuItem key={member.id}>
@@ -210,25 +214,38 @@ export function AppSidebar({
                   </SidebarMenuItem>
                 );
               })}
-              {datasets.length >= 2 ? (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    className={cn(
-                      ACTIVE_ITEM_CLASS,
-                      !dataset && pathname === groupComparePath() && "font-medium",
-                    )}
-                    isActive={!dataset && pathname === groupComparePath()}
-                    tooltip="全员对比"
-                    render={<NavLink data-astro-prefetch to={groupComparePath()} />}
-                  >
-                    <GitCompare aria-hidden="true" />
-                    <span>全员对比</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ) : null}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {officials.length > 0 ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>官方</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {officials.map(official => (
+                  <SidebarMenuItem key={official.id}>
+                    <SidebarMenuButton
+                      className={ACTIVE_ITEM_CLASS}
+                      isActive={official.id === dataset?.id}
+                      onClick={() => handleMemberSelect(official)}
+                      tooltip={official.label}
+                      type="button"
+                    >
+                      <Radio aria-hidden="true" />
+                      <span className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
+                        <span className="truncate">{official.label}</span>
+                        <span className="shrink-0 text-caption text-ink-3">
+                          {formatInteger(official.count)}
+                        </span>
+                      </span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
 
         <SidebarGroup>
           <SidebarGroupLabel>浏览</SidebarGroupLabel>
@@ -293,4 +310,3 @@ export function AppSidebar({
     </Sidebar>
   );
 }
-

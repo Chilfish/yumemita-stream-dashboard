@@ -85,7 +85,9 @@ export function CalendarView({ data, basePath, showMemberFilter }: CalendarViewP
         : baseEvents.filter(
             event =>
               selectedMembers.includes(event.datasetId)
-              || event.participantIds.some(id => selectedMembers.includes(id)),
+              // 官方场次的参与者是「在场的成员」，不是联动：按成员筛时只认频道主。
+              || (event.memberKind !== "official"
+                && event.participantIds.some(id => selectedMembers.includes(id))),
           ),
     [baseEvents, selectedMembers],
   );

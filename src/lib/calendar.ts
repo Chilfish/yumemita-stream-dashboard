@@ -470,6 +470,7 @@ export function buildCalendarEvents(input: BuildCalendarInput): CalendarEvent[] 
         ...event,
         state: deriveCalendarEventState(event, input.now),
         memberLabel: member?.label ?? event.datasetId,
+        memberKind: member?.kind === "official" ? "official" : "member",
         color: member?.color ?? "var(--member-color)",
         participantLabels: event.participantIds
           .map(id => memberById.get(id)?.label ?? id)

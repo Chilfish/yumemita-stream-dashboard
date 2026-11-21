@@ -1,7 +1,7 @@
 import { and, sql } from 'drizzle-orm'
 import { runBatch } from '@/db/batch'
 import type { Db } from '@/db/connection'
-import { streams } from '@/db/schema'
+import { datasets, streams } from '@/db/schema'
 import {
   ATTENDANCE_WINDOW_DAYS,
   mergeParticipantDays,
@@ -28,6 +28,15 @@ const DAY_WINDOW = ATTENDANCE_WINDOW_DAYS
 const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
 const PUBLIC_ONLY = sql`${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY}`
 const PUBLIC_WEIGHT = sql`case when ${streams.availability} is distinct from ${MEMBER_ONLY_AVAILABILITY} then 1 else 0 end`
+
+/**
+ * 组级口径只含成员频道的场次。官方账号的场次不计入全组场次数、
+ * 出勤条、最近更新与全组相册，否则「全组」会被团体节目抬高。
+ */
+const MEMBER_OWNED = sql`exists (
+  select 1 from ${datasets} owner
+   where owner.id = ${streams.datasetId} and owner.kind = 'member'
+)`
 
 /** 组级列表只渲染这些字段，避免把整行 jsonb 指标拉回来。 */
 const GROUP_STREAM_COLUMNS = {
@@ -61,6 +70,7 @@ export function buildMemberStatsQuery(db: Db) {
       concurrentDuration: sql<string>`coalesce(sum(case when ${PUBLIC_WEIGHT} = 1 and ${streams.avgConcurrent} is not null then ${streams.durationSec} else 0 end), 0)`,
     })
     .from(streams)
+    .where(MEMBER_OWNED)
     .groupBy(streams.datasetId)
 }
 
@@ -90,7 +100,7 @@ export function buildDayStatsQuery(db: Db) {
       latest: sql<string>`max(${streams.date})`,
     })
     .from(streams)
-    .where(sql`${streams.date} is not null`)
+    .where(and(sql`${streams.date} is not null`, MEMBER_OWNED))
     .groupBy(streams.datasetId, streams.date)
 }
 
@@ -113,26 +123,29 @@ export function buildLatestStreamsQuery(db: Db) {
   return db
     .selectDistinctOn([streams.datasetId], GROUP_STREAM_COLUMNS)
     .from(streams)
-    // 首页主视觉只取公开场次，会员限定不占大图。
-    .where(PUBLIC_ONLY)
+    // 首页主视觉只取公开场次，会员限定不占大图；官方账号不参与成员主视觉。
+    .where(and(PUBLIC_ONLY, MEMBER_OWNED))
     .orderBy(streams.datasetId, NEWEST_FIRST)
 }
 
 /**
  * 联动场对参与者也应算进「他的最新场」。这里只取参与场次（数量很少），
  * 由 `pickLatest` 与 owner 场次一起挑出每位成员的最新一场。
+ *
+ * 官方场次的参与者不是「联动」，不能进成员的最新场。
  */
 export function buildParticipantStreamsQuery(db: Db) {
   return db
     .select(GROUP_STREAM_COLUMNS)
     .from(streams)
-    .where(and(PUBLIC_ONLY, sql`cardinality(${streams.participants}) > 0`))
+    .where(and(PUBLIC_ONLY, MEMBER_OWNED, sql`cardinality(${streams.participants}) > 0`))
 }
 
 export function buildRecentStreamsQuery(db: Db) {
   return db
     .select(GROUP_STREAM_COLUMNS)
     .from(streams)
+    .where(MEMBER_OWNED)
     .orderBy(NEWEST_FIRST)
     .limit(GROUP_RECENT_LIMIT)
 }
@@ -150,7 +163,8 @@ export function buildCollaborationStreamsQuery(db: Db) {
   return db
     .select(COLLABORATION_COLUMNS)
     .from(streams)
-    .where(sql`cardinality(${streams.participants}) > 0`)
+    // 联动矩阵只统计成员频道里的同场；官方场次的 participants 是「在场成员」。
+    .where(and(MEMBER_OWNED, sql`cardinality(${streams.participants}) > 0`))
     .orderBy(NEWEST_FIRST)
 }
 
@@ -244,6 +258,7 @@ export function buildGroupGalleryQuery(db: Db) {
   return db
     .select(GROUP_STREAM_COLUMNS)
     .from(streams)
+    // 全组相册包含官方场次：它回答「这天都有什么直播」，不限成员个人频道。
     .orderBy(NEWEST_FIRST)
 }
 

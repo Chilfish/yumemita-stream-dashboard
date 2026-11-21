@@ -99,6 +99,7 @@ export function toIndex(rows: Awaited<ReturnType<typeof getDatasets>>): DatasetI
   return rows.map(row => ({
     id: row.id,
     label: row.label,
+    kind: row.kind,
     color: row.color,
     avatar: row.avatarKey,
     channelId: row.channelId,
@@ -283,6 +284,7 @@ export async function getGroupPageData(
   const calendarMembers: CalendarMember[] = datasets.map(dataset => ({
     id: dataset.id,
     label: dataset.label,
+    kind: dataset.kind === 'official' ? 'official' : 'member',
     color: dataset.color ?? null,
     avatar: dataset.avatar ?? null,
     streamCount: dataset.count,

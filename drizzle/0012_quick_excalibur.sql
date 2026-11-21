@@ -1,0 +1,1 @@
+ALTER TABLE "datasets" ADD COLUMN "kind" text DEFAULT 'member' NOT NULL;

@@ -58,6 +58,10 @@ type Report = (level: 'info' | 'warn' | 'error', message: string) => void
 interface DatasetSource {
   id: string
   label: string
+  /** `member` = 成员个人频道（默认），`official` = 官方账号。 */
+  kind?: 'member' | 'official'
+  /** `channel` 整频道同步，`filtered` 先过滤再收，`manual` 由手动命令维护。 */
+  sync?: 'channel' | 'filtered' | 'manual'
   channelId?: string
   manifest: string
   datapackDir: string
@@ -373,10 +377,17 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResu
   const log: Logger = options.log ?? fallbackLog
 
   const sources = readJson<{ datasets?: DatasetSource[] }>(CONFIG_PATH).datasets ?? []
-  const selected = options.dataset ? sources.filter(item => item.id === options.dataset) : sources
+  // 每日自动更新只覆盖配置里说明同步方式的账号；`manual` 账号（第三方联动）由手动命令维护。
+  const autoSources = sources.filter(source => (source.sync ?? 'channel') !== 'manual')
+  const selected = options.dataset
+    ? autoSources.filter(item => item.id === options.dataset)
+    : autoSources
   if (selected.length === 0) {
-    report('error', `找不到 dataset：${options.dataset ?? '(data-sources.json 为空)'}`)
-    report('error', `可用：${sources.map(item => item.id).join(', ') || '(空)'}`)
+    const manual = sources.filter(source => source.sync === 'manual').map(source => source.id)
+    report('error', `找不到可自动同步的 dataset：${options.dataset ?? '(data-sources.json 为空)'}`)
+    report('error', manual.length > 0
+      ? `可用：${autoSources.map(item => item.id).join(', ') || '(空)'}；${manual.join(', ')} 走手动命令`
+      : `可用：${autoSources.map(item => item.id).join(', ') || '(空)'}`)
     return { exitCode: 1 }
   }
 
@@ -421,7 +432,9 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResu
   const databaseUrl = requireEnv('DATABASE_URL', '缺少环境变量 DATABASE_URL；请在 .dev.vars 中配置')
   const db = createDb(databaseUrl)
   const { states, collaborationRows } = await loadDatabaseStates(db, selected)
-  const knownDatasetIds = sources.map(source => source.id)
+  const knownDatasetIds = sources
+    .filter(source => (source.kind ?? 'member') === 'member')
+    .map(source => source.id)
   const collaborations = loadCollaborations({ knownDatasetIds })
   if (collaborations.skipped.length > 0) {
     report('warn', `联动登记跳过 ${collaborations.skipped.length} 条`)

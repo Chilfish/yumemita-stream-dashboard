@@ -56,6 +56,8 @@ export interface CalendarEventInput {
 export interface CalendarEvent extends CalendarEventInput {
   state: CalendarEventState;
   memberLabel: string;
+  /** 频道主的类型：`official` 表示官方账号；`participantIds` 对它只表示在场成员。 */
+  memberKind: "member" | "official";
   color: string;
   /** owner 之外的参与成员标签，顺序与 `participantIds` 一致。 */
   participantLabels: string[];
@@ -66,6 +68,8 @@ export interface CalendarEvent extends CalendarEventInput {
 export interface CalendarMember {
   id: string;
   label: string;
+  /** `member` = 成员个人频道；`official` = 官方账号。 */
+  kind?: "member" | "official";
   color: string | null;
   avatar: string | null;
   streamCount: number;

@@ -5,6 +5,7 @@ import { GroupCompareApp } from '@/components/app/views/group-compare-app'
 import { db } from '@/db/client'
 import { getGroupCompareData, type GroupComparePageData } from '@/db/queries/group-compare'
 import { pageSeo, requestParams, requestSearch } from '@/lib/page'
+import { countMembers } from '@/lib/dataset-kind'
 
 export const prerender = false
 
@@ -27,7 +28,7 @@ const streamCount = pageData
 
 const meta = pageSeo(Astro, {
   section: 'compare',
-  memberCount: pageData?.datasets.length ?? null,
+  memberCount: pageData ? countMembers(pageData.datasets) : null,
   streamCount,
 })
 ---

@@ -54,7 +54,7 @@ export function GroupShell({
       <SidebarInset className="ambient-field min-w-0" id="main-content" tabIndex={-1}>
         <GroupHeader
           chatTotal={chatTotal}
-          memberCount={datasets.length}
+          memberCount={datasets.filter(dataset => dataset.kind !== 'official').length}
           section={section}
           streamCount={streamCount}
         />

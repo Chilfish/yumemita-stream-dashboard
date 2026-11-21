@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
-import { streams } from '@/db/schema'
+import { datasets, streams } from '@/db/schema'
 import type { StreamSummary } from '@/types/dataset'
 import type { StreamListOptions, StreamListResult, StreamSummaryRow } from '@/types/db'
 import { mapStreamSummary, maskMemberOnlyMetrics } from './shared'
@@ -10,9 +10,21 @@ const NEWEST_FIRST = sql`${streams.startedAt} desc nulls last`
 /**
  * 某成员的场次 = 他做频道主的场次 ∪ 他作为参与者的场次。
  * 两个来源不重叠（`participants` 不含 owner），所以不需要去重。
+ *
+ * 官方账号场次的 `participants` 是「在场的成员」，不能反推成成员个人的场次：
+ * 参与者分支只对**成员频道**的场次生效。
  */
 export function involvesMember(datasetId: string) {
-  return sql`(${streams.datasetId} = ${datasetId} or ${datasetId}::text = any(${streams.participants}))`
+  return sql`(
+    ${streams.datasetId} = ${datasetId}
+    or (
+      exists (
+        select 1 from ${datasets} owner
+         where owner.id = ${streams.datasetId} and owner.kind = 'member'
+      )
+      and ${datasetId}::text = any(${streams.participants})
+    )
+  )`
 }
 
 /** 岛屿摘要用到的列；不要退回 `select()`，否则会多带 content_hash 等写路径字段。 */

@@ -10,6 +10,15 @@
 
 `index.json` 只是旧派生格式，不再上传或读取。当前成员入口由 `getDatasets()` 查 `datasets` 表生成。
 
+`datasets.kind` 区分两类账号：
+
+| `kind` | 含义 | 组级口径 |
+| --- | --- | --- |
+| `member`（默认） | 成员个人频道 | 计入成员榜、出勤、联动矩阵、对比、SEO 人数 |
+| `official` | 官方账号（团体号、企划母频道、第三方联动聚合） | 只在自己的页面、日历与全组相册出现；不计入成员口径 |
+
+新增成员时不写 `kind` 即可；新增官方账号时写 `kind: "official"`，并在 `data-sources.json` 里给出 `sync`（`channel` / `filtered` / `manual`）。见 [official-channels.md](../planning/official-channels.md)。
+
 ```json
 {
   "schema": "yumemita.dashboard.datasets/v1",
@@ -459,18 +468,25 @@ bun run ymmt data live-chat --video <videoId>                       # 已结束�
 
 ### 联动场次
 
-`streams.participants` 与 `scheduled_streams.participants` 都是 `text[]`，只放 owner 之外的成员 id。
-`dataset_id` 仍是唯一频道主，两个来源不重叠，所以「某成员的场次」直接并集即可：
+`streams.participants` 与 `scheduled_streams.participants` 都是 `text[]`，语义按频道主区分：
+
+- 频道主是**成员**：放 owner 之外的成员 id，表示联动来串门的成员。
+- 频道主是**官方账号**（`datasets.kind = 'official'`）：放这场在场的成员，只用于展示与日历筛选，**不并入成员个人场次**。
+
+`dataset_id` 仍是唯一频道主，成员维度查询统一写成：
 
 ```sql
-dataset_id = $1 or $1::text = any(participants)
+-- 成员频道：owner ∪ 参与者
+dataset_id = $1
+  or (owner 是成员 and $1::text = any(participants))
 ```
 
-- 参与者来源：手动登记 `content/collaborations.json` 优先（空数组合义是确认无联动），未登记场次用标题推断；`db:ingest` 与 `data update` 的对账共用同一套取值口径，按目标值全量替换。
-- `data update` 每天 ingest 后会重新对账一次，手动补登 / 改登 / 删登在下一轮自动生效，并重算受影响成员的 `public_totals`。
-- 成员的场次数与汇总包含他参与的联动场；全组合计按 videoId 去重，因此**全组总数不等于各成员之和**。
+官方场次计入官方账号自己的场次数与汇总；全组与成员口径都不含它。场次 URL 始终指向频道主，成员路径返回 404。方案见 [official-channels.md](../planning/official-channels.md)。
+
+- 参与者来源：成员频道的联动场，手动登记 `content/collaborations.json` 优先（空数组合义是确认无联动），未登记场次用标题推断；官方场次不推断标题，由 `data official --participants` 显式登记。
+- `data update` 每天 ingest 后会重新对账成员频道的联动参与者，并重算受影响成员的 `public_totals`。
+- 成员的场次数包含他参与的**成员频道**联动场；全组合计按 videoId 去重，因此**全组总数不等于各成员之和**。
 - 站内链接始终指向频道主；参与者 URL 也能打开同一场，但站内不生成。
-- 方案与取舍见 [collaboration-streams.md](../planning/collaboration-streams.md)。
 
 ## 口径与限制
 

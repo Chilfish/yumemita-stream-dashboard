@@ -47,6 +47,7 @@ function toMember(row: ReturnType<typeof mapDataset>): CalendarMember {
   return {
     id: row.id,
     label: row.label,
+    kind: row.kind === 'official' ? 'official' : 'member',
     color: row.color,
     avatar: row.avatarKey,
     streamCount: row.streamCount,

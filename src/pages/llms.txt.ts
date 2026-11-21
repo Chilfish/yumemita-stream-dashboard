@@ -34,6 +34,7 @@ export const GET: APIRoute = async (context) => {
     members: datasetRows.map(mapDataset).map(dataset => ({
       id: dataset.id,
       label: dataset.label,
+      kind: dataset.kind,
       streamCount: dataset.streamCount,
     })),
     streams,

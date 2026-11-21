@@ -24,10 +24,13 @@ function parseWindow(value: string | null): CompareWindow {
 
 export function parseCompareParams(
   search: URLSearchParams,
-  datasets: { id: string }[],
+  datasets: { id: string; kind?: string | null }[],
 ): CompareParams {
-  const ids = datasets.map(dataset => dataset.id);
-  const valid = new Set(ids);
+  // 全员对比只针对成员：官方账号没有「全员」语义，不进默认集合。
+  const memberIds = datasets
+    .filter(dataset => dataset.kind !== "official")
+    .map(dataset => dataset.id);
+  const valid = new Set(memberIds);
 
   const picked: string[] = [];
   for (const part of (search.get("members") ?? "").split(",")) {
@@ -40,7 +43,7 @@ export function parseCompareParams(
   const monthsParam = search.get("months");
 
   return {
-    members: picked.length > 0 ? picked : ids,
+    members: picked.length > 0 ? picked : memberIds,
     type: isContentType(typeParam) ? typeParam : null,
     months: parseWindow(monthsParam),
   };

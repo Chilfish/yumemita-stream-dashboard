@@ -24,8 +24,7 @@ interface GroupHomePageProps {
  * 顺序即优先级——脉冲只有三行数字，hero 拿走整块封面，最近更新与入口留在下面。
  */
 export function GroupHomePage({ dayPlan, monthDay = "", onThisDay = [], collaborations = [] }: GroupHomePageProps) {
-  const { attendanceEnd, attendanceStart, days, members, rows, totals } = useGroupDataContext();
-  const latest = rows[0] ?? null;
+  const { attendanceEnd, attendanceStart, days, members } = useGroupDataContext();
 
   return (
     <div className="flex flex-col gap-6">
