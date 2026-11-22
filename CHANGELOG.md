@@ -52,7 +52,8 @@
 - 数据集扩展为 5 位成员：宮永ののか、仲町あられ、峰月律、藤都子、千石ユノ，合计 **1891 场**（2023-11-18 – 2026-10-29）：nonoka 287、arale 505、ritsu 339、miyako 321、yuno 439。
 - 五位成员都按频道顺序补齐历史场次（同名去重、保留正片）；当前 manifest 没有待抓场次。
 - 新增 [docs/data/data-progress.md](docs/data/data-progress.md)：五位成员的抓取进度、nonoka 批次记录、跳过判定、下一批候选。
-- 词频剔除英文虚词与寒暄词（`said` / `hi` / `the` …）：分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表；旧 pack 里残留的这类词在单场页与跨场聚合展示时也会过滤。
+- 词频剔除英文虚词、寒暄词与纯符号噪声（`said` / `hi` / `the` / `ーーーー` …）：分词与页面聚合共用 `src/lib/words.ts` 的停用词/噪声表；旧 pack 里残留的这类词在单场页与跨场聚合展示时也会过滤。
+- **表记ゆれ归一**：`ww` / `ｗｗ` / `笑笑` / `草` 统一记作 `www`；`かわいい` / `可愛い`、`たすかる` / `助かる`、`ヤバ` / `ヤバイ` 等常见写法合并到规范词形，纯拉丁词小写，全半角走 NFKC。单场「高频词」不再被同一句话的不同写法拆成多条；历史 `stream_words` 行在 SQL 汇总时按同一份别名表合并，不必先全量重写。
 - **归档弹幕改走 InnerTube 回放**：新增 `scripts/lib/live-chat-collect.ts`，用 watch 页 token 翻 `get_live_chat_replay`，消息 / 事件 / 频道表情与实时采集同一套字段；`fetch:danmaku` 新增 `--video` 与 `--engine`（默认 InnerTube，无回放时回退 yt-dlp），`fetch:live-chat` 对已结束场次自动抓完整回放。回放支持断点续跑，并与旧 yt-dlp jsonl 按 `rendererId` / 内容双键合并；被删除 / 封禁账号的历史消息只在 yt-dlp 字幕档里。
 
 ### 界面

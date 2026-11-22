@@ -54,9 +54,9 @@
 | `paid.gifts`                                | 赠送会员公告：`at` / `author`（赠送方）/ `count`（个数）/ `text`（原文） |
 | `paid.paidSharePct`                         | 付费条目占全部条目的比例                                                  |
 | `topAuthors`                                | 发言数 Top 20（含 `authorId` / 各自 SC / 贴纸 / 会员次数）                |
-| `topWords`                                  | 分词后词频（`Intl.Segmenter` 日语分词；≥3 次、最多 40 个；剔除英文虚词/寒暄词） |
+| `topWords`                                  | 分词后词频（`Intl.Segmenter` 日语分词；≥3 次、最多 40 个；剔除停用词/噪声并合并表记ゆれ） |
 | `authors`                                   | **v2 全量**：`author` / `authorId` / `messages` / SC / 贴纸 / 会员次数    |
-| `wordCounts`                                | **v2 全量**：`{ 词: 次数 }`，不截断；跨场精确词频靠它；同样剔除英文虚词/寒暄词 |
+| `wordCounts`                                | **v2 全量**：`{ 词: 次数 }`，不截断；跨场精确词频靠它；过滤与归一规则同上 |
 | `hashtags`                                  | `#` / `＃` 标签计数                                                       |
 | `emojiKinds`                                | 表情种类数 ＋ Top 15（频道表情的 id 形如 `<channelId>/<hash>`）           |
 | `emojis`                                    | 本场频道专属表情的 `id` / `name` / `url`，供 `fetch:emoji` 镜像；旧 pack 缺失 |
@@ -76,7 +76,7 @@
 - **纯表情**沿用归档工程 `scripts/danmaku` 的判定：`emoji.id` 含 `/` 的频道表情全部折成 `[表情]`，去掉后为空才算。
 - **SC 金额不换算**：`¥ / HK$ / NT$ / MX$ / SGD / IDR …` 各记各的，合计只按币种分组（汇率随时变，不做隐含假设）。币种取金额原文里第一个数字之前的前缀，不做白名单。
 - **只收 `addChatItemAction` 的事件**：banner / ticker 是同一事件的置顶与滚动副本，跳过避免重复；删除类 action 不回改已记录条数。Q&A、慢速模式、auto-mod 这类系统提示也不入库，但会按 renderer 类型计入归一化的 skipped 统计。
-- **词频剔除英文虚词/寒暄词**：只剩助词/语尾的短平假名会被丢掉，`said` / `hi` / `the` 这类 token 走 `src/lib/stopwords.ts` 的停用词表；同义词、表记揺れ仍不合并。
+- **词频剔除噪声并归一表记**：只剩助词/语尾的短平假名会被丢掉，`said` / `hi` / `the` 这类 token 与 `ーーーー` 这类纯符号走 `src/lib/words.ts` 的停用词/噪声表；`ww` / `ｗｗｗ` / `笑笑` / `草` 统一记作 `www`，`かわいい` / `可愛い`、`たすかる` / `助かる` 等常见表记ゆれ合并到规范词形，纯拉丁词小写。其余同义词仍不合并。
 - **频道表情只有重抓过弹幕的场次有**：图片地址来自原始回放的 emoji run；旧 pack 的 `chat.emojis` 缺失，页面退回 id 文本。
 - **作者身份**：归一化弹幕带 `msg.authorId`（来自 `authorExternalChannelId`）。显示名会改、会重名，观众重叠按 ID 合并；旧 jsonl 没有该字段，需要重新归一化。
 - **体积**：v2 每场多约 20–30 KB（全量词表 + 作者），只在单场页按需下载。

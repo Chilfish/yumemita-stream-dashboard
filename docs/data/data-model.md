@@ -285,9 +285,9 @@
 | `paid.gifts` | 赠送会员公告：`at` / `author`（赠送方）/ `count`（个数）/ `text`（原文） |
 | `paid.paidSharePct` | 付费条目（SC / 贴纸 / 会员 / 赠送）占比 |
 | `topAuthors` | 发言数 Top 20（含 `authorId` / SC / 贴纸 / 会员次数） |
-| `topWords` | 分词词频（≥3 次、最多 40 个；已剔除英文虚词与寒暄词） |
+| `topWords` | 分词词频（≥3 次、最多 40 个；已剔除停用词/噪声并合并表记ゆれ） |
 | `authors` | **v2**：全量作者统计，按发言数降序；字段 `author` / `authorId` / `messages` / `superchats` / `stickers` / `memberships` |
-| `wordCounts` | **v2**：全量分词词频 `{ 词: 次数 }`，不截断；同样已剔除英文虚词与寒暄词 |
+| `wordCounts` | **v2**：全量分词词频 `{ 词: 次数 }`，不截断；过滤与归一规则同上 |
 | `hashtags` | `#` / `＃` 标签计数 |
 | `emojiKinds` | 表情种类数 + Top 15 |
 | `ownerChats` | 主播本人发言，按时间顺序全量：`at` / `kind` / `text` / `emojis`；`kind: "event"` 表示置顶 / 投票 / Q&A 等主播操作。旧 pack 缺失 |
@@ -495,8 +495,8 @@ dataset_id = $1
 - **`vstats` 可能为 null**：会员限定、站点未收录、或早于收录起始日。相关图表会跳过/显示“—”。
 - **评论区是抓取上限内的条数**，不等于视频总评论数；`video.snapshot.comments` 是 YouTube 侧的总数。
 - **Top 列表有截断**：`topWords` 最多 40、`topAuthors` 最多 20，单场页直接用它们。
-- **英文虚词与寒暄词不进词频**：`Intl.Segmenter` 会把英文句子切成完整单词，`said` / `hi` / `the` 这类不承载内容的 token 不该挤进高频词。分词与页面聚合共用 `src/lib/stopwords.ts` 的停用词表，旧 pack 里残留的这类词在展示时也会被过滤。
-- **笑声词形归一**：`ww` / `wwww` / 全角 `ｗｗｗ` 等连续 `w` 在分词、入库、聚合查询与单场展示时都统一记作 `www`；旧 `stream_words` 行没重写也会在汇总时合并。
+- **英文虚词与噪声 token 不进词频**：`Intl.Segmenter` 会把英文句子切成完整单词，`said` / `hi` / `the` 与 `ーーーー` 这类不承载内容的 token 不该挤进高频词。分词与页面聚合共用 `src/lib/words.ts` 的停用词/噪声表，旧 pack 里残留的这类词在展示时也会被过滤。
+- **表记ゆれ归一**：`ww` / `ｗｗ` / `笑笑` / `草` 统一记作 `www`；`かわいい` / `可愛い`、`たすかる` / `助かる`、`ヤバ` / `ヤバイ` 等常见写法映射到规范词形，纯拉丁词小写；分词、入库、聚合查询与单场展示同口径，别名表由 SQL 汇总直接复用。
 - **跨场精确聚合依赖 v2**：v2 pack 另存全量 `wordCounts` / `authors`，`ingest-db` 用 `aggregateDataset` 重算；v1 场次自动回退到该场的 Top 列表相加。`dataset_insights.aggregation` 标出 `full` / `partial` / `top-lists` 与覆盖率，页面文案随之切换。
 - **频道专属表情靠频道字典补图**：`data/emoji-<dataset>.html` 覆盖该频道当前的表情，旧 pack 不需要重新归一化；字典里没有的历史表情退回占位。Unicode 表情不镜像，直接显示字符。
 - **作者身份以 `authorId` 为准**：旧 jsonl 没有该字段（显示名会改、会重名），需要归档侧重跑归一化才能补齐；缺 ID 时只能按显示名匹配，重叠结果仅供参考。
