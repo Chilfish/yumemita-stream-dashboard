@@ -22,6 +22,7 @@ import {
 } from '@/lib/aggregate'
 import type { ChatByKind, CurrencyTotal, EmojiCount } from '@/types/datapack'
 import { isMemberOnly } from '@/lib/visibility'
+import { LAUGH_WORDS, WORD_ALIASES } from '@/lib/words'
 import { isV2Pack } from '@/lib/schema-version'
 import { involvesMember } from './streams'
 import { toIso } from './shared'
@@ -174,6 +175,34 @@ export async function computeDatasetPublicTotals(
   const publicRows = ordered.filter(row => !isMemberOnly(row.availability))
   const publicIds = publicRows.map(row => row.id)
 
+  // 与 `src/lib/words.ts` 同口径：历史 `stream_words` 里还没归一的写法在汇总时合并。
+  // 别名表直接由 `WORD_ALIASES` 生成，避免 SQL 与分词侧两套规则。
+  const laughterIn = sql.join([...LAUGH_WORDS].map(word => sql`${word}`), sql`, `)
+  const aliasCases = sql.join(
+    [...WORD_ALIASES].map(([from, to]) => sql`when ${streamWords.word} = ${from} then ${to}`),
+    sql` `,
+  )
+  const wordKey = sql<string>`case
+    when lower(${streamWords.word}) ~ '^[wｗ]+$' or ${streamWords.word} in (${laughterIn}) then 'www'
+    when ${streamWords.word} ~ '^[A-Za-z]+$' then lower(${streamWords.word})
+    ${aliasCases}
+    else ${streamWords.word}
+  end`
+  // 先归一化再聚合：CASE 表达式在 SELECT / GROUP BY 重复生成时 Postgres 不认。
+  const normalizedWords = db.$with('normalized_words').as(
+    db
+      .select({
+        streamId: streamWords.streamId,
+        word: wordKey.as('word'),
+        count: streamWords.count,
+      })
+      .from(streamWords)
+      .where(and(
+        inArray(streamWords.streamId, publicIds),
+        sql`${streamWords.word} !~ '^[\\sー〜～~―…・.,、。!?！？-]+$'`,
+      )),
+  )
+
   const [commentStats, stickerStats, wordStats, authorStats, detailStats] = publicIds.length > 0
     ? await runBatch<[
         CommentStat[],
@@ -201,15 +230,15 @@ export async function computeDatasetPublicTotals(
           .where(and(inArray(paidEvents.streamId, publicIds), eq(paidEvents.kind, 'sticker')))
           .groupBy(paidEvents.currency),
         db
+          .with(normalizedWords)
           .select({
-            word: streamWords.word,
-            count: sql<number>`sum(${streamWords.count})::int`,
-            streams: sql<number>`count(distinct ${streamWords.streamId})::int`,
+            word: normalizedWords.word,
+            count: sql<number>`sum(${normalizedWords.count})::int`,
+            streams: sql<number>`count(distinct ${normalizedWords.streamId})::int`,
           })
-          .from(streamWords)
-          .where(inArray(streamWords.streamId, publicIds))
-          .groupBy(streamWords.word)
-          .orderBy(desc(sql`sum(${streamWords.count})`), asc(streamWords.word))
+          .from(normalizedWords)
+          .groupBy(normalizedWords.word)
+          .orderBy(desc(sql`sum(${normalizedWords.count})`), asc(normalizedWords.word))
           .limit(TOP_WORDS),
         db
           .select({

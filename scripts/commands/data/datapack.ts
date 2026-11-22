@@ -25,7 +25,7 @@ import { type Logger, type CommandSpec, UsageError } from '@chilfish/devkit/cli'
 import { parseAmount } from '@scripts/lib/amount.ts'
 import { upsertManifestStream } from '@scripts/lib/dataset-manifest.ts'
 import { deriveVstats, parseVstats } from '@scripts/lib/vstats.ts'
-import { isStopword } from '@/lib/stopwords.ts'
+import { canonicalWord, isNoiseWord, isStopword } from '@/lib/words.ts'
 import type { ChatRecord } from '@scripts/lib/live-chat.ts'
 import { jstIso } from '@scripts/lib/jst.ts'
 import { chatTimestamp, collectMemberChats, memberChannelMap } from '@scripts/lib/member-chats.ts'
@@ -256,9 +256,12 @@ function countWords(texts: string[]): Map<string, number> {
       const informative = INFORMATIVE_RE.test(word) || word.length >= 4
       if (!informative)
         continue
+      if (isNoiseWord(word))
+        continue
       if (isStopword(word))
         continue
-      counts.set(word, (counts.get(word) ?? 0) + 1)
+      const key = canonicalWord(word)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
     }
   }
   return counts

@@ -22,7 +22,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Option } from 'commander'
-import { isStopword } from '@/lib/stopwords.ts'
+import { canonicalWord, isNoiseWord, isStopword } from '@/lib/words.ts'
 import { archiveKey, createObjectStore, readCredentials, remoteBase } from '@scripts/lib/object-storage.ts'
 import { type CommandSpec, ConfigError, createLogger, type Logger } from '@chilfish/devkit/cli'
 
@@ -159,17 +159,19 @@ export async function runVerifyContent(options: VerifyContentOptions): Promise<V
       const chat: PackChat = pack.chat ?? {}
       if (chat.wordCounts) {
         for (const [word, count] of Object.entries(chat.wordCounts)) {
-          if (isStopword(word))
+          if (isStopword(word) || isNoiseWord(word))
             continue
           if (typeof count !== 'number') continue
-          wordTotals.set(word, (wordTotals.get(word) ?? 0) + count)
+          const key = canonicalWord(word)
+          wordTotals.set(key, (wordTotals.get(key) ?? 0) + count)
         }
       }
       else {
         for (const word of chat.topWords ?? []) {
-          if (isStopword(word.word))
+          if (isStopword(word.word) || isNoiseWord(word.word))
             continue
-          wordTotals.set(word.word, (wordTotals.get(word.word) ?? 0) + word.count)
+          const key = canonicalWord(word.word)
+          wordTotals.set(key, (wordTotals.get(key) ?? 0) + word.count)
         }
       }
 

@@ -4,7 +4,7 @@ import {
   classifyTitle,
   type ContentTypeKey,
 } from "@/lib/classify";
-import { isStopword } from "@/lib/stopwords";
+import { canonicalWord, isNoiseWord, isStopword } from "@/lib/words";
 import { isMemberOnly } from "@/lib/visibility";
 import type {
   ChatByKind,
@@ -142,19 +142,30 @@ export function buildStreamRows(
 
 /**
  * 单场高频词：v2 用全量 `wordCounts` 过滤停用词后重排，v1 退回已截断的 `topWords`。
- * 旧 pack 的 Top 列表里还留着 `said` / `hi` 这类噪声，展示前统一过掉。
+ * 旧 pack 的 Top 列表里还留着 `said` / `hi` 这类噪声，展示前统一过掉；
+ * 笑声的各种写法（`ww` / `wwww` / 全角）也在这里并成 `www`。
  */
 export function streamTopWords(chat: {
   topWords: TopWord[];
   wordCounts?: Record<string, number>;
 }): TopWord[] {
-  if (chat.wordCounts) {
-    return Object.entries(chat.wordCounts)
-      .filter(([word]) => !isStopword(word))
-      .map(([word, count]) => ({ word, count }))
-      .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word));
+  const counts = new Map<string, number>()
+  const add = (word: string, count: number) => {
+    if (isStopword(word) || isNoiseWord(word)) return
+    const key = canonicalWord(word)
+    counts.set(key, (counts.get(key) ?? 0) + count)
   }
-  return chat.topWords.filter(entry => !isStopword(entry.word));
+
+  if (chat.wordCounts) {
+    for (const [word, count] of Object.entries(chat.wordCounts)) add(word, count)
+  }
+  else {
+    for (const entry of chat.topWords) add(entry.word, entry.count)
+  }
+
+  return [...counts.entries()]
+    .map(([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
 }
 
 export function currencyRows(totals: CurrencyTotals): CurrencyRow[] {
@@ -360,22 +371,28 @@ export function aggregateDataset(rows: StreamRow[]): DatasetTotals {
 
     if (chat.wordCounts) {
       wordsFullCount += 1;
+      const streamWordKeys = new Set<string>();
       for (const [word, count] of Object.entries(chat.wordCounts)) {
-        if (isStopword(word)) continue;
-        const current = wordCounts.get(word) ?? { word, count: 0, streams: 0 };
+        if (isStopword(word) || isNoiseWord(word)) continue;
+        const key = canonicalWord(word);
+        const current = wordCounts.get(key) ?? { word: key, count: 0, streams: 0 };
         current.count += count;
-        current.streams += 1;
-        wordCounts.set(word, current);
+        wordCounts.set(key, current);
+        streamWordKeys.add(key);
       }
+      for (const key of streamWordKeys) wordCounts.get(key)!.streams += 1;
     }
     else {
+      const streamWordKeys = new Set<string>();
       for (const word of chat.topWords) {
-        if (isStopword(word.word)) continue;
-        const current = wordCounts.get(word.word) ?? { word: word.word, count: 0, streams: 0 };
+        if (isStopword(word.word) || isNoiseWord(word.word)) continue;
+        const key = canonicalWord(word.word);
+        const current = wordCounts.get(key) ?? { word: key, count: 0, streams: 0 };
         current.count += word.count;
-        current.streams += 1;
-        wordCounts.set(word.word, current);
+        wordCounts.set(key, current);
+        streamWordKeys.add(key);
       }
+      for (const key of streamWordKeys) wordCounts.get(key)!.streams += 1;
     }
 
     if (chat.authors) {

@@ -510,6 +510,45 @@ describe("aggregate with full v2 data", () => {
     const words = aggregateDataset([full, list]).topWords.map(word => word.word);
     expect(words).toEqual(["かわいい", "ライブ"]);
   });
+
+  it("merges laughter spellings across streams and counts each stream once", () => {
+    const rows = [
+      {
+        summary: makeSummary({
+          startedAt: "2026-10-01T20:00:00+09:00",
+          videoId: "a",
+          durationSec: 3600,
+        }),
+        pack: makePack({
+          id: "a",
+          startedAt: "2026-10-01T20:00:00+09:00",
+          durationSec: 3600,
+          avg: null,
+          chat: 100,
+          fullWords: { ww: 5, www: 3, "かわいい": 20 },
+        }),
+      },
+      {
+        summary: makeSummary({
+          startedAt: "2026-10-02T20:00:00+09:00",
+          videoId: "b",
+          durationSec: 3600,
+        }),
+        pack: makePack({
+          id: "b",
+          startedAt: "2026-10-02T20:00:00+09:00",
+          durationSec: 3600,
+          avg: null,
+          chat: 50,
+          fullWords: { wwww: 6 },
+        }),
+      },
+    ];
+
+    const laugh = aggregateDataset(rows).topWords.find(word => word.word === "www");
+    expect(laugh).toEqual({ word: "www", count: 14, streams: 2 });
+    expect(aggregateDataset(rows).topWords).toHaveLength(2);
+  });
 });
 
 describe("streamTopWords", () => {
@@ -534,6 +573,33 @@ describe("streamTopWords", () => {
     ).toEqual([
       { word: "かわいい", count: 27 },
       { word: "ライブ", count: 12 },
+    ]);
+  });
+
+  it("merges laughter spellings into www", () => {
+    expect(
+      streamTopWords({
+        topWords: [],
+        wordCounts: { ww: 5, wwww: 7, "ｗｗ": 3, WWW: 2, "かわいい": 4 },
+      }),
+    ).toEqual([
+      { word: "www", count: 17 },
+      { word: "かわいい", count: 4 },
+    ]);
+  });
+
+  it("merges laughter spellings in a v1 top list", () => {
+    expect(
+      streamTopWords({
+        topWords: [
+          { word: "www", count: 9 },
+          { word: "wwww", count: 4 },
+          { word: "ライブ", count: 6 },
+        ],
+      }),
+    ).toEqual([
+      { word: "www", count: 13 },
+      { word: "ライブ", count: 6 },
     ]);
   });
 });

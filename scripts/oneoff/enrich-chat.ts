@@ -14,7 +14,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { isStopword } from '@/lib/stopwords.ts'
+import { canonicalWord, isNoiseWord, isStopword } from '@/lib/words.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const CONFIG_PATH = join(APP_ROOT, 'data-sources.json')
@@ -137,9 +137,12 @@ function countWords(texts: string[]): Map<string, number> {
         continue
       if (!(INFORMATIVE_RE.test(word) || word.length >= 4))
         continue
+      if (isNoiseWord(word))
+        continue
       if (isStopword(word))
         continue
-      counts.set(word, (counts.get(word) ?? 0) + 1)
+      const key = canonicalWord(word)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
     }
   }
   return counts

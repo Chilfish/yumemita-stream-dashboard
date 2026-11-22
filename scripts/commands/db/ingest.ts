@@ -5,7 +5,7 @@ import { basename, resolve } from 'node:path'
 import { Option } from 'commander'
 import { type CommandSpec, requireEnv } from '@chilfish/devkit/cli'
 import { aggregateDataset, type StreamRow } from '@/lib/aggregate.ts'
-import { canonicalWord, isStopword } from '@/lib/stopwords.ts'
+import { canonicalWord, isNoiseWord, isStopword } from '@/lib/words.ts'
 import { createDb, createWriteDb } from '@/db/connection.ts'
 import { computeDatasetPublicTotals } from '@/db/queries/dataset-totals.ts'
 import {
@@ -206,7 +206,7 @@ function collectWords(pack: StreamDatapack): { word: string, count: number }[] {
   // 先按归一化词形合并再卡阈值：同一句笑声的不同写法（`ww` / `wwww`）算同一个词。
   const merged = new Map<string, number>()
   for (const entry of source) {
-    if (isStopword(entry.word))
+    if (isStopword(entry.word) || isNoiseWord(entry.word))
       continue
     const key = canonicalWord(entry.word)
     merged.set(key, (merged.get(key) ?? 0) + entry.count)
