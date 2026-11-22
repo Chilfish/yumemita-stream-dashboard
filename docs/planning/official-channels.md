@@ -400,7 +400,7 @@ bun run ymmt data fetch --dataset yumemita --concurrency 4 --build-every 5 --no-
 | 参与者规则（`all` / `cast` / `none`） | ✅ 单测 12 条 |
 | `data official` | ✅ 单测 9 条 |
 | `yumemita` 抓取与入库 | ✅ 71 场，本地 + 线上 |
-| `bangdream` 的 `filtered` 抓取 | 📋 待接 |
+| `bangdream` 的 `filtered` 抓取 | ✅ 29 集已入库；首轮回填靠人工清单 |
 | `other` 的真实场次 | 📋 待手动添加 |
 
 `yumemita` 实测结果（2026-11-21）：
@@ -417,6 +417,34 @@ bun run ymmt data fetch --dataset yumemita --concurrency 4 --build-every 5 --no-
 | 成员口径 | 未受影响；成员与官方账号没有任何重复 videoId |
 
 发布注意：本地开发要看到封面，必须用 `LOCAL=1` 跑一次 `publish data --assets-only`，把资产传进本地 SILO；`LOCAL=0` 只写线上 R2。
+
+### 9.5 筛选 TV LIVE 中本团出演的集数（2026-11-21）
+
+`bangdream` 的自动过滤（标题粗筛 + 简介 cast）还没接进 `data fetch`，所以首轮用人工清单回填。
+
+扫描方法：拉频道 `/streams`（306 集 TV LIVE），逐集取元信息，用 `castFromDescription` 解析简介「出演」区块。起点是 #228（2024-08-15，`70B2OLNBRsM`）。
+
+| 项 | 结果 |
+| --- | --- |
+| 缓存集数 | 305 / 306（`i64CrvW6zng` #342 还没开播，拉不到元信息） |
+| 范围内（2024-08-15 起） | 112 集 |
+| 命中本团出演 | 29 集 |
+| 期号连续性 | 2024 #228–245、2025 #246–295 完整；2026 #296–340 缺 #338（频道上本就没有） |
+
+抽查未命中的 #229 / #231 / #245 / #246 / #258 / #272，简介「出演」区块里只有其他乐队声优，确认不是解析失效。
+
+入库结果：29 集全部成功，弹幕 230,579 条；`participants` 由简介解析，与扫描结果逐条比对 **0 差异**；成员口径未变。
+
+执行命令：
+
+```bash
+bun run ymmt data fetch --dataset bangdream --ids temp/tv-live-ids.txt --concurrency 6 --no-publish
+bun run ymmt data thumbnails --dataset bangdream
+bun run ymmt db ingest --dataset bangdream
+bun run ymmt publish data --dataset bangdream --assets-only
+```
+
+扫描脚本在 `temp/`（分片 + 缓存可续跑），未进仓库：它属于一次性回填，正式能力是让 `data fetch` 支持 `filtered`。
 
 ## 10. 验收标准
 
