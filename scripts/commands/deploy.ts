@@ -6,7 +6,7 @@
  *   bun run ymmt deploy --no-deploy  # 只构建并校验产物
  *
  * 1. 强制 `LOCAL=0`：`.dev.vars` 里的 `LOCAL=1` 不会带进构建；
- * 2. `loadEnvFile()` 走线上分支，用 `DATABASE_URL_ONLINE` 等线上目标；
+ * 2. `loadEnvFile()` 走线上分支，叠加 `.dev.vars.prod` 的线上目标；
  * 3. `PUBLIC_R2_BASE` 指向本机时拒绝（它会被内联进客户端 bundle）；
  * 4. 构建后扫描 `dist/`：出现本机媒体 / 代理地址就中止，不部署；
  * 5. 以上通过才 `wrangler deploy --config dist/server/wrangler.json`。
@@ -20,6 +20,7 @@ import { isLocalUrl } from '@/lib/local-url.ts'
 import { type CommandSpec, CliError, ConfigError, createLogger, type Logger } from '@chilfish/devkit/cli'
 import { loadEnvFile } from '@chilfish/devkit/env'
 import { localBucket, localEndpoint, localPublicBase } from '@chilfish/devkit/shared'
+import { applyProdEnv } from '@scripts/lib/online-env.ts'
 import { devkit } from '../dev.config.ts'
 
 // 文件在 scripts/commands/，仓库根在上一级。
@@ -131,7 +132,7 @@ function runStep(args: string[], label: string): void {
 /**
  * 业务主体：强制线上环境 → 校验 `PUBLIC_R2_BASE` → 从零构建 → 扫描 `dist/` → 可选部署。
  *
- * 永远按线上处理：一开始就把 `LOCAL` 设成 `0`，再用 `loadEnvFile()` 选 `*_ONLINE` 那套值。
+ * 永远按线上处理：一开始就把 `LOCAL` 设成 `0`，再用 `loadEnvFile()` 叠加 `.dev.vars.prod`。
  * 构建产物里出现本机地址时中止（退出码 1），绝不部署一个指向 localhost 的构建。
  */
 export async function runDeploy(options: DeployOptions): Promise<DeployResult> {
@@ -149,9 +150,16 @@ export async function runDeploy(options: DeployOptions): Promise<DeployResult> {
   }
 
   // 线上模式是硬约束：不管 `.dev.vars` 与调用方怎么写，都不许部署本地构建。
+  // `loadEnvFile` 只补缺失的键，CLI 启动时已按本地模式加载过，所以这里用
+  // `applyProdEnv` 直接把 `.dev.vars.prod` 的值覆盖进进程环境。
   process.env.LOCAL = '0'
+  const prod = applyProdEnv({ config: devkit, cwd: APP_ROOT })
   loadEnvFile({ config: devkit, log: false })
   log.info('部署固定按线上处理（LOCAL=0），不使用 `.dev.vars` 的本地目标')
+  if (!prod.prodFile)
+    log.warn('没有 .dev.vars.prod：线上值只来自进程环境；部署前确认 DATABASE_URL / PUBLIC_R2_BASE 是线上地址')
+  if (prod.databaseLocal)
+    log.warn('DATABASE_URL 仍指向本机：这次构建不会连线上库；线上值请写进 .dev.vars.prod')
 
   const publicBase = (process.env.PUBLIC_R2_BASE ?? '').replace(/\/+$/, '')
   data.publicBase = publicBase
@@ -161,7 +169,7 @@ export async function runDeploy(options: DeployOptions): Promise<DeployResult> {
   else if (isLocalUrl(publicBase)) {
     throw new ConfigError(`PUBLIC_R2_BASE 指向本机（${publicBase}）：这个构建属于本地预览，不能部署`, {
       code: 'LOCAL_PUBLIC_BASE',
-      hint: '把 .dev.vars 里 PUBLIC_R2_BASE_ONLINE 配成对象存储的公开地址，然后重跑 bun run ymmt deploy',
+      hint: '把 .dev.vars.prod 里 PUBLIC_R2_BASE 配成对象存储的公开地址，然后重跑 bun run ymmt deploy',
       context: { publicBase },
     })
   }
@@ -205,7 +213,7 @@ export const deploySpec: CommandSpec = {
   id: 'deploy',
   description: '构建并部署到 Cloudflare Workers（固定线上环境）',
   details: [
-    '固定按线上处理，不受 `LOCAL` 开关影响：命令一开始就把 `LOCAL` 设成 `0`，并用 `*_ONLINE` 那套变量。',
+    '固定按线上处理，不受 `LOCAL` 开关影响：命令一开始就把 `LOCAL` 设成 `0`，并叠加 `.dev.vars.prod` 的线上变量。',
     '',
     '1. `PUBLIC_R2_BASE` 指向本机时直接拒绝（它会被内联进客户端 bundle）；',
     '2. 清空 `dist/` 后从零构建（上次的 `.prerender` 残留会让 build 失败）；',

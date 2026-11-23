@@ -15,7 +15,10 @@ coverage
 .astro
 .wrangler
 .dev.vars
+.dev.vars.dev
+.dev.vars.prod
 !.dev.vars.example
+!.dev.vars.prod.example
 # 遗留文件：Bun 会自动加载 .env，容易绕过 .dev.vars 的判定，别提交也别留着用。
 .env
 .env.*

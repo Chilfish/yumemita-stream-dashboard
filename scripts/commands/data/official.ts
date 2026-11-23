@@ -24,8 +24,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Option } from 'commander'
 import { type CommandSpec, CliError, UsageError, type Logger } from '@chilfish/devkit/cli'
-import { applyOnlineEnv, readOnlineTarget } from '@chilfish/devkit/env'
 import { devkit } from '../../dev.config.ts'
+import { applyOnlineEnv, readOnlineTarget } from '@scripts/lib/online-env.ts'
 import { parseVideoRef } from '@scripts/lib/video-ref.ts'
 import {
   FALLBACK_OFFICIAL_ID,
@@ -287,7 +287,7 @@ export async function runOfficialAdd(
   const online = options.online !== false
   if (online) {
     const onlineTarget = readOnlineTarget({ config: devkit, cwd: APP_ROOT })
-    const restoreEnv = applyOnlineEnv({ config: devkit, remote: onlineTarget.remote })
+    const restoreEnv = applyOnlineEnv({ config: devkit, target: onlineTarget })
     try {
       log.info(`线上目标：${new URL(onlineTarget.databaseUrl).host} · r2://${onlineTarget.bucket}`)
 

@@ -36,7 +36,7 @@
       },
       "devDependencies": {
         "@astrojs/check": "^0.9.12",
-        "@chilfish/devkit": "0.1.4",
+        "@chilfish/devkit": "0.2.0",
         "@types/bun": "^1.4.4",
         "@types/d3": "^7.4.3",
         "@types/node": "^26.6.6",
@@ -140,7 +140,7 @@
 
     "@capsizecss/unpack": ["@capsizecss/unpack@4.0.1", "", { "dependencies": { "fontkitten": "^1.0.3" } }, "sha512-CuNiSqg7+e1cO/GjffyMOm5Tt2jUF9CWHHnvQ/UkqvtkGfHdgwEC0wpmq7fkN3gxwpRnrAN0WzO3vREKmNolMQ=="],
 
-    "@chilfish/devkit": ["@chilfish/devkit@0.1.4", "", { "dependencies": { "aws4fetch": "^1.0.20", "commander": "^15.1.0" }, "peerDependencies": { "drizzle-orm": ">=0.30.0", "pg": ">=8.11.0" }, "optionalPeers": ["drizzle-orm", "pg"] }, "sha512-/wvezqPR67QS0WpFpujwBdqf6uPl+rpqZH8FuY7fDivEESyVRxM+zX0/ZW+eWkeu0mr81GlXPBp8hJ7jClakXA=="],
+    "@chilfish/devkit": ["@chilfish/devkit@0.2.0", "", { "dependencies": { "aws4fetch": "^1.0.20", "commander": "^15.1.0" }, "peerDependencies": { "drizzle-orm": ">=0.30.0", "pg": ">=8.11.0" }, "optionalPeers": ["drizzle-orm", "pg"] }, "sha512-WbxHgZsdgZn+slOe3CeIPLBaMMDgQxl17mWixwQmK7Kc8RvNk6SNWPCaML8JMwlnSyTX9ZNM3siFl38G/7+l6g=="],
 
     "@clack/core": ["@clack/core@1.5.1", "", { "dependencies": { "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-iHTrHA8MtVuLl2TfZySmcKv1qO2PoyC9Z7pfSDozEuV5vtY3/wcOPKJXlqJ5Oq2Cx5DDGQGAMVx6HZfRRoVEbQ=="],
 

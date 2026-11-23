@@ -6,15 +6,15 @@
  *   bun run ymmt data refetch 1dGnP_rXgW0 --no-online
  *
  * 顺序：重抓素材 → 重建 datapack → 本地 ingest → 线上 ingest → verify → publish data → purge。
- * 默认同时覆盖本地库与线上（.dev.vars 的 DATABASE_URL_ONLINE + R2）；--no-online 只改本地。
+ * 默认同时覆盖本地库与线上（.dev.vars.prod 的 DATABASE_URL + R2）；--no-online 只改本地。
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Option } from 'commander'
 import { type CommandSpec, CliError, UsageError, type Logger } from '@chilfish/devkit/cli'
-import { applyOnlineEnv, readOnlineTarget } from '@chilfish/devkit/env'
 import { devkit } from '../../dev.config.ts'
+import { applyOnlineEnv, readOnlineTarget } from '@scripts/lib/online-env.ts'
 import { parseVideoRef } from '@scripts/lib/video-ref.ts'
 import { DEFAULT_COOKIE_BROWSER, resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
 import { runIngest } from '../db/ingest.ts'
@@ -263,7 +263,7 @@ export async function runRefetch(options: RefetchOptions): Promise<{ exitCode: n
   let verifyProblems = 0
   if (online) {
     const target = readOnlineTarget({ config: devkit, cwd: APP_ROOT })
-    const restoreEnv = applyOnlineEnv({ config: devkit, remote: target.remote })
+    const restoreEnv = applyOnlineEnv({ config: devkit, target })
     try {
       log.info(`线上目标：${new URL(target.databaseUrl).host} · r2://${target.bucket}`)
 
@@ -332,7 +332,7 @@ export const dataRefetchSpec: CommandSpec<RefetchResult> = {
   description: '单场重抓并覆盖：给链接或 ID，重抓素材并同步本地库 / 线上库与 R2 索引',
   details: '解析 YouTube 链接或 11 位视频 ID，按本地 pack 或频道 ID 找到成员，'
     + '然后跑完整链路：重抓素材 → 重建 datapack → 本地 ingest → 线上 ingest → verify → publish → purge。\n'
-    + '默认同时覆盖本地与线上（.dev.vars 的 DATABASE_URL_ONLINE / R2_*）；--no-online 只改本地。',
+    + '默认同时覆盖本地与线上（.dev.vars.prod 的 DATABASE_URL / R2_*）；--no-online 只改本地。',
   examples: [
     'bun run ymmt data refetch "https://www.youtube.com/watch?v=1dGnP_rXgW0"',
     'bun run ymmt data refetch 1dGnP_rXgW0',

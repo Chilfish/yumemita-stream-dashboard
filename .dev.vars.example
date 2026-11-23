@@ -1,16 +1,17 @@
-# 唯一的环境文件。复制为 .dev.vars（已在 .gitignore）后填真实值。
+# 环境模板。复制为 `.dev.vars`（已在 .gitignore）后填真实值。
 #
-# 一份文件放下两套目标：
-#   - 普通键是本地开发用的值，wrangler / astro dev 与所有脚本都读它们；
-#   - 线上目标写在 `*_ONLINE` 里（DATABASE_URL_ONLINE 等），LOCAL=0 时替换同名键。
+# devkit 0.2.0 起按环境分文件，不再用 `*_ONLINE` 后缀：
+#   .dev.vars        共同值（本文件；LOCAL=1 时同时是本地默认目标）
+#   .dev.vars.dev    LOCAL=1 时叠加（可选，覆盖 base）
+#   .dev.vars.prod   LOCAL=0 时叠加（线上部署目标，不进 git）
+# 后读的文件覆盖先读的，进程环境里的同名变量永远优先。
+#
 # 开关：LOCAL=1 全部走本机（数据库 / 对象存储 / 媒体地址），LOCAL=0 走线上。
 # 不设时按文件里的 LOCAL 行；命令行设的 LOCAL 优先于文件。
 
 # 本地开发：工作区默认走本机 Postgres（bun run dev 会准备它）。
 LOCAL=1
 DATABASE_URL=postgres://postgres@localhost:5432/ymmt_dev
-# 线上 Neon；LOCAL=0 时生效，sync:remote / 发布 / 部署走它。
-DATABASE_URL_ONLINE=postgresql://user:password@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 
 # workerd 不能直连 TCP：本地页面读路径经 /sql 代理（bun run dev 自动拉起）。
 NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql
@@ -29,7 +30,8 @@ R2_BUCKET=yumemita-data
 # 桶内已无公共前缀；对象直接放在桶根（archive/、<datasetId>/thumbs/、emojis/ …）。
 R2_PREFIX=
 
-# 封面 / 表情的公开域名，构建时内联到客户端（LOCAL=1 时自动改成本机桶地址）
+# 封面 / 表情的公开域名，构建时内联到客户端（LOCAL=1 时自动改成本机桶地址）。
+# 线上部署要求这里是 HTTPS 域，写进 .dev.vars.prod 更清楚。
 PUBLIC_R2_BASE=https://ymmt-s3.chilfish.top
 
 # 站点根地址：canonical / sitemap / purge 端点

@@ -2,7 +2,7 @@
  * 清理 `scheduled_streams`：这张表只保留还没入库的未来场。
  *
  * 默认 dry-run，只列出会删除 / 会合并的行；加 `--apply` 才写库。
- * 目标环境沿用 `LOCAL` 开关：`.dev.vars` 里 `LOCAL=1` 走本机库，`LOCAL=0` 走 `*_ONLINE`。
+ * 目标环境沿用 `LOCAL` 开关：`LOCAL=1` 叠加 `.dev.vars.dev` 走本机库，`LOCAL=0` 叠加 `.dev.vars.prod`。
  *
  *   bun run ymmt db schedules
  *   bun run ymmt db schedules --apply
@@ -124,7 +124,7 @@ export const dbSchedulesSpec: CommandSpec = {
   id: 'db.schedules',
   description: '清理已入库日程、归一自然键（默认 dry-run）',
   details: '删除已经有对应 streams 行的日程，并把 yt: 行归一为日期 + 时段自然键。\n'
-    + '默认只打印计划；加 --apply 才写库。目标环境沿用 LOCAL 开关（LOCAL=0 走 *_ONLINE）。',
+    + '默认只打印计划；加 --apply 才写库。目标环境沿用 LOCAL 开关（LOCAL=0 叠加 .dev.vars.prod）。',
   examples: [
     'bun run ymmt db schedules',
     'bun run ymmt db schedules --apply',

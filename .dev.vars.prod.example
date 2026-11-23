@@ -1,0 +1,21 @@
+# 线上目标模板。复制为 `.dev.vars.prod`（已在 .gitignore）。
+#
+# `LOCAL=0` 时 devkit 先读 `.dev.vars`，再用本文件覆盖；部署与
+# `publish sync` / `data refetch` / `data official` 的线上写入都读这里。
+# 进程环境里的同名变量仍然优先，CI 可以直接用 secrets 注入、不放文件。
+
+# 线上 Neon 地址；必须是远端，指向 localhost 会被拒绝。
+DATABASE_URL=postgresql://user:password@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+
+# 线上 R2 公开域名（会内联进客户端 bundle，不能是本机地址）。
+PUBLIC_R2_BASE=https://ymmt-s3.chilfish.top
+
+# 站点根地址与内部缓存失效令牌；与 `.dev.vars` 相同时可省略。
+# SITE_URL=https://ymmt.chilfish.top
+# PURGE_TOKEN=
+
+# R2 凭据与桶名一般与 `.dev.vars` 相同，可省略。
+# R2_ACCOUNT_ID=
+# R2_ACCESS_KEY_ID=
+# R2_SECRET_ACCESS_KEY=
+# R2_BUCKET=yumemita-data

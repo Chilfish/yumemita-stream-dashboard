@@ -7,7 +7,7 @@
  *   bun run ymmt publish sync --update-existing      # 允许按内容 hash 改写已有场次
  *   bun run ymmt publish sync --force                # 连同已有场次一起全量重写
  *
- * 只认 `.dev.vars` 里的线上目标（`DATABASE_URL_ONLINE` / `R2_*`），并把进程切成 `LOCAL=0`，
+ * 只认 `.dev.vars.prod` 里的线上目标（`DATABASE_URL` / `R2_*`），并把进程切成 `LOCAL=0`，
  * 避免本地开关把数据写回本机 Postgres / SILO。
  *
  * 默认策略是**只新增**：先对比本地 pack 文件名与线上 `streams.video_id`，只把缺失的
@@ -28,8 +28,8 @@ import { inArray, sql } from 'drizzle-orm'
 import { createDb } from '@/db/connection.ts'
 import { streams, transcripts } from '@/db/schema.ts'
 import { type CommandSpec, CliError, type Logger } from '@chilfish/devkit/cli'
-import { applyOnlineEnv, readOnlineTarget } from '@chilfish/devkit/env'
 import { devkit } from '../../dev.config.ts'
+import { applyOnlineEnv, readOnlineTarget } from '@scripts/lib/online-env.ts'
 import { createObjectStore, readCredentials } from '@scripts/lib/object-storage.ts'
 import { runMigrate } from '../db/migrate.ts'
 import { runRefreshTotals } from '../db/totals.ts'
@@ -144,7 +144,8 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
   const dryRun = options.dryRun === true
   const force = options.force === true
 
-  const { remote, databaseUrl, bucket } = readOnlineTarget({ config: devkit, cwd: APP_ROOT })
+  const online = readOnlineTarget({ config: devkit, cwd: APP_ROOT })
+  const { remote, databaseUrl, bucket } = online
 
   const sources = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as { datasets?: DatasetSource[] }
   const all = sources.datasets ?? []
@@ -244,7 +245,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
       .where(recentDays > 0 ? inArray(streams.videoId, candidateIds) : undefined)
       .catch((error: unknown) => {
         throw new CliError(`读取线上 streams 失败：${errorMessage(error)}`, {
-          hint: '检查 .dev.vars 的 DATABASE_URL_ONLINE 是否可连',
+          hint: '检查 .dev.vars.prod 的 DATABASE_URL 是否可连',
         })
       })
   }
@@ -261,7 +262,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     .groupBy(streams.datasetId)
     .catch((error: unknown) => {
       throw new CliError(`读取线上 streams 数量失败：${errorMessage(error)}`, {
-        hint: '检查 .dev.vars 的 DATABASE_URL_ONLINE 是否可连',
+        hint: '检查 .dev.vars.prod 的 DATABASE_URL 是否可连',
       })
     })
   const countByDataset = new Map(remoteCounts.map(row => [row.id, Number(row.count)]))
@@ -272,7 +273,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     .groupBy(transcripts.datasetId)
     .catch((error: unknown) => {
       throw new CliError(`读取线上逐字稿数量失败：${errorMessage(error)}`, {
-        hint: '检查 .dev.vars 的 DATABASE_URL_ONLINE 是否可连',
+        hint: '检查 .dev.vars.prod 的 DATABASE_URL 是否可连',
       })
     })
   const transcriptByDataset = new Map(transcriptCounts.map(row => [row.id, Number(row.count)]))
@@ -432,7 +433,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
     })
   }
 
-  const restoreEnv = applyOnlineEnv({ config: devkit, remote })
+  const restoreEnv = applyOnlineEnv({ config: devkit, target: online })
   try {
     if (!options.skipMigrate) {
       log.info('=== 数据库迁移 ===')
@@ -559,8 +560,8 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncResult> {
 
 export const publishSyncSpec: CommandSpec = {
   id: 'publish.sync',
-  description: '同步到线上：把本地 pack / 封面 / 逐字稿推到 .dev.vars 指定的 Neon + R2',
-  details: '只读 .dev.vars 的线上目标（DATABASE_URL_ONLINE / R2_*），执行期间强制 LOCAL=0。\n'
+  description: '同步到线上：把本地 pack / 封面 / 逐字稿推到 .dev.vars.prod 指定的 Neon + R2',
+  details: '只读 .dev.vars.prod 的线上目标（DATABASE_URL / R2_*），执行期间强制 LOCAL=0。\n'
     + '默认只新增缺失场次；需要刷新旧场次加 --update-existing（或 --force）。\n'
     + '顺序：迁移 → 逐字稿 → ingest → 刷新公开汇总 → verify → publish data → purge。',
   examples: [
