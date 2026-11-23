@@ -252,7 +252,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 bun run ymmt db schedules                     # dry-run，列出会删除 / 会合并的行
 bun run ymmt db schedules --apply             # 写库
 bun run ymmt db schedules --apply --dataset miyako
-LOCAL=0 bun run ymmt db schedules --apply     # 线上，使用 .dev.vars 的 DATABASE_URL_ONLINE
+LOCAL=0 bun run ymmt db schedules --apply     # 线上，叠加 .dev.vars.prod 的 DATABASE_URL
 ```
 
 - 默认 dry-run；输出里 `-` 是删除、`~` 是合并，并注明命中原因（`video_id` / `链接` / `日期+时段`）。

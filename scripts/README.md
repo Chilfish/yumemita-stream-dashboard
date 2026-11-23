@@ -39,6 +39,12 @@ bun scripts/oneoff/add-datapack.mjs <path>
 [data.update] 本地模式（LOCAL=1） · 数据库 localhost:5432/ymmt_dev · 对象存储 http://127.0.0.1:9000/yumemita-data
 ```
 
-`describeEnvironment()`（`lib/local-config.ts`）是唯一实现。环境变量只有一个文件 `.dev.vars`
-（模板 `.dev.vars.example`）：普通键是本地值，`*_ONLINE` 是线上目标，`LOCAL=1` 用普通键，
-`LOCAL=0` 用 `*_ONLINE` 覆盖。
+目标环境由 `@chilfish/devkit/env` 的 `describeEnvironment()` 统一打印。环境变量按文件分层
+（模板 `.dev.vars.example`）：`.dev.vars` 是 base，`LOCAL=1` 时叠加 `.dev.vars.dev`，
+`LOCAL=0` 时叠加 `.dev.vars.prod`，后读的覆盖先读的。
+
+## 批处理并发
+
+分批任务统一走 `lib/pool.ts` 的 `runPool(items, concurrency, task, options)`：
+有界并发、单项失败只记录、可选重试与超时。约定与现有调用点见
+[docs/engineering/concurrency.md](../docs/engineering/concurrency.md)，不要在命令里再手写 worker 循环。

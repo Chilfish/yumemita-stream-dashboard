@@ -69,6 +69,16 @@ export const devGroup = createDevCommands(devkit, {
           'LOCAL=1 bun run ymmt dev storage --json',
         ],
       },
+      status: {
+        description: '只读检查本地服务状态：Postgres、Neon 代理与 SILO',
+        details: '不启动、不停止任何服务：只检查 Postgres 可达性、`/sql` 代理健康与 SILO 健康，\n'
+          + '任一服务未运行时报 `running: false` 而不是失败。系统 Postgres 不归 devkit 管，\n'
+          + '所以没有 `dev stop`；要停服务用 pg_ctl / taskkill，见 docs/engineering/local-database.md。',
+        examples: [
+          'bun run ymmt dev status',
+          'bun run ymmt dev status --json',
+        ],
+      },
     },
   },
 })

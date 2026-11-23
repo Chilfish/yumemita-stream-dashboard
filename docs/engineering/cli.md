@@ -27,7 +27,7 @@ bun run ymmt data refetch <链接> --dataset nonoka --dry-run
 - 链接解析支持 `watch?v=`、`youtu.be`、`/live/`、`/shorts/`，也接受裸 11 位 ID。
 - dataset 先按 `data/<id>/<videoId>.datapack.json` 推断；本地没有 pack 时用 yt-dlp 元信息的频道 ID 匹配 `data-sources.json`。
 - 顺序固定：重抓素材 → 重建 datapack → 本地 ingest → 线上 ingest → 定向 verify → publish data → purge。
-- 默认写线上（`.dev.vars` 的 `DATABASE_URL_ONLINE` 与 `R2_*`）；`--no-online` 只写本地并重算本地 manifest / insights。
+- 默认写线上（`.dev.vars.prod` 的 `DATABASE_URL` 与 `R2_*`）；`--no-online` 只写本地并重算本地 manifest / insights。
 - 定向 verify 有差异时继续发布，命令以退出码 1 结束。
 
 ## 手动添加官方账号的场次
@@ -85,6 +85,7 @@ bun run ymmt data official "https://www.youtube.com/live/V2AJBNJGR8E" --particip
 | `dev db` | 只做本地库初始化 |
 | `dev proxy` | 前台启动 Neon HTTP 兼容代理 |
 | `dev storage` | 启动本地 SILO 对象存储 |
+| `dev status` | 只读检查本地服务状态（Postgres / 代理 / SILO） |
 | `tool cookies` | 导出 YouTube 登录态 cookie |
 | `tool mihomo` | 生成 CI 用的 mihomo 配置 |
 | `deploy` | 构建并部署到 Cloudflare Workers |

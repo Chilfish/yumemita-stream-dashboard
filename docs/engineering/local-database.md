@@ -2,7 +2,7 @@
 
 > **最后更新**：2026-11-19
 > 本地开发默认连本机 Postgres + SILO，避免把开发 / 预览 / 爬虫流量算进线上出流量。
-> 环境变量只有一个文件：`.dev.vars`。本地值写普通键，线上目标写 `*_ONLINE`。
+> 环境变量按文件分层：`.dev.vars`（base）→ `LOCAL=1` 时 `.dev.vars.dev`，否则 `.dev.vars.prod`。
 > `LOCAL=1` 同时切换数据库、对象存储与媒体地址；见下方「本地对象存储」。
 
 ## 为什么需要代理
@@ -98,10 +98,10 @@ bun run dev --local    # 强制 LOCAL=1，并把开关写回 .dev.vars
 它会依次：
 
 1. 读 `.dev.vars` 的 `DATABASE_URL`（`LOCAL=1` 时强制本机地址）；开发服务器无条件用本机库，
-   普通脚本按 `LOCAL` 取普通键或 `DATABASE_URL_ONLINE`，见下方「与线上环境的关系」；
+   普通脚本在 `LOCAL=0` 时叠加 `.dev.vars.prod`，见下方「与线上环境的关系」；
 2. `DATABASE_URL` 是本机地址时，启动 Postgres（已在运行则跳过）、创建 `ymmt_dev`、应用 `drizzle/` 迁移；
 3. 缺少 `.dev.vars` 时按模板补写；`LOCAL=1` 时把本地地址与
-   `NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql` 覆盖回文件（`*_ONLINE` 的线上目标保持不动）；
+   `NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql` 覆盖回文件（`.dev.vars.prod` 保持不动）；
 4. 启动或复用 `dev:db:proxy`；
 5. `LOCAL=1` 时启动或复用 SILO，建桶并设置匿名读；
 6. 用 **Node** 启动 Astro（Bun 运行时的 fetch 会让 miniflare 报 `ECONNREFUSED`，不要改回去）。
@@ -153,25 +153,35 @@ bun run ymmt db ingest --dataset nonoka
 ```
 
 灌数据写哪张库由 `LOCAL` 决定：`LOCAL=1` 时 `db:ingest` / `db:verify` / `db:query` 指向本地库，
-`LOCAL=0` 时用 `DATABASE_URL_ONLINE` 的 Neon。执行前看脚本首行的目标环境就能确认。
+`LOCAL=0` 时叠加 `.dev.vars.prod`，用里面的 Neon 地址。执行前看脚本首行的目标环境就能确认。
 
 `db:ingest` 会同时写 `dataset_insights.totals` 与 `public_totals`，页面汇总只读后者。
 
-## 环境文件：只有 `.dev.vars`
+## 环境文件：按环境分层
 
 | 文件 | 用途 | 是否提交 |
 | --- | --- | --- |
-| `.dev.vars` | 唯一的本地环境文件：本地值 + `*_ONLINE` 线上目标 | 否 |
-| `.dev.vars.example` | 模板，列出所有键与说明 | 是 |
+| `.dev.vars` | base：共同值与本地默认目标（`LOCAL=1` 用） | 否 |
+| `.dev.vars.dev` | `LOCAL=1` 时叠加，覆盖 base（可选） | 否 |
+| `.dev.vars.prod` | `LOCAL=0` 时叠加，线上部署目标 | 否 |
+| `.dev.vars.example` | base 模板 | 是 |
+| `.dev.vars.prod.example` | 线上目标模板 | 是 |
 
 - wrangler / astro dev 原生读 `.dev.vars`；脚本、`astro.config.mjs`、`drizzle.config.ts`
   统一走 `loadEnvFile()`（`@chilfish/devkit/env`），不再有 `.env` / `.env.local`。
-- 普通键是本地值；`DATABASE_URL_ONLINE` 这类 `*_ONLINE` 是线上目标。
-  `LOCAL=1` 用普通键（并忽略 `*_ONLINE`），`LOCAL=0` 用 `*_ONLINE` 覆盖同名键。
+- 加载顺序：`env.file`（`.dev.vars`）→ `LOCAL=1` 时 `.dev.vars.dev`，否则 `.dev.vars.prod`；
+  后读的覆盖先读的，进程环境里的同名变量永远优先。
+- 0.2.0 起不再有 `*_ONLINE` 后缀：线上值直接写成 `.dev.vars.prod` 里的同名键，
+  部署不需要改写键名。
 - `LOCAL` 本身以运行环境为准：`LOCAL=0 bun run …` / `bun run dev --local` 都压过文件。
 - 文件只补运行环境里没有的键，所以 `DATABASE_URL=… bun run ymmt db verify` 这种显式覆盖照样生效。
 - 线上模式但 `DATABASE_URL` 仍指向本机时，加载器会清掉它并提示——正是为了拦住
   「对象传到 R2、元数据写进本地库」这种混合状态。
+- `publish sync` / `data refetch` / `data official` 的线上写入读 `.dev.vars.prod`，
+  执行期间强制 `LOCAL=0` 并清掉本机端点（`scripts/lib/online-env.ts`）。
+- **注意 `loadEnvFile` 只补缺失的键**：CLI 启动时已按本地模式加载过，同一进程内再
+  `LOCAL=0` 重载不会覆盖已经写进去的本机 `DATABASE_URL` / `PUBLIC_R2_BASE`。
+  需要在同一进程里切到线上的入口（`deploy`）用 `applyProdEnv()` 直接覆盖进程环境。
 - 开发服务器（`bun run dev`）不走上面的判定：它始终准备本机 Postgres / 代理。
 - `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` 只在 `LOCAL=1` 时生效；线上仍用 `R2_*`。
 - `LOCAL=1` 打开后，`DATABASE_URL` / `NEON_HTTP_ENDPOINT` / `PUBLIC_R2_BASE` 会在加载后强制切到本机。
@@ -218,6 +228,8 @@ kill $(lsof -ti :9000)
 | 上传报 403 / SignatureDoesNotMatch | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` 与 SILO 启动时的 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` 不一致；默认都是 `silo-admin` |
 | 本地发布仍显示「跳过未变化」但桶是空的 | 本地进度在 `data/.publish-state.local.json`，`target` 应带 `local/`；确认 `LOCAL=1` 对当前进程可见，且没有被线上 `.publish-state.json` 干扰 |
 | SILO 启动失败 | 看 `temp/silo.log`；端口冲突时改 `S3_ENDPOINT` 与 `SILO_CONSOLE_PORT` |
-| 线上模式却提示「DATABASE_URL 指向本机」 | `.dev.vars` 只有本地 `DATABASE_URL`、没写 `DATABASE_URL_ONLINE`；补上线上地址，或确认这次本来就要跑本地（`LOCAL=1`） |
-| 改了 `.env` 却不生效 | 已经没有 `.env` 了：变量只有 `.dev.vars` 一个来源，`*_ONLINE` 是线上目标 |
+| 线上模式却提示「DATABASE_URL 指向本机」 | `.dev.vars` 只有本地 `DATABASE_URL`、没有 `.dev.vars.prod`；补上线上文件，或确认这次本来就要跑本地（`LOCAL=1`） |
+| 改了 `.env` 却不生效 | 已经没有 `.env` 了：变量按 `.dev.vars` → `.dev.vars.dev` / `.dev.vars.prod` 分层读取 |
+| 线上任务读不到线上库 | 确认 `.dev.vars.prod` 存在且有 `DATABASE_URL`；`publish sync --dry-run` 会打印解析到的线上主机 |
+| `deploy` 报 `PUBLIC_R2_BASE 指向本机` | `.dev.vars.prod` 缺 `PUBLIC_R2_BASE`，只落到了 base 里的公开域名；补进 prod，或确认进程环境里给的是线上地址 |
 | 想临时只改一次数据库 | 直接传进程环境：`DATABASE_URL=… LOCAL=0 bun run ymmt db verify` |

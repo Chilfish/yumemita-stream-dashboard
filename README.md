@@ -94,18 +94,18 @@ bun run ymmt db ingest   # 可选：从本地 pack 灌数据
 ```
 
 Astro 退出或被 kill 后，Postgres 与代理继续在后台运行。`.dev.vars` 缺失时脚本会自动补写
-`DATABASE_URL` 与 `NEON_HTTP_ENDPOINT`；完整说明见
+`DATABASE_URL` 与 `NEON_HTTP_ENDPOINT`；完整说明（含文件分层与线上目标）见
 [docs/engineering/local-database.md](docs/engineering/local-database.md)。
 
 ### 配置
 
-复制 `.dev.vars.example` 为 `.dev.vars`（唯一的环境文件，已在 `.gitignore`），填数据库与公开资源地址：
+复制 `.dev.vars.example` 为 `.dev.vars`（不进 git），填本机数据库与公开资源地址；线上目标单独放
+`.dev.vars.prod`（模板 `.dev.vars.prod.example`），`LOCAL=0` 时叠加生效：
 
 ```env
-# 本地开发用本机库；线上目标写在 *_ONLINE 里，LOCAL=0 时生效
+# .dev.vars：本地开发，LOCAL=1 时使用本机库
 LOCAL=1
 DATABASE_URL=postgres://postgres@localhost:5432/ymmt_dev
-DATABASE_URL_ONLINE=postgresql://user:password@ep-xxx.neon.tech/neondb?sslmode=require
 
 # 封面 / 表情的 R2 公开域名，构建时内联
 PUBLIC_R2_BASE=https://ymmt-s3.chilfish.top
@@ -120,6 +120,14 @@ R2_SECRET_ACCESS_KEY=""
 R2_BUCKET="yumemita-data"
 PURGE_TOKEN=""
 ```
+
+```env
+# .dev.vars.prod：LOCAL=0 时叠加，部署与线上写入都读它
+DATABASE_URL=postgresql://user:password@ep-xxx.neon.tech/neondb?sslmode=require
+```
+
+环境按文件分层：`.dev.vars` → `LOCAL=1` 时 `.dev.vars.dev`，否则 `.dev.vars.prod`；
+后读的覆盖先读的，进程环境里的同名变量永远优先。
 
 页面请求期查数据库，新场次 ingest 并 purge 后刷新即可，不需要重新构建前端。
 

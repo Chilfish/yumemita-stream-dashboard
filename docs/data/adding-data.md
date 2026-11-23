@@ -76,7 +76,7 @@ bun run ymmt publish sync -- --update-existing     # 允许按 hash 刷新已有
 bun run ymmt publish sync -- --recent-days 30 --update-existing
 ```
 
-它只读 `.dev.vars` 的线上目标（`DATABASE_URL_ONLINE` / `R2_*`），并在子进程里设置 `LOCAL=0`；`DATABASE_URL_ONLINE` 指向本机时直接拒绝执行。
+它只读 `.dev.vars.prod` 的线上目标（`DATABASE_URL` / `R2_*`），并在子进程里设置 `LOCAL=0`；`DATABASE_URL` 指向本机时直接拒绝执行。
 
 默认策略：
 

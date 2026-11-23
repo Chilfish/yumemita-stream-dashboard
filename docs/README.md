@@ -28,6 +28,7 @@ docs/
 │   ├── code-style.md
 │   ├── code-map.md
 │   ├── cli.md
+│   ├── concurrency.md
 │   ├── component-organization.md
 │   ├── git-workflow.md
 │   ├── release-checklist.md
@@ -114,6 +115,7 @@ docs/
 | 优化数据库读路径 | [performance.md](./engineering/performance.md) + [db-optimization.md](./archive/db-optimization.md) | 当前结论与历史压测 |
 | 写代码 | [code-style.md](./engineering/code-style.md) + [writing-style.md](./writing-style.md) | 命名、组件、数据边界、文案 |
 | 跑脚本 / 数据流水线 | [cli.md](./engineering/cli.md) | `bun run ymmt …` 命令树、`--json` 信封、退出码 |
+| 写 / 改批处理并发 | [concurrency.md](./engineering/concurrency.md) | `runPool` 入口、失败聚合、重试与超时 |
 | 不确定该改哪个文件 | [code-map.md](./engineering/code-map.md) | 任务意图 → 关键文件；只放入口 |
 | 本地开发 / 测试 | [development.md](./engineering/development.md) + [local-database.md](./engineering/local-database.md) | 环境、脚本、D3、测试；本地 Postgres 与开发代理 |
 | Commit / PR | [git-workflow.md](./engineering/git-workflow.md) + [../.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) | 分支、提交纪律、审查清单 |

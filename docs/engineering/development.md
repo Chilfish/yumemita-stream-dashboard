@@ -70,7 +70,7 @@ Astro 退出或被 kill 后，Postgres 与代理继续在后台运行；完整�
   - 全量回填可按 `--dataset <id>` 一个 dataset 一个进程并行；每个进程独立算该成员的 insights，互不覆盖。
   - `dataset_insights.public_totals` 由 ingest 用窄 SQL 聚合写入，页面汇总只读它；请求期不再加载明细。
 - 对账：`scripts/verify-db.ts`，覆盖行数、`chat_total`、SC 币种、`paid_events`、`comments`、作者与词表；`dataset_insights` 用 `scripts/lib/json-equal.ts` 深比较（`jsonb` 不保留键顺序）。
-- `DATABASE_URL` 从 `.dev.vars` 读取（`loadEnvFile()`），运行环境里的同名变量优先；`LOCAL=0` 时取 `DATABASE_URL_ONLINE`；缺失时直接报错，不静默回退。
+- `DATABASE_URL` 从 `.dev.vars` 读取（`loadEnvFile()`），运行环境里的同名变量优先；`LOCAL=0` 时叠加 `.dev.vars.prod`；缺失时直接报错，不静默回退。
 - 查询层：`src/db/queries/`，函数接收 `Db` 作为第一个参数（页面 / 脚本共用）；DTO 在 `src/types/db.ts`。
   - `batch.ts`：`runBatch()`，Neon HTTP 下用 `db.batch` 把多条只读 SQL 放进一次请求；本地 `pg` 回退并行。
   - `datasets.ts`：`selectDatasetsQuery` / `getDatasets` / `getDataset`
