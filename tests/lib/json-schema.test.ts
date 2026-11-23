@@ -87,6 +87,7 @@ function validate(value: unknown, schema: JsonSchema, root: JsonSchema, path = "
 const datapack = SCHEMAS["stream-datapack.v2"].schema;
 const transcript = SCHEMAS["transcript.v1"].schema;
 const densities = SCHEMAS["densities.v1"].schema;
+const streamSearch = SCHEMAS["stream-search.v1"].schema;
 
 /** 与 `/api/packs` 的实际输出同形：v2 全量字段齐全。 */
 function pack(): Record<string, unknown> {
@@ -279,6 +280,74 @@ describe("JSON Schema 与真实响应同形", () => {
   it("densities 通过校验", () => {
     const payload = { densities: { vid1: [1, 2, 3] }, locked: ["vid2"] };
     expect(validate(payload, densities, densities)).toEqual([]);
+  });
+
+  it("stream-search 通过校验", () => {
+    const payload = {
+      schema: "yumemita.stream-search/v1",
+      query: {
+        q: "",
+        members: [],
+        type: "all",
+        from: null,
+        to: null,
+        availability: "all",
+        sort: "date",
+        dir: "desc",
+        limit: 50,
+        offset: 0,
+      },
+      total: 1,
+      count: 1,
+      nextOffset: null,
+      streams: [
+        {
+          rank: 1,
+          datasetId: "arale",
+          participants: [],
+          date: "2026-11-14",
+          videoId: "vid1",
+          title: "歌枠",
+          url: "https://www.youtube.com/watch?v=vid1",
+          durationHms: "1:00:00",
+          durationSec: 3600,
+          startedAt: "2026-11-14T11:00:00.000Z",
+          endedAt: null,
+          availability: "public",
+          avgConcurrent: 1.5,
+          maxConcurrent: 2,
+          maxConcurrentAt: "11:30",
+          watchTimeHours: 1.5,
+          vstatsViews: 100,
+          vstatsLikes: 10,
+          snapshotViews: 90,
+          snapshotLikes: 9,
+          snapshotComments: 3,
+          chatTotal: 50,
+          chatByKind: { text: 50 },
+          pureEmojiOnly: 0,
+          uniqueAuthors: 20,
+          superchats: 0,
+          scTotalsByCurrency: {},
+          stickers: 0,
+          memberships: 0,
+          commentsCaptured: 3,
+          chatPer1000AvgViewers: null,
+          likesPer1000Views: null,
+          scPerHour: null,
+          sessionDir: "",
+          datapack: "",
+          generatedAt: "2026-11-14T12:00:00.000Z",
+          type: "sing",
+          links: {
+            html: "https://example.com/arale/stream/vid1",
+            markdown: "https://example.com/arale/stream/vid1.md",
+            pack: "https://example.com/api/packs/arale/vid1",
+          },
+        },
+      ],
+    };
+    expect(validate(payload, streamSearch, streamSearch)).toEqual([]);
   });
 
   it("每个 $defs 都被引用且能被解析", () => {

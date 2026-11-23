@@ -129,6 +129,8 @@ describe("renderLlmsTxt", () => {
 
   it("结构化接口用真实存在的路由与参数", () => {
     const text = lines().join("\n");
+    expect(text).toContain("https://example.com/api/streams?member=arale&limit=20");
+    expect(text).toContain("https://example.com/schemas/stream-search.v1.json");
     expect(text).toContain("https://example.com/api/packs/arale/vid1");
     expect(text).toContain("https://example.com/api/densities/arale?ids=vid1");
     expect(text).toContain("https://example.com/api/transcripts/arale/vid1");
