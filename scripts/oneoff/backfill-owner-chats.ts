@@ -20,6 +20,7 @@ import { loadEnvFile } from '@chilfish/devkit/env'
 import { devkit } from '../dev.config.ts'
 import { normalizeLiveChat, type ChatRecord } from '@scripts/lib/live-chat.ts'
 import { archiveKey, createObjectStore, datapackKey, readCredentials } from '@scripts/lib/object-storage.ts'
+import { runPool } from '@scripts/lib/pool.ts'
 import { resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
 import type { OwnerChat, StreamDatapack } from '@/types/datapack.ts'
 
@@ -392,15 +393,12 @@ async function processTarget(target: Target): Promise<void> {
   }
 }
 
-const workers = Array.from({ length: Math.min(concurrency, targets.length) }, async () => {
-  for (;;) {
-    const target = targets.shift()
-    if (!target || aborted)
-      return
-    await processTarget(target)
-  }
+await runPool(targets, concurrency, async (target) => {
+  await processTarget(target)
+}, {
+  name: 'backfill-owner-chats',
+  key: target => `${target.source.id}/${target.videoId}`,
 })
-await Promise.all(workers)
 
 console.log(`[backfill] 完成：成功 ${ok} / 已有 ${skipped} / 无回放 ${unavailable} / 无 Owner ${noOwner} / 失败 ${failed}`)
 if (failures.length > 0) {

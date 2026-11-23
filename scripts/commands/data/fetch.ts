@@ -28,6 +28,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Option } from 'commander'
 import { type CommandSpec, type Logger } from '@chilfish/devkit/cli'
+import { runPool } from '@scripts/lib/pool.ts'
 import { normalizeLiveChat } from '@scripts/lib/live-chat.ts'
 import { sentinelIsFresh } from '@scripts/lib/sentinel.ts'
 import { mergeDanmakuFiles } from '@scripts/lib/danmaku-merge.ts'
@@ -184,15 +185,7 @@ function run(command: string, args: string[], capture: boolean, retries = 2): Pr
 }
 
 async function pool<T>(items: T[], limit: number, worker: (item: T, index: number) => Promise<void>): Promise<void> {
-  let cursor = 0
-  const runners = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor
-      cursor += 1
-      await worker(items[index] as T, index)
-    }
-  })
-  await Promise.all(runners)
+  await runPool(items, limit, worker, { name: 'fetch' })
 }
 
 function isValidInfoJson(path: string, videoId: string): boolean {

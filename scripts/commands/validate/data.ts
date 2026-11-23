@@ -8,6 +8,7 @@ import { basename, join, relative, resolve, sep } from 'node:path'
 import { safeParse } from 'valibot'
 import { Option } from 'commander'
 import { type CommandSpec, CliError } from '@chilfish/devkit/cli'
+import { runPool } from '@scripts/lib/pool.ts'
 import { DatapackSchema, formatIssues } from '../../lib/validate-schema.ts'
 
 const APP_ROOT = resolve(import.meta.dir, '..', '..', '..')
@@ -44,28 +45,21 @@ async function checkRemoteObjects(
   }
 
   const urls = targets.map(({ datasetId, videoId }) => `${remoteBase}/archive/${datasetId}/${videoId}.datapack.json`)
-  const failures: string[] = []
-  let cursor = 0
+  const failures: { key: string, error: string }[] = []
 
-  const workers = Array.from({ length: Math.min(8, urls.length) }, async () => {
-    for (;;) {
-      const url = urls[cursor]
-      cursor += 1
-      if (!url) return
-      try {
-        const response = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(15_000) })
-        if (!response.ok) failures.push(`${url} -> HTTP ${response.status}`)
-      }
-      catch (error) {
-        failures.push(`${url} -> ${errorMessage(error)}`)
-      }
-    }
+  await runPool(urls, 8, async (url) => {
+    const response = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(15_000) })
+    if (!response.ok)
+      throw new Error(`HTTP ${response.status}`)
+  }, {
+    name: 'validate-remote',
+    key: url => url,
+    onFailure: failure => failures.push(failure),
   })
-  await Promise.all(workers)
 
   if (failures.length > 0) {
     errors.push(`${failures.length}/${urls.length} 个 archive 对象不可达`)
-    errors.push(...failures.slice(0, 20))
+    errors.push(...failures.slice(0, 20).map(failure => `${failure.key} -> ${failure.error}`))
   }
   return urls.length
 }

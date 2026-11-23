@@ -16,6 +16,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { Option } from 'commander'
 import { type Logger, type CommandSpec, CliError, UsageError } from '@chilfish/devkit/cli'
+import { runPool } from '@scripts/lib/pool.ts'
 import { upsertManifestStream } from '@scripts/lib/dataset-manifest.ts'
 import { deriveVstats, parseVstats, VSTATS_MIN_HTML_BYTES } from '@scripts/lib/vstats.ts'
 import type { StreamDatapack } from '@/types/datapack.ts'
@@ -256,48 +257,43 @@ export async function runVstats(options: RunVstatsOptions = {}): Promise<{ exitC
   const skipped: string[] = []
   let done = 0
 
-  const queue = [...picked]
-  const worker = async (): Promise<void> => {
-    while (queue.length > 0) {
-      const candidate = queue.shift()
-      if (!candidate)
-        continue
-      const label = `${candidate.source.id}/${candidate.videoId}`
-      // 本地没有 pack（安静日没恢复）或已经有 VSTATS 时不发请求。
-      const pack = loadPack(candidate.source, candidate.videoId)
-      if (!pack || pack.vstats) {
-        skipped.push(label)
-        if (!quiet)
-          log.info(`${label} 本地 pack 不存在或已有 VSTATS，跳过`)
-        continue
-      }
-
-      const result = await probe(candidate.videoId)
-      done += 1
-      if (result.kind === 'ok') {
-        applyVstats(candidate.source, candidate.videoId, pack, result.vstats)
-        updated.push(`${candidate.source.id}/${candidate.videoId}`)
-        if (!quiet)
-          log.info(`${label} 补到（平均同接 ${result.vstats.avgConcurrent ?? '—'} / 播放 ${result.vstats.views ?? '—'}）`)
-      }
-      else if (result.kind === 'missing') {
-        missing.push(label)
-        if (!quiet)
-          log.info(`${label} 未收录（${result.detail}）`)
-      }
-      else {
-        failures.push({ candidate, detail: result.detail })
-        if (!quiet)
-          log.info(`${label} 临时失败（${result.detail}）`)
-      }
-      if (quiet && done % 20 === 0)
-        log.info(`进度 ${done}/${picked.length}`)
-      if (queue.length > 0)
-        await sleep(300)
+  await runPool(picked, concurrency, async (candidate) => {
+    const label = `${candidate.source.id}/${candidate.videoId}`
+    // 本地没有 pack（安静日没恢复）或已经有 VSTATS 时不发请求。
+    const pack = loadPack(candidate.source, candidate.videoId)
+    if (!pack || pack.vstats) {
+      skipped.push(label)
+      if (!quiet)
+        log.info(`${label} 本地 pack 不存在或已有 VSTATS，跳过`)
+      return
     }
-  }
 
-  await Promise.all(Array.from({ length: Math.min(concurrency, picked.length) }, () => worker()))
+    const result = await probe(candidate.videoId)
+    done += 1
+    if (result.kind === 'ok') {
+      applyVstats(candidate.source, candidate.videoId, pack, result.vstats)
+      updated.push(`${candidate.source.id}/${candidate.videoId}`)
+      if (!quiet)
+        log.info(`${label} 补到（平均同接 ${result.vstats.avgConcurrent ?? '—'} / 播放 ${result.vstats.views ?? '—'}）`)
+    }
+    else if (result.kind === 'missing') {
+      missing.push(label)
+      if (!quiet)
+        log.info(`${label} 未收录（${result.detail}）`)
+    }
+    else {
+      failures.push({ candidate, detail: result.detail })
+      if (!quiet)
+        log.info(`${label} 临时失败（${result.detail}）`)
+    }
+    if (quiet && done % 20 === 0)
+      log.info(`进度 ${done}/${picked.length}`)
+    // 对 vstats.jp 保持请求间隔；这一条原本跑在每个 worker 的循环里。
+    await sleep(300)
+  }, {
+    name: 'vstats',
+    key: candidate => candidate.videoId,
+  })
 
   if (options.idsOut) {
     const outPath = resolve(options.idsOut)

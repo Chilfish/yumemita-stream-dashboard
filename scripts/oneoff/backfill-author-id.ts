@@ -25,6 +25,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { normalizeLiveChat } from '@scripts/lib/live-chat.ts'
+import { runPool as runPoolImpl } from '@scripts/lib/pool.ts'
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -92,17 +93,7 @@ function countLines(path: string): number {
 }
 
 async function runPool<T>(items: T[], size: number, task: (item: T) => Promise<void>): Promise<void> {
-  let cursor = 0
-  const workers = Array.from({ length: Math.max(1, Math.min(size, items.length)) }, async () => {
-    for (;;) {
-      const item = items[cursor]
-      cursor += 1
-      if (item === undefined)
-        return
-      await task(item)
-    }
-  })
-  await Promise.all(workers)
+  await runPoolImpl(items, size, task, { name: 'backfill-author-id' })
 }
 
 const targets: Target[] = []

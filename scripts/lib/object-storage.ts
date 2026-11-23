@@ -249,20 +249,4 @@ export function createObjectStore(credentials: Credentials): ObjectStore {
 }
 
 /** 有限并发地跑完一批任务，避免把 200+ 个 PUT 同时打出去。 */
-export async function runPool<T>(
-  items: T[],
-  concurrency: number,
-  task: (item: T) => Promise<void>,
-): Promise<void> {
-  let cursor = 0
-  const workers = Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, async () => {
-    for (;;) {
-      const item = items[cursor]
-      cursor += 1
-      if (item === undefined)
-        return
-      await task(item)
-    }
-  })
-  await Promise.all(workers)
-}
+export { runPool } from './pool.ts'

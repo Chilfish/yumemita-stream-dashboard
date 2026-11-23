@@ -26,6 +26,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import { join, resolve } from 'node:path'
 import { Option } from 'commander'
 import { type Logger, type CommandSpec, CliError, UsageError } from '@chilfish/devkit/cli'
+import { runPool } from '@scripts/lib/pool.ts'
 import { sentinelIsFresh } from '@scripts/lib/sentinel.ts'
 import { normalizeLiveChat } from '@scripts/lib/live-chat.ts'
 import { mergeDanmakuFiles } from '@scripts/lib/danmaku-merge.ts'
@@ -144,20 +145,6 @@ async function runYtdlp(args: string[]): Promise<{ code: number, stderr: string 
   await new Response(proc.stdout).text()
   const code = await proc.exited
   return { code, stderr: await stderrPromise }
-}
-
-async function runPool<T>(items: T[], size: number, task: (item: T) => Promise<void>): Promise<void> {
-  let cursor = 0
-  const workers = Array.from({ length: Math.max(1, Math.min(size, items.length)) }, async () => {
-    for (;;) {
-      const item = items[cursor]
-      cursor += 1
-      if (item === undefined)
-        return
-      await task(item)
-    }
-  })
-  await Promise.all(workers)
 }
 
 /**
