@@ -93,7 +93,7 @@ bunx wrangler r2 bucket cors list yumemita-data
 ## 缓存
 
 - 数据页用 `Astro.cache.set({ maxAge, swr, tags })`；endpoint 用 `context.cache.set()`。
-- `Cache-Tag`：`group`、`gallery`、`dataset-<id>`、`stream-<videoId>`、`transcripts`、`schedule`、`sitemap`、`llms`。
+- `Cache-Tag`：`group`、`gallery`、`datasets`、`streams`、`dataset-<id>`、`stream-<videoId>`、`transcripts`、`schedule`、`sitemap`、`llms`。
 - 404 与 purge 端点 `no-store`；其余数据页 TTL 60–300 秒，`stale-while-revalidate` 300–600 秒。
 - 缓存是 Workers Cache；zone 级 purge 不影响它，只能调 Worker 内部端点。
 - 观察 `Cf-Cache-Status` 与 middleware 的 `x-response-time`。

@@ -17,6 +17,7 @@
 | URL 状态 | `src/lib/table-params.ts`、`src/lib/routes.ts`、`src/lib/router-compat.ts` | 可分享、可刷新 |
 | SEO | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | 请求期输出 head / sitemap |
 | Agent 视图 | `src/lib/agent-markdown.ts`、`src/pages/[datasetId]/stream/[videoId].md.ts` | `text/markdown` + 逐字稿 |
+| Agent 场次搜索 | `src/lib/stream-search.ts`、`src/pages/api/streams.ts`、`src/db/queries/streams.ts` | 参数解析与 SQL 筛选分离；分类规则复用 `classify.ts` |
 | llms.txt / 对外 schema | `src/lib/agent-llms.ts`、`src/pages/llms.txt.ts`、`src/lib/json-schema.ts`、`src/pages/schemas/[name].json.ts` | 按 llmstxt.org v2 生成；JSON Schema 与类型强校验 |
 | 数据发布 | `scripts/publish-data.ts`、`scripts/publish-transcripts.ts` | `--assets-only`：thumbs / emoji / archive；逐字稿单独发 |
 | 增量更新 | `scripts/daily-update.ts`、`.github/workflows/data.yml` | 频道差集，安静日不发布 |

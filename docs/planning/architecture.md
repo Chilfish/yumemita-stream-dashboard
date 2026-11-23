@@ -153,6 +153,7 @@ src/db/
 | `/:datasetId/table` | 302 → 场次列表 | 页面 |
 | `/sitemap.xml`、`/llms.txt` | SEO / Agent 入口 | SSR endpoint |
 | `/schemas/stream-datapack.v2.json` 等 | 对外 JSON Schema（draft-07） | endpoint |
+| `/api/streams?q=&member=&type=&from=&to=&availability=&sort=&dir=&limit=&offset=` | 跨成员场次搜索 / 索引 | endpoint |
 | `/api/packs/:datasetId/:videoId` | 单场 pack | endpoint |
 | `/api/transcripts/:datasetId/:videoId` | 逐字稿正文 | endpoint |
 | `/api/densities/:datasetId?ids=` | 对比页逐分钟密度 | endpoint |
@@ -164,7 +165,8 @@ src/db/
 
 - 数据页用 `Astro.cache.set({ maxAge, swr, tags })`；endpoint 用 `context.cache.set()`。
 - 404 与 purge 端点 `no-store`，避免未知单场被长期缓存。
-- tag：`group`、`gallery`、`dataset-<id>`、`stream-<videoId>`、`transcripts`、`sitemap`、`llms`。
+- tag：`group`、`gallery`、`datasets`、`streams`、`dataset-<id>`、`stream-<videoId>`、`transcripts`、`sitemap`、`llms`。
+- `/api/streams` 是跨成员结果，只能按全局 `streams` tag 失效；`publish purge --dataset` 会一并清 `streams`。
 - ingest 提交后调用 purge；缓存是 Workers Cache，zone 级 purge 不影响它。
 - 部署默认 `cross_version_cache: false`，新版本从冷缓存开始。
 
@@ -174,9 +176,10 @@ src/db/
 - 单场页静态 head 由 SSR 直接输出，不再有构建期注入脚本。
 - `sitemap.xml` 查 `datasets` + `streams`，条数为 `2 + 6 × 成员数 + 单场数`。
 - `.md` 不进 sitemap，带 `X-Robots-Tag: noindex`；HTML 单场页带 `<link rel="alternate" type="text/markdown">`。
-- `llms.txt` 按 [llmstxt.org v2](https://llmstxt.org/)：H1 → 摘要 blockquote → 说明段 → H2 文件列表 → `## Optional`，条目一律 `- [name](url): notes`。内容由 `src/lib/agent-llms.ts` 生成，列出成员、最近公开场次、Markdown 参数、结构化接口与 schema 入口。会员限定场次不进「最近场次」。
+- `llms.txt` 按 [llmstxt.org v2](https://llmstxt.org/)：H1 → 摘要 blockquote → 说明段 → H2 文件列表 → `## Optional`，条目一律 `- [name](url): notes`。内容由 `src/lib/agent-llms.ts` 生成，列出成员、最近公开场次、场次搜索入口、Markdown 参数、结构化接口与 schema 入口。会员限定场次不进「最近场次」。
+- Agent 不必先遍历 sitemap：`/api/streams` 支持标题 / videoId / 日期子串、成员、内容类型、日期区间、公开范围与指标排序，返回归一化参数、总数和分页偏移。
 - 任意 HTML 页在 `<head>` 里带 `<link rel="describedby" type="text/plain">` 指向 `/llms.txt`。
-- `/schemas/*.json` 是对外 JSON Schema（draft-07），由 `src/lib/json-schema.ts` 定义；`/api/packs`、`/api/transcripts`、`/api/densities` 的成功响应用 `Link: rel="describedby"` 指过去。schema 的字段集合与 `src/types/datapack.ts` 等在编译期强校验，改类型不改 schema 会编译失败。
+- `/schemas/*.json` 是对外 JSON Schema（draft-07），由 `src/lib/json-schema.ts` 定义；`/api/streams`、`/api/packs`、`/api/transcripts`、`/api/densities` 的成功响应用 `Link: rel="describedby"` 指过去。schema 的字段集合与 `src/types/datapack.ts`、`src/types/dataset.ts` 等在编译期强校验，改类型不改 schema 会编译失败。
 
 ## 图表策略：React + D3
 

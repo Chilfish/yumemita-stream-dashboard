@@ -64,6 +64,7 @@
 | `FR-CAL-009` | P3 | 日历 ICS 订阅 | `AC-CAL-009`：`/calendar.ics` 与 `/{datasetId}/calendar.ics` 返回 `text/calendar`；只含未来 90 天且未取消的事件；会限事件标题前缀 `[会限]`（手工） | 📋 | 2026-11-04 需求 |
 | `FR-STREAM-001` | P0 | 场次列表可搜索、筛选、排序、导出 | `AC-STREAM-001`：`q` / `type` / `sort` / `dir` / `vstats` 写入 URL；刷新与前进后退保持状态；可导出 CSV（手工） | ✅ | README / architecture |
 | `FR-STREAM-002` | P0 | 单场页提供分段详情 | `AC-STREAM-002`：概览、时间轴、弹幕与词、付费、评论可切换；`?view=` 可分享；有稿时出现逐字稿分段（手工） | ✅ | README / ui-refactor |
+| `FR-STREAM-003` | P1 | 为 Agent 提供跨成员场次搜索接口 | `AC-STREAM-003`：`GET /api/streams` 支持 `q`（标题 / videoId / 日期子串）、`member`（逗号分隔）、`type`、`from` / `to`、`availability`、`sort` / `dir`、`limit` / `offset`；返回 `{ schema, query, total, count, nextOffset, streams }`，每项带内容类型与 HTML / Markdown / pack 链接；会限场次指标按 0 / null 屏蔽；非法参数 400 且带字段名；缓存 tag 为 `streams`，`publish purge --dataset` 一并失效（单测 + 手工） | ✅ | 2026-11-23 需求 |
 | `FR-TREND-001` | P1 | 趋势页提供月度与类型分析 | `AC-TREND-001`：`/:datasetId/trends` 展示月度趋势、月度明细、内容类型对比、典型节奏曲线、全期榜单（手工） | ✅ | README / roadmap |
 | `FR-GALLERY-001` | P1 | 成员相册按 JST 自然月分组 | `AC-GALLERY-001`：`/:datasetId/gallery` 按月份分组，图片懒加载，`?order=` 可分享；390 / 320px 无横向滚动（手工） | ✅ | archive/product-direction |
 | `FR-GALLERY-002` | P1 | 全组相册支持跨成员筛选 | `AC-GALLERY-002`：`/gallery` 展示全部成员封面，`?member=` / `?type=` 写进 URL（手工） | ✅ | archive/product-direction |
@@ -141,3 +142,4 @@
 | 2026-11-12 | 新增 `FR-DATA-006` 联动关系视图（📋）：成员页面板 + 组级同场次数矩阵，前置为 B36 回填 | v1.9 |
 | 2026-11-21 | 新增 `FR-DATA-007` / `FR-DATA-008` 官方账号场次：独立归属、不并入成员个人场次；`data update` 只同步配置账号，其他官方场次手动添加。POC 中 | v1.10 |
 | 2026-11-21 | 新增 `FR-DATA-009` 手动添加官方联动场次（`data official`）；明确日历与全组相册包含官方场次，成员口径不含 | v1.11 |
+| 2026-11-23 | 新增 `FR-STREAM-003` 跨成员场次搜索接口 `/api/streams`，供 Agent 索引与筛选 | v1.12 |
