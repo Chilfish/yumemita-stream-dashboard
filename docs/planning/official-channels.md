@@ -1,6 +1,6 @@
 # 官方账号场次
 
-> 状态：🚧 实施中（2026-11-21 起）。`datasets.kind`、查询层口径、日历 / 相册、`data official` 与 `yumemita` 抓取已完成；`bangdream` 的 `filtered` 待接。
+> 状态：🚧 实施中（2026-11-21 起）。`datasets.kind`、查询层口径、日历 / 相册、`data official` 与 `yumemita` 抓取已完成；`bangdream` 于 2026-11-23 改为 `manual`（见 9.6），`filtered` 暂不实现。
 > 关联：`datasets.kind`、`streams.participants` 语义、`data update` 频道范围、`scheduled_streams`、日历、侧栏与组级口径。
 > 相关文档：[data-model.md](../data/data-model.md)、[collaboration-streams.md](./collaboration-streams.md)、[live-calendar.md](./live-calendar.md)。
 
@@ -33,7 +33,7 @@
 
 1. **官方场次单独计数，不并入任何成员的个人场次。** 成员页的场次数、汇总、趋势、相册、逐字稿索引都不因官方场次变化。
 2. **官方场次的 `participants` 只表示在场成员，不参与成员维度聚合。** 它与成员频道联动场共用同一个字段，但语义由 owner 是否成员决定（第 3.3 节）。
-3. **每日自动更新只覆盖配置里 `sync` 为 `channel` / `filtered` 的账号。** 目前是 5 位成员的频道加两个官方号。
+3. **每日自动更新只覆盖配置里 `sync` 为 `channel` / `filtered` 的账号。** 目前是 5 位成员的频道加 `yumemita`；`bangdream` 与 `other` 都是 `manual`。
 4. **其他官方账号的场次用手动命令添加，参与者作为参数传入。** 例如某个活动只在第三方频道播一次。
 5. **成员页不新增「出演的官方节目」区块。** 成员页保持现状。
 6. **日历与全组相册都包含官方场次。** 两者回答的是「那天有什么直播」，不限成员个人频道；但日历按成员筛选时不带出官方场次。
@@ -92,8 +92,8 @@ ALTER TABLE "datasets" ADD COLUMN "kind" text DEFAULT 'member' NOT NULL;
 | `kind` | `member` / `official` | 缺省 `member` |
 | `sync` | `channel` / `filtered` / `manual` | 缺省 `channel` |
 | `channelId` | string / `null` | `other` 没有固定频道，可以省略 |
-| `include.titlePattern` | 正则字符串 | 仅 `filtered` 使用，先按标题粗筛候选 |
-| `include.descriptionCast` | boolean | 仅 `filtered` 使用，再按简介「出演者」确认成员 |
+| `include.titlePattern` | 正则字符串 | 仅 `filtered` 使用，先按标题粗筛候选（`filtered` 暂未实现） |
+| `include.descriptionCast` | boolean | 仅 `filtered` 使用，再按简介「出演者」确认成员（`filtered` 暂未实现） |
 
 `sync` 的三种取值：
 
@@ -106,7 +106,7 @@ ALTER TABLE "datasets" ADD COLUMN "kind" text DEFAULT 'member' NOT NULL;
 | id | 标签 | 频道 | `sync` | 内容 |
 | --- | --- | --- | --- | --- |
 | `yumemita` | 夢限大みゅーたいぷ | `UCxL_Vlnhfo46sN6vPHR_4hA` | `channel` | 团体官方号全部直播 |
-| `bangdream` | バンドリちゃんねる☆ | `UCN-bFIdJM0gQlgX7h6LKcZA` | `filtered` | 母频道中本团成员出演的集数 |
+| `bangdream` | バンドリちゃんねる☆ | `UCN-bFIdJM0gQlgX7h6LKcZA` | `manual` | 母频道中本团成员出演的集数，手动添加 |
 | `other` | 其他联动 | — | `manual` | 其余第三方官方账号的联动，手动添加 |
 
 `other` 没有固定频道，同一账号的场次可以来自任意频道。它的 `streams.dataset_id` 都是 `other`，来源频道保留在 pack 的 `video.channelId` / `channelName` 里。
@@ -157,7 +157,7 @@ dataset_id = $1
 | --- | --- | --- | --- | --- | --- |
 | `nonoka` … `yuno` | 5 个成员频道 | `member` | `channel` | — | — |
 | `yumemita` | `@BDP_yumemita` | `official` | `channel` | `all` | 整频道收录 |
-| `bangdream` | `@bang_dream_official` | `official` | `filtered` | `cast` | 标题粗筛 + 简介 cast |
+| `bangdream` | `@bang_dream_official` | `official` | `manual` | `cast` | 手动命令，不回补历史 |
 | `other` | 任意第三方官方账号 | `official` | `manual` | `none` | 手动命令 + 参与者参数 |
 
 ### 4.0 参与者规则（`participants`）
@@ -174,7 +174,9 @@ dataset_id = $1
 
 `cast` 只截取简介里的出演者区块（`出演 / 出演者 / キャスト / cast` 之后约 600 字），不扫整段：每位成员的简介模板都带全员名单与链接，整段匹配会误命中。
 
-### 4.1 `filtered` 的两段过滤
+### 4.1 `filtered` 的两段过滤（暂不实现）
+
+> 2026-11-23：`bangdream` 改为 `manual`，每日不再扫描母频道；`data fetch` 也没有接入这套过滤。以下保留为后续备选方案。
 
 1. 标题粗筛：`TV LIVE|ゆめ∞みた|Our Notes|ゆめみた|夢限大|むーたいぷ`。命中数远大于真实收录数，只是候选池。
 2. 简介确认：拉 `-J` 元信息，取「出演者」区块（`castFromDescription`），命中成员全名才收录。命中后由 `ingest` 按 `participants: "cast"` 写入参与者。
@@ -217,7 +219,7 @@ bun run ymmt data official <链接> --participants arale --dataset limista --no-
 
 | 环节 | 改动 |
 | --- | --- |
-| `data update` | 只遍历 `sync !== 'manual'` 的账号；`filtered` 在 `planDataset` 前套用过滤；联动对账的已知成员集合排除官方账号 |
+| `data update` | 只遍历 `sync !== 'manual'` 的账号（`bangdream` / `other` 跳过）；联动对账的已知成员集合排除官方账号 |
 | `schedule-sync` | 使用与抓取同一套过滤，避免「预告进了日程、成片没入库」 |
 | `db ingest` | 写 `datasets.kind`；官方场次照常写 streams / details，不参与成员汇总；参与者按 `participants` 规则（`all` / `cast` / `none`）解析，登记优先 |
 | `dataset_insights` | 官方 dataset 照常算自己的 totals，不混入成员 |
@@ -400,7 +402,7 @@ bun run ymmt data fetch --dataset yumemita --concurrency 4 --build-every 5 --no-
 | 参与者规则（`all` / `cast` / `none`） | ✅ 单测 12 条 |
 | `data official` | ✅ 单测 9 条 |
 | `yumemita` 抓取与入库 | ✅ 71 场，本地 + 线上 |
-| `bangdream` 的 `filtered` 抓取 | ✅ 29 集已入库；首轮回填靠人工清单 |
+| `bangdream` 入库 | ✅ 29 集（人工清单）；2026-11-23 起 `manual`，不再自动扫描母频道 |
 | `other` 的真实场次 | 📋 待手动添加 |
 
 `yumemita` 实测结果（2026-11-21）：
@@ -444,7 +446,23 @@ bun run ymmt db ingest --dataset bangdream
 bun run ymmt publish data --dataset bangdream --assets-only
 ```
 
-扫描脚本在 `temp/`（分片 + 缓存可续跑），未进仓库：它属于一次性回填，正式能力是让 `data fetch` 支持 `filtered`。
+扫描脚本在 `temp/`（分片 + 缓存可续跑），未进仓库：它属于一次性回填。2026-11-23 起不再需要自动能力，见 9.6。
+
+### 9.6 `bangdream` 改为手动添加（2026-11-23）
+
+`filtered` 始终没有接进 `data fetch`，`sync: "filtered"` 在 `data update` 里等同于整频道同步。2026-11-23 的每日更新把母频道 423 场全部判为新场次，开始逐场拉元信息，被及时中止（本地只留下已入库的 29 份 pack）。
+
+决定：`bangdream` 的 `sync` 改为 `manual`，删除 `include` 过滤配置。
+
+- 每日 `data update` 完全不碰这个账号：不拉频道列表、不写日程、不补 VSTATS。
+- 不回补历史场次；新增场次由人工确认后手动添加：
+  ```bash
+  bun run ymmt data official "<链接>" --dataset bangdream --participants <成员>
+  ```
+- `participants: "cast"` 保留：手动添加时若没有登记，ingest 仍按简介「出演者」区块解析。
+- 未来场预告走 `/admin/schedule`（或 `schedule-maintenance` skill），与 `manual` 账号的约定一致。
+
+验收信号：`tests/scripts/config.test.ts` 断言 `bangdream.sync === 'manual'` 且没有 `include`；把配置改回去测试会失败。
 
 ## 10. 验收标准
 
@@ -456,9 +474,9 @@ bun run ymmt publish data --dataset bangdream --assets-only
 | `FR-OFFICIAL-004` | 单一 canonical | 官方场次只从官方账号路径打开，成员路径 404（C3） |
 | `FR-OFFICIAL-005` | 组级成员口径不变 | 组首页成员榜、出勤、联动矩阵、最近更新不含官方场次（C4） |
 | `FR-OFFICIAL-006` | 日历与全组相册包含官方场次 | `/calendar`、今日 / 明日时间线、`/gallery` 显示官方场次；日历按成员筛选不带出官方（C5/C6/S7） |
-| `FR-OFFICIAL-007` | 每日只同步配置账号 | `data update` 跳过 `sync=manual`；`filtered` 按标题 + cast 过滤（脚本测试） |
+| `FR-OFFICIAL-007` | 每日只同步配置账号 | `data update` 跳过 `sync=manual`（当前 `bangdream` / `other`）；`channel` 整频道同步（配置测试） |
 | `FR-OFFICIAL-008` | 手动添加外部场次 | `data official <url> --participants` 完成登记、落库与发布；未知成员与成员频道报错（单测 + 脚本） |
-| `FR-OFFICIAL-009` | 日程与抓取同源 | 未确认出演的候选不写日程；确认无出演的自动日程会被清理（S1–S5） |
+| `FR-OFFICIAL-009` | 日程与抓取同源 | 未确认出演的候选不写日程；确认无出演的自动日程会被清理（`filtered` 暂不实现，`bangdream` 改手动，日程走 `/admin/schedule`） |
 | `FR-OFFICIAL-010` | 现有联动场不受影响 | 成员频道联动场仍计入参与者（C7） |
 | `FR-OFFICIAL-011` | 官方 dataset 有汇总 | 官方账号页正常渲染，不因缺 `dataset_insights` 报错（P10） |
 

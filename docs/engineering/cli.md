@@ -30,9 +30,9 @@ bun run ymmt data refetch <链接> --dataset nonoka --dry-run
 - 默认写线上（`.dev.vars` 的 `DATABASE_URL_ONLINE` 与 `R2_*`）；`--no-online` 只写本地并重算本地 manifest / insights。
 - 定向 verify 有差异时继续发布，命令以退出码 1 结束。
 
-## 手动添加官方账号的联动场次
+## 手动添加官方账号的场次
 
-成员频道与两个固定官方号之外，第三方官方账号偶尔也会办本团出演的直播（商店直播、企划方节目、签名会）。参与者无法从标题或简介可靠推断，必须显式指定：
+`bangdream` 母频道与第三方官方账号的场次都走这条命令：母频道的出演信息只在简介，第三方账号偶尔才办本团出演的直播（商店直播、企划方节目、签名会）。参与者无法从标题可靠推断，必须显式指定：
 
 ```bash
 bun run ymmt data official "https://www.youtube.com/watch?v=Jih2ArVViRo" --participants all
@@ -41,12 +41,12 @@ bun run ymmt data official "https://www.youtube.com/live/V2AJBNJGR8E" --particip
 ```
 
 - `--participants` 必填：`all` 展开为全部成员，或用逗号分隔的成员 id（可重复传入）。未知 id 直接报错。
-- 默认落到聚合账号 `other`（`data-sources.json` 里 `kind=official`、`sync=manual`）；`--dataset` 可指向任意官方账号，指向成员频道会被拒绝。
+- 默认落到聚合账号 `other`；`--dataset` 可指向任意官方账号（例如 `bangdream`），指向成员频道会被拒绝。`bangdream` 与 `other` 都是 `sync=manual`。
 - 参与者写进 `content/collaborations.json`，由 ingest 落到 `streams.participants`。
 - 顺序：元信息 → 登记 → `data fetch --ids` → 本地 ingest → 线上 ingest → verify → publish → purge。`--no-online` 只改本地。
 - 场次还没结束（`is_upcoming` / `is_live`）会直接拒绝；未来场走 `/admin/schedule`。
 
-`data update` 不会碰 `sync=manual` 的账号。详见 [official-channels.md](../planning/official-channels.md)。
+`data update` 不会碰 `sync=manual` 的账号（`bangdream`、`other`）。详见 [official-channels.md](../planning/official-channels.md)。
 
 ## 命令树
 
