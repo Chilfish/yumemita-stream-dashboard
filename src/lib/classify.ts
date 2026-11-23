@@ -13,7 +13,7 @@ export function isContentType(value: unknown): value is ContentTypeKey {
   return typeof value === "string" && (CONTENT_TYPES as readonly string[]).includes(value);
 }
 
-interface Rule {
+export interface ContentTypeRule {
   key: ContentTypeKey;
   pattern: RegExp;
 }
@@ -21,8 +21,11 @@ interface Rule {
 /**
  * 顺序即优先级：先识别信号最强的标题前缀，再退到泛化关键词。
  * 未命中的标题归入「杂谈」，并单独计数，避免静默丢弃。
+ *
+ * 搜索接口把同一份 `pattern.source` 翻译成 PostgreSQL 正则，
+ * 所以这里的规则顺序和写法同时决定了页面与接口的分类结果。
  */
-const RULES: Rule[] = [
+export const CONTENT_TYPE_RULES: readonly ContentTypeRule[] = [
   { key: "sing", pattern: /弾き語り|弾き騙り|歌枠|アコギ|歌って|カバー|リサイタル/ },
   { key: "game", pattern: /ゲーム|実況|プレイ|あそぶ|魔女裁判|SSR|ガチャ|引くまで|ノベル|RPG/ },
   {
@@ -39,7 +42,7 @@ export interface ClassifiedTitle {
 
 export function classifyTitle(title: string | null | undefined): ClassifiedTitle {
   const text = title ?? "";
-  for (const rule of RULES) {
+  for (const rule of CONTENT_TYPE_RULES) {
     if (rule.pattern.test(text)) return { key: rule.key, matched: true };
   }
   return { key: "talk", matched: false };

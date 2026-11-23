@@ -1,4 +1,6 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, gte, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm'
+import { CONTENT_TYPE_RULES } from '@/lib/classify'
+import type { StreamSearchParams } from '@/lib/stream-search'
 import type { Db } from '@/db/connection'
 import { datasets, streams } from '@/db/schema'
 import type { StreamSummary } from '@/types/dataset'
@@ -204,4 +206,101 @@ export async function getLatestStream(
     .orderBy(NEWEST_FIRST)
     .limit(1)
   return row ? toPublicSummary(row, 1) : null
+}
+
+/**
+ * 标题分类在 `classify.ts` 里是纯 JS 规则；搜索接口需要让数据库直接筛选，
+ * 这里把同一份正则源码翻译成 PostgreSQL 的 `~`，顺序即优先级。
+ */
+function contentTypeCase(): SQL {
+  let expression: SQL = sql`'talk'`
+  for (let index = CONTENT_TYPE_RULES.length - 1; index >= 0; index -= 1) {
+    const rule = CONTENT_TYPE_RULES[index]!
+    expression = sql`case when ${streams.title} ~ ${rule.pattern.source} then ${rule.key} else ${expression} end`
+  }
+  return expression
+}
+
+/** ILIKE 里 `%` / `_` 是通配符；用户输入按字面量匹配。 */
+function likePattern(query: string): string {
+  return `%${query.replace(/[\\%_]/g, '\\$&')}%`
+}
+
+export function buildStreamSearchWhere(params: StreamSearchParams): SQL | undefined {
+  const conditions: SQL[] = []
+
+  if (params.members.length > 0) {
+    const matched = params.members.map(datasetId => involvesMember(datasetId))
+    conditions.push(matched.length === 1 ? matched[0]! : or(...matched)!)
+  }
+
+  if (params.q) {
+    const pattern = likePattern(params.q)
+    conditions.push(
+      or(
+        ilike(streams.title, pattern),
+        ilike(streams.videoId, pattern),
+        sql`${streams.date}::text ilike ${pattern}`,
+      )!,
+    )
+  }
+
+  if (params.type !== 'all') {
+    conditions.push(sql`${contentTypeCase()} = ${params.type}`)
+  }
+
+  if (params.from) conditions.push(gte(streams.date, params.from))
+  if (params.to) conditions.push(lte(streams.date, params.to))
+  if (params.availability !== 'all') {
+    conditions.push(eq(streams.availability, params.availability))
+  }
+
+  return conditions.length > 0 ? and(...conditions) : undefined
+}
+
+const SEARCH_SORT_EXPRESSIONS: Record<string, SQL> = {
+  duration: sql`${streams.durationSec}`,
+  avg: sql`${streams.avgConcurrent}`,
+  max: sql`${streams.maxConcurrent}`,
+  watch: sql`${streams.watchTimeHours}`,
+  views: sql`coalesce(${streams.vstatsViews}, ${streams.snapshotViews})`,
+  likes: sql`coalesce(${streams.vstatsLikes}, ${streams.snapshotLikes})`,
+  chat: sql`${streams.chatTotal}`,
+  authors: sql`${streams.uniqueAuthors}`,
+  sc: sql`${streams.superchats}`,
+  comments: sql`${streams.commentsCaptured}`,
+}
+
+/** 会限场次的指标已屏蔽，按指标排序时整行推到最后，不泄露真实名次。 */
+export function buildStreamSearchOrder(params: StreamSearchParams): SQL {
+  const direction = params.dir === 'asc' ? sql`asc` : sql`desc`
+  if (params.sort === 'date') {
+    return sql`${streams.date} ${direction} nulls last, ${streams.startedAt} desc nulls last, ${streams.videoId} asc`
+  }
+
+  const metric = SEARCH_SORT_EXPRESSIONS[params.sort] ?? sql`${streams.date}`
+  return sql`case when ${streams.availability} = 'subscriber_only' then null else ${metric} end ${direction} nulls last, ${streams.startedAt} desc nulls last, ${streams.videoId} asc`
+}
+
+export function buildStreamSearchQuery(db: Db, params: StreamSearchParams) {
+  return db
+    .select(SUMMARY_COLUMNS)
+    .from(streams)
+    .where(buildStreamSearchWhere(params))
+    .orderBy(buildStreamSearchOrder(params))
+    .limit(params.limit)
+    .offset(params.offset)
+}
+
+export type StreamSearchRow = Awaited<ReturnType<typeof buildStreamSearchQuery>>[number]
+
+export function buildStreamSearchCountQuery(db: Db, params: StreamSearchParams) {
+  return db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(streams)
+    .where(buildStreamSearchWhere(params))
+}
+
+export function mapStreamSearchRows(rows: StreamSearchRow[], offset = 0): StreamSummary[] {
+  return rows.map((row, index) => toPublicSummary(row, offset + index + 1))
 }

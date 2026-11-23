@@ -41,7 +41,7 @@ export interface PurgeOptions {
   token?: string
   /** `--tags`：追加 tag（可重复，每项可用逗号分隔多个）。 */
   tags?: string[]
-  /** `--dataset`：追加 dataset-<id>、group、gallery、schedule、sitemap、llms。 */
+  /** `--dataset`：追加 dataset-<id>、group、gallery、schedule、sitemap、llms、streams。 */
   dataset?: string[]
   /** `--video`：追加 stream-<id>。 */
   video?: string[]
@@ -77,6 +77,8 @@ export function computePurgeTags(options: PurgeOptions = {}): string[] {
     tags.add(CACHE_TAGS.schedule)
     tags.add(CACHE_TAGS.sitemap)
     tags.add(CACHE_TAGS.llms)
+    // 跨成员搜索按全局 streams tag 缓存；任一场次变化都要失效。
+    tags.add(CACHE_TAGS.streams)
   }
   for (const videoId of options.video ?? [])
     tags.add(streamTag(videoId))
@@ -158,7 +160,7 @@ export const publishPurgeSpec: CommandSpec = {
   ],
   options: [
     new Option('--tags <a,b>', '追加 tag（可重复）').argParser((value: string, previous: string[] = []) => [...previous, value]),
-    new Option('--dataset <id>', '追加 dataset-<id>、group、gallery、schedule、sitemap、llms（可重复）').argParser((value: string, previous: string[] = []) => [...previous, value]),
+    new Option('--dataset <id>', '追加 dataset-<id>、group、gallery、schedule、sitemap、llms、streams（可重复）').argParser((value: string, previous: string[] = []) => [...previous, value]),
     new Option('--video <id>', '追加 stream-<id>（可重复）').argParser((value: string, previous: string[] = []) => [...previous, value]),
     new Option('--group', '追加 group、gallery、schedule、sitemap、llms'),
     new Option('--all', '刷新所有页面（group / gallery / datasets / streams / transcripts / sitemap / llms）'),

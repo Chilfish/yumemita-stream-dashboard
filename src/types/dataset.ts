@@ -1,3 +1,4 @@
+import type { ContentTypeKey } from "@/lib/classify";
 import type { ChatByKind, CurrencyTotals } from "./datapack";
 
 /** `batch30_manifest.json` 的一行。字段由 collect-batch.mjs 产出。 */
@@ -88,4 +89,38 @@ export interface DatasetIndex {
   schema: string;
   generatedAt: string;
   datasets: DatasetIndexEntry[];
+}
+
+export interface StreamSearchLinks {
+  html: string;
+  markdown: string;
+  pack: string;
+}
+
+/** `/api/streams` 的一行：摘要 + 内容类型 + 可继续读取的链接。 */
+export interface StreamSearchItem extends StreamSummary {
+  datasetId: string;
+  participants: string[];
+  type: ContentTypeKey;
+  links: StreamSearchLinks;
+}
+
+export interface StreamSearchResponse {
+  schema: "yumemita.stream-search/v1";
+  query: {
+    q: string;
+    members: string[];
+    type: string;
+    from: string | null;
+    to: string | null;
+    availability: string;
+    sort: string;
+    dir: string;
+    limit: number;
+    offset: number;
+  };
+  total: number;
+  count: number;
+  nextOffset: number | null;
+  streams: StreamSearchItem[];
 }
