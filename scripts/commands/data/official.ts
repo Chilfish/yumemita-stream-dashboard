@@ -355,11 +355,11 @@ export async function runOfficialAdd(
   }
 }
 
-/** `data official`：手动添加第三方官方账号里的本团联动场次。 */
+/** `data official`：手动添加官方账号的场次（bangdream 母频道、第三方账号）。 */
 export const dataOfficialSpec: CommandSpec<OfficialAddResult> = {
   id: 'data.official',
-  description: '手动添加官方账号的联动场次：拉元信息 → 登记参与者 → 抓取 → 入库 → 发布',
-  details: '用于成员频道与两个固定官方号之外的场次（例如商店直播、企划方节目）。\n'
+  description: '手动添加官方账号的场次：拉元信息 → 登记参与者 → 抓取 → 入库 → 发布',
+  details: '用于 bangdream 母频道与第三方官方账号的场次（TV LIVE 出演、商店直播、企划方节目）。\n'
     + '参与者必须显式指定（`all` 或成员 id 列表），因为标题与简介都不可靠。\n'
     + `默认落到聚合账号 ${FALLBACK_OFFICIAL_ID}（kind=official，sync=manual），不并入成员个人场次。\n`
     + '不同账号各建一个 dataset 时用 --dataset 指定；指向成员频道会被拒绝。',

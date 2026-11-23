@@ -85,14 +85,10 @@
       "manifest": "data/bangdream/manifest.json",
       "datapackDir": "data/bangdream",
       "subject": null,
-      "scope": "企划母频道中本团成员出演的场次",
-      "note": "按简介「出演者」过滤，只收本团成员在场的场次。",
-      "sync": "filtered",
-      "participants": "cast",
-      "include": {
-        "titlePattern": "TV LIVE|ゆめ∞みた|Our Notes|ゆめみた|夢限大|むーたいぷ",
-        "descriptionCast": true
-      }
+      "scope": "企划母频道中本团成员出演的场次；手动添加，不回补历史",
+      "note": "不参与每日自动更新；由 data official --dataset bangdream 手动添加，参与者按简介「出演者」解析。",
+      "sync": "manual",
+      "participants": "cast"
     },
     {
       "id": "other",
