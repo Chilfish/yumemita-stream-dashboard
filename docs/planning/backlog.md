@@ -21,7 +21,7 @@
 | B32 | SC 留言主题：简单关键词 / 共现，不引入重型 NLP | P3 | 无 | 2026-11-03 roadmap | 📋 |
 | B33 | 峰值解释：把峰值分钟与人工标注的事件对齐 | P3 | 事件标注数据 | 2026-11-03 roadmap | 📋 |
 | B34 | 推文联动：先用手动 pin 验证价值，外部服务只做增强 | P3 | 无 | roadmap | 📋 |
-| B35 | 空数据 / 部分数据的更明确提示（已有基础版） | P3 | 无 | roadmap | 📋 |
+| B35 | 空数据 / 部分数据的更明确提示（已有基础版） | P3 | 无 | roadmap | 🚧 2026-11-24 完成单场页与图表空态归因（`data-availability.ts` + `DataEmpty`）；`captured` 三态字段仍待做 |
 | B39 | `/gallery` 载荷：SSR 只渲染首屏，其余按页从服务端拉取，别把 1,837 行塞进 `astro-island` props（当前 1.71 MB / 全页 1.89 MB） | P2 | 需要新端点与三态 | 2026-11-15 审计 | 📋 背景见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) |
 | B40 | `ymmt-s3.chilfish.top` 加 Cloudflare Cache Rule：`Cache-Control: public, max-age=31536000, immutable`（现为 R2 默认 4 小时） | P2 | 无 | 2026-11-15 审计 | 📋 桶侧配置，代码改不了 |
 | B41 | 部署后线上复测 Lighthouse：mobile preset（首页）、桌面 preset（对比度复核），以及逐字稿页的 SSR 与 CSP 修复 | P3 | 需先部署 | 2026-11-15 审计 | 🚧 线上复核与修复见 [seo-audit-2026-11-15.md](../research/seo-audit-2026-11-15.md) 第八节；本地生产构建 a11y / BP / SEO 均 100，线上数字仍待复测 |

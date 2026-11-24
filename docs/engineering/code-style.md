@@ -97,7 +97,7 @@ error   → 消息 + 可执行动作（重试 / 检查配置 / 查看日志）
 - **React 拥有 DOM，D3 只算数学**；不用 `d3-selection` 操作 React 节点。
 - 用 `ChartCanvas` 拿响应式宽度，不自己写 ResizeObserver。
 - 用 `scaleLinear` / `scaleBand` / `scaleSqrt`；`line` / `area` / `pie` / `arc` 生成 path。
-- 空数据用 `EmptyChart`；`null` 跳过，不画 0。
+- 空数据用 `DataEmpty`（`src/components/dashboard/primitives/data-empty.tsx`）；`null` 跳过，不画 0。
 - 每个数据标记尽量有 `<title>`；SVG 有 `aria-label`。
 - hover / 触控用 pointer 事件，不只写 `onMouseMove`；覆盖层保留纵向滚动。
 
