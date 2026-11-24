@@ -3,6 +3,9 @@ import type { DatasetIndexEntry } from '@/types/dataset'
 /** 官方账号的 `kind`；缺省视为成员（旧数据没有这个字段）。 */
 export const OFFICIAL_KIND = 'official'
 
+/** 第三方联动聚合账号：没有固定频道，场次来源分散，列表里固定排在官方分组最后。 */
+export const AGGREGATE_OFFICIAL_ID = 'other'
+
 export function isOfficialDataset(dataset: Pick<DatasetIndexEntry, 'kind'>): boolean {
   return dataset.kind === OFFICIAL_KIND
 }

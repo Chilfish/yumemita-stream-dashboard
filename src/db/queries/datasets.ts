@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
 import { datasets, streams } from '@/db/schema'
+import { AGGREGATE_OFFICIAL_ID } from '@/lib/dataset-kind'
 import type { DatasetSummary } from '@/types/db'
 import { toIso } from './shared'
 
@@ -49,8 +50,15 @@ export function selectDatasetsQuery(
     })
     .from(datasets)
     .where(where)
-    // 成员在前、官方账号在后，同组内按 id。只按 id 排会把官方账号夹在成员之间。
-    .orderBy(sql`case when ${datasets.kind} = 'member' then 0 else 1 end`, datasets.id)
+    // 成员在前、官方账号在后，聚合账号 `other` 固定在官方分组末尾；同组内按 id。
+    .orderBy(
+      sql`case
+        when ${datasets.kind} = 'member' then 0
+        when ${datasets.id} = ${AGGREGATE_OFFICIAL_ID} then 2
+        else 1
+      end`,
+      datasets.id,
+    )
 }
 
 /** 成员列表：组级口径、对比默认集合、SEO 人数都只数成员。 */

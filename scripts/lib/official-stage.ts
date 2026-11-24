@@ -5,9 +5,10 @@
  * （那条链路依赖 `bun` 运行时的 S3 客户端）。
  */
 import { CliError, UsageError } from '@chilfish/devkit/cli'
+import { AGGREGATE_OFFICIAL_ID } from '@/lib/dataset-kind'
 
 /** 没有固定频道的第三方联动聚合账号。 */
-export const FALLBACK_OFFICIAL_ID = 'other'
+export const FALLBACK_OFFICIAL_ID = AGGREGATE_OFFICIAL_ID
 
 export interface OfficialDatasetLike {
   id: string
