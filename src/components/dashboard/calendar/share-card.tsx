@@ -1,35 +1,108 @@
 import { forwardRef } from "react";
 import { ContentTypeIcon } from "@/components/dashboard/calendar/content-type-icon";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarImage,
+} from "@/components/ui/avatar";
 import { deriveCalendarEventState, monthDayLabel } from "@/lib/calendar";
 import { eventMemberLabel, eventTimeLabel, eventTitle } from "@/lib/calendar-labels";
 import { CONTENT_TYPE_LABELS } from "@/lib/classify";
+import { readableOn } from "@/lib/color";
 import { assetUrl } from "@/lib/utils";
-import type { CalendarEvent, DayPlan, DayPlanDay } from "@/types/calendar";
+import type { CalendarEvent, CalendarMember, DayPlan, DayPlanDay } from "@/types/calendar";
 
 const MAX_EVENTS = 7;
 
-function MemberAvatar({ event }: { event: CalendarEvent }) {
-  if (event.memberAvatar) {
+interface Person {
+  id: string;
+  label: string;
+  avatar: string | null;
+  color: string | null;
+}
+
+function toPerson(
+  id: string,
+  fallback: { label: string, avatar: string | null, color: string | null },
+  members: Map<string, CalendarMember>,
+): Person {
+  const member = members.get(id);
+  return {
+    id,
+    label: member?.label ?? fallback.label,
+    avatar: member?.avatar ?? fallback.avatar,
+    color: member?.color ?? fallback.color,
+  };
+}
+
+/**
+ * 卡片头像按「在场的人」展示：成员频道是 owner + 参与者；
+ * 官方账号本身不画头像，只显示 participantIds 里的成员，没有参与者就留空。
+ */
+function eventPeople(event: CalendarEvent, members: Map<string, CalendarMember>): Person[] {
+  const participants = event.participantIds.map((id, index) =>
+    toPerson(
+      id,
+      { label: event.participantLabels[index] ?? id, avatar: null, color: null },
+      members,
+    ),
+  );
+  if (event.memberKind === "official") return participants;
+
+  return [
+    toPerson(event.datasetId, {
+      label: event.memberLabel,
+      avatar: event.memberAvatar,
+      color: event.color,
+    }, members),
+    ...participants,
+  ];
+}
+
+function PersonAvatar({ person, className }: { person: Person, className?: string }) {
+  return (
+    <Avatar className={className}>
+      {person.avatar ? <AvatarImage alt="" src={assetUrl(person.avatar)} /> : null}
+      <AvatarFallback
+        className="font-semibold"
+        style={person.color
+          ? { backgroundColor: person.color, color: readableOn(person.color) }
+          : undefined}
+      >
+        {person.label.slice(0, 1)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
+function EventAvatars({ event, members }: {
+  event: CalendarEvent
+  members: Map<string, CalendarMember>
+}) {
+  const people = eventPeople(event, members);
+  if (people.length === 0) return null;
+  if (people.length === 1) {
     return (
-      <img
-        alt=""
-        className="size-12 rounded-full object-cover ring-2 ring-white/80"
-        src={assetUrl(event.memberAvatar)}
+      <PersonAvatar
+        className="[--avatar-size:--spacing(12)] ring-2 ring-white/80"
+        person={people[0]!}
       />
     );
   }
 
   return (
-    <span
-      className="flex size-12 items-center justify-center rounded-full text-lg font-semibold text-stone-800 ring-2 ring-white/80"
-      style={{ backgroundColor: event.color }}
-    >
-      {event.memberLabel.slice(0, 1)}
-    </span>
+    <AvatarGroup className="[--avatar-size:--spacing(12)]">
+      {people.map(person => <PersonAvatar key={person.id} person={person} />)}
+    </AvatarGroup>
   );
 }
 
-function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
+function DayGroup({ day, now, members }: {
+  day: DayPlanDay
+  now: Date
+  members: Map<string, CalendarMember>
+}) {
   const events = day.events
     .map(event => ({ ...event, state: deriveCalendarEventState(event, now) }))
     .filter(event => event.state !== "cancelled");
@@ -51,7 +124,7 @@ function DayGroup({ day, now }: { day: DayPlanDay; now: Date }) {
             </div>
 
             <div className="shrink-0 self-center">
-              <MemberAvatar event={event} />
+              <EventAvatars event={event} members={members} />
             </div>
 
             <div className="min-w-0 flex-1">
@@ -105,6 +178,8 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
     .map(day => ({ ...day, events: day.events.filter(event => shown.includes(event)) }))
     .filter(day => day.events.length > 0);
 
+  const members = new Map(plan.members.map(member => [member.id, member]));
+
   const first = shown[0]?.date ?? "";
   const last = shown[shown.length - 1]?.date ?? first;
   const range = first && last && first !== last
@@ -133,7 +208,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
 
         <div className="mt-10 rounded-3xl border border-white/70 bg-white/55 px-12 py-2">
           {visibleDays.map(day => (
-            <DayGroup day={day} key={day.date} now={now} />
+            <DayGroup day={day} key={day.date} members={members} now={now} />
           ))}
 
           {hidden > 0 ? (
