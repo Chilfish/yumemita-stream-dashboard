@@ -1,4 +1,5 @@
-import { ChartCard, EmptyChart } from "@/components/charts/chart-card";
+import { ChartCard } from "@/components/charts/chart-card";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { MultiLineChart, type ChartSeries } from "@/components/charts/multi-line-chart";
 import { CopyLinkButton } from "@/components/dashboard/primitives/copy-link-button";
 import { DataTable, type DataColumn } from "@/components/dashboard/primitives/data-table";
@@ -374,7 +375,7 @@ export function GroupComparePage({ datasets, data }: GroupComparePageProps) {
             </p>
           </>
         ) : (
-          <EmptyChart
+          <DataEmpty
             hint="换一个内容类型，或者把时间范围改成「全部」。"
             message="这个筛选下没有可对比的场次"
           />
@@ -410,7 +411,7 @@ export function GroupComparePage({ datasets, data }: GroupComparePageProps) {
             })}
           </div>
         ) : (
-          <EmptyChart
+          <DataEmpty
             hint="至少需要两个有场次的月份才能画趋势；扩大时间范围再试。"
             message={hasData ? "时间范围里只有一个月的场次" : "没有可以画趋势的数据"}
           />

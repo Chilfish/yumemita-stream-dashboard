@@ -35,7 +35,7 @@ export function StreamList({ datasetId, rows, empty, className }: StreamListProp
   if (rows.length === 0) {
     return (
       <p className={cn("px-4 py-8 text-center text-footnote text-muted-foreground", className)}>
-        {empty ?? "暂无数据"}
+        {empty ?? "没有记录"}
       </p>
     );
   }

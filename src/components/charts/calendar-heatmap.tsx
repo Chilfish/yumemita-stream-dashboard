@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { EmptyChart } from "@/components/charts/chart-card";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import {
   calendarMetricValue,
   type CalendarDay,
@@ -99,9 +99,9 @@ export function CalendarHeatmap({ days, metric, ariaLabel, className }: Calendar
 
   if (!view) {
     return (
-      <EmptyChart
+      <DataEmpty
         height={120}
-        hint="没有可用的开播日期。"
+        hint="有场次入库后，开播日期会填满这里。"
         message="还没有可用的直播日期"
       />
     );

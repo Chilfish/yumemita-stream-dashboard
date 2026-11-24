@@ -1,6 +1,7 @@
 import { area, curveMonotoneX, line, max, scaleLinear } from "d3";
 import { useId, useMemo, useState } from "react";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { useThrottledHover } from "@/hooks/use-throttled-hover";
 import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
 import {
@@ -106,11 +107,7 @@ export function MultiLineChart({
   const direct = visible.length > 0 && visible.length <= DIRECT_LABEL_LIMIT;
 
   if (visible.length === 0) {
-    return (
-      <p className="py-12 text-center text-footnote text-muted-foreground">
-        {emptyMessage}
-      </p>
-    );
+    return <DataEmpty message={emptyMessage} />;
   }
 
   return (

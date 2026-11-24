@@ -4,7 +4,7 @@ import { AxisLabel, YAxis } from "@/components/charts/axis";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
 import { useThrottledHover } from "@/hooks/use-throttled-hover";
 import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
-import { EmptyChart } from "@/components/charts/chart-card";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatCompact, formatMinuteOffset } from "@/lib/format";
 import type { PeakMinute } from "@/types/datapack";
@@ -37,9 +37,9 @@ export function StreamTimeline({
 
   if (minutes.length === 0) {
     return (
-      <EmptyChart
+      <DataEmpty
         height={height}
-        hint="没有可用的逐分钟数据。"
+        hint="弹幕按分钟聚合后才能画时间轴。"
         message="本场没有逐分钟弹幕数据"
       />
     );

@@ -1,5 +1,6 @@
 import { max, scaleBand, scaleLinear } from "d3";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatCompact } from "@/lib/format";
 
@@ -11,7 +12,8 @@ export interface TopBarItem {
 
 interface TopBarsProps {
   items: TopBarItem[];
-  emptyMessage?: string;
+  /** 无数据时的说明；由调用方给出具体原因，不要用通用兜底。 */
+  emptyMessage: string;
   valueLabel?: (value: number) => string;
   color?: string;
   labelWidth?: number;
@@ -26,13 +28,13 @@ const ROW_HEIGHT = 26;
 /** 横向条形：没有网格，数值直接标在条尾（直接标注优先于图例）。 */
 export function TopBars({
   items,
-  emptyMessage = "暂无数据",
+  emptyMessage,
   valueLabel = formatCompact,
   color = CHART_COLORS[0],
   labelWidth = 112,
 }: TopBarsProps) {
   if (items.length === 0) {
-    return <p className="py-10 text-center text-footnote text-muted-foreground">{emptyMessage}</p>;
+    return <DataEmpty message={emptyMessage} />;
   }
 
   const maxValue = max(items, item => item.value) ?? 1;

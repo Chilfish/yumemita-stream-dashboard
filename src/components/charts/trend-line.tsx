@@ -3,7 +3,7 @@ import { useId } from "react";
 import { AreaGradient, TickText, YAxis } from "@/components/charts/axis";
 import { ChartCanvas } from "@/components/charts/chart-canvas";
 import { minWidthForPoints, resolveMargin } from "@/lib/chart-layout";
-import { EmptyChart } from "@/components/charts/chart-card";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { formatCompact } from "@/lib/format";
 
@@ -37,9 +37,9 @@ export function TrendLine({
 
   if (numeric.length === 0) {
     return (
-      <EmptyChart
+      <DataEmpty
         height={height}
-        hint="没有可用的日期数据。"
+        hint="换一个指标或时间范围再看。"
         message="没有可用的月度数据"
       />
     );

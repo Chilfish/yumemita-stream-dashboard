@@ -112,7 +112,7 @@ export function DataTable<T>({
               className="py-6 text-center text-footnote text-muted-foreground"
               colSpan={columns.length}
             >
-              {empty ?? "暂无数据"}
+              {empty ?? "没有记录"}
             </TableCell>
           </TableRow>
         ) : (

@@ -77,21 +77,3 @@ export function ChartCard({ title, description, action, children, className }: C
     </ChartFrame>
   );
 }
-
-interface EmptyChartProps {
-  message: string;
-  hint?: string;
-  height?: number;
-}
-
-export function EmptyChart({ message, hint, height = 220 }: EmptyChartProps) {
-  return (
-    <div
-      className="flex flex-col items-center justify-center gap-1 px-4 text-center"
-      style={{ height }}
-    >
-      <p className="text-footnote text-muted-foreground">{message}</p>
-      {hint ? <p className="max-w-sm text-caption text-ink-3">{hint}</p> : null}
-    </div>
-  );
-}
