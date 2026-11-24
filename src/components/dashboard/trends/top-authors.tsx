@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { MeterRow } from "@/components/dashboard/primitives/meter-row";
 import { PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
 import { Button } from "@/components/ui/button";
@@ -39,18 +40,22 @@ export function TopAuthors({ authors }: TopAuthorsProps) {
         title="全期高频发言者"
       />
       <PanelBody className="pb-4">
-        <ul className="grid gap-x-6 gap-y-2.5" id={listId}>
-          {visible.map(author => (
-            <MeterRow
-              count={formatInteger(author.messages)}
-              key={author.author}
-              label={author.author}
-              max={max}
-              note={`${formatInteger(author.streams)} 场`}
-              value={author.messages}
-            />
-          ))}
-        </ul>
+        {visible.length === 0 ? (
+          <DataEmpty message="还没有可以统计的发言者" hint="有弹幕的场次入库后才会出现。" />
+        ) : (
+          <ul className="grid gap-x-6 gap-y-2.5" id={listId}>
+            {visible.map(author => (
+              <MeterRow
+                count={formatInteger(author.messages)}
+                key={author.author}
+                label={author.author}
+                max={max}
+                note={`${formatInteger(author.streams)} 场`}
+                value={author.messages}
+              />
+            ))}
+          </ul>
+        )}
       </PanelBody>
     </section>
   );

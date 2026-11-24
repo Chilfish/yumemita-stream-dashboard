@@ -196,6 +196,8 @@ export function MonthGrid({
 }: MonthGridProps) {
   const weeks = useMemo(() => buildMonthGrid(month, now), [month, now]);
   const byDate = useMemo(() => groupEventsByDate(events), [events]);
+  // 整月没有任何场次时，空日格本身不说话；补一行说明，与列表视图的空态保持一致。
+  const emptyMonth = events.length === 0;
 
   return (
     <SectionCard as="div">
@@ -226,6 +228,12 @@ export function MonthGrid({
           )),
         )}
       </div>
+
+      {emptyMonth ? (
+        <p className="border-t border-hairline px-2 py-2 text-center text-caption text-muted-foreground">
+          这个月还没有安排
+        </p>
+      ) : null}
     </SectionCard>
   );
 }

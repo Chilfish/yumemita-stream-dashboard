@@ -1,3 +1,4 @@
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { MeterRow } from "@/components/dashboard/primitives/meter-row";
 import { PanelHead, PanelBody } from "@/components/dashboard/primitives/panel";
 import type { AggregatedWord } from "@/lib/aggregate";
@@ -12,23 +13,28 @@ interface TopWordsProps {
 export function TopWords({ words }: TopWordsProps) {
   const visible = words.slice(0, TOP_WORDS);
   const max = visible[0]?.count ?? 1;
+  const empty = visible.length === 0;
 
   return (
     <section className="flex min-w-0 flex-col">
-      <PanelHead meta={`Top ${visible.length}`} title="全期高频词" />
+      <PanelHead meta={empty ? undefined : `Top ${visible.length}`} title="全期高频词" />
       <PanelBody className="flex-1 pb-3">
-        <ul className="flex flex-col gap-2.5">
-          {visible.map(word => (
-            <MeterRow
-              count={formatInteger(word.count)}
-              key={word.word}
-              label={word.word}
-              max={max}
-              note={`${formatInteger(word.streams)} 场`}
-              value={word.count}
-            />
-          ))}
-        </ul>
+        {empty ? (
+          <DataEmpty message="还没有可以统计的高频词" hint="有弹幕的场次入库后才会出现。" />
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {visible.map(word => (
+              <MeterRow
+                count={formatInteger(word.count)}
+                key={word.word}
+                label={word.word}
+                max={max}
+                note={`${formatInteger(word.streams)} 场`}
+                value={word.count}
+              />
+            ))}
+          </ul>
+        )}
       </PanelBody>
     </section>
   );

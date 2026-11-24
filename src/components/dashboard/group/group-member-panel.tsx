@@ -1,8 +1,9 @@
 import { useMemo, type CSSProperties } from "react";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { MemberDot } from "@/components/dashboard/primitives/member-avatar";
 import { Panel } from "@/components/dashboard/primitives/panel";
 import { formatInteger } from "@/lib/format";
-import type { GroupMemberSummary } from "@/lib/group";
+import { ATTENDANCE_WINDOW_DAYS, type GroupMemberSummary } from "@/lib/group";
 import { buildAttendance } from "@/lib/group-home";
 import type { GroupDayStat } from "@/types/group";
 
@@ -146,7 +147,17 @@ export function GroupMemberPanel({
             </p>
           ) : null}
         </div>
-      ) : null}
+      ) : (
+        // 出勤算不出来时不要再留一张空白卡片：说明缺什么、什么条件下会出现。
+        <DataEmpty
+          hint={
+            attendanceEnd
+              ? `${ATTENDANCE_WINDOW_DAYS} 天窗口内还没有场次时，这里会是空的。`
+              : undefined
+          }
+          message="还没有足够的开播记录"
+        />
+      )}
     </Panel>
   );
 }

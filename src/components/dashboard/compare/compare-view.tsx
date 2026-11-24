@@ -3,6 +3,7 @@ import { ChartFrame } from "@/components/charts/chart-frame";
 import { MultiLineChart, type ChartSeries } from "@/components/charts/multi-line-chart";
 import { CopyLinkButton } from "@/components/dashboard/primitives/copy-link-button";
 import { DataTable, type DataColumn } from "@/components/dashboard/primitives/data-table";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { PageHeader } from "@/components/dashboard/primitives/page-header";
 import { Panel, PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
 import { SectionHeading } from "@/components/dashboard/primitives/section";
@@ -228,8 +229,11 @@ export function CompareView({
           />
           <PanelBody flush>
             <ScrollArea className="h-64 sm:h-80 xl:h-[33.75rem]">
-              <ul className="divide-y divide-hairline">
-                {rows.map(row => {
+              {rows.length === 0 ? (
+                <DataEmpty message="这位成员还没有可对比的场次" hint="有场次入库后可以从这里勾选。" />
+              ) : (
+                <ul className="divide-y divide-hairline">
+                  {rows.map(row => {
                   const checked = selectedIds.includes(row.videoId);
                   const disabled = !checked && atLimit;
 
@@ -263,6 +267,7 @@ export function CompareView({
                   );
                 })}
               </ul>
+              )}
             </ScrollArea>
           </PanelBody>
         </Panel>
