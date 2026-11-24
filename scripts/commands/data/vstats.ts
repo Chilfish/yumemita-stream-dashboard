@@ -257,9 +257,11 @@ export async function runVstats(options: RunVstatsOptions = {}): Promise<{ exitC
 
   // 已判「未收录」的场次直接剔出候选，别让它们占掉本轮配额。
   const sessions = sessionDirs(options.root)
-  const settled = new Set(
-    [...sessions].filter(([id, dir]) => sentinelIsFresh(join(dir, 'work', 'vstats-unavailable.txt'))).map(([id]) => id),
-  )
+  const settled = new Set<string>()
+  for (const [id, dir] of sessions) {
+    if (sentinelIsFresh(join(dir, 'work', 'vstats-unavailable.txt')))
+      settled.add(id)
+  }
   const openCandidates = candidates.filter(candidate => !settled.has(candidate.videoId))
 
   const picked = limit > 0 ? shuffle(openCandidates).slice(0, limit) : shuffle(openCandidates)
