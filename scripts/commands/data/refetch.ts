@@ -42,6 +42,7 @@ function runYtDlpJson(videoId: string, cookieArgs: string[]): Promise<{ channel_
   const proxy = process.env.YTDLP_PROXY
   const args = [
     '-J',
+    '--ignore-no-formats-error',
     '--socket-timeout',
     '30',
     '--retries',

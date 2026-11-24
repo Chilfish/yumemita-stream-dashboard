@@ -78,6 +78,8 @@ function runYtDlpJson(videoId: string, cookieArgs: string[]): Promise<VideoInfo>
   const proxy = process.env.YTDLP_PROXY
   const args = [
     '-J',
+    // 只要元信息：n-challenge 解不出来时视频格式会消失，不加这个开关整条命令直接失败。
+    '--ignore-no-formats-error',
     '--socket-timeout',
     '30',
     '--retries',

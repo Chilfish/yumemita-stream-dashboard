@@ -356,9 +356,11 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
     if (!existsSync(ignorePath))
       writeFileSync(ignorePath, '*\n', 'utf8')
   }
-  const logPath = join(stateDir, 'fetch.log')
-  const progressPath = join(stateDir, 'fetch-progress.json')
-  const channelCache = join(stateDir, 'channel-ids.txt')
+  // 同一次 `data update` 里多个成员会并发跑 fetch；这三个文件按 dataset 分名，
+  // 否则进度与频道缓存会被互相覆盖。
+  const logPath = join(stateDir, `fetch-${dataset.id}.log`)
+  const progressPath = join(stateDir, `fetch-${dataset.id}-progress.json`)
+  const channelCache = join(stateDir, `channel-ids-${dataset.id}.txt`)
 
   const limit = Number(values.limit ?? 0)
   const concurrency = Number(values.concurrency ?? 3)
@@ -540,7 +542,9 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
         }
         else {
           const url = `https://www.youtube.com/watch?v=${candidate.id}`
-          const raw = await run('yt-dlp', ['-J', ...ytdlpBase, ...cookieArgs, url], true)
+          // 只要元信息：n-challenge 解不出来时 yt-dlp 只剩 storyboard，
+          // 不加这个开关会让整条命令以「Requested format is not available」失败。
+          const raw = await run('yt-dlp', ['-J', '--ignore-no-formats-error', ...ytdlpBase, ...cookieArgs, url], true)
           const info = JSON.parse(raw) as InfoJson
           if (info.id !== candidate.id)
             throw new Error(`id 不匹配：${info.id}`)
@@ -674,7 +678,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
         try {
           const chatFile = join(session, 'danmaku', `${id}.live_chat.json`)
           if (!existsSync(chatFile)) {
-            await run('yt-dlp', [...cookieArgs, ...ytdlpBase, '--skip-download', '--write-subs', '--sub-langs', 'live_chat', '-o', join(session, 'danmaku', '%(id)s.%(ext)s'), `https://www.youtube.com/watch?v=${id}`], false)
+            await run('yt-dlp', [...cookieArgs, ...ytdlpBase, '--ignore-no-formats-error', '--skip-download', '--write-subs', '--sub-langs', 'live_chat', '-o', join(session, 'danmaku', '%(id)s.%(ext)s'), `https://www.youtube.com/watch?v=${id}`], false)
           }
           if (existsSync(chatFile)) {
             try {
@@ -716,7 +720,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
         try {
           if (existsSync(commentsPath))
             unlinkSync(commentsPath)
-          const raw = await run('yt-dlp', ['-J', '--write-comments', ...ytdlpBase, ...cookieArgs, `https://www.youtube.com/watch?v=${id}`], true)
+          const raw = await run('yt-dlp', ['-J', '--ignore-no-formats-error', '--write-comments', ...ytdlpBase, ...cookieArgs, `https://www.youtube.com/watch?v=${id}`], true)
           writeFileSync(commentsPath, raw, 'utf8')
           media.comments += 1
         }
