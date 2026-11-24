@@ -3,6 +3,7 @@ import { dbBenchSpec } from './bench.ts'
 import { dbIngestSpec } from './ingest.ts'
 import { dbLatestSpec } from './latest.ts'
 import { dbMigrateSpec } from './migrate.ts'
+import { dbPullSpec } from './pull.ts'
 import { dbQuerySpec } from './query.ts'
 import { dbSchedulesSpec } from './schedules.ts'
 import { dbTotalsSpec } from './totals.ts'
@@ -14,6 +15,7 @@ export const dbGroup: CommandGroup = {
   description: '数据库：ingest、对账、迁移、查询冒烟与压测',
   commands: [
     dbIngestSpec,
+    dbPullSpec,
     dbVerifySpec,
     dbMigrateSpec,
     dbQuerySpec,

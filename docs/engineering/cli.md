@@ -63,6 +63,7 @@ bun run ymmt data official "https://www.youtube.com/live/V2AJBNJGR8E" --particip
 | `data live-chat` | InnerTube 实时聊天采集 |
 | `data datapack` | 把一场素材合并成 datapack |
 | `db ingest` | 本地 pack 写入 PostgreSQL（增量、一场一事务） |
+| `db pull` | 线上库增量同步到本机库（按 `content_hash`，日程表整体覆盖） |
 | `db verify` | 数据库与本地 pack 字段级对账 |
 | `db migrate` | 应用 drizzle 迁移 |
 | `db query` | 查询层冒烟 + 本地延迟 |
