@@ -18,7 +18,11 @@ describe("splitCommentText", () => {
       text: "1:09:12",
       url: url(4152),
     });
-    expect(splitCommentText("2:50 開始", VIDEO)[0]?.url).toBe(url(170));
+    expect(splitCommentText("2:50 開始", VIDEO)[0]).toEqual({
+      kind: "timecode",
+      text: "2:50",
+      url: url(170),
+    });
     expect(splitCommentText("4:26", VIDEO)).toEqual([
       { kind: "timecode", text: "4:26", url: url(266) },
     ]);
