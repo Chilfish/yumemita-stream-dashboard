@@ -1,4 +1,5 @@
 import { DataTable, type DataColumn } from "@/components/dashboard/primitives/data-table";
+import { MissingValue } from "@/components/dashboard/primitives/missing-value";
 import { Panel, PanelBody, PanelHead } from "@/components/dashboard/primitives/panel";
 import { StreamCover } from "@/components/dashboard/primitives/stream-cover";
 import { StreamList } from "@/components/dashboard/streams/stream-list";
@@ -11,12 +12,8 @@ import type { StreamSummary } from "@/types/dataset";
 
 const RECENT_LIMIT = 8;
 
-function Missing() {
-  return <span className="text-ink-3 opacity-40">—</span>;
-}
-
 function metricCell(row: StreamSummary, value: number | null | undefined) {
-  return (row.masked ?? isMemberOnly(row.availability)) ? <Missing /> : formatInteger(value);
+  return (row.masked ?? isMemberOnly(row.availability)) ? <MissingValue /> : formatInteger(value);
 }
 
 interface HomeRecentStreamsProps {

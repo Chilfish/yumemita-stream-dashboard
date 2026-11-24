@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { type DataColumn } from "@/components/dashboard/primitives/data-table";
+import { MissingValue } from "@/components/dashboard/primitives/missing-value";
 import { Badge } from "@/components/ui/badge";
 import { CONTENT_TYPE_LABELS, classifyTitle } from "@/lib/classify";
 import {
@@ -13,13 +14,9 @@ import type { OptionalTableColumn } from "@/lib/table-params";
 import type { StreamSummary } from "@/types/dataset";
 import { isMemberOnly } from "@/lib/visibility";
 
-function Missing() {
-  return <span className="text-ink-3 opacity-40">—</span>;
-}
-
 /** 数字默认退到二级色，只有主指标（峰值）用前景色加粗，给每行一个落点。 */
 function numberCell(value: number | null | undefined, strong = false): ReactNode {
-  if (value == null) return <Missing />;
+  if (value == null) return <MissingValue />;
   return (
     <span className={strong ? "font-medium text-foreground" : "text-muted-foreground"}>
       {formatInteger(value)}
@@ -29,7 +26,7 @@ function numberCell(value: number | null | undefined, strong = false): ReactNode
 
 /** `likesPer1000Views` 是千次播放点赞数，换算成百分比。 */
 function likeRateCell(value: number | null | undefined): ReactNode {
-  if (value == null) return <Missing />;
+  if (value == null) return <MissingValue />;
   return <span className="text-muted-foreground">{formatPercent(value / 10, 2)}</span>;
 }
 
@@ -42,12 +39,12 @@ function streamMetricCell(
   value: number | null | undefined,
   strong = false,
 ): ReactNode {
-  if (isMasked(row)) return <Missing />;
+  if (isMasked(row)) return <MissingValue />;
   return numberCell(value, strong);
 }
 
 function streamRateCell(row: StreamSummary, value: number | null | undefined): ReactNode {
-  if (isMasked(row)) return <Missing />;
+  if (isMasked(row)) return <MissingValue />;
   return likeRateCell(value);
 }
 
@@ -102,7 +99,7 @@ export function buildStreamColumns(extraCols: Set<OptionalTableColumn>): DataCol
       width: "5.5rem",
       render: row =>
         row.durationSec == null ? (
-          <Missing />
+          <MissingValue />
         ) : (
           <span className="text-muted-foreground">{formatDuration(row.durationSec)}</span>
         ),

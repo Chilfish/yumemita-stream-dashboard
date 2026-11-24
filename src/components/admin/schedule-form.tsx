@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import type { SubmitEvent } from "react";
 import type { DatasetOption, FormState } from "@/components/admin/schedule-form-state";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -36,7 +36,7 @@ interface ScheduleFormProps {
   error: string | null;
   onChange: (patch: Partial<FormState>) => void;
   onReset: () => void;
-  onSubmit: (event: FormEvent) => void;
+  onSubmit: (event: SubmitEvent<HTMLFormElement>) => void;
 }
 
 export function ScheduleForm({

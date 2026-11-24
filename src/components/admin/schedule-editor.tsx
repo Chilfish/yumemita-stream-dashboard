@@ -1,5 +1,5 @@
 import { CalendarPlus } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 import {
   emptyForm,
   jstTime,
@@ -91,7 +91,7 @@ function Editor({ datasets, initialItems, today }: ScheduleEditorProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function submit(event: FormEvent): Promise<void> {
+  async function submit(event: SubmitEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (form.timeMode === "time" && !form.time) {
       setError("请填写精确时间，或切换到时段模式");

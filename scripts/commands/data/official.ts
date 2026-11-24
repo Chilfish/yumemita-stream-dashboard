@@ -23,7 +23,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Option } from 'commander'
-import { type CommandSpec, CliError, UsageError, type Logger } from '@chilfish/devkit/cli'
+import { type CommandSpec, CliError, type Logger } from '@chilfish/devkit/cli'
 import { devkit } from '../../dev.config.ts'
 import { applyOnlineEnv, readOnlineTarget } from '@scripts/lib/online-env.ts'
 import { parseVideoRef } from '@scripts/lib/video-ref.ts'
@@ -72,10 +72,6 @@ interface CollaborationsFile {
 function readDatasets(): DatasetSource[] {
   const config = JSON.parse(readFileSync(DATASOURCES_PATH, 'utf8')) as { datasets?: DatasetSource[] }
   return config.datasets ?? []
-}
-
-function members(datasets: DatasetSource[]): DatasetSource[] {
-  return datasets.filter(item => (item.kind ?? 'member') === 'member')
 }
 
 function runYtDlpJson(videoId: string, cookieArgs: string[]): Promise<VideoInfo> {

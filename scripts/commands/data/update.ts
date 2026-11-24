@@ -39,7 +39,7 @@ import {
 import { purgeCache } from '@scripts/lib/purge.ts'
 import { syncScheduleFromChannel } from '@scripts/lib/schedule-sync.ts'
 import { planDataset, type ChannelEntry, type PlanStream } from '@scripts/lib/update-plan.ts'
-import { resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
+import { resolveCookies } from '@scripts/lib/yt-cookies.ts'
 import { runFetch } from './fetch.ts'
 import { runVstats } from './vstats.ts'
 import { runThumbnails } from './thumbnails.ts'
@@ -410,7 +410,7 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResu
   }
   // cookie 默认每次运行重新导出到 ~/yt-cookies.txt；CI 走显式 --cookies 文件。
   const cookiesFromBrowser = options.cookiesFromBrowser ?? 'firefox'
-  const resolvedCookies = await resolveCookies({
+  await resolveCookies({
     cookies: options.cookies,
     envCookie: process.env.YT_COOKIE,
     browser: cookiesFromBrowser,
@@ -419,7 +419,6 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<UpdateResu
     appRoot: APP_ROOT,
     log: line => report('info', line),
   })
-  const cookieArgs = ytdlpCookieArgs(resolvedCookies, { browser: cookiesFromBrowser })
   const dryRun = options.dryRun === true
   const noPublish = options.noPublish === true
   const vstatsLimit = options.vstatsLimit ?? 20

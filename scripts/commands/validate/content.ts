@@ -79,10 +79,6 @@ interface AuthorIndex {
   streams: { authors: number[] }[]
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
 function parse<T>(text: string | null): T | null {
   if (text == null)
     return null

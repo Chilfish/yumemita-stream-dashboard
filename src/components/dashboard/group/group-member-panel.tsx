@@ -1,18 +1,9 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { MemberDot } from "@/components/dashboard/primitives/member-avatar";
 import { Panel } from "@/components/dashboard/primitives/panel";
-import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { formatDecimal, formatInteger, formatPercent } from "@/lib/format";
+import { formatInteger } from "@/lib/format";
 import type { GroupMemberSummary } from "@/lib/group";
-import {
-  buildAttendance,
-  buildMemberStandings,
-  MEMBER_METRICS,
-  memberMetric,
-  type MemberMetricKey,
-  type MemberMetricOption,
-} from "@/lib/group-home";
+import { buildAttendance } from "@/lib/group-home";
 import type { GroupDayStat } from "@/types/group";
 
 const OPACITY = [0, 0.18, 0.36, 0.56, 0.76, 1] as const;
@@ -25,15 +16,9 @@ interface GroupMemberPanelProps {
   attendanceEnd: string | null;
 }
 
-function formatMetricValue(value: number | null, option: MemberMetricOption): string {
-  if (value == null) return "—";
-  if (option.key === "duration") return formatDecimal(Math.round(value * 10) / 10);
-  return option.format === "decimal" ? formatDecimal(value) : formatInteger(value);
-}
-
 /**
- * 成员榜 + 近 100 天出勤。两组数据都来自 group summary，切换指标只在本地重算，
- * 不触发新的查询；场次含会限，其余指标只累加公开场次。
+ * 近 100 天出勤。数据来自 group summary，只在本地重算，不触发新的查询；
+ * 场次含会限，其余指标只累加公开场次。
  */
 export function GroupMemberPanel({
   members,
@@ -41,10 +26,6 @@ export function GroupMemberPanel({
   attendanceStart,
   attendanceEnd,
 }: GroupMemberPanelProps) {
-  const [metric, setMetric] = useState<MemberMetricKey>("streams");
-  const active = memberMetric(metric);
-  const standings = useMemo(() => buildMemberStandings(members, metric), [members, metric]);
-  const maxValue = Math.max(1, standings.find(row => row.value != null)?.value ?? 0);
   const attendance = useMemo(
     () =>
       attendanceStart && attendanceEnd
@@ -52,12 +33,6 @@ export function GroupMemberPanel({
         : null,
     [attendanceEnd, attendanceStart, days, members],
   );
-
-  function changeMetric(next: string[]): void {
-    const [value] = next;
-    const option = MEMBER_METRICS.find(item => item.key === value);
-    if (option) setMetric(option.key);
-  }
 
   return (
     <Panel>

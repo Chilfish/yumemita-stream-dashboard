@@ -23,7 +23,9 @@ function copyWithTextarea(text: string): boolean {
   try {
     textarea.select();
     textarea.setSelectionRange(0, text.length);
-    return document.execCommand("copy");
+    // Clipboard API 在非安全上下文不可用，execCommand 是唯一的退路。
+    const legacy = document as unknown as { execCommand(command: string): boolean };
+    return legacy.execCommand("copy");
   } catch {
     return false;
   } finally {

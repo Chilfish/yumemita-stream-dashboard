@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { Link } from "@/lib/router-compat";
-import { MemberAvatar, MemberDot } from "@/components/dashboard/primitives/member-avatar";
+import { MemberAvatar } from "@/components/dashboard/primitives/member-avatar";
 import { StreamCover } from "@/components/dashboard/primitives/stream-cover";
-import { formatDate, formatInteger, formatTime } from "@/lib/format";
+import { formatDate, formatTime } from "@/lib/format";
 import type { GroupMemberSummary } from "@/lib/group";
 import {
   memberAccentColor,
@@ -11,22 +11,6 @@ import {
   secondaryReadout,
 } from "@/lib/group-home";
 import { homePath, streamPath } from "@/lib/routes";
-
-interface InlineValueProps {
-  label: string;
-  unit: string;
-  value: number | null;
-}
-
-function InlineValue({ label, unit, value }: InlineValueProps) {
-  return (
-    <span className="flex items-baseline gap-1">
-      <span className="text-ink-3">{label}</span>
-      <span className="font-medium tabular-nums text-foreground">{formatInteger(value)}</span>
-      {value == null ? null : <span className="text-caption text-ink-3">{unit}</span>}
-    </span>
-  );
-}
 
 interface GroupMemberRowProps {
   member: GroupMemberSummary;

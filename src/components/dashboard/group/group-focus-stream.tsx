@@ -1,8 +1,7 @@
 import type { CSSProperties } from "react";
 import { Link } from "@/lib/router-compat";
-import { MemberAvatar, MemberDot } from "@/components/dashboard/primitives/member-avatar";
+import { MemberAvatar } from "@/components/dashboard/primitives/member-avatar";
 import { StreamCover } from "@/components/dashboard/primitives/stream-cover";
-import { Badge } from "@/components/ui/badge";
 import {
   formatDate,
   formatDurationLong,
@@ -14,14 +13,10 @@ import type { GroupMemberSummary } from "@/lib/group";
 import {
   memberAccentColor,
   primaryReadout,
-  relativeDayLabel,
   secondaryReadout,
 } from "@/lib/group-home";
-import { homePath, streamPath } from "@/lib/routes";
+import { streamPath } from "@/lib/routes";
 import type { GroupStreamSummary } from "@/types/group";
-
-const LINK_CLASS =
-  "text-footnote text-muted-foreground underline-offset-4 transition-colors duration-120 ease-out hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-member-ink";
 
 interface ReadoutProps {
   label: string;
@@ -57,8 +52,6 @@ export function GroupFocusStream({ member, stream }: GroupFocusStreamProps) {
   const color = memberAccentColor(member);
   const primary = primaryReadout(stream);
   const secondary = secondaryReadout(stream);
-  const relative = relativeDayLabel(stream.startedAt);
-  const memberOnly = stream.availability === "subscriber_only";
 
   return (
     <section

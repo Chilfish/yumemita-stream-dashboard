@@ -1,6 +1,4 @@
-import { Check, GitCompare } from "lucide-react";
-import { Link } from "@/lib/router-compat";
-import { groupComparePath } from "@/lib/routes";
+import { Check } from "lucide-react";
 import {
   Sheet,
   SheetHeader,

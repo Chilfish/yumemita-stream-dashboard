@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm'
 import type { Db } from '@/db/connection'
-import { datasets, streams } from '@/db/schema'
+import { datasets } from '@/db/schema'
 import { AGGREGATE_OFFICIAL_ID } from '@/lib/dataset-kind'
 import type { DatasetSummary } from '@/types/db'
 import { toIso } from './shared'
