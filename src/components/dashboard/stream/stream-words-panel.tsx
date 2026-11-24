@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { TopBars } from "@/components/charts/top-bars";
 import { EmojiImage } from "@/components/dashboard/primitives/emoji-image";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { SectionHeading } from "@/components/dashboard/primitives/section";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { StreamRow } from "@/lib/aggregate";
 import { streamTopWords } from "@/lib/aggregate";
+import { chatUnavailableCopy, resolveChatAvailability } from "@/lib/data-availability";
 import { useEmojiIndex } from "@/hooks/use-emoji-index";
 import { isCustomEmojiId } from "@/lib/emoji";
 import {
@@ -135,6 +137,21 @@ export function StreamWordsPanel({ datasetId, row }: StreamWordsPanelProps) {
     label: tag,
     value: formatInteger(count),
   }));
+
+  // 整场没有任何弹幕内容时，下面的分区只会重复「本场没有…」，换一条说明即可。
+  const availability = resolveChatAvailability({
+    availability: pack.video.availability,
+    hasLiveChatReplay: pack.video.hasLiveChatReplay,
+    liveStatus: pack.video.liveStatus,
+    total: chat.total,
+  });
+  const hasAnyChat = chat.total > 0 || ownerChats.length > 0 || memberChats.length > 0;
+  if (!hasAnyChat) {
+    const copy = availability.state === "unavailable"
+      ? chatUnavailableCopy(availability.reason)
+      : { hint: "弹幕、词频与发言者都来自聊天回放。", message: "这场没有弹幕记录" };
+    return <DataEmpty hint={copy.hint} message={copy.message} />;
+  }
 
   return (
     <div className="flex flex-col gap-5">

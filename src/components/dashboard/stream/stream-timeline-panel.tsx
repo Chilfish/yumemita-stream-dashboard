@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { ChartFrame } from "@/components/charts/chart-frame";
 import { StreamTimeline } from "@/components/charts/stream-timeline";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import type { StreamRow } from "@/lib/aggregate";
+import { chatUnavailableCopy, resolveChatAvailability } from "@/lib/data-availability";
 import { formatCurrency, formatInteger, formatTime } from "@/lib/format";
 import type { Superchat } from "@/types/datapack";
 
@@ -39,6 +41,21 @@ export function StreamTimelinePanel({ row }: StreamTimelinePanelProps) {
     return before != null && before >= 0 && before <= tailWindowMin;
   });
   const biggest = topPerCurrency(superchats);
+
+  // 没有逐分钟弹幕就没有时间轴，也不会有峰值；一条说明替代整块内容。
+  const hasTimeline = density.perMinute.some(value => value > 0);
+  const availability = resolveChatAvailability({
+    availability: pack.video.availability,
+    hasLiveChatReplay: pack.video.hasLiveChatReplay,
+    liveStatus: pack.video.liveStatus,
+    total: pack.chat.total,
+  });
+  if (!hasTimeline) {
+    const copy = availability.state === "unavailable"
+      ? chatUnavailableCopy(availability.reason)
+      : { hint: "弹幕按分钟聚合后才能画时间轴。", message: "这场没有逐分钟弹幕数据" };
+    return <DataEmpty hint={copy.hint} message={copy.message} />;
+  }
 
   return (
     <div className="flex flex-col gap-5">

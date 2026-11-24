@@ -1,4 +1,5 @@
 import { ChartFrame } from "@/components/charts/chart-frame";
+import { DataEmpty } from "@/components/dashboard/primitives/data-empty";
 import { EmojiImage } from "@/components/dashboard/primitives/emoji-image";
 import { SectionHeading } from "@/components/dashboard/primitives/section";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useEmojiIndex } from "@/hooks/use-emoji-index";
 import type { StreamRow } from "@/lib/aggregate";
+import { chatUnavailableCopy, resolveChatAvailability } from "@/lib/data-availability";
 import {
   currencyLabel,
   formatCurrency,
@@ -71,6 +73,20 @@ export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
   const hasSc = superchats.length > 0;
   const hasOtherPaid =
     paid.stickers.length > 0 || paid.memberships.length > 0 || gifts.length > 0;
+  const availability = resolveChatAvailability({
+    availability: pack.video.availability,
+    hasLiveChatReplay: pack.video.hasLiveChatReplay,
+    liveStatus: pack.video.liveStatus,
+    total: pack.chat.total,
+  });
+  // 弹幕不可用时这里没有任何明细，只留一条说明，不逐块写「本场没有 SC / 贴纸 / 会员」。
+  const emptyCopy = availability.state === "unavailable"
+    ? chatUnavailableCopy(availability.reason)
+    : { hint: "这场没有 SC、贴纸或会员记录。", message: "没有付费记录" };
+
+  if (!hasSc && !hasOtherPaid) {
+    return <DataEmpty hint={emptyCopy.hint} message={emptyCopy.message} />;
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -102,9 +118,10 @@ export function StreamPaidPanel({ datasetId, row }: StreamPaidPanelProps) {
           </dl>
         </section>
       ) : (
-        <section className="flex flex-col items-center gap-1 py-8 text-center">
-          <h2 className="text-headline text-foreground">本场没有 SC</h2>
-        </section>
+        <DataEmpty
+          hint={emptyCopy.hint}
+          message={emptyCopy.message}
+        />
       )}
 
       {hasSc ? (

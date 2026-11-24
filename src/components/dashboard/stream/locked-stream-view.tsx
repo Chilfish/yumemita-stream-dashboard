@@ -22,7 +22,16 @@ interface LockedStreamViewProps {
 export function LockedStreamView({ datasetId, summary }: LockedStreamViewProps) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[28rem_minmax(0,1fr)] lg:items-start">
+        <StreamCover
+          datasetId={datasetId}
+          eager
+          sizes="(min-width: 1024px) 28rem, 100vw"
+          thumbnail={summary.thumbnail}
+          title={summary.title}
+          videoId={summary.videoId}
+        />
+
         <PageHeader
           actions={
             <>
@@ -45,15 +54,6 @@ export function LockedStreamView({ datasetId, summary }: LockedStreamViewProps) 
         >
           <Badge variant="warning">会员限定</Badge>
         </PageHeader>
-
-        <StreamCover
-          datasetId={datasetId}
-          eager
-          sizes="(min-width: 1024px) 20rem, 100vw"
-          thumbnail={summary.thumbnail}
-          title={summary.title}
-          videoId={summary.videoId}
-        />
       </div>
 
       <Panel className="p-4 md:p-5">

@@ -23,6 +23,7 @@ import {
   formatWeekday,
 } from "@/lib/format";
 import { STREAM_SUBVIEWS, type StreamSubView } from "@/lib/routes";
+import { resolveChatAvailability } from "@/lib/data-availability";
 import type { StreamNavItem } from "@/types/dataset";
 
 const SUBVIEW_LABELS: Record<StreamSubView, string> = {
@@ -97,6 +98,48 @@ export function StreamDetailView({
   // 联动场把全部成员写在一行；单人场为空，页头不额外占用一行。
   const memberLine = memberLabels.length > 1 ? memberLabels.join(" × ") : null;
 
+  const chatAvailability = resolveChatAvailability({
+    availability: pack.video.availability,
+    hasLiveChatReplay: pack.video.hasLiveChatReplay,
+    liveStatus: pack.video.liveStatus,
+    total: pack.chat.total,
+  });
+  const chatAvailable = chatAvailability.state === "available";
+  // 投稿没有开播/结束的时段，只写发布时刻。
+  const isPublished = pack.video.liveStatus === "not_live";
+  // 没有 VSTATS 时不留两个「—」占住位置：换成抓取时的播放与点赞快照。
+  const vstats = pack.vstats;
+  const chatTotal = chatAvailable ? formatInteger(pack.chat.total) : "—";
+  const superchatValue = chatAvailable ? `${formatInteger(superchatCount)} 笔` : "—";
+  // 评论优先用本站抓到的条数；没抓到但有 YouTube 总数时标出口径。
+  const commentsTotal = pack.comments?.total ?? null;
+  const commentsValue = commentsTotal != null
+    ? formatInteger(commentsTotal)
+    : formatInteger(pack.video.snapshot.comments);
+  const facts = vstats
+    ? [
+        { label: "时长", value: formatDuration(summary.durationSec) },
+        { label: "平均同接", value: formatInteger(vstats.avgConcurrent ?? null) },
+        { label: "峰值", value: formatInteger(vstats.maxConcurrent ?? null) },
+        { label: "弹幕", value: chatTotal },
+        { label: "SC", value: superchatValue },
+        {
+          label: commentsTotal != null ? "评论" : "YouTube 评论",
+          value: commentsValue,
+        },
+      ]
+    : [
+        { label: "时长", value: formatDuration(summary.durationSec) },
+        { label: "播放", value: formatInteger(pack.video.snapshot.views) },
+        { label: "点赞", value: formatInteger(pack.video.snapshot.likes) },
+        { label: "弹幕", value: chatTotal },
+        { label: "SC", value: superchatValue },
+        {
+          label: commentsTotal != null ? "评论" : "YouTube 评论",
+          value: commentsValue,
+        },
+      ];
+
   // 逐字稿是可选内容：没有稿的场次不显示这个分段，避免出现永远为空的标签。
   const subviews = STREAM_SUBVIEWS.filter(subview => subview !== "transcript" || hasTranscriptProp);
   // URL 里的 view 可能指向当前不可用的分段（例如无稿时的 transcript）；回退到概览。
@@ -135,7 +178,17 @@ export function StreamDetailView({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      {/* 封面是这一屏的主视觉：桌面左置放大，移动端自然排在标题之前。 */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[28rem_minmax(0,1fr)] lg:items-start">
+        <StreamCover
+          datasetId={datasetId}
+          eager
+          sizes="(min-width: 1024px) 28rem, 100vw"
+          thumbnail={summary.thumbnail}
+          title={summary.title}
+          videoId={summary.videoId}
+        />
+
         <PageHeader
           actions={
             <>
@@ -151,15 +204,8 @@ export function StreamDetailView({
             </>
           }
           className="min-w-0 border-b-0 pb-0 lg:border-b lg:pb-4"
-          eyebrow={`${formatFullDate(summary.startedAt)} ${formatWeekday(summary.startedAt)} · ${formatTime(summary.startedAt)}–${formatTime(summary.endedAt)} JST`}
-          facts={[
-            { label: "时长", value: formatDuration(summary.durationSec) },
-            { label: "平均同接", value: formatInteger(pack.vstats?.avgConcurrent ?? null) },
-            { label: "峰值", value: formatInteger(pack.vstats?.maxConcurrent ?? null) },
-            { label: "弹幕", value: formatInteger(pack.chat.total) },
-            { label: "SC", value: `${formatInteger(superchatCount)} 笔` },
-            { label: "评论", value: formatInteger(pack.comments?.total ?? null) },
-          ]}
+          eyebrow={`${isPublished ? "发布" : "开播"} · ${formatFullDate(summary.startedAt)} ${formatWeekday(summary.startedAt)} · ${formatTime(summary.startedAt)}${isPublished ? "" : `–${formatTime(summary.endedAt)}`} JST`}
+          facts={facts}
           title={summary.title}
           titleClassName="text-title line-clamp-2"
         >
@@ -170,15 +216,6 @@ export function StreamDetailView({
             </span>
           ) : null}
         </PageHeader>
-
-        <StreamCover
-          datasetId={datasetId}
-          eager
-          sizes="(min-width: 1024px) 20rem, 100vw"
-          thumbnail={summary.thumbnail}
-          title={summary.title}
-          videoId={summary.videoId}
-        />
       </div>
 
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">

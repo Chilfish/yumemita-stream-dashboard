@@ -5,7 +5,8 @@ import { LockedStreamView } from '@/components/dashboard/stream/locked-stream-vi
 import { StreamDetailView } from '@/components/dashboard/stream/stream-detail-view'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { memberLabelsOf } from '@/lib/members'
-import { DEFAULT_STREAM_SUBVIEW, parseStreamSubView, streamPath } from '@/lib/routes'
+import { pickDefaultStreamSubView, resolveChatAvailability } from '@/lib/data-availability'
+import { DEFAULT_STREAM_SUBVIEW, parseStreamSubView, streamPath, type StreamSubView } from '@/lib/routes'
 import { RouterProvider, useNavigate, useSearchParams } from '@/lib/router-compat'
 
 export function StreamApp(props: DatasetAppProps) {
@@ -30,7 +31,8 @@ function StreamBody({
 }: DatasetAppProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const view = parseStreamSubView(searchParams.get('view'))
+  const viewParam = searchParams.get('view')
+  const view = parseStreamSubView(viewParam)
 
   if (locked && stream) {
     return <LockedStreamView datasetId={dataset.id} summary={stream} />
@@ -45,6 +47,21 @@ function StreamBody({
       </Alert>
     )
   }
+
+  // 没带 ?view 时按数据决定首屏：没有弹幕可看就落到评论，有弹幕仍停在概览。
+  // URL 显式给出 view 时一率尊重，避免用户的选择被覆盖。
+  const chatAvailability = resolveChatAvailability({
+    availability: pack.video.availability,
+    hasLiveChatReplay: pack.video.hasLiveChatReplay,
+    liveStatus: pack.video.liveStatus,
+    total: pack.chat.total,
+  })
+  const resolvedView: StreamSubView = viewParam
+    ? view
+    : pickDefaultStreamSubView({
+        chatAvailable: chatAvailability.state === 'available',
+        hasComments: (pack.comments?.items.length ?? 0) > 0,
+      })
 
   return (
     <StreamDetailView
@@ -62,7 +79,7 @@ function StreamBody({
       }}
       row={{ summary: stream, pack }}
       rows={rows}
-      view={view}
+      view={resolvedView}
     />
   )
 }
