@@ -1,6 +1,7 @@
 import type { CommandGroup } from '@chilfish/devkit/cli'
 import { publishDataSpec } from './data.ts'
 import { publishPurgeSpec } from './purge.ts'
+import { publishPushSpec } from './push.ts'
 import { publishSyncSpec } from './sync.ts'
 import { publishTranscriptsSpec } from './transcripts.ts'
 
@@ -8,5 +9,5 @@ import { publishTranscriptsSpec } from './transcripts.ts'
 export const publishGroup: CommandGroup = {
   name: 'publish',
   description: '发布：对象存储资产、逐字稿、远端同步、缓存失效',
-  commands: [publishDataSpec, publishTranscriptsSpec, publishSyncSpec, publishPurgeSpec],
+  commands: [publishDataSpec, publishTranscriptsSpec, publishSyncSpec, publishPushSpec, publishPurgeSpec],
 }

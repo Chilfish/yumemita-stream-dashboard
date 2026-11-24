@@ -14,6 +14,11 @@ import { join, resolve } from 'node:path'
 import { Option } from 'commander'
 import { type CommandSpec, CliError, UsageError, type Logger } from '@chilfish/devkit/cli'
 import { devkit } from '../../dev.config.ts'
+import {
+  findDatasetByLocalPack,
+  type LocalDatasetSource as DatasetSource,
+  readDatasets,
+} from '@scripts/lib/dataset-locate.ts'
 import { applyOnlineEnv, readOnlineTarget } from '@scripts/lib/online-env.ts'
 import { parseVideoRef } from '@scripts/lib/video-ref.ts'
 import { DEFAULT_COOKIE_BROWSER, resolveCookies, ytdlpCookieArgs } from '@scripts/lib/yt-cookies.ts'
@@ -24,15 +29,6 @@ import { runPurge } from '../publish/purge.ts'
 import { runFetch } from './fetch.ts'
 
 const APP_ROOT = resolve(import.meta.dir, '../../..')
-const DATASOURCES_PATH = join(APP_ROOT, 'data-sources.json')
-
-interface DatasetSource {
-  id: string
-  label: string
-  channelId?: string
-  manifest: string
-  datapackDir: string
-}
 
 interface PackStats {
   chatTotal: number
@@ -40,11 +36,6 @@ interface PackStats {
   superchats: number
   comments: number
   hasVstats: boolean
-}
-
-function readDatasets(): DatasetSource[] {
-  const config = JSON.parse(readFileSync(DATASOURCES_PATH, 'utf8')) as { datasets?: DatasetSource[] }
-  return config.datasets ?? []
 }
 
 function runYtDlpJson(videoId: string, cookieArgs: string[]): Promise<{ channel_id?: string }> {
@@ -95,7 +86,7 @@ async function resolveDataset(
   videoId: string,
   options: ResolveOptions,
 ): Promise<DatasetSource> {
-  const datasets = readDatasets()
+  const datasets = readDatasets(APP_ROOT)
   if (datasets.length === 0)
     throw new CliError('data-sources.json 里没有 datasets', { hint: '补上成员配置后再试' })
 
@@ -109,8 +100,7 @@ async function resolveDataset(
     return explicit
   }
 
-  const local = datasets.find(item =>
-    existsSync(join(APP_ROOT, item.datapackDir, `${videoId}.datapack.json`)))
+  const local = findDatasetByLocalPack(datasets, APP_ROOT, videoId)
   if (local)
     return local
 

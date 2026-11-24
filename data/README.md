@@ -55,6 +55,9 @@ bun scripts/oneoff/add-datapack.mjs nonoka /path/to/<videoId>.datapack.json
 bun run ymmt db ingest
 bun run ymmt db verify
 
+# 单场已经在暂存区、只推这一场到线上（不重抓素材）
+bun run ymmt publish push <videoId>
+
 # 上传封面 / 表情 / archive（增量）
 bun run ymmt publish data --assets-only
 bun run ymmt publish purge --dataset <id>

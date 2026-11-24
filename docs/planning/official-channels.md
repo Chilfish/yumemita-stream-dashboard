@@ -211,7 +211,7 @@ bun run ymmt data official <链接> --participants arale --dataset limista --no-
 3. 确定归属：默认 `other`；`--dataset` 可指向任意 `kind=official` 的账号，指向成员频道会被拒绝。
 4. 把 `videoId → participants` 写进 `content/collaborations.json`（已存在则覆盖，条目按 videoId 排序）。
 5. `data fetch --ids` → 本地 ingest → 线上 ingest → verify → publish → purge。
-6. `--no-online` 只改本地；`--dry-run` 只打印计划。
+6. `--no-online` 只改本地；`--dry-run` 只打印计划。之后补推单场用 `publish push <链接或 ID>`。
 
 `participants` 是必填项：标题推断对官方场次无效（实测团体号 71 场命中 1 场，母频道 0 场）。命令写进 `content/collaborations.json` 的登记优先于账号的 `participants` 规则，所以单人特番可以覆盖 `all`。
 

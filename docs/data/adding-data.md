@@ -66,6 +66,20 @@ bun run ymmt data refetch 1dGnP_rXgW0 --no-online   # 只改本地 pack / 本地
 
 ## 本地已最新，同步到线上
 
+### 只推一场
+
+pack 已经在 `data/<id>/`、只是线上没有（或要按 hash 覆盖）时，用单场命令，不重抓素材：
+
+```bash
+bun run ymmt publish push Jih2ArVViRo               # 归属按 pack 所在目录反查
+bun run ymmt publish push Jih2ArVViRo --dry-run     # 先看线上是新增还是覆盖
+bun run ymmt publish push Jih2ArVViRo --dataset other
+```
+
+顺序：线上 ingest → 刷新公开汇总 → 定向 verify → publish data → purge。适合 `data official --no-online` / `data refetch --no-online` 之后补推。需要重新抓素材时用 `data refetch`，不要用这条。
+
+### 批量补推
+
 本地 pack、封面、逐字稿都齐了以后，用一条命令按线上目标跑完整链路。**默认只同步新增场次**：
 
 ```bash

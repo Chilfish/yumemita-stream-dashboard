@@ -30,6 +30,28 @@ bun run ymmt data refetch <链接> --dataset nonoka --dry-run
 - 默认写线上（`.dev.vars.prod` 的 `DATABASE_URL` 与 `R2_*`）；`--no-online` 只写本地并重算本地 manifest / insights。
 - 定向 verify 有差异时继续发布，命令以退出码 1 结束。
 
+## 把本地已有场次推到线上
+
+pack 已经在 `data/<dataset>/`、本地库也能正常看，只想让线上也有这一场：
+
+```bash
+bun run ymmt publish push Jih2ArVViRo                  # 按 pack 所在目录自动归属
+bun run ymmt publish push "https://www.youtube.com/watch?v=Jih2ArVViRo" --dry-run
+bun run ymmt publish push Jih2ArVViRo --dataset other  # 跳过推断
+```
+
+- 只处理指定的一场，不重抓素材；顺序：线上 ingest → 刷新公开汇总 → 定向 verify → publish data → purge。
+- 归属按 `data/<dataset>/<videoId>.datapack.json` 反查，多个 dataset 都有同名 pack 时取 `data-sources.json` 里的第一个；本地没有 pack 直接报错并提示先抓取。
+- 线上目标只认 `.dev.vars.prod`，执行期间强制 `LOCAL=0`；`--dry-run` 会先查线上是否已有这一场，说明是新增还是覆盖。
+- 需要重新抓素材（弹幕 / 评论 / VSTATS 更新）用 `data refetch`，不要用本命令。
+
+批量补推（例如一次放了多场）走 `publish sync`。默认只看最近 7 天开播的 pack，老场次补推要显式放开窗口：
+
+```bash
+bun run ymmt publish sync --dataset other --recent-days 0 --dry-run
+bun run ymmt publish sync --dataset other --recent-days 0
+```
+
 ## 手动添加官方账号的场次
 
 `bangdream` 母频道与第三方官方账号的场次都走这条命令：母频道的出演信息只在简介，第三方账号偶尔才办本团出演的直播（商店直播、企划方节目、签名会）。参与者无法从标题可靠推断，必须显式指定：
@@ -43,7 +65,7 @@ bun run ymmt data official "https://www.youtube.com/live/V2AJBNJGR8E" --particip
 - `--participants` 必填：`all` 展开为全部成员，或用逗号分隔的成员 id（可重复传入）。未知 id 直接报错。
 - 默认落到聚合账号 `other`；`--dataset` 可指向任意官方账号（例如 `bangdream`），指向成员频道会被拒绝。`bangdream` 与 `other` 都是 `sync=manual`。
 - 参与者写进 `content/collaborations.json`，由 ingest 落到 `streams.participants`。
-- 顺序：元信息 → 登记 → `data fetch --ids` → 本地 ingest → 线上 ingest → verify → publish → purge。`--no-online` 只改本地。
+- 顺序：元信息 → 登记 → `data fetch --ids` → 本地 ingest → 线上 ingest → verify → publish → purge。`--no-online` 只改本地，之后再补推单场用 [`publish push`](#把本地已有场次推到线上)。
 - 场次还没结束（`is_upcoming` / `is_live`）会直接拒绝；未来场走 `/admin/schedule`。
 
 `data update` 不会碰 `sync=manual` 的账号（`bangdream`、`other`）。详见 [official-channels.md](../planning/official-channels.md)。
@@ -74,6 +96,7 @@ bun run ymmt data official "https://www.youtube.com/live/V2AJBNJGR8E" --particip
 | `publish data` | 生成索引 / insights 并上传资产 |
 | `publish transcripts` | 校验并增量上传逐字稿 |
 | `publish sync` | 本地 → 线上库与对象存储同步 |
+| `publish push` | 把本地已有的一场推到线上（不重抓素材） |
 | `publish purge` | 按 cache tag 失效 Workers Cache |
 | `transcript new` | 按模板新建逐字稿 |
 | `transcript import` | 导入写好的 Markdown |

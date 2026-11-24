@@ -177,7 +177,7 @@ bun run ymmt db ingest --dataset nonoka
 - 文件只补运行环境里没有的键，所以 `DATABASE_URL=… bun run ymmt db verify` 这种显式覆盖照样生效。
 - 线上模式但 `DATABASE_URL` 仍指向本机时，加载器会清掉它并提示——正是为了拦住
   「对象传到 R2、元数据写进本地库」这种混合状态。
-- `publish sync` / `data refetch` / `data official` 的线上写入读 `.dev.vars.prod`，
+- `publish sync` / `publish push` / `data refetch` / `data official` 的线上写入读 `.dev.vars.prod`，
   执行期间强制 `LOCAL=0` 并清掉本机端点（`scripts/lib/online-env.ts`）。
 - **注意 `loadEnvFile` 只补缺失的键**：CLI 启动时已按本地模式加载过，同一进程内再
   `LOCAL=0` 重载不会覆盖已经写进去的本机 `DATABASE_URL` / `PUBLIC_R2_BASE`。
