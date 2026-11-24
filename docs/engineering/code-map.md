@@ -14,6 +14,7 @@
 | 数据库 / ingest | `src/db/schema.ts`、`scripts/ingest-db.ts`、`scripts/verify-db.ts` | `bun run ymmt db ingest` / `db:verify` |
 | 数据库读路径 / 压测 | `src/db/batch.ts`、`src/db/queries/*`、`scripts/bench-db.ts` | 先跑 `bun run ymmt db bench`；方案见 [db-optimization.md](../archive/db-optimization.md) |
 | 聚合 / 纯函数 | `src/lib/aggregate.ts`、`format.ts`、`classify.ts` | 配对应 `.test.ts` |
+| 评论文本富文本 | `src/lib/comment-text.ts` | 裸时间码 → YouTube 深链；简介不走这里 |
 | URL 状态 | `src/lib/table-params.ts`、`src/lib/routes.ts`、`src/lib/router-compat.ts` | 可分享、可刷新 |
 | SEO | `src/lib/seo.ts`、`src/components/shared/SEO.astro`、`src/pages/sitemap.xml.ts` | 请求期输出 head / sitemap |
 | Agent 视图 | `src/lib/agent-markdown.ts`、`src/pages/[datasetId]/stream/[videoId].md.ts` | `text/markdown` + 逐字稿 |

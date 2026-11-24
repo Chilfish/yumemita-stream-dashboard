@@ -1,5 +1,6 @@
 import type { StreamDatapack } from '@/types/datapack'
 import type { StreamSummary } from '@/types/dataset'
+import { linkifyCommentText } from '@/lib/comment-text'
 import { absoluteUrl, thumbnailUrl } from '@/lib/media'
 import { SITE_NAME } from '@/lib/seo'
 
@@ -169,7 +170,8 @@ export function renderStreamMarkdown(input: AgentMarkdownInput): string {
   if (commentItems.length > 0) {
     lines.push('## 评论', '', '| 赞 | 作者 | 内容 |', '| ---: | --- | --- |')
     for (const item of commentItems) {
-      lines.push(`| ${num(item.likes)} | ${cell(item.author)} | ${cell(item.text)} |`)
+      const text = linkifyCommentText(item.text, summary.videoId)
+      lines.push(`| ${num(item.likes)} | ${cell(item.author)} | ${cell(text)} |`)
     }
     lines.push('')
   }

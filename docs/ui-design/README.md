@@ -134,7 +134,10 @@
 - 焦点环 2px `accent`，`outline-offset: 2px`；不允许 `outline: none` 无替代。
 - 图标按钮必须有 `aria-label` 或显式文本。
 - 表格行使用链接语义，支持 Tab + Enter，而不是 `tr onClick`。
+- 视频内时间是可点的深链：逐字稿行首时间码、弹幕 / SC 时刻、评论里的时间码都跳到原视频对应位置（`&t=<秒>`）。评论由 `src/lib/comment-text.ts` 切片段，简介里的时间码保持原文本。
 - 空态说清：这里是什么、为什么空、下一步怎么做。
+- 空态只有一个组件入口：图表与面板区块用 `DataEmpty`（`src/components/dashboard/primitives/data-empty.tsx`，两行 + 固定高度防 CLS），页面级空态用 `ui/empty.tsx` 的 `Empty`（图标 + 标题 + 描述 + 动作）。不自造 `<p className="py-10 text-center">`。
+- 数据为空时需要归因（平台没有 / 我们没抓到 / 投稿本来就没有）就用 `src/lib/data-availability.ts`，不要把三种原因写成同一句「暂无数据」。
 - 加载使用骨架屏，保留布局高度，避免 CLS。
 - 200% 缩放不横向溢出。
 
