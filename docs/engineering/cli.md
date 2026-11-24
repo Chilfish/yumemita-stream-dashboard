@@ -75,7 +75,7 @@ bun run ymmt data official "https://www.youtube.com/live/V2AJBNJGR8E" --particip
 
 | 命令 | 作用 |
 | --- | --- |
-| `data update` | 每日增量：频道差集 → 定点抓取 → 补 VSTATS / 封面 → ingest → 联动参与者对账 → 发布 → purge |
+| `data update` | 每日增量：频道差集 → 定点抓取 → 补 VSTATS / 封面 → ingest → 联动参与者对账 → 发布 → purge；成员之间并发（`--dataset-concurrency`），写库与发布串行 |
 | `data fetch` | 按频道补齐历史场次，每 N 场生成 datapack |
 | `data refetch` | 单场重抓并覆盖：给链接或 ID，重抓素材并同步本地库、线上库与索引 |
 | `data official` | 手动添加第三方官方账号里的本团联动场次（参与者必填） |

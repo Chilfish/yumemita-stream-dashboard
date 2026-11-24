@@ -58,11 +58,41 @@ log.info(`成功 ${result.succeeded} / 失败 ${result.failed}`)
 | `publish/transcripts.ts` | 4 | 逐字稿正文上传 |
 | `data/emoji.ts`、`data/thumbnails.ts` | 4 | 镜像图片 |
 | `data/fetch.ts` | `--meta-concurrency` / `--concurrency` | 元信息与媒体 |
+| `data/update.ts` | `--dataset-concurrency` | 成员之间并发；每个成员分到的并发 = `--concurrency / --dataset-concurrency` |
 | `data/vstats.ts` | `--concurrency` | 单场页请求，任务内 sleep 300ms |
 | `data/danmaku.ts` | `--concurrency` | 回放采集 |
 | `validate/data.ts` | 8 | `--remote` 的 HEAD 探测 |
 | `lib/restore-datapacks.ts` | 8 | 从对象存储恢复本地 pack |
 | `oneoff/backfill-owner-chats.ts`、`oneoff/backfill-author-id.ts` | 参数 | 一次性回填 |
+
+## `data update` 的两阶段编排
+
+成员之间并发，但不是整条链路并发：
+
+1. **抓取阶段（并发）**：频道差集 → `fetch` → VSTATS → 封面。各成员互不依赖。
+   - 每个成员按 `--concurrency / --dataset-concurrency` 均摊并发，总请求量不随成员数放大。
+   - 状态文件按 dataset 分名（`fetch-<id>.log` / `fetch-<id>-progress.json` /
+     `channel-ids-<id>.txt`），不会互相覆盖。
+   - cookie 只导出一次，整轮复用（`cookieMaxAgeMs`）。
+2. **写库与发布（串行）**：ingest → publish → 逐字稿 → purge。这几步共享
+   `data/.publish-state*.json` 与远端桶列举，并发会互相踩；桶只列一次，各成员复用
+   `remoteSizes`。
+
+阶段之间用 `MemberWork` 交接：第一阶段只决定「这一位要动哪些 id」，第二阶段按顺序执行。
+
+## 重复抓取的三个来源
+
+`data update` 的可重入性取决于三件事，改动时别破坏：
+
+- **差集基线是数据库**：`planDataset` 的 `knownIds` 来自 `DATABASE_URL` 指向的库。本地跑完
+  只写了本地库，线上库没有这些行，第二次（尤其是 CI）仍会判成新场次。本地 → 线上走
+  `publish sync`，不要重跑 `data update`。
+- **素材判定看 `--root`**：`fetch` 用 `<root>/<日期>_<label>_<videoId>/` 下的
+  `meta/info.json`、`danmaku_*.jsonl`、`comments_*.json` 决定跳过。换机器 / 换 root 就没有
+  这些文件，整套重下。
+- **哨兵有 TTL**：`vstats-unavailable.txt` / `chat-unavailable.txt` 30 天过期
+  （`SENTINEL_TTL_DAYS`）。VSTATS 补抓会读写同一份哨兵，已判「未收录」的场次不再占用每轮配额；
+  日常「缺弹幕」重抓走 `noReset`，不会清掉评论 / VSTATS / 哨兵，只有显式 `--force` 才清空重下。
 
 ## 验证
 

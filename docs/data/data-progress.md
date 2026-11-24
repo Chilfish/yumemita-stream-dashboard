@@ -102,11 +102,19 @@ yt-dlp --flat-playlist --print "%(id)s" `
 不重抓素材、也不受 14 天窗口限制。之后固定顺序 ingest → 资产 → purge。没有变化时不会恢复 datapack，
 也不会重新上传。
 
+成员之间并发抓取（`--dataset-concurrency`，默认 3），每个成员的 yt-dlp 并发按 `--concurrency` 均摊；
+ingest 与发布仍串行，并共享一次远端桶列举。编排细节见 [concurrency.md](../engineering/concurrency.md)。
+
 ```powershell
 bun run ymmt data update                 # 增量（本地用 Firefox cookie）
 bun run ymmt data update --force         # 额外重抓最近 24 小时
 bun run ymmt data update --dry-run       # 只列候选
+bun run ymmt data update --dataset-concurrency 2 --concurrency 4   # 少成员并发、每人多给点
 ```
+
+本地跑完只想让线上也有，用 `bun run ymmt publish sync`（见 [adding-data.md](./adding-data.md)），
+不要重跑 `data update`：差集基线是 `DATABASE_URL` 指向的库，本地库里有的场次线上还没有，
+重跑仍会被判成新场次。
 
 数据更新工作流在 `.github/workflows/data.yml`，只支持手动 `workflow_dispatch`（每日 cron 已于 2026-11-09 取消）；配置与 cookie 导出见
 [deployment.md](../engineering/deployment.md) 的「每日数据流程」。
@@ -119,9 +127,9 @@ bun run ymmt data fetch --dataset <id> `
   --root "D:/projects/claude-messages/temp/youtube-live" `
   --concurrency 3
 
-# 进度与日志
-Get-Content -Wait "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch.log"
-Get-Content "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch-progress.json"
+# 进度与日志（按 dataset 分名，`data update` 会并发跑多个成员）
+Get-Content -Wait "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch-nonoka.log"
+Get-Content "D:/projects/claude-messages/temp/youtube-live/.fetch-state/fetch-nonoka-progress.json"
 
 # 单场返工：清掉该场本地素材重抓，datapack 更新后自动增量发布
 bun run ymmt data fetch --dataset <id> --force <videoId>

@@ -30,6 +30,7 @@
 | B49 | 类名体积：把表格 / 列表里重复的长 cva 类串收成语义类（`/arale/streams` 一条 352 字符的 `td` 类名重复 400 次 = 140 KB raw）；类名重命名只在 CSS 侧有确定性收益，先用 `npx minwind measure` 出只读预估再决定 | P2 | 无 | 2026-11-15 类名调研 | 📋 实测与方案对比见 [ssr-html-classname-weight.md](../research/ssr-html-classname-weight.md) |
 | B50 | 成员串门发言：单场 `chat.memberChats` + `?view=words` 独立区块；历史 143 场回填 | P2 | 无 | 2026-11-18 需求 | 🚧 本地与线上数据回填完成、对账 0 问题；等待部署上线。方案见 [member-chats.md](member-chats.md) |
 | B51 | 官方账号场次：官方场次独立归属、不并入成员个人场次；`data update` 只同步配置账号，其他官方场次手动添加 | P1 | 无 | 2026-11-21 需求 | 🚧 POC 通过（查询 / 日历 / 相册 / 页面 / 门禁）。2026-11-23 `bangdream` 改为 `manual`，不回补、不自动抓取，`filtered` 暂不实现；待办：官方 dataset 的 insights 并入 ingest。方案见 [official-channels.md](official-channels.md) |
+| B52 | `data update` 成员并发已完成，但真实并发下载路径未验证（当天全部安静日）；下次有新场次时确认并发上限与限流表现 | P2 | 需有新场次的日子 | 2026-11-24 并发改造 | 📋 代码见 [concurrency.md](../engineering/concurrency.md) 的两阶段编排 |
 
 > 2026-11-08 隐式状态机审查的 Z / R / E / U 问题已全部关闭，记录见 [review-2026-11-08-implicit-state-machines.md](../reviews/review-2026-11-08-implicit-state-machines.md) 与 [archive/state-machine-remediation.md](../archive/state-machine-remediation.md)。
 
