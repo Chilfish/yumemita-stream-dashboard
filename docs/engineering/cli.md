@@ -6,6 +6,7 @@
 - 参数解析、`--help`、日志、退出码、JSON 信封由 `@chilfish/devkit/cli` 统一提供。
 - 命令实现在 `scripts/commands/<group>/<command>.ts`，每个文件导出一个 `CommandSpec`。
 - 一次性补丁脚本在 `scripts/oneoff/`，不注册子命令、不进 `package.json`。
+- 补数据 / 同步线上该走哪条命令，见 [data-maintenance skill](../../.agents/skills/data-maintenance/SKILL.md)。
 
 ## 常用
 

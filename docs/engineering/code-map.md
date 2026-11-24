@@ -11,8 +11,8 @@
 | 新增图表 | `src/components/charts/` | D3 算数学，React 渲染 SVG |
 | 新增 coss 组件 | `src/components/ui/` | 用 shadcn CLI + `@coss` registry，不手写业务 |
 | 数据加载 | `src/db/queries/*`、`src/types/db.ts` | 页面先查库，再传给岛屿 |
-| 数据库 / ingest | `src/db/schema.ts`、`scripts/ingest-db.ts`、`scripts/verify-db.ts` | `bun run ymmt db ingest` / `db:verify` |
-| 数据库读路径 / 压测 | `src/db/batch.ts`、`src/db/queries/*`、`scripts/bench-db.ts` | 先跑 `bun run ymmt db bench`；方案见 [db-optimization.md](../archive/db-optimization.md) |
+| 数据库 / ingest | `src/db/schema.ts`、`scripts/commands/db/ingest.ts`、`scripts/commands/db/verify.ts` | `bun run ymmt db ingest` / `db verify` |
+| 数据库读路径 / 压测 | `src/db/batch.ts`、`src/db/queries/*`、`scripts/commands/db/bench.ts` | 先跑 `bun run ymmt db bench`；方案见 [db-optimization.md](../archive/db-optimization.md) |
 | 聚合 / 纯函数 | `src/lib/aggregate.ts`、`format.ts`、`classify.ts` | 配对应 `.test.ts` |
 | 评论文本富文本 | `src/lib/comment-text.ts` | 裸时间码 → YouTube 深链；简介不走这里 |
 | URL 状态 | `src/lib/table-params.ts`、`src/lib/routes.ts`、`src/lib/router-compat.ts` | 可分享、可刷新 |
@@ -20,9 +20,9 @@
 | Agent 视图 | `src/lib/agent-markdown.ts`、`src/pages/[datasetId]/stream/[videoId].md.ts` | `text/markdown` + 逐字稿 |
 | Agent 场次搜索 | `src/lib/stream-search.ts`、`src/pages/api/streams.ts`、`src/db/queries/streams.ts` | 参数解析与 SQL 筛选分离；分类规则复用 `classify.ts` |
 | llms.txt / 对外 schema | `src/lib/agent-llms.ts`、`src/pages/llms.txt.ts`、`src/lib/json-schema.ts`、`src/pages/schemas/[name].json.ts` | 按 llmstxt.org v2 生成；JSON Schema 与类型强校验 |
-| 数据发布 | `scripts/publish-data.ts`、`scripts/publish-transcripts.ts` | `--assets-only`：thumbs / emoji / archive；逐字稿单独发 |
-| 增量更新 | `scripts/daily-update.ts`、`.github/workflows/data.yml` | 频道差集，安静日不发布 |
-| 抓取 / 补数据 | `scripts/fetch-streams.ts`、`fetch-danmaku.ts`、`fetch-live-chat.ts`、`fetch-thumbnails.ts`、`fetch-emoji.ts`、`enrich-chat.ts` | 只写本地，不改前端 |
+| 数据发布 | `scripts/commands/publish/data.ts`、`scripts/commands/publish/transcripts.ts` | `--assets-only`：thumbs / emoji / archive；逐字稿单独发 |
+| 增量更新 | `scripts/commands/data/update.ts`、`.github/workflows/data.yml` | 频道差集，安静日不发布 |
+| 抓取 / 补数据 / 线上同步 | `scripts/commands/data/{fetch,official,refetch}.ts`、`scripts/commands/publish/{push,sync}.ts`、`scripts/lib/dataset-locate.ts` | 只写本地用 `--no-online`；工作流见 [data-maintenance skill](../../.agents/skills/data-maintenance/SKILL.md) |
 | 逐字稿 | `content/transcripts/`、`scripts/publish-transcripts.ts`、`src/components/dashboard/transcript/transcript-view.tsx`、`transcript-appendix.tsx`、`src/lib/preferences.ts` | 手写 Markdown，发布到 R2；附录默认折叠，展开后中日对照按语言挂载、默认中文，偏好存本地 |
 | 逐字稿索引 / 长列表 | `src/lib/transcript-params.ts`、`src/components/dashboard/transcript/transcripts-view.tsx`、`src/components/dashboard/transcript/transcripts-toolbar.tsx`、`docs/archive/transcript-index.md` | 搜索、标签分面、月份折叠；筛选写 URL |
 | 那年今日 / 同一天回看 | `src/lib/gallery-params.ts`、`src/db/queries/group.ts`、`src/components/pages/group-gallery-page.tsx`、`src/components/dashboard/group/group-on-this-day.tsx` | `?day=MM-DD` 按年分组；首页预览只收今天之前；日期选择器写回 URL |

@@ -4,6 +4,8 @@
 
 页面消费的是 `stream-datapack` 生成的归一化 JSON。生产这些 JSON 的 pipeline（yt-dlp 元信息 / 弹幕 / 评论区 / VSTATS 快照）不在本仓库内。
 
+Agent 补数据时按 [data-maintenance skill](../../.agents/skills/data-maintenance/SKILL.md) 判断该用 `data official`、`data fetch`、`data refetch`、`publish push` 还是 `publish sync`。
+
 - **当前页面读 PostgreSQL**：`db:ingest` 把 `data/<datasetId>/*.datapack.json` 投影到 Neon，页面请求期查库。
 - **本地 pack 是唯一真源**：`data/<datasetId>/` 不进 git；manifest / insights 仍是本地派生物。
 - **R2 只保留对象**：封面、表情、逐字稿正文、原始 pack 归档。`publish:assets` 不再写 index / manifest / insights。
