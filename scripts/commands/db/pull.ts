@@ -7,7 +7,7 @@
  *   bun run ymmt db pull --keep-local          # 保留本机独有场次（默认删除）
  *   bun run ymmt db pull --dry-run             # 只打印计划，不写库
  *
- * 线上目标只从 `.dev.vars` 的 `DATABASE_URL_ONLINE` 读（`readOnlineTarget`）；
+ * 线上目标只从 `.dev.vars.prod` 的 `DATABASE_URL` 读（`readOnlineTarget`）；
  * 写入目标必须是本机库，`DATABASE_URL` 不是本机地址时直接拒绝，避免把线上行写回线上。
  *
  * 数据方向与 `publish sync` 相反：那边把本地 pack 推到线上，这里把线上行拉到本地，
@@ -20,7 +20,6 @@ import { resolve } from 'node:path'
 import { Option } from 'commander'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { type CommandSpec, CliError, type Logger, requireEnvVar, UsageError } from '@chilfish/devkit/cli'
-import { readOnlineTarget } from '@chilfish/devkit/env'
 import { createDb, createWriteDb, isLocalDatabaseUrl } from '@/db/connection.ts'
 import {
   authors,
@@ -36,6 +35,7 @@ import {
   transcripts,
 } from '@/db/schema.ts'
 import { planStreamPull, type StreamPullEntry } from '@scripts/lib/stream-sync.ts'
+import { readOnlineTarget } from '@scripts/lib/online-env.ts'
 import { devkit } from '../../dev.config.ts'
 
 /** 只取命令需要的日志通道；默认空操作，被其它脚本调用时不产生输出。 */
@@ -136,7 +136,7 @@ export async function runPull(options: PullOptions = {}): Promise<PullResult> {
   if (!isLocalDatabaseUrl(localUrl)) {
     throw new CliError('db pull 只写本机库，但 DATABASE_URL 不是本机地址', {
       code: 'NON_LOCAL_TARGET',
-      hint: '把 .dev.vars 的 DATABASE_URL 指回 localhost，或加 LOCAL=1；线上目标写在 DATABASE_URL_ONLINE',
+      hint: '把 .dev.vars 的 DATABASE_URL 指回 localhost，或加 LOCAL=1；线上目标写在 .dev.vars.prod',
       context: { host: new URL(localUrl).host },
     })
   }
@@ -149,7 +149,7 @@ export async function runPull(options: PullOptions = {}): Promise<PullResult> {
   try {
     const remoteDatasets = await remote.select().from(datasets).orderBy(datasets.id)
     if (remoteDatasets.length === 0) {
-      throw new CliError('线上 datasets 为空', { hint: '确认 DATABASE_URL_ONLINE 指向正确的库' })
+      throw new CliError('线上 datasets 为空', { hint: '确认 .dev.vars.prod 的 DATABASE_URL 指向正确的库' })
     }
 
     const wanted = toList(options.dataset) ?? []
@@ -485,7 +485,7 @@ async function pullMissingAuthors(
 export const dbPullSpec: CommandSpec = {
   id: 'db.pull',
   description: '从线上库增量同步到本机库（日程表整体覆盖）',
-  details: '线上来源只读 `.dev.vars` 的 DATABASE_URL_ONLINE，写入目标必须是本机库。\n'
+  details: '线上来源只读 `.dev.vars.prod` 的 DATABASE_URL，写入目标必须是本机库。\n'
     + '按 content_hash 增量：补本机缺失 + 内容不同的场次，其余跳过整场明细的传输。\n'
     + '本机独有场次默认删除（--keep-local 保留）；scheduled_streams 每次整体覆盖，本地改动不保留。\n'
     + 'ingest 逻辑变更后加 --full 重写选中成员的全部场次——hash 相同不代表旧代码灌的明细一致。\n'
