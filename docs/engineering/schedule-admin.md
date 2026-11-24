@@ -77,7 +77,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" https://ymmt.chilfish.top/api/admin/schedu
 | --- | --- | --- |
 | `from` | 今天 − 7 天 | JST 日期，闭区间 |
 | `to` | 今天 + 60 天 | JST 日期，闭区间 |
-| `datasetId` | 全部成员 | 只看某个成员 |
+| `datasetId` | 全部 | 只看某个成员或官方账号 |
 | `includeCancelled` | `true` | 传 `false` 时过滤已取消 |
 | `includeUndated` | `false` | 传 `true` 时额外返回没有日期也没有时间的旧行 |
 
@@ -138,7 +138,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `datasetId` | 是 | 成员 id |
+| `datasetId` | 是 | 成员 id 或官方账号 id（`yumemita` / `bangdream` / `other`）；目标库必须有该 dataset |
 | `title` | 否 | ≤200 字；预告里没有标题时可以省略，日历显示「待定」 |
 | `date` | 条件 | 只给日期时还需 `slot` |
 | `slot` | 条件 | 没有 `scheduledAt` 时需要 |
@@ -146,7 +146,7 @@ curl -u "$ADMIN_USER:$ADMIN_PASSWORD" \
 | `kind` | 否 | `sing` / `event` / `talk` / `game`；省略时按标题推断，标题也为空则留空 |
 | `expectedMinutes` | 否 | 15–720 |
 | `availability` | 否 | `public`（默认）/ `subscriber_only` |
-| `participants` | 否 | owner 之外的参与成员 id 数组；最多 4 个，自动去重并排除 owner |
+| `participants` | 否 | 成员频道：owner 之外的参与成员 id；官方账号：在场的成员 id。自动去重并排除 owner |
 | `cancelled` | 否 | 默认 `false` |
 | `source` | 否 | 只允许 `manual`（默认）；管理端不会创建自动同步行 |
 | `note` | 否 | ≤500 字 |
