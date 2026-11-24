@@ -12,12 +12,13 @@
  * 改完 pack 后同步 upsert manifest；入库与上传由 daily-update 或手动
  * `db ingest --ids` / `publish data --assets-only --ids` 完成。
  */
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import { Option } from 'commander'
 import { type Logger, type CommandSpec, CliError, UsageError } from '@chilfish/devkit/cli'
 import { runPool } from '@scripts/lib/pool.ts'
 import { upsertManifestStream } from '@scripts/lib/dataset-manifest.ts'
+import { sentinelIsFresh } from '@scripts/lib/sentinel.ts'
 import { deriveVstats, parseVstats, VSTATS_MIN_HTML_BYTES } from '@scripts/lib/vstats.ts'
 import type { StreamDatapack } from '@/types/datapack.ts'
 
@@ -69,6 +70,8 @@ export interface RunVstatsOptions {
   concurrency?: number
   /** 把补到的 videoId 写到文件（每行一个）。 */
   idsOut?: string
+  /** 原始会话根目录；给了之后读 / 写「VSTATS 未收录」哨兵，已判死的场次不再重探。 */
+  root?: string
   /** 只打印汇总与更新名单（对应旧脚本的 `--quiet`；CLI 上是 `--summary-only`）。 */
   quiet?: boolean
   /** 只列候选，不发请求、不写文件。 */
@@ -131,6 +134,26 @@ function manifestCandidates(source: DatasetSource): Candidate[] {
 
 function explicitCandidates(source: DatasetSource, ids: string[]): Candidate[] {
   return ids.map(videoId => ({ source, videoId }))
+}
+
+/**
+ * `videoId → 会话目录`，按 `<root>/<JST 日期>_<成员>_<videoId>` 的目录名还原。
+ *
+ * 用来和 `fetch.ts` 共用 `work/vstats-unavailable.txt` 哨兵：读到它在，就说明
+ * 这场已经在抓取阶段判过「未收录」，本轮不用再请求单场页。
+ */
+function sessionDirs(root: string | undefined): Map<string, string> {
+  const dirs = new Map<string, string>()
+  if (!root || !existsSync(root))
+    return dirs
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory())
+      continue
+    const match = /_([A-Za-z0-9_-]{11})$/.exec(entry.name)
+    if (match)
+      dirs.set(match[1] as string, join(root, entry.name))
+  }
+  return dirs
 }
 
 async function probe(videoId: string): Promise<Probe> {
@@ -232,8 +255,15 @@ export async function runVstats(options: RunVstatsOptions = {}): Promise<{ exitC
     candidates.push(...list)
   }
 
-  const picked = limit > 0 ? shuffle(candidates).slice(0, limit) : shuffle(candidates)
-  log.info(`候选 ${candidates.length} · 本轮 ${picked.length}（并发 ${concurrency}）`)
+  // 已判「未收录」的场次直接剔出候选，别让它们占掉本轮配额。
+  const sessions = sessionDirs(options.root)
+  const settled = new Set(
+    [...sessions].filter(([id, dir]) => sentinelIsFresh(join(dir, 'work', 'vstats-unavailable.txt'))).map(([id]) => id),
+  )
+  const openCandidates = candidates.filter(candidate => !settled.has(candidate.videoId))
+
+  const picked = limit > 0 ? shuffle(openCandidates).slice(0, limit) : shuffle(openCandidates)
+  log.info(`候选 ${openCandidates.length}（已判未收录 ${candidates.length - openCandidates.length}）· 本轮 ${picked.length}（并发 ${concurrency}）`)
 
   if (dryRun) {
     for (const candidate of picked)
@@ -267,7 +297,6 @@ export async function runVstats(options: RunVstatsOptions = {}): Promise<{ exitC
         log.info(`${label} 本地 pack 不存在或已有 VSTATS，跳过`)
       return
     }
-
     const result = await probe(candidate.videoId)
     done += 1
     if (result.kind === 'ok') {
@@ -278,6 +307,15 @@ export async function runVstats(options: RunVstatsOptions = {}): Promise<{ exitC
     }
     else if (result.kind === 'missing') {
       missing.push(label)
+      // 记下终态，下一轮直接跳过；哨兵有 TTL，过期后还会再试。
+      // 写回该场自己的会话目录，和 fetch.ts 的哨兵同一个文件。
+      const sessionDir = sessions.get(candidate.videoId)
+      if (sessionDir) {
+        const sentinel = join(sessionDir, 'work', 'vstats-unavailable.txt')
+        mkdirSync(dirname(sentinel), { recursive: true })
+        writeFileSync(sentinel, 'empty (vstats)\n', 'utf8')
+        settled.add(candidate.videoId)
+      }
       if (!quiet)
         log.info(`${label} 未收录（${result.detail}）`)
     }
@@ -349,6 +387,7 @@ export const dataVstatsSpec: CommandSpec<VstatsRunResult> = {
     new Option('--limit <n>', `本轮最多请求 n 场（全部 dataset 合计），默认 ${DEFAULT_LIMIT}；0 = 全部`).default(DEFAULT_LIMIT),
     new Option('--concurrency <n>', `并发，默认 ${DEFAULT_CONCURRENCY}`).default(DEFAULT_CONCURRENCY),
     new Option('--ids-out <文件>', '把补到的 videoId 写到文件（每行一个）'),
+    new Option('--root <目录>', '原始会话目录；给了之后复用「VSTATS 未收录」哨兵，已判死的场次不重探'),
     new Option('--summary-only', '只打印汇总与更新名单（旧的 --quiet；全局 --quiet 会连汇总一起静音）'),
   ],
   async run(ctx) {
@@ -358,6 +397,7 @@ export const dataVstatsSpec: CommandSpec<VstatsRunResult> = {
       limit: ctx.integer('limit', DEFAULT_LIMIT, 0),
       concurrency: ctx.integer('concurrency', DEFAULT_CONCURRENCY, 1),
       idsOut: optionalString(ctx.options.idsOut),
+      root: optionalString(ctx.options.root),
       quiet: ctx.flag('summaryOnly'),
       dryRun: ctx.dryRun,
       log: ctx.log,
