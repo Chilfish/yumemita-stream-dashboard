@@ -125,6 +125,11 @@ export interface PublishDataOptions {
   allowShrink?: boolean
   /** `--dry-run`：只读，不写本地文件 / 对象存储 / 发布进度。 */
   dryRun?: boolean
+  /**
+   * 已经列好的远端对象大小。同一次更新里连续发布多个 dataset 时复用一份，
+   * 避免每次都把整个桶列一遍。
+   */
+  remoteSizes?: ReadonlyMap<string, number> | null
   /** 进度日志；默认静默。 */
   log?: Logger
 }
@@ -549,8 +554,8 @@ export async function runPublishData(options: PublishDataOptions = {}): Promise<
       writePublishState(statePath, state)
   }
 
-  let remote: Map<string, number> | null = null
-  if (!force) {
+  let remote: ReadonlyMap<string, number> | null = options.remoteSizes ?? null
+  if (!force && remote === null) {
     try {
       remote = await store.list()
     }

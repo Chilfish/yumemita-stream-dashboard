@@ -9,7 +9,8 @@
  *   - 可重入：已存在的 meta / danmaku jsonl / comments 不重抓，按 videoId 跳过已入库场次
  *   - 并发：元信息与媒体分别限流，默认 6 / 3
  *   - 增量落库：每 N 场调用一次 stream-datapack.ts，manifest 始终是当前进度
- *   - 可观测：进度写 `<state-dir>/fetch-progress.json`，日志追加 `<state-dir>/fetch.log`
+ *   - 可观测：进度写 `<state-dir>/fetch-<dataset>-progress.json`，日志追加 `<state-dir>/fetch-<dataset>.log`
+ *     （按 dataset 分名：`data update` 会并发跑多个成员）
  *   - 去重：同名场次保留时长正常的一条（短摘要/预告让位正片）
  *   - 强制重抓：`--force <id>` 只跑点名的场次，清掉本地素材后重抓并覆盖结果，默认顺手发布
  */
@@ -240,6 +241,10 @@ export interface FetchOptions {
   noRestore?: boolean
   ids?: string
   force?: string[]
+  /** `--force` 时保留已有素材与「不可用」哨兵，只补缺的部分。 */
+  noReset?: boolean
+  /** cookie 缓存的最长复用时间；并发成员共用一个 jar 时传正值，避免互相覆盖。 */
+  cookieMaxAgeMs?: number
   publish?: boolean
   noPublish?: boolean
   /** 运行期日志；CLI 传 ctx.log，测试可省略。 */
@@ -282,6 +287,8 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
     'no-restore': options.noRestore,
     ids: options.ids,
     force: options.force,
+    'no-reset': options.noReset,
+    'cookie-max-age-ms': options.cookieMaxAgeMs,
     publish: options.publish,
     'no-publish': options.noPublish,
   }
@@ -375,6 +382,7 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
     envCookie: process.env.YT_COOKIE,
     browser: cookiesFromBrowser,
     cachePath: typeof values['cookie-cache'] === 'string' ? values['cookie-cache'] as string : undefined,
+    maxAgeMs: typeof values['cookie-max-age-ms'] === 'number' ? values['cookie-max-age-ms'] as number : 0,
     disable: values['no-cookies'] === true,
     appRoot: APP_ROOT,
     log: line => report('info', `[fetch] ${line}`),
@@ -777,8 +785,9 @@ export async function runFetch(options: FetchOptions = {}): Promise<FetchResult>
     const chunkSize = buildEvery > 0 ? buildEvery : kept.length || 1
     const resetDone = new Set<string>()
     // --force：先清掉旧的素材，让下面的「已存在就跳过」逻辑失效，结果被完整覆盖。
+    // `no-reset`（日常「缺弹幕」重试）跳过这一步：只补缺失项，已有评论 / VSTATS / 哨兵保留。
     const resetSession = (candidate: Candidate): void => {
-      if (!candidate.forced || !candidate.session || resetDone.has(candidate.id))
+      if (values['no-reset'] === true || !candidate.forced || !candidate.session || resetDone.has(candidate.id))
         return
       resetDone.add(candidate.id)
       const session = candidate.session
@@ -960,6 +969,7 @@ export const dataFetchSpec: CommandSpec = {
     new Option('--limit <n>', '本次最多处理 n 场，0 = 全部'),
     new Option('--ids <文件>', '直接读视频 ID 列表（每行一个），跳过频道列表抓取'),
     new Option('--force <ids>', '定点重抓这些场次（逗号分隔，可重复）；all = 全频道候选重抓'),
+    new Option('--no-reset', '配 --force 时保留已有素材与「不可用」哨兵，只补缺失项'),
     new Option('--cookies <文件>', 'Netscape cookie jar；CI 用这个'),
     new Option('--cookies-from-browser <b>', '导出 cookie 的浏览器，默认 firefox'),
     new Option('--cookie-cache <文件>', 'cookie 缓存路径，默认 ~/yt-cookies.txt'),
@@ -992,6 +1002,7 @@ export const dataFetchSpec: CommandSpec = {
       noRestore: ctx.options.restore === false,
       ids: typeof ctx.options.ids === 'string' ? ctx.options.ids : undefined,
       force,
+      noReset: ctx.options.reset === false,
       publish: ctx.flag('publish'),
       noPublish: ctx.options.publish === false,
       log: ctx.log,
