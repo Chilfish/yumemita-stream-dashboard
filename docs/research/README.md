@@ -12,6 +12,7 @@
 | [long-document-rendering-practices.md](./long-document-rendering-practices.md) | 业界如何处理超长文档 / 列表：SSR、content-visibility、虚拟化、渐进渲染、Canvas 与内容折叠的取舍 | 2026-11-09 |
 | [seo-audit-2026-11-15.md](./seo-audit-2026-11-15.md) | 用 claude-seo 对线上站点做的一次完整 SEO 审计：工具评估、发现分级与修复顺序 | 2026-11-15 |
 | [ssr-html-classname-weight.md](./ssr-html-classname-weight.md) | SSR HTML 里 Tailwind 类名到底占多少：四个页面的实测、压缩后的边际成本、业内六类做法与本站模拟收益 | 2026-11-15 |
+| [danmaku-viewer-design.md](./danmaku-viewer-design.md) | 弹幕查看器调研：现有 InnerTube 采集、记录格式、平台限制与量级；新项目的数据结构、存储选型（SQLite / Neon）、写入路径与四种展示形态 | 2026-11-24 |
 
 ## 约定
 

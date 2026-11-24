@@ -132,6 +132,7 @@ docs/
 | 改 UI / 组件 | [ui-design/README.md](./ui-design/README.md) + [GENERAL.md](./ui-design/GENERAL.md) | Token、排版、coss 原子组件；时间输入见 [time-input.md](./ui-design/time-input.md) |
 | 判断信息该不该上屏 | [information-density.md](./ui-design/information-density.md) | 一屏一个焦点、四个冗余信号、删除清单与组首页反例 |
 | 理解 AI 生成页面的通病 | [ai-generated-ui-density.md](./research/ai-generated-ui-density.md) | 外部观察、机制分析、组首页案例与规避方法 |
+| 新做弹幕查看器 / 迁移弹幕数据 | [danmaku-viewer-design.md](./research/danmaku-viewer-design.md) | 现有采集链路、记录格式、平台限制与新项目的数据结构、存储选型、展示形态 |
 | SEO 审计 / 线上站点体检 | [seo-audit-2026-11-15.md](./research/seo-audit-2026-11-15.md) | claude-seo 工具评估、发现分级、修复顺序 |
 | HTML 太大 / 类名太长 | [ssr-html-classname-weight.md](./research/ssr-html-classname-weight.md) | 类名与 props 各占多少；重命名、组件化、换引擎的收益对比 |
 | 安全自查 / 加固 | [security-review-2026-11-15.md](./research/security-review-2026-11-15.md) + [postmortem/006](./postmortem/006-public-r2-member-only-leak.md) | 鉴权与对象存储的匿名可达性、CSP、注入面 |
